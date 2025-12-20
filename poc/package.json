@@ -1,0 +1,27 @@
+{
+  "name": "zarf-poc",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "postinstall": "node scripts/copy-wasm.js"
+  },
+  "dependencies": {
+    "@aztec/bb.js": "2.1.9",
+    "@noir-lang/acvm_js": "1.0.0-beta.17",
+    "@noir-lang/noir_js": "1.0.0-beta.17",
+    "@noir-lang/noirc_abi": "1.0.0-beta.17",
+    "noir-jwt": "0.4.5"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^5.0.3",
+    "svelte": "^5.16.0",
+    "vite": "^6.0.6",
+    "vite-plugin-node-polyfills": "^0.24.0",
+    "vite-plugin-top-level-await": "^1.5.0",
+    "vite-plugin-wasm": "^3.4.1"
+  }
+}
