@@ -1,0 +1,6 @@
+[package]
+name = "zarf"
+type = "bin"
+authors = [""]
+
+[dependencies]
