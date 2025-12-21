@@ -124,9 +124,15 @@ export async function generateJwtProof(jwt, publicKey, expectedEmail, onProgress
 
     onProgress('Proof generated successfully!');
 
+    // Public outputs structure:
+    // 1. pubkey_modulus_limbs[0..17] (18 limbs), public input
+    // 2. email_hash (1 Field), return value (Pedersen hash of email)
+    const emailHash = proof.publicInputs[proof.publicInputs.length - 1];
+
     return {
       proof: proofHex,
       publicInputs: proof.publicInputs,
+      emailHash,
     };
   } catch (error) {
     console.error('Proof generation failed:', error);
