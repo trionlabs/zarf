@@ -161,14 +161,21 @@
       <!-- Proof Generated State -->
       <div class="card success">
         <h2>Proof Generated!</h2>
+        <p class="privacy-note">
+          Your email is now private. Only the hash commitment is public.
+        </p>
         <div class="proof-info">
           <div class="claim">
-            <span class="label">Email Proven:</span>
-            <span class="value">{jwtPayload?.email}</span>
+            <span class="label">Email Hash:</span>
+            <span class="value hash">{proof.emailHash}</span>
           </div>
           <div class="claim">
-            <span class="label">Proof Length:</span>
+            <span class="label">Proof Size:</span>
             <span class="value">{proof.proof.length} chars</span>
+          </div>
+          <div class="claim">
+            <span class="label">Public Inputs:</span>
+            <span class="value">{proof.publicInputs.length} fields</span>
           </div>
         </div>
         <details>
@@ -342,5 +349,19 @@
 
   .proof-info {
     margin-bottom: 1rem;
+  }
+
+  .privacy-note {
+    color: #22c55e !important;
+    font-size: 0.875rem;
+    margin-bottom: 1rem !important;
+  }
+
+  .value.hash {
+    font-family: monospace;
+    font-size: 0.75rem;
+    background: #0a0a0a;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
   }
 </style>
