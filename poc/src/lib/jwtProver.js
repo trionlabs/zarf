@@ -4,6 +4,9 @@ import { Noir } from '@noir-lang/noir_js';
 import { UltraHonkBackend } from '@aztec/bb.js';
 import { generateInputs } from 'noir-jwt';
 
+// Circuit constants
+const TREE_DEPTH = 20;
+
 let initialized = false;
 let cachedCircuit = null;
 let cachedNoir = null;
@@ -45,7 +48,6 @@ async function initializeBackend(circuit) {
   }
 
   cachedNoir = new Noir(circuit);
-  // bb.js 2.x API: pass bytecode string directly
   cachedBackend = new UltraHonkBackend(circuit.bytecode);
 
   console.log('Backend initialized');
@@ -60,15 +62,45 @@ export function isProofGenerationSupported() {
 }
 
 /**
- * Generate a ZK proof for a JWT
+ * Convert a bigint to a hex string for circuit input
+ */
+function toHex(value) {
+  if (typeof value === 'string' && value.startsWith('0x')) {
+    return value;
+  }
+  return '0x' + BigInt(value).toString(16);
+}
+
+/**
+ * Pad merkle proof arrays to TREE_DEPTH
+ */
+function padMerkleProof(siblings, indices) {
+  const paddedSiblings = [...siblings];
+  const paddedIndices = [...indices];
+
+  while (paddedSiblings.length < TREE_DEPTH) {
+    paddedSiblings.push('0x0');
+    paddedIndices.push('0x0');
+  }
+
+  return {
+    siblings: paddedSiblings.map((s) => toHex(s)),
+    indices: paddedIndices.map((i) => toHex(i)),
+  };
+}
+
+/**
+ * Generate a ZK proof for a JWT with Merkle tree membership
  * @param {string} jwt - The JWT string
  * @param {object} publicKey - The JWK public key
- * @param {string} expectedEmail - The email to prove
+ * @param {object} claimData - { email, salt, amount, merkleProof: { siblings, indices }, merkleRoot }
  * @param {function} onProgress - Progress callback
- * @returns {Promise<{ proof: string, publicInputs: string[] }>}
+ * @returns {Promise<{ proof: string, publicInputs: string[], emailHash: string, merkleRoot: string }>}
  */
-export async function generateJwtProof(jwt, publicKey, expectedEmail, onProgress = () => {}) {
+export async function generateJwtProof(jwt, publicKey, claimData, onProgress = () => {}) {
   try {
+    const { email, salt, amount, merkleProof, merkleRoot } = claimData;
+
     onProgress('Initializing WASM modules...');
     await initializeWasm();
 
@@ -85,34 +117,43 @@ export async function generateJwtProof(jwt, publicKey, expectedEmail, onProgress
       maxSignedDataLength: 1024,
     });
 
-    // Convert email to bytes array
-    const emailBytes = Array.from(new TextEncoder().encode(expectedEmail));
-    // Pad to MAX_EMAIL_LENGTH (64)
+    // Convert email to bytes array (padded to 64)
+    const emailBytes = Array.from(new TextEncoder().encode(email));
     while (emailBytes.length < 64) {
       emailBytes.push(0);
     }
 
+    // Pad Merkle proof to TREE_DEPTH
+    const { siblings, indices } = padMerkleProof(merkleProof.siblings, merkleProof.indices);
+
     // Prepare full circuit inputs
     const inputs = {
+      // JWT data
       data: {
         storage: jwtInputs.data.storage,
         len: jwtInputs.data.len,
       },
       base64_decode_offset: jwtInputs.base64_decode_offset,
-      pubkey_modulus_limbs: jwtInputs.pubkey_modulus_limbs,
       redc_params_limbs: jwtInputs.redc_params_limbs,
       signature_limbs: jwtInputs.signature_limbs,
       expected_email: {
         storage: emailBytes,
-        len: expectedEmail.length,
+        len: email.length,
       },
+      // Merkle proof data
+      salt: toHex(salt),
+      amount: toHex(amount),
+      merkle_siblings: siblings,
+      merkle_path_indices: indices,
+      // Public inputs
+      pubkey_modulus_limbs: jwtInputs.pubkey_modulus_limbs,
+      merkle_root: toHex(merkleRoot),
     };
 
     onProgress('Generating witness...');
     const { witness } = await noir.execute(inputs);
 
     onProgress('Generating proof (this may take 30-60 seconds)...');
-    // keccak: true for EVM-compatible proof verification
     const proof = await backend.generateProof(witness, { keccak: true });
 
     // Convert proof to hex string
@@ -125,14 +166,16 @@ export async function generateJwtProof(jwt, publicKey, expectedEmail, onProgress
     onProgress('Proof generated successfully!');
 
     // Public outputs structure:
-    // 1. pubkey_modulus_limbs[0..17] (18 limbs), public input
-    // 2. email_hash (1 Field), return value (Pedersen hash of email)
+    // 1. pubkey_modulus_limbs[0..17] (18 limbs)
+    // 2. merkle_root (1 Field)
+    // 3. email_hash (1 Field) - return value
     const emailHash = proof.publicInputs[proof.publicInputs.length - 1];
 
     return {
       proof: proofHex,
       publicInputs: proof.publicInputs,
       emailHash,
+      merkleRoot: toHex(merkleRoot),
     };
   } catch (error) {
     console.error('Proof generation failed:', error);

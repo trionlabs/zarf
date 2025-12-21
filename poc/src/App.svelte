@@ -9,6 +9,8 @@
     clearUrlFragment,
   } from './lib/googleAuth.js';
   import { generateJwtProof, isProofGenerationSupported } from './lib/jwtProver.js';
+  import { readCSVFile, generateSampleCSV } from './lib/csvProcessor.js';
+  import { processWhitelist, getMerkleProof } from './lib/merkleTree.js';
 
   // State
   let jwt = $state(null);
@@ -19,11 +21,78 @@
   let isGenerating = $state(false);
   let error = $state(null);
 
-  // Config - Replace with your Google OAuth Client ID
+  // Whitelist state
+  let whitelist = $state(null); // { root, tree, claims }
+  let userClaim = $state(null); // claim data for logged-in user
+  let isProcessingCSV = $state(false);
+
+  // File input reference for resetting
+  let fileInputRef = $state(null);
+
+  // Config
   const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
   const REDIRECT_URI = window.location.origin + window.location.pathname;
+  const STORAGE_KEY = 'zarf_whitelist';
+
+  // Persist whitelist to localStorage
+  function saveWhitelist(data) {
+    try {
+      // Convert bigints to strings for JSON serialization
+      const serializable = {
+        root: data.root.toString(),
+        claims: data.claims.map(c => ({
+          ...c,
+          salt: c.salt.toString(),
+          leaf: c.leaf.toString(),
+        })),
+        tree: {
+          minDepth: data.tree.minDepth,
+          depth: data.tree.depth,
+          // Store layers as string arrays
+          layers: data.tree.layers.map(layer => layer.map(v => v.toString())),
+          emptyHashes: data.tree.emptyHashes.map(v => v.toString()),
+        },
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(serializable));
+    } catch (e) {
+      console.warn('Failed to save whitelist:', e);
+    }
+  }
+
+  // Restore whitelist from localStorage
+  function loadWhitelist() {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (!stored) return null;
+
+      const data = JSON.parse(stored);
+      return {
+        root: BigInt(data.root),
+        claims: data.claims.map(c => ({
+          ...c,
+          salt: c.salt,
+          leaf: BigInt(c.leaf),
+        })),
+        tree: {
+          minDepth: data.tree.minDepth,
+          depth: data.tree.depth,
+          layers: data.tree.layers.map(layer => layer.map(v => BigInt(v))),
+          emptyHashes: data.tree.emptyHashes.map(v => BigInt(v)),
+        },
+      };
+    } catch (e) {
+      console.warn('Failed to load whitelist:', e);
+      localStorage.removeItem(STORAGE_KEY);
+      return null;
+    }
+  }
 
   onMount(async () => {
+    // Restore whitelist from localStorage (survives OAuth redirect)
+    const savedWhitelist = loadWhitelist();
+    if (savedWhitelist) {
+      whitelist = savedWhitelist;
+    }
     // Check for token in URL after OAuth redirect
     const token = extractTokenFromUrl();
     if (token) {
@@ -40,7 +109,11 @@
           error = 'Could not find matching public key for JWT';
         }
 
-        // Clear token from URL for security
+        // Check if user is in whitelist
+        if (whitelist && jwtPayload?.email) {
+          checkUserInWhitelist(jwtPayload.email);
+        }
+
         clearUrlFragment();
         status = 'JWT loaded successfully';
       } catch (e) {
@@ -48,6 +121,72 @@
       }
     }
   });
+
+  function checkUserInWhitelist(email) {
+    if (!whitelist) return;
+
+    const normalizedEmail = email.toLowerCase().trim();
+    const claim = whitelist.claims.find((c) => c.email === normalizedEmail);
+
+    if (claim) {
+      const merkleProof = getMerkleProof(whitelist.tree, claim.leafIndex);
+      userClaim = {
+        ...claim,
+        merkleProof,
+        merkleRoot: whitelist.root,
+      };
+    } else {
+      userClaim = null;
+    }
+  }
+
+  async function handleCSVUpload(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    isProcessingCSV = true;
+    error = null;
+
+    try {
+      status = 'Reading CSV file...';
+      const entries = await readCSVFile(file);
+
+      if (entries.length === 0) {
+        throw new Error('No valid entries found in CSV');
+      }
+
+      status = `Processing ${entries.length} entries...`;
+      whitelist = await processWhitelist(entries);
+
+      // Save to localStorage to survive OAuth redirect
+      saveWhitelist(whitelist);
+
+      status = `Whitelist created with ${entries.length} entries. Merkle root: ${whitelist.root.toString(16).slice(0, 16)}...`;
+
+      // Check if current user is in whitelist
+      if (jwtPayload?.email) {
+        checkUserInWhitelist(jwtPayload.email);
+      }
+    } catch (e) {
+      error = `Failed to process CSV: ${e.message}`;
+      status = '';
+    } finally {
+      isProcessingCSV = false;
+      // Reset file input so same file can be selected again
+      if (fileInputRef) {
+        fileInputRef.value = '';
+      }
+    }
+  }
+
+  function handleUseSampleCSV() {
+    const sampleContent = generateSampleCSV();
+    const blob = new Blob([sampleContent], { type: 'text/csv' });
+    const file = new File([blob], 'sample.csv', { type: 'text/csv' });
+
+    // Trigger the same processing as file upload
+    handleCSVUpload({ target: { files: [file] } });
+  }
 
   function handleLogin() {
     if (!CLIENT_ID) {
@@ -58,11 +197,7 @@
   }
 
   async function handleGenerateProof() {
-    if (!jwt || !publicKey || !jwtPayload?.email) {
-      error = 'Missing JWT, public key, or email claim';
-      return;
-    }
-
+    // Relaxed validation - let it try and fail with circuit error if invalid
     if (!isProofGenerationSupported()) {
       error = 'Your browser does not support WebAssembly or BigInt';
       return;
@@ -73,10 +208,22 @@
     proof = null;
 
     try {
-      const result = await generateJwtProof(jwt, publicKey, jwtPayload.email, (msg) => {
+      const claimData = {
+        email: jwtPayload?.email || '',
+        salt: userClaim?.salt || '0x0',
+        amount: userClaim?.amount || 0,
+        merkleProof: userClaim?.merkleProof || { siblings: [], indices: [] },
+        merkleRoot: userClaim?.merkleRoot || 0n,
+      };
+
+      const result = await generateJwtProof(jwt, publicKey, claimData, (msg) => {
         status = msg;
       });
-      proof = result;
+
+      proof = {
+        ...result,
+        amount: userClaim?.amount || 0,
+      };
       status = 'Proof generated successfully!';
     } catch (e) {
       error = `Proof generation failed: ${e.message}`;
@@ -91,25 +238,77 @@
     jwtPayload = null;
     publicKey = null;
     proof = null;
+    userClaim = null;
     status = '';
     error = null;
+  }
+
+  function handleResetAll() {
+    handleReset();
+    whitelist = null;
+    localStorage.removeItem(STORAGE_KEY);
   }
 </script>
 
 <main>
   <div class="container">
     <h1>Zarf</h1>
-    <p class="subtitle">Zarf</p>
+    <p class="subtitle">Private Email Whitelist Verification</p>
 
     {#if error}
-      <div class="error">{error}</div>
+      <div class="error">
+        <span>{error}</span>
+        <button class="dismiss-btn" onclick={() => error = null} aria-label="Dismiss error">×</button>
+      </div>
     {/if}
 
-    {#if !jwt}
-      <!-- Login State -->
+    {#if !whitelist}
+      <!-- Step 1: Upload CSV -->
       <div class="card">
-        <h2>Login with Google</h2>
-        <p>Authenticate with Google to get a JWT containing your email claim.</p>
+        <h2>1. Upload Whitelist CSV</h2>
+        <p>Upload a CSV file with email addresses and amounts. Format: <code>email,amount</code></p>
+
+        <div class="upload-area">
+          <input
+            type="file"
+            accept=".csv"
+            onchange={handleCSVUpload}
+            disabled={isProcessingCSV}
+            id="csv-upload"
+            bind:this={fileInputRef}
+          />
+          <label for="csv-upload" class="upload-label">
+            {isProcessingCSV ? 'Processing...' : 'Choose CSV File'}
+          </label>
+        </div>
+
+        <button onclick={handleUseSampleCSV} class="secondary" disabled={isProcessingCSV}>
+          Use Sample CSV
+        </button>
+
+        {#if status}
+          <p class="status">{status}</p>
+        {/if}
+      </div>
+    {:else if !jwt}
+      <!-- Step 2: Login with Google -->
+      <div class="card success">
+        <h2>Whitelist Loaded</h2>
+        <div class="claims">
+          <div class="claim">
+            <span class="label">Entries:</span>
+            <span class="value">{whitelist.claims.length}</span>
+          </div>
+          <div class="claim">
+            <span class="label">Merkle Root:</span>
+            <span class="value hash">{whitelist.root.toString(16).slice(0, 20)}...</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>2. Login with Google</h2>
+        <p>Authenticate with Google to prove you own an email in the whitelist.</p>
         <button onclick={handleLogin} class="primary">Login with Google</button>
 
         {#if !CLIENT_ID}
@@ -118,8 +317,10 @@
           </p>
         {/if}
       </div>
+
+      <button onclick={handleResetAll} class="secondary">Start Over</button>
     {:else if !proof}
-      <!-- JWT Loaded State -->
+      <!-- Step 3: Generate Proof -->
       <div class="card">
         <h2>JWT Claims</h2>
         <div class="claims">
@@ -131,24 +332,39 @@
             <span class="label">Name:</span>
             <span class="value">{jwtPayload?.name || 'N/A'}</span>
           </div>
-          <div class="claim">
-            <span class="label">Issuer:</span>
-            <span class="value">{jwtPayload?.iss || 'N/A'}</span>
-          </div>
-          <div class="claim">
-            <span class="label">Expires:</span>
-            <span class="value"
-              >{jwtPayload?.exp ? new Date(jwtPayload.exp * 1000).toLocaleString() : 'N/A'}</span
-            >
-          </div>
         </div>
       </div>
 
+      {#if userClaim}
+        <div class="card success">
+          <h2>Email Found in Whitelist</h2>
+          <div class="claims">
+            <div class="claim">
+              <span class="label">Amount:</span>
+              <span class="value">{userClaim.amount}</span>
+            </div>
+            <div class="claim">
+              <span class="label">Leaf Index:</span>
+              <span class="value">{userClaim.leafIndex}</span>
+            </div>
+          </div>
+        </div>
+      {:else}
+        <div class="card error-card">
+          <h2>Email Not in Whitelist</h2>
+          <p>Your email ({jwtPayload?.email}) is not in the uploaded whitelist.</p>
+        </div>
+      {/if}
+
       <div class="card">
-        <h2>Generate a ZK Proof</h2>
+        <h2>3. Generate ZK Proof</h2>
         <p>
-          Generate a zero-knowledge proof that you own a valid Google JWT with this email, without
-          revealing the JWT itself.
+          {#if userClaim}
+            Generate a zero-knowledge proof that your email is in the whitelist, without revealing
+            which email you own.
+          {:else}
+            <span class="warning-text">Warning: Your email is not in the whitelist. Proof generation will fail at the circuit level.</span>
+          {/if}
         </p>
         <button onclick={handleGenerateProof} class="primary" disabled={isGenerating}>
           {isGenerating ? 'Generating...' : 'Generate Proof'}
@@ -157,12 +373,14 @@
           <p class="status">{status}</p>
         {/if}
       </div>
+
+      <button onclick={handleReset} class="secondary">Try Different Account</button>
     {:else}
       <!-- Proof Generated State -->
       <div class="card success">
         <h2>Proof Generated!</h2>
         <p class="privacy-note">
-          Your email is now private. Only the hash commitment is public.
+          Your email is private. Only the hash commitment and Merkle root are public.
         </p>
         <div class="proof-info">
           <div class="claim">
@@ -170,12 +388,16 @@
             <span class="value hash">{proof.emailHash}</span>
           </div>
           <div class="claim">
-            <span class="label">Proof Size:</span>
-            <span class="value">{proof.proof.length} chars</span>
+            <span class="label">Merkle Root:</span>
+            <span class="value hash">{proof.merkleRoot}</span>
           </div>
           <div class="claim">
-            <span class="label">Public Inputs:</span>
-            <span class="value">{proof.publicInputs.length} fields</span>
+            <span class="label">Amount:</span>
+            <span class="value">{proof.amount}</span>
+          </div>
+          <div class="claim">
+            <span class="label">Proof Size:</span>
+            <span class="value">{proof.proof.length} chars</span>
           </div>
         </div>
         <details>
@@ -188,7 +410,7 @@
         </details>
       </div>
 
-      <button onclick={handleReset} class="secondary">Start Over</button>
+      <button onclick={handleResetAll} class="secondary">Start Over</button>
     {/if}
   </div>
 </main>
@@ -233,6 +455,10 @@
     border-color: #22c55e;
   }
 
+  .card.error-card {
+    border-color: #dc2626;
+  }
+
   .card h2 {
     font-size: 1.25rem;
     margin-bottom: 0.75rem;
@@ -243,6 +469,13 @@
     color: #aaa;
     margin-bottom: 1rem;
     line-height: 1.5;
+  }
+
+  .card code {
+    background: #333;
+    padding: 0.125rem 0.375rem;
+    border-radius: 4px;
+    font-size: 0.875rem;
   }
 
   button {
@@ -275,8 +508,32 @@
     color: #fff;
   }
 
-  button.secondary:hover {
+  button.secondary:hover:not(:disabled) {
     background: #444;
+  }
+
+  .upload-area {
+    margin-bottom: 1rem;
+  }
+
+  .upload-area input[type='file'] {
+    display: none;
+  }
+
+  .upload-label {
+    display: inline-block;
+    padding: 0.75rem 1.5rem;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.2s;
+  }
+
+  .upload-label:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
   }
 
   .claims {
@@ -292,7 +549,7 @@
 
   .claim .label {
     color: #888;
-    min-width: 80px;
+    min-width: 100px;
   }
 
   .claim .value {
@@ -306,6 +563,25 @@
     color: #fca5a5;
     padding: 1rem;
     border-radius: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  .dismiss-btn {
+    background: none;
+    border: none;
+    color: #fca5a5;
+    font-size: 1.25rem;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0;
+    opacity: 0.7;
+  }
+
+  .dismiss-btn:hover {
+    opacity: 1;
   }
 
   .warning {
@@ -314,10 +590,8 @@
     margin-top: 1rem;
   }
 
-  .warning code {
-    background: #333;
-    padding: 0.125rem 0.375rem;
-    border-radius: 4px;
+  .warning-text {
+    color: #fbbf24;
   }
 
   .status {
