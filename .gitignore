@@ -11,3 +11,8 @@ poc/dist
 poc/public/wasm/*.wasm
 poc/public/wasm/*.wasm.gz
 poc/public/circuits/zarf.json
+
+# contracts
+contracts/cache/
+contracts/out/
+contracts/broadcast/
