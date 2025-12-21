@@ -11,6 +11,7 @@ contract ZarfVesting {
     // ============ Errors ============
     error InvalidProof();
     error InvalidMerkleRoot();
+    error InvalidRecipient();
     error NothingToClaim();
     error AllocationAlreadySet();
     error VestingNotStarted();
@@ -111,22 +112,26 @@ contract ZarfVesting {
 
     /// @notice Claim vested tokens with ZK proof
     /// @param proof The ZK proof bytes
-    /// @param publicInputs The public inputs (includes merkleRoot and emailHash)
-    /// @dev publicInputs layout: [..., merkleRoot, emailHash]
-    ///      The last element is emailHash, second to last is merkleRoot
+    /// @param publicInputs The public inputs (includes merkleRoot, recipient, and emailHash)
+    /// @dev publicInputs layout: [..., merkleRoot, recipient, emailHash]
+    ///      The last element is emailHash, third to last is merkleRoot, second to last is recipient
     function claim(bytes calldata proof, bytes32[] calldata publicInputs) external {
         if (vestingStart == 0) revert VestingNotStarted();
 
         // Verify the ZK proof
         if (!verifier.verify(proof, publicInputs)) revert InvalidProof();
 
-        // Extract public inputs (last two elements)
-        // Note: Adjust indices based on actual circuit output structure
-        bytes32 proofMerkleRoot = publicInputs[publicInputs.length - 2];
+        // Extract public inputs (last three elements)
+        // Layout: [..., merkleRoot, recipient, emailHash]
+        bytes32 proofMerkleRoot = publicInputs[publicInputs.length - 3];
+        bytes32 proofRecipient = publicInputs[publicInputs.length - 2];
         bytes32 emailHash = publicInputs[publicInputs.length - 1];
 
         // Verify merkle root matches
         if (proofMerkleRoot != merkleRoot) revert InvalidMerkleRoot();
+
+        // Verify recipient matches msg.sender (prevents front-running)
+        if (proofRecipient != bytes32(uint256(uint160(msg.sender)))) revert InvalidRecipient();
 
         // Calculate claimable amount
         uint256 vested = calculateVested(emailHash);

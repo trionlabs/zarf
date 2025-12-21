@@ -108,10 +108,12 @@ contract ZarfVestingTest is Test {
         vm.warp(block.timestamp + CLIFF + VESTING_DURATION);
 
         // Create mock proof and public inputs
+        // Layout: [merkleRoot, recipient, emailHash]
         bytes memory proof = "";
-        bytes32[] memory publicInputs = new bytes32[](2);
+        bytes32[] memory publicInputs = new bytes32[](3);
         publicInputs[0] = merkleRoot;
-        publicInputs[1] = aliceEmailHash;
+        publicInputs[1] = bytes32(uint256(uint160(alice))); // recipient
+        publicInputs[2] = aliceEmailHash;
 
         // Claim as alice
         vm.prank(alice);
@@ -127,9 +129,10 @@ contract ZarfVestingTest is Test {
         vm.warp(block.timestamp + CLIFF + VESTING_DURATION / 2);
 
         bytes memory proof = "";
-        bytes32[] memory publicInputs = new bytes32[](2);
+        bytes32[] memory publicInputs = new bytes32[](3);
         publicInputs[0] = merkleRoot;
-        publicInputs[1] = aliceEmailHash;
+        publicInputs[1] = bytes32(uint256(uint160(alice)));
+        publicInputs[2] = aliceEmailHash;
 
         vm.prank(alice);
         vesting.claim(proof, publicInputs);
@@ -140,9 +143,10 @@ contract ZarfVestingTest is Test {
 
     function test_ClaimMultipleTimes() public {
         bytes memory proof = "";
-        bytes32[] memory publicInputs = new bytes32[](2);
+        bytes32[] memory publicInputs = new bytes32[](3);
         publicInputs[0] = merkleRoot;
-        publicInputs[1] = aliceEmailHash;
+        publicInputs[1] = bytes32(uint256(uint160(alice)));
+        publicInputs[2] = aliceEmailHash;
 
         // First claim at 25%
         vm.warp(block.timestamp + CLIFF + VESTING_DURATION / 4);
@@ -165,9 +169,10 @@ contract ZarfVestingTest is Test {
 
     function test_RevertClaimBeforeCliff() public {
         bytes memory proof = "";
-        bytes32[] memory publicInputs = new bytes32[](2);
+        bytes32[] memory publicInputs = new bytes32[](3);
         publicInputs[0] = merkleRoot;
-        publicInputs[1] = aliceEmailHash;
+        publicInputs[1] = bytes32(uint256(uint160(alice)));
+        publicInputs[2] = aliceEmailHash;
 
         vm.prank(alice);
         vm.expectRevert(ZarfVesting.NothingToClaim.selector);
@@ -178,9 +183,10 @@ contract ZarfVestingTest is Test {
         vm.warp(block.timestamp + CLIFF + VESTING_DURATION);
 
         bytes memory proof = "";
-        bytes32[] memory publicInputs = new bytes32[](2);
+        bytes32[] memory publicInputs = new bytes32[](3);
         publicInputs[0] = bytes32(uint256(0x9999)); // Wrong merkle root
-        publicInputs[1] = aliceEmailHash;
+        publicInputs[1] = bytes32(uint256(uint160(alice)));
+        publicInputs[2] = aliceEmailHash;
 
         vm.prank(alice);
         vm.expectRevert(ZarfVesting.InvalidMerkleRoot.selector);
@@ -191,9 +197,10 @@ contract ZarfVestingTest is Test {
         vm.warp(block.timestamp + CLIFF + VESTING_DURATION);
 
         bytes memory proof = "";
-        bytes32[] memory publicInputs = new bytes32[](2);
+        bytes32[] memory publicInputs = new bytes32[](3);
         publicInputs[0] = merkleRoot;
-        publicInputs[1] = bytes32(uint256(0xDEAD)); // Unknown email hash
+        publicInputs[1] = bytes32(uint256(uint160(alice)));
+        publicInputs[2] = bytes32(uint256(0xDEAD)); // Unknown email hash
 
         vm.prank(alice);
         vm.expectRevert(ZarfVesting.NothingToClaim.selector);
@@ -204,9 +211,10 @@ contract ZarfVestingTest is Test {
         vm.warp(block.timestamp + CLIFF + VESTING_DURATION);
 
         bytes memory proof = "";
-        bytes32[] memory publicInputs = new bytes32[](2);
+        bytes32[] memory publicInputs = new bytes32[](3);
         publicInputs[0] = merkleRoot;
-        publicInputs[1] = aliceEmailHash;
+        publicInputs[1] = bytes32(uint256(uint160(alice)));
+        publicInputs[2] = aliceEmailHash;
 
         vm.prank(alice);
         vesting.claim(proof, publicInputs);
@@ -214,6 +222,22 @@ contract ZarfVestingTest is Test {
         // Try to claim again in same block
         vm.prank(alice);
         vm.expectRevert(ZarfVesting.NothingToClaim.selector);
+        vesting.claim(proof, publicInputs);
+    }
+
+    function test_RevertClaimInvalidRecipient() public {
+        // Bob tries to use a proof intended for alice
+        vm.warp(block.timestamp + CLIFF + VESTING_DURATION);
+
+        bytes memory proof = "";
+        bytes32[] memory publicInputs = new bytes32[](3);
+        publicInputs[0] = merkleRoot;
+        publicInputs[1] = bytes32(uint256(uint160(alice))); // Proof is bound to alice
+        publicInputs[2] = aliceEmailHash;
+
+        // Bob tries to claim - should fail because recipient doesn't match
+        vm.prank(bob);
+        vm.expectRevert(ZarfVesting.InvalidRecipient.selector);
         vesting.claim(proof, publicInputs);
     }
 
@@ -257,20 +281,28 @@ contract ZarfVestingTest is Test {
 
     // ============ Edge Cases ============
 
-    function test_AnyoneCanClaimForEmailHash() public {
-        // Bob claims alice's tokens (tokens go to msg.sender)
+    function test_FrontRunningPrevented() public {
+        // This test verifies that front-running is prevented
+        // Bob cannot intercept alice's proof and claim her tokens
         vm.warp(block.timestamp + CLIFF + VESTING_DURATION);
 
+        // Alice's proof with alice as recipient
         bytes memory proof = "";
-        bytes32[] memory publicInputs = new bytes32[](2);
+        bytes32[] memory publicInputs = new bytes32[](3);
         publicInputs[0] = merkleRoot;
-        publicInputs[1] = aliceEmailHash;
+        publicInputs[1] = bytes32(uint256(uint160(alice))); // bound to alice
+        publicInputs[2] = aliceEmailHash;
 
+        // Bob tries to front-run - FAILS
         vm.prank(bob);
+        vm.expectRevert(ZarfVesting.InvalidRecipient.selector);
         vesting.claim(proof, publicInputs);
 
-        // Tokens go to bob (the caller), not alice
-        assertEq(token.balanceOf(bob), ALICE_ALLOCATION);
-        assertEq(token.balanceOf(alice), 0);
+        // Alice can still claim her tokens
+        vm.prank(alice);
+        vesting.claim(proof, publicInputs);
+
+        assertEq(token.balanceOf(alice), ALICE_ALLOCATION);
+        assertEq(token.balanceOf(bob), 0);
     }
 }

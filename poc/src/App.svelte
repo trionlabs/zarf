@@ -11,6 +11,13 @@
   import { generateJwtProof, isProofGenerationSupported } from './lib/jwtProver.js';
   import { readCSVFile, generateSampleCSV } from './lib/csvProcessor.js';
   import { processWhitelist, getMerkleProof } from './lib/merkleTree.js';
+  import {
+    connectWallet,
+    disconnectWallet,
+    getWalletAccount,
+    watchWalletAccount,
+    formatAddress,
+  } from './lib/wallet.js';
 
   // State
   let jwt = $state(null);
@@ -20,6 +27,10 @@
   let status = $state('');
   let isGenerating = $state(false);
   let error = $state(null);
+
+  // Wallet state
+  let walletAddress = $state(null);
+  let isConnectingWallet = $state(false);
 
   // Whitelist state
   let whitelist = $state(null); // { root, tree, claims }
@@ -93,6 +104,18 @@
     if (savedWhitelist) {
       whitelist = savedWhitelist;
     }
+
+    // Check for existing wallet connection
+    const account = getWalletAccount();
+    if (account.isConnected) {
+      walletAddress = account.address;
+    }
+
+    // Watch for wallet changes
+    watchWalletAccount((account) => {
+      walletAddress = account.isConnected ? account.address : null;
+    });
+
     // Check for token in URL after OAuth redirect
     const token = extractTokenFromUrl();
     if (token) {
@@ -196,6 +219,31 @@
     initiateGoogleLogin(CLIENT_ID, REDIRECT_URI);
   }
 
+  async function handleConnectWallet() {
+    isConnectingWallet = true;
+    error = null;
+
+    try {
+      const result = await connectWallet();
+      walletAddress = result.address;
+      status = `Wallet connected: ${formatAddress(result.address)}`;
+    } catch (e) {
+      error = `Failed to connect wallet: ${e.message}`;
+    } finally {
+      isConnectingWallet = false;
+    }
+  }
+
+  async function handleDisconnectWallet() {
+    try {
+      await disconnectWallet();
+      walletAddress = null;
+      status = '';
+    } catch (e) {
+      error = `Failed to disconnect wallet: ${e.message}`;
+    }
+  }
+
   async function handleGenerateProof() {
     // Relaxed validation - let it try and fail with circuit error if invalid
     if (!isProofGenerationSupported()) {
@@ -214,6 +262,7 @@
         amount: userClaim?.amount || 0,
         merkleProof: userClaim?.merkleProof || { siblings: [], indices: [] },
         merkleRoot: userClaim?.merkleRoot || 0n,
+        recipient: walletAddress || '0x0', // Bind proof to wallet address
       };
 
       const result = await generateJwtProof(jwt, publicKey, claimData, (msg) => {
@@ -320,7 +369,7 @@
 
       <button onclick={handleResetAll} class="secondary">Start Over</button>
     {:else if !proof}
-      <!-- Step 3: Generate Proof -->
+      <!-- JWT Claims Card -->
       <div class="card">
         <h2>JWT Claims</h2>
         <div class="claims">
@@ -356,8 +405,26 @@
         </div>
       {/if}
 
+      <!-- Step 3: Connect Wallet -->
       <div class="card">
-        <h2>3. Generate ZK Proof</h2>
+        <h2>3. Connect Wallet</h2>
+        <p>Connect your wallet to bind the proof to your address (prevents front-running).</p>
+
+        {#if walletAddress}
+          <div class="wallet-connected">
+            <span class="wallet-address">{formatAddress(walletAddress)}</span>
+            <button onclick={handleDisconnectWallet} class="secondary small">Disconnect</button>
+          </div>
+        {:else}
+          <button onclick={handleConnectWallet} class="primary" disabled={isConnectingWallet}>
+            {isConnectingWallet ? 'Connecting...' : 'Connect Wallet'}
+          </button>
+        {/if}
+      </div>
+
+      <!-- Step 4: Generate Proof -->
+      <div class="card">
+        <h2>4. Generate ZK Proof</h2>
         <p>
           {#if userClaim}
             Generate a zero-knowledge proof that your email is in the whitelist, without revealing
@@ -366,7 +433,10 @@
             <span class="warning-text">Warning: Your email is not in the whitelist. Proof generation will fail at the circuit level.</span>
           {/if}
         </p>
-        <button onclick={handleGenerateProof} class="primary" disabled={isGenerating}>
+        {#if !walletAddress}
+          <p class="warning-text">Please connect your wallet first.</p>
+        {/if}
+        <button onclick={handleGenerateProof} class="primary" disabled={isGenerating || !walletAddress}>
           {isGenerating ? 'Generating...' : 'Generate Proof'}
         </button>
         {#if status}
@@ -390,6 +460,10 @@
           <div class="claim">
             <span class="label">Merkle Root:</span>
             <span class="value hash">{proof.merkleRoot}</span>
+          </div>
+          <div class="claim">
+            <span class="label">Recipient:</span>
+            <span class="value hash">{proof.recipient}</span>
           </div>
           <div class="claim">
             <span class="label">Amount:</span>
@@ -510,6 +584,27 @@
 
   button.secondary:hover:not(:disabled) {
     background: #444;
+  }
+
+  button.small {
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+  }
+
+  .wallet-connected {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    background: #0a0a0a;
+    padding: 0.75rem 1rem;
+    border-radius: 8px;
+    border: 1px solid #22c55e;
+  }
+
+  .wallet-address {
+    font-family: monospace;
+    color: #22c55e;
+    font-size: 0.875rem;
   }
 
   .upload-area {

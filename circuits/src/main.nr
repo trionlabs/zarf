@@ -57,6 +57,7 @@ fn main(
     // Public inputs
     pubkey_modulus_limbs: pub [u128; 18],
     merkle_root: pub Field,
+    recipient: pub Field, // Ethereum address as Field (prevents front-running)
 ) -> pub Field {
     // 1. Initialize and verify the JWT
     let jwt: JWT<MAX_DATA_LENGTH> = JWT::init(

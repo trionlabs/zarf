@@ -93,13 +93,13 @@ function padMerkleProof(siblings, indices) {
  * Generate a ZK proof for a JWT with Merkle tree membership
  * @param {string} jwt - The JWT string
  * @param {object} publicKey - The JWK public key
- * @param {object} claimData - { email, salt, amount, merkleProof: { siblings, indices }, merkleRoot }
+ * @param {object} claimData - { email, salt, amount, merkleProof: { siblings, indices }, merkleRoot, recipient }
  * @param {function} onProgress - Progress callback
- * @returns {Promise<{ proof: string, publicInputs: string[], emailHash: string, merkleRoot: string }>}
+ * @returns {Promise<{ proof: string, publicInputs: string[], emailHash: string, merkleRoot: string, recipient: string }>}
  */
 export async function generateJwtProof(jwt, publicKey, claimData, onProgress = () => {}) {
   try {
-    const { email, salt, amount, merkleProof, merkleRoot } = claimData;
+    const { email, salt, amount, merkleProof, merkleRoot, recipient } = claimData;
 
     onProgress('Initializing WASM modules...');
     await initializeWasm();
@@ -148,6 +148,7 @@ export async function generateJwtProof(jwt, publicKey, claimData, onProgress = (
       // Public inputs
       pubkey_modulus_limbs: jwtInputs.pubkey_modulus_limbs,
       merkle_root: toHex(merkleRoot),
+      recipient: recipient || '0x0', // Ethereum address as Field
     };
 
     onProgress('Generating witness...');
@@ -168,7 +169,8 @@ export async function generateJwtProof(jwt, publicKey, claimData, onProgress = (
     // Public outputs structure:
     // 1. pubkey_modulus_limbs[0..17] (18 limbs)
     // 2. merkle_root (1 Field)
-    // 3. email_hash (1 Field) - return value
+    // 3. recipient (1 Field)
+    // 4. email_hash (1 Field) - return value
     const emailHash = proof.publicInputs[proof.publicInputs.length - 1];
 
     return {
@@ -176,6 +178,7 @@ export async function generateJwtProof(jwt, publicKey, claimData, onProgress = (
       publicInputs: proof.publicInputs,
       emailHash,
       merkleRoot: toHex(merkleRoot),
+      recipient: recipient || '0x0',
     };
   } catch (error) {
     console.error('Proof generation failed:', error);
