@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import {IVerifier} from "./interfaces/IVerifier.sol";
 import {IERC20} from "forge-std/interfaces/IERC20.sol";
+import {JWKRegistry} from "./JWKRegistry.sol";
 
 /// @title ZarfVesting
 /// @notice Vesting contract with ZK proof-based claims
@@ -12,6 +13,7 @@ contract ZarfVesting {
     error InvalidProof();
     error InvalidMerkleRoot();
     error InvalidRecipient();
+    error InvalidPubkey();
     error NothingToClaim();
     error AllocationAlreadySet();
     error VestingNotStarted();
@@ -26,9 +28,14 @@ contract ZarfVesting {
     event MerkleRootSet(bytes32 merkleRoot);
     event Deposited(uint256 amount);
 
+    // ============ Constants ============
+    /// @notice Number of pubkey limbs in public inputs (RSA-2048 = 18 limbs of 120 bits)
+    uint256 public constant PUBKEY_LIMBS = 18;
+
     // ============ State ============
     IERC20 public immutable token;
     IVerifier public immutable verifier;
+    JWKRegistry public immutable jwkRegistry;
     address public owner;
 
     bytes32 public merkleRoot;
@@ -48,9 +55,10 @@ contract ZarfVesting {
     }
 
     // ============ Constructor ============
-    constructor(address _token, address _verifier) {
+    constructor(address _token, address _verifier, address _jwkRegistry) {
         token = IERC20(_token);
         verifier = IVerifier(_verifier);
+        jwkRegistry = JWKRegistry(_jwkRegistry);
         owner = msg.sender;
     }
 
@@ -112,20 +120,39 @@ contract ZarfVesting {
 
     /// @notice Claim vested tokens with ZK proof
     /// @param proof The ZK proof bytes
-    /// @param publicInputs The public inputs (includes merkleRoot, recipient, and emailHash)
-    /// @dev publicInputs layout: [..., merkleRoot, recipient, emailHash]
-    ///      The last element is emailHash, third to last is merkleRoot, second to last is recipient
+    /// @param publicInputs The public inputs (includes pubkey limbs, merkleRoot, emailHash, recipient)
+    /// @dev publicInputs layout: [pubkey_modulus_limbs[0..17], merkleRoot, emailHash, recipient]
+    ///      - First 18 elements: RSA pubkey modulus limbs (120 bits each)
+    ///      - Element 18: merkleRoot
+    ///      - Element 19: emailHash (return value 1 from circuit)
+    ///      - Element 20: recipient (return value 2 from circuit)
     function claim(bytes calldata proof, bytes32[] calldata publicInputs) external {
         if (vestingStart == 0) revert VestingNotStarted();
 
         // Verify the ZK proof
         if (!verifier.verify(proof, publicInputs)) revert InvalidProof();
 
-        // Extract public inputs (last three elements)
-        // Layout: [..., merkleRoot, recipient, emailHash]
-        bytes32 proofMerkleRoot = publicInputs[publicInputs.length - 3];
-        bytes32 proofRecipient = publicInputs[publicInputs.length - 2];
-        bytes32 emailHash = publicInputs[publicInputs.length - 1];
+        // Verify pubkey is a trusted key (e.g., Google OAuth)
+        // Copy first 18 public inputs (pubkey limbs) to memory and hash
+        bytes32 keyHash;
+        assembly {
+            // Allocate 576 bytes (18 * 32) on the stack via scratch space
+            let ptr := mload(0x40)
+            // Copy each of the 18 pubkey limbs from calldata to memory
+            for { let i := 0 } lt(i, 18) { i := add(i, 1) } {
+                // publicInputs[i] - calldataload at offset + i*32
+                let val := calldataload(add(publicInputs.offset, mul(i, 32)))
+                mstore(add(ptr, mul(i, 32)), val)
+            }
+            keyHash := keccak256(ptr, 576)
+        }
+        if (!jwkRegistry.isValidKeyHash(keyHash)) revert InvalidPubkey();
+
+        // Extract public inputs (last three elements after pubkey)
+        // Layout: [pubkey[0..17], merkleRoot, emailHash, recipient]
+        bytes32 proofMerkleRoot = publicInputs[PUBKEY_LIMBS]; // index 18
+        bytes32 emailHash = publicInputs[PUBKEY_LIMBS + 1]; // index 19
+        bytes32 proofRecipient = publicInputs[PUBKEY_LIMBS + 2]; // index 20
 
         // Verify merkle root matches
         if (proofMerkleRoot != merkleRoot) revert InvalidMerkleRoot();
