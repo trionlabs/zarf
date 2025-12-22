@@ -18,6 +18,12 @@
     watchWalletAccount,
     formatAddress,
   } from './lib/wallet.js';
+  import {
+    submitClaim,
+    isContractConfigured,
+    getExplorerUrl,
+    getVestingInfo,
+  } from './lib/contracts.js';
 
   // State
   let jwt = $state(null);
@@ -31,6 +37,13 @@
   // Wallet state
   let walletAddress = $state(null);
   let isConnectingWallet = $state(false);
+
+  // Claim submission state
+  let isSubmitting = $state(false);
+  let txHash = $state(null);
+  let claimSuccess = $state(false);
+  let contractConfigured = $state(false);
+  let vestingInfo = $state(null);
 
   // Whitelist state
   let whitelist = $state(null); // { root, tree, claims }
@@ -99,6 +112,12 @@
   }
 
   onMount(async () => {
+    // Check if contracts are configured
+    contractConfigured = isContractConfigured();
+    if (contractConfigured) {
+      vestingInfo = await getVestingInfo();
+    }
+
     // Restore whitelist from localStorage (survives OAuth redirect)
     const savedWhitelist = loadWhitelist();
     if (savedWhitelist) {
@@ -282,6 +301,31 @@
     }
   }
 
+  async function handleSubmitClaim() {
+    if (!proof || !walletAddress) return;
+
+    isSubmitting = true;
+    error = null;
+    status = 'Submitting claim transaction...';
+
+    try {
+      const result = await submitClaim(
+        proof.proof,
+        proof.publicInputs,
+        walletAddress
+      );
+
+      txHash = result.hash;
+      claimSuccess = true;
+      status = 'Claim successful!';
+    } catch (e) {
+      error = `Claim failed: ${e.message}`;
+      status = '';
+    } finally {
+      isSubmitting = false;
+    }
+  }
+
   function handleReset() {
     jwt = null;
     jwtPayload = null;
@@ -290,6 +334,8 @@
     userClaim = null;
     status = '';
     error = null;
+    txHash = null;
+    claimSuccess = false;
   }
 
   function handleResetAll() {
@@ -448,7 +494,7 @@
     {:else}
       <!-- Proof Generated State -->
       <div class="card success">
-        <h2>Proof Generated!</h2>
+        <h2>{claimSuccess ? 'Claim Successful!' : 'Proof Generated!'}</h2>
         <p class="privacy-note">
           Your email is private. Only the hash commitment and Merkle root are public.
         </p>
@@ -473,6 +519,16 @@
             <span class="label">Proof Size:</span>
             <span class="value">{proof.proof.length} chars</span>
           </div>
+          {#if txHash}
+            <div class="claim">
+              <span class="label">Transaction:</span>
+              <span class="value">
+                <a href={getExplorerUrl(txHash)} target="_blank" rel="noopener noreferrer" class="tx-link">
+                  {txHash.slice(0, 10)}...{txHash.slice(-8)}
+                </a>
+              </span>
+            </div>
+          {/if}
         </div>
         <details>
           <summary>View Proof (hex)</summary>
@@ -483,6 +539,37 @@
           <pre class="proof-hex">{JSON.stringify(proof.publicInputs, null, 2)}</pre>
         </details>
       </div>
+
+      <!-- Step 5: Submit Claim -->
+      {#if !claimSuccess}
+        <div class="card">
+          <h2>5. Submit Claim</h2>
+          {#if contractConfigured}
+            <p>Submit your ZK proof on-chain to claim your tokens.</p>
+            {#if vestingInfo}
+              <div class="vesting-info">
+                <small>Contract: {vestingInfo.vestingAddress.slice(0, 10)}...</small>
+              </div>
+            {/if}
+            <button onclick={handleSubmitClaim} class="primary" disabled={isSubmitting}>
+              {isSubmitting ? 'Submitting...' : 'Submit Claim'}
+            </button>
+            {#if status}
+              <p class="status">{status}</p>
+            {/if}
+          {:else}
+            <p class="warning-text">
+              Contract not configured. Set <code>VITE_VESTING_ADDRESS</code> in your <code>.env</code> file.
+            </p>
+            <p>For now, copy the proof above and submit manually.</p>
+          {/if}
+        </div>
+      {:else}
+        <div class="card success">
+          <h2>Tokens Claimed!</h2>
+          <p>Your tokens have been successfully claimed to your wallet.</p>
+        </div>
+      {/if}
 
       <button onclick={handleResetAll} class="secondary">Start Over</button>
     {/if}
@@ -732,5 +819,25 @@
     background: #0a0a0a;
     padding: 0.25rem 0.5rem;
     border-radius: 4px;
+  }
+
+  .tx-link {
+    color: #667eea;
+    text-decoration: none;
+    font-family: monospace;
+    font-size: 0.75rem;
+  }
+
+  .tx-link:hover {
+    text-decoration: underline;
+  }
+
+  .vesting-info {
+    margin-bottom: 1rem;
+    color: #888;
+  }
+
+  .vesting-info small {
+    font-family: monospace;
   }
 </style>

@@ -166,19 +166,20 @@ export async function generateJwtProof(jwt, publicKey, claimData, onProgress = (
 
     onProgress('Proof generated successfully!');
 
-    // Public outputs structure:
-    // 1. pubkey_modulus_limbs[0..17] (18 limbs)
-    // 2. merkle_root (1 Field)
-    // 3. recipient (1 Field)
-    // 4. email_hash (1 Field) - return value
-    const emailHash = proof.publicInputs[proof.publicInputs.length - 1];
+    // Public outputs structure (matches contract layout):
+    // [0..17]: pubkey_modulus_limbs (18 limbs)
+    // [18]: merkle_root
+    // [19]: email_hash (return value 1)
+    // [20]: recipient (return value 2)
+    const emailHash = proof.publicInputs[19];
+    const proofRecipient = proof.publicInputs[20];
 
     return {
       proof: proofHex,
       publicInputs: proof.publicInputs,
       emailHash,
       merkleRoot: toHex(merkleRoot),
-      recipient: recipient || '0x0',
+      recipient: proofRecipient,
     };
   } catch (error) {
     console.error('Proof generation failed:', error);
