@@ -16,3 +16,8 @@ poc/public/circuits/zarf.json
 contracts/cache/
 contracts/out/
 contracts/broadcast/
+
+# notes
+docs/
+.md
+.gemini 
