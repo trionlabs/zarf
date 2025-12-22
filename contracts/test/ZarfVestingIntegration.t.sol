@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import {Test} from "forge-std/Test.sol";
 import {ZarfVesting} from "../src/ZarfVesting.sol";
+import {JWKRegistry} from "../src/JWKRegistry.sol";
 import {HonkVerifier} from "../src/HonkVerifier.sol";
 import {MockERC20} from "./mocks/MockERC20.sol";
 
@@ -13,6 +14,7 @@ import {MockERC20} from "./mocks/MockERC20.sol";
  */
 contract ZarfVestingIntegrationTest is Test {
     ZarfVesting public vesting;
+    JWKRegistry public jwkRegistry;
     HonkVerifier public verifier;
     MockERC20 public token;
 
@@ -30,12 +32,16 @@ contract ZarfVestingIntegrationTest is Test {
     uint256 public constant VESTING_DURATION = 1; // 1 second for instant vesting
 
     function setUp() public {
+        // Deploy JWK registry and register test pubkey
+        jwkRegistry = new JWKRegistry();
+        _registerTestPubkey();
+
         // Deploy real HonkVerifier
         verifier = new HonkVerifier();
 
         // Deploy token and vesting contract
         token = new MockERC20("Zarf Token", "ZARF", TOTAL_SUPPLY);
-        vesting = new ZarfVesting(address(token), address(verifier));
+        vesting = new ZarfVesting(address(token), address(verifier), address(jwkRegistry));
 
         // Setup vesting
         vesting.setMerkleRoot(merkleRoot);
@@ -52,6 +58,32 @@ contract ZarfVestingIntegrationTest is Test {
         vm.warp(block.timestamp + CLIFF + VESTING_DURATION + 1);
     }
 
+    /// @dev Register the test pubkey from the generated proof
+    /// These are the first 18 public inputs from testProof.json
+    function _registerTestPubkey() internal {
+        bytes32[18] memory pubkeyLimbs = [
+            bytes32(0x00000000000000000000000000000000001d35da9983bde00e628ef58bedc3fb),
+            bytes32(0x000000000000000000000000000000000072fc9fafa1c7362f8e96beb1e94265),
+            bytes32(0x0000000000000000000000000000000000724782ca2f5b393489c2d1f055118f),
+            bytes32(0x000000000000000000000000000000000035c994ecacaeb1b26d35c2553d5cee),
+            bytes32(0x000000000000000000000000000000000062d3cb6e542ccf4d72bf86a55e29ca),
+            bytes32(0x000000000000000000000000000000000067bea2868de4dc17a99e8df2fc1db0),
+            bytes32(0x00000000000000000000000000000000003195939e4774ab27176a63037422f3),
+            bytes32(0x0000000000000000000000000000000000eb00cb1f8d833f1bae94c4cb57f4aa),
+            bytes32(0x00000000000000000000000000000000000a557c203fd42c76cecf320dd64483),
+            bytes32(0x0000000000000000000000000000000000e95bad34163e1b0ef3e6b93706fc34),
+            bytes32(0x0000000000000000000000000000000000d617991eb25e09370ae12e3231689f),
+            bytes32(0x000000000000000000000000000000000082ee86c3a384e3d35bfdfffae92147),
+            bytes32(0x0000000000000000000000000000000000bf42a8f7d4e971b6d0c2113453b516),
+            bytes32(0x0000000000000000000000000000000000a8984c8641401a3a50e8102761c0d5),
+            bytes32(0x000000000000000000000000000000000039939849206e7c4207f37532c93f0c),
+            bytes32(0x0000000000000000000000000000000000716de5bfee1406accfdcd619a4cda3),
+            bytes32(0x0000000000000000000000000000000000b054e1ed43487bf5818606048dc3b1),
+            bytes32(0x0000000000000000000000000000000000000000000000000000000000000095)
+        ];
+        jwkRegistry.registerKey("test-key", pubkeyLimbs);
+    }
+
     /**
      * @notice Test claiming with a real ZK proof
      * @dev This test uses a pre-generated proof from the circuit
@@ -62,10 +94,11 @@ contract ZarfVestingIntegrationTest is Test {
         bytes32[] memory publicInputs = _getTestPublicInputs();
 
         // Verify public inputs structure
+        // Layout: [pubkey[0..17], merkleRoot, emailHash, recipient]
         assertEq(publicInputs.length, 21, "Should have 21 public inputs");
         assertEq(publicInputs[18], merkleRoot, "Merkle root should match");
-        assertEq(publicInputs[19], bytes32(uint256(uint160(recipient))), "Recipient should match");
-        assertEq(publicInputs[20], emailHash, "Email hash should match");
+        assertEq(publicInputs[19], emailHash, "Email hash should match");
+        assertEq(publicInputs[20], bytes32(uint256(uint160(recipient))), "Recipient should match");
 
         // Claim as recipient
         vm.prank(recipient);
@@ -119,6 +152,22 @@ contract ZarfVestingIntegrationTest is Test {
         vesting.claim(proof, publicInputs);
     }
 
+    /**
+     * @notice Test that unregistered pubkey fails
+     */
+    function test_RevertUnregisteredPubkey() public {
+        bytes memory proof = _getTestProof();
+        bytes32[] memory publicInputs = _getTestPublicInputs();
+
+        // Modify pubkey limbs to an unregistered key
+        publicInputs[0] = bytes32(uint256(0xDEAD));
+
+        vm.prank(recipient);
+        // Will fail at verifier level (proof doesn't match modified inputs)
+        vm.expectRevert();
+        vesting.claim(proof, publicInputs);
+    }
+
     // ============ Helper Functions ============
 
     /**
@@ -132,6 +181,8 @@ contract ZarfVestingIntegrationTest is Test {
 
     /**
      * @dev Returns the test public inputs array
+     * NOTE: Layout changed - [pubkey, merkleRoot, emailHash, recipient]
+     * The proof needs to be regenerated with the updated circuit!
      */
     function _getTestPublicInputs() internal pure returns (bytes32[] memory) {
         bytes32[] memory inputs = new bytes32[](21);
@@ -154,8 +205,8 @@ contract ZarfVestingIntegrationTest is Test {
         inputs[16] = bytes32(0x0000000000000000000000000000000000b054e1ed43487bf5818606048dc3b1);
         inputs[17] = bytes32(0x0000000000000000000000000000000000000000000000000000000000000095);
         inputs[18] = bytes32(0x0d7ff9f493f7a01fc88d11714f630d0573faae3f862ddc12944b4e52cee86478); // merkleRoot
-        inputs[19] = bytes32(0x00000000000000000000000000000000000000000000000000000000000a11ce); // recipient
-        inputs[20] = bytes32(0x0e0831b9d4f5db98fab220b5f9af70836bfee0d501df4980f79952dfb69d2bb2); // emailHash
+        inputs[19] = bytes32(0x0e0831b9d4f5db98fab220b5f9af70836bfee0d501df4980f79952dfb69d2bb2); // emailHash (return 1)
+        inputs[20] = bytes32(0x00000000000000000000000000000000000000000000000000000000000a11ce); // recipient (return 2)
         return inputs;
     }
 }
