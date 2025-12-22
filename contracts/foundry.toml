@@ -11,6 +11,8 @@ optimizer_runs = 1  # Minimum runs = smallest bytecode
 dotenv = "../.env"
 
 # Sepolia configuration
+fs_permissions = [{ access = "read", path = "./" }]
+
 [rpc_endpoints]
 sepolia = "${RPC_URL}"
 
