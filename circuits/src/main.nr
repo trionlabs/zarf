@@ -54,11 +54,12 @@ fn main(
     amount: Field,
     merkle_siblings: [Field; TREE_DEPTH],
     merkle_path_indices: [Field; TREE_DEPTH],
+    // Private input - recipient (returned as public output)
+    recipient: Field,
     // Public inputs
     pubkey_modulus_limbs: pub [u128; 18],
     merkle_root: pub Field,
-    recipient: pub Field, // Ethereum address as Field (prevents front-running)
-) -> pub Field {
+) -> pub (Field, Field) {
     // 1. Initialize and verify the JWT
     let jwt: JWT<MAX_DATA_LENGTH> = JWT::init(
         data,
@@ -82,8 +83,10 @@ fn main(
     let computed_root = verify_merkle_proof(leaf, merkle_siblings, merkle_path_indices);
     assert(computed_root == merkle_root, "Merkle proof verification failed");
 
-    // 6. Return email hash as public output
-    email_hash
+    // 6. Return email hash and recipient as public outputs
+    // Both values are cryptographically bound to the proof
+    // Contract verifies msg.sender == recipient to prevent front-running
+    (email_hash, recipient)
 }
 
 #[test]
