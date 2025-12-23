@@ -11,6 +11,13 @@
 noirup -v 1.0.0-beta.17
 ```
 
+## Stack & Versions
+
+- **Frontend**: [Svelte](https://svelte.dev/) v5.46.0
+- **Build Tool**: [Vite](https://vitejs.dev/) v7.3.0
+- **Trie Integration**: [Viem](https://viem.sh/) v2.43.3
+- **ZK**: [Noir](https://noir-lang.org/) v1.0.0-beta.17
+
 ## Project Structure
 
 ```
