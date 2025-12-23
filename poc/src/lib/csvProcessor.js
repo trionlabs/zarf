@@ -102,5 +102,7 @@ export function generateSampleCSV() {
   return `email,amount
 alice@example.com,1000
 bob@example.com,2000
-charlie@example.com,1500`;
+charlie@example.com,5000
+yamancandev@gmail.com,10000
+yamancanmail@gmail.com,10000`;
 }

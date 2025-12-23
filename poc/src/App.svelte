@@ -1,5 +1,5 @@
 <script>
-  import { onMount } from 'svelte';
+  import { onMount } from "svelte";
   import {
     initiateGoogleLogin,
     extractTokenFromUrl,
@@ -7,30 +7,33 @@
     fetchGooglePublicKeys,
     findKeyById,
     clearUrlFragment,
-  } from './lib/googleAuth.js';
-  import { generateJwtProof, isProofGenerationSupported } from './lib/jwtProver.js';
-  import { readCSVFile, generateSampleCSV } from './lib/csvProcessor.js';
-  import { processWhitelist, getMerkleProof } from './lib/merkleTree.js';
+  } from "./lib/googleAuth.js";
+  import {
+    generateJwtProof,
+    isProofGenerationSupported,
+  } from "./lib/jwtProver.js";
+  import { readCSVFile, generateSampleCSV } from "./lib/csvProcessor.js";
+  import { processWhitelist, getMerkleProof } from "./lib/merkleTree.js";
   import {
     connectWallet,
     disconnectWallet,
     getWalletAccount,
     watchWalletAccount,
     formatAddress,
-  } from './lib/wallet.js';
+  } from "./lib/wallet.js";
   import {
     submitClaim,
     isContractConfigured,
     getExplorerUrl,
     getVestingInfo,
-  } from './lib/contracts.js';
+  } from "./lib/contracts.js";
 
   // State
   let jwt = $state(null);
   let jwtPayload = $state(null);
   let publicKey = $state(null);
   let proof = $state(null);
-  let status = $state('');
+  let status = $state("");
   let isGenerating = $state(false);
   let error = $state(null);
 
@@ -49,14 +52,15 @@
   let whitelist = $state(null); // { root, tree, claims }
   let userClaim = $state(null); // claim data for logged-in user
   let isProcessingCSV = $state(false);
+  let loadedFilename = $state(null);
 
   // File input reference for resetting
   let fileInputRef = $state(null);
 
   // Config
-  const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
+  const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || "";
   const REDIRECT_URI = window.location.origin + window.location.pathname;
-  const STORAGE_KEY = 'zarf_whitelist';
+  const STORAGE_KEY = "zarf_whitelist";
 
   // Persist whitelist to localStorage
   function saveWhitelist(data) {
@@ -64,22 +68,25 @@
       // Convert bigints to strings for JSON serialization
       const serializable = {
         root: data.root.toString(),
-        claims: data.claims.map(c => ({
+        claims: data.claims.map((c) => ({
           ...c,
           salt: c.salt.toString(),
           leaf: c.leaf.toString(),
         })),
+        filename: loadedFilename,
         tree: {
           minDepth: data.tree.minDepth,
           depth: data.tree.depth,
           // Store layers as string arrays
-          layers: data.tree.layers.map(layer => layer.map(v => v.toString())),
-          emptyHashes: data.tree.emptyHashes.map(v => v.toString()),
+          layers: data.tree.layers.map((layer) =>
+            layer.map((v) => v.toString()),
+          ),
+          emptyHashes: data.tree.emptyHashes.map((v) => v.toString()),
         },
       };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(serializable));
     } catch (e) {
-      console.warn('Failed to save whitelist:', e);
+      console.warn("Failed to save whitelist:", e);
     }
   }
 
@@ -92,20 +99,21 @@
       const data = JSON.parse(stored);
       return {
         root: BigInt(data.root),
-        claims: data.claims.map(c => ({
+        claims: data.claims.map((c) => ({
           ...c,
           salt: c.salt,
           leaf: BigInt(c.leaf),
         })),
+        filename: data.filename || "Unknown",
         tree: {
           minDepth: data.tree.minDepth,
           depth: data.tree.depth,
-          layers: data.tree.layers.map(layer => layer.map(v => BigInt(v))),
-          emptyHashes: data.tree.emptyHashes.map(v => BigInt(v)),
+          layers: data.tree.layers.map((layer) => layer.map((v) => BigInt(v))),
+          emptyHashes: data.tree.emptyHashes.map((v) => BigInt(v)),
         },
       };
     } catch (e) {
-      console.warn('Failed to load whitelist:', e);
+      console.warn("Failed to load whitelist:", e);
       localStorage.removeItem(STORAGE_KEY);
       return null;
     }
@@ -122,6 +130,7 @@
     const savedWhitelist = loadWhitelist();
     if (savedWhitelist) {
       whitelist = savedWhitelist;
+      loadedFilename = savedWhitelist.filename;
     }
 
     // Check for existing wallet connection
@@ -148,7 +157,7 @@
         publicKey = findKeyById(keys, decoded.header.kid);
 
         if (!publicKey) {
-          error = 'Could not find matching public key for JWT';
+          error = "Could not find matching public key for JWT";
         }
 
         // Check if user is in whitelist
@@ -157,7 +166,7 @@
         }
 
         clearUrlFragment();
-        status = 'JWT loaded successfully';
+        status = "JWT loaded successfully";
       } catch (e) {
         error = `Failed to process JWT: ${e.message}`;
       }
@@ -190,15 +199,16 @@
     error = null;
 
     try {
-      status = 'Reading CSV file...';
+      status = "Reading CSV file...";
       const entries = await readCSVFile(file);
 
       if (entries.length === 0) {
-        throw new Error('No valid entries found in CSV');
+        throw new Error("No valid entries found in CSV");
       }
 
       status = `Processing ${entries.length} entries...`;
       whitelist = await processWhitelist(entries);
+      loadedFilename = file.name;
 
       // Save to localStorage to survive OAuth redirect
       saveWhitelist(whitelist);
@@ -211,28 +221,29 @@
       }
     } catch (e) {
       error = `Failed to process CSV: ${e.message}`;
-      status = '';
+      status = "";
     } finally {
       isProcessingCSV = false;
       // Reset file input so same file can be selected again
       if (fileInputRef) {
-        fileInputRef.value = '';
+        fileInputRef.value = "";
       }
     }
   }
 
   function handleUseSampleCSV() {
     const sampleContent = generateSampleCSV();
-    const blob = new Blob([sampleContent], { type: 'text/csv' });
-    const file = new File([blob], 'sample.csv', { type: 'text/csv' });
+    const blob = new Blob([sampleContent], { type: "text/csv" });
+    const file = new File([blob], "sample.csv", { type: "text/csv" });
 
     // Trigger the same processing as file upload
     handleCSVUpload({ target: { files: [file] } });
+    loadedFilename = "Internal Sample";
   }
 
   function handleLogin() {
     if (!CLIENT_ID) {
-      error = 'Please set VITE_GOOGLE_CLIENT_ID in your .env file';
+      error = "Please set VITE_GOOGLE_CLIENT_ID in your .env file";
       return;
     }
     initiateGoogleLogin(CLIENT_ID, REDIRECT_URI);
@@ -257,7 +268,7 @@
     try {
       await disconnectWallet();
       walletAddress = null;
-      status = '';
+      status = "";
     } catch (e) {
       error = `Failed to disconnect wallet: ${e.message}`;
     }
@@ -266,7 +277,7 @@
   async function handleGenerateProof() {
     // Relaxed validation - let it try and fail with circuit error if invalid
     if (!isProofGenerationSupported()) {
-      error = 'Your browser does not support WebAssembly or BigInt';
+      error = "Your browser does not support WebAssembly or BigInt";
       return;
     }
 
@@ -276,26 +287,31 @@
 
     try {
       const claimData = {
-        email: jwtPayload?.email || '',
-        salt: userClaim?.salt || '0x0',
+        email: jwtPayload?.email || "",
+        salt: userClaim?.salt || "0x0",
         amount: userClaim?.amount || 0,
         merkleProof: userClaim?.merkleProof || { siblings: [], indices: [] },
         merkleRoot: userClaim?.merkleRoot || 0n,
-        recipient: walletAddress || '0x0', // Bind proof to wallet address
+        recipient: walletAddress || "0x0", // Bind proof to wallet address
       };
 
-      const result = await generateJwtProof(jwt, publicKey, claimData, (msg) => {
-        status = msg;
-      });
+      const result = await generateJwtProof(
+        jwt,
+        publicKey,
+        claimData,
+        (msg) => {
+          status = msg;
+        },
+      );
 
       proof = {
         ...result,
         amount: userClaim?.amount || 0,
       };
-      status = 'Proof generated successfully!';
+      status = "Proof generated successfully!";
     } catch (e) {
       error = `Proof generation failed: ${e.message}`;
-      status = '';
+      status = "";
     } finally {
       isGenerating = false;
     }
@@ -306,21 +322,21 @@
 
     isSubmitting = true;
     error = null;
-    status = 'Submitting claim transaction...';
+    status = "Submitting claim transaction...";
 
     try {
       const result = await submitClaim(
         proof.proof,
         proof.publicInputs,
-        walletAddress
+        walletAddress,
       );
 
       txHash = result.hash;
       claimSuccess = true;
-      status = 'Claim successful!';
+      status = "Claim successful!";
     } catch (e) {
       error = `Claim failed: ${e.message}`;
-      status = '';
+      status = "";
     } finally {
       isSubmitting = false;
     }
@@ -332,7 +348,7 @@
     publicKey = null;
     proof = null;
     userClaim = null;
-    status = '';
+    status = "";
     error = null;
     txHash = null;
     claimSuccess = false;
@@ -341,6 +357,7 @@
   function handleResetAll() {
     handleReset();
     whitelist = null;
+    loadedFilename = null;
     localStorage.removeItem(STORAGE_KEY);
   }
 </script>
@@ -353,7 +370,11 @@
     {#if error}
       <div class="error">
         <span>{error}</span>
-        <button class="dismiss-btn" onclick={() => error = null} aria-label="Dismiss error">×</button>
+        <button
+          class="dismiss-btn"
+          onclick={() => (error = null)}
+          aria-label="Dismiss error">×</button
+        >
       </div>
     {/if}
 
@@ -361,7 +382,11 @@
       <!-- Step 1: Upload CSV -->
       <div class="card">
         <h2>1. Upload Whitelist CSV</h2>
-        <p>Upload a CSV file with email addresses and amounts. Format: <code>email,amount</code></p>
+        <p>
+          Upload a CSV file with email addresses and amounts. Format: <code
+            >email,amount</code
+          >
+        </p>
 
         <div class="upload-area">
           <input
@@ -373,11 +398,15 @@
             bind:this={fileInputRef}
           />
           <label for="csv-upload" class="upload-label">
-            {isProcessingCSV ? 'Processing...' : 'Choose CSV File'}
+            {isProcessingCSV ? "Processing..." : "Choose CSV File"}
           </label>
         </div>
 
-        <button onclick={handleUseSampleCSV} class="secondary" disabled={isProcessingCSV}>
+        <button
+          onclick={handleUseSampleCSV}
+          class="secondary"
+          disabled={isProcessingCSV}
+        >
           Use Sample CSV
         </button>
 
@@ -391,24 +420,33 @@
         <h2>Whitelist Loaded</h2>
         <div class="claims">
           <div class="claim">
+            <span class="label">Source:</span>
+            <span class="value">{loadedFilename}</span>
+          </div>
+          <div class="claim">
             <span class="label">Entries:</span>
             <span class="value">{whitelist.claims.length}</span>
           </div>
           <div class="claim">
             <span class="label">Merkle Root:</span>
-            <span class="value hash">{whitelist.root.toString(16).slice(0, 20)}...</span>
+            <span class="value hash"
+              >{whitelist.root.toString(16).slice(0, 20)}...</span
+            >
           </div>
         </div>
       </div>
 
       <div class="card">
         <h2>2. Login with Google</h2>
-        <p>Authenticate with Google to prove you own an email in the whitelist.</p>
+        <p>
+          Authenticate with Google to prove you own an email in the whitelist.
+        </p>
         <button onclick={handleLogin} class="primary">Login with Google</button>
 
         {#if !CLIENT_ID}
           <p class="warning">
-            Set <code>VITE_GOOGLE_CLIENT_ID</code> in <code>.env</code> file to enable login.
+            Set <code>VITE_GOOGLE_CLIENT_ID</code> in <code>.env</code> file to enable
+            login.
           </p>
         {/if}
       </div>
@@ -421,11 +459,11 @@
         <div class="claims">
           <div class="claim">
             <span class="label">Email:</span>
-            <span class="value">{jwtPayload?.email || 'N/A'}</span>
+            <span class="value">{jwtPayload?.email || "N/A"}</span>
           </div>
           <div class="claim">
             <span class="label">Name:</span>
-            <span class="value">{jwtPayload?.name || 'N/A'}</span>
+            <span class="value">{jwtPayload?.name || "N/A"}</span>
           </div>
         </div>
       </div>
@@ -447,23 +485,34 @@
       {:else}
         <div class="card error-card">
           <h2>Email Not in Whitelist</h2>
-          <p>Your email ({jwtPayload?.email}) is not in the uploaded whitelist.</p>
+          <p>
+            Your email ({jwtPayload?.email}) is not in the uploaded whitelist.
+          </p>
         </div>
       {/if}
 
       <!-- Step 3: Connect Wallet -->
       <div class="card">
         <h2>3. Connect Wallet</h2>
-        <p>Connect your wallet to bind the proof to your address (prevents front-running).</p>
+        <p>
+          Connect your wallet to bind the proof to your address (prevents
+          front-running).
+        </p>
 
         {#if walletAddress}
           <div class="wallet-connected">
             <span class="wallet-address">{formatAddress(walletAddress)}</span>
-            <button onclick={handleDisconnectWallet} class="secondary small">Disconnect</button>
+            <button onclick={handleDisconnectWallet} class="secondary small"
+              >Disconnect</button
+            >
           </div>
         {:else}
-          <button onclick={handleConnectWallet} class="primary" disabled={isConnectingWallet}>
-            {isConnectingWallet ? 'Connecting...' : 'Connect Wallet'}
+          <button
+            onclick={handleConnectWallet}
+            class="primary"
+            disabled={isConnectingWallet}
+          >
+            {isConnectingWallet ? "Connecting..." : "Connect Wallet"}
           </button>
         {/if}
       </div>
@@ -473,30 +522,40 @@
         <h2>4. Generate ZK Proof</h2>
         <p>
           {#if userClaim}
-            Generate a zero-knowledge proof that your email is in the whitelist, without revealing
-            which email you own.
+            Generate a zero-knowledge proof that your email is in the whitelist,
+            without revealing which email you own.
           {:else}
-            <span class="warning-text">Warning: Your email is not in the whitelist. Proof generation will fail at the circuit level.</span>
+            <span class="warning-text"
+              >Warning: Your email is not in the whitelist. Proof generation
+              will fail at the circuit level.</span
+            >
           {/if}
         </p>
         {#if !walletAddress}
           <p class="warning-text">Please connect your wallet first.</p>
         {/if}
-        <button onclick={handleGenerateProof} class="primary" disabled={isGenerating || !walletAddress}>
-          {isGenerating ? 'Generating...' : 'Generate Proof'}
+        <button
+          onclick={handleGenerateProof}
+          class="primary"
+          disabled={isGenerating || !walletAddress}
+        >
+          {isGenerating ? "Generating..." : "Generate Proof"}
         </button>
         {#if status}
           <p class="status">{status}</p>
         {/if}
       </div>
 
-      <button onclick={handleReset} class="secondary">Try Different Account</button>
+      <button onclick={handleReset} class="secondary"
+        >Try Different Account</button
+      >
     {:else}
       <!-- Proof Generated State -->
       <div class="card success">
-        <h2>{claimSuccess ? 'Claim Successful!' : 'Proof Generated!'}</h2>
+        <h2>{claimSuccess ? "Claim Successful!" : "Proof Generated!"}</h2>
         <p class="privacy-note">
-          Your email is private. Only the hash commitment and Merkle root are public.
+          Your email is private. Only the hash commitment and Merkle root are
+          public.
         </p>
         <div class="proof-info">
           <div class="claim">
@@ -523,7 +582,12 @@
             <div class="claim">
               <span class="label">Transaction:</span>
               <span class="value">
-                <a href={getExplorerUrl(txHash)} target="_blank" rel="noopener noreferrer" class="tx-link">
+                <a
+                  href={getExplorerUrl(txHash)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="tx-link"
+                >
                   {txHash.slice(0, 10)}...{txHash.slice(-8)}
                 </a>
               </span>
@@ -536,7 +600,11 @@
         </details>
         <details>
           <summary>View Public Inputs</summary>
-          <pre class="proof-hex">{JSON.stringify(proof.publicInputs, null, 2)}</pre>
+          <pre class="proof-hex">{JSON.stringify(
+              proof.publicInputs,
+              null,
+              2,
+            )}</pre>
         </details>
       </div>
 
@@ -548,18 +616,25 @@
             <p>Submit your ZK proof on-chain to claim your tokens.</p>
             {#if vestingInfo}
               <div class="vesting-info">
-                <small>Contract: {vestingInfo.vestingAddress.slice(0, 10)}...</small>
+                <small
+                  >Contract: {vestingInfo.vestingAddress.slice(0, 10)}...</small
+                >
               </div>
             {/if}
-            <button onclick={handleSubmitClaim} class="primary" disabled={isSubmitting}>
-              {isSubmitting ? 'Submitting...' : 'Submit Claim'}
+            <button
+              onclick={handleSubmitClaim}
+              class="primary"
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? "Submitting..." : "Submit Claim"}
             </button>
             {#if status}
               <p class="status">{status}</p>
             {/if}
           {:else}
             <p class="warning-text">
-              Contract not configured. Set <code>VITE_VESTING_ADDRESS</code> in your <code>.env</code> file.
+              Contract not configured. Set <code>VITE_VESTING_ADDRESS</code> in
+              your <code>.env</code> file.
             </p>
             <p>For now, copy the proof above and submit manually.</p>
           {/if}
@@ -698,7 +773,7 @@
     margin-bottom: 1rem;
   }
 
-  .upload-area input[type='file'] {
+  .upload-area input[type="file"] {
     display: none;
   }
 
