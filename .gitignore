@@ -17,7 +17,7 @@ contracts/cache/
 contracts/out/
 contracts/broadcast/
 
-# notes
+# notes, backlogs, docs & ai
 docs/
-.md
-.gemini 
+.md 
+.agent
