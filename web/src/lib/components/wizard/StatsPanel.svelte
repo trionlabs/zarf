@@ -1,20 +1,27 @@
 <script lang="ts">
     import { wizardStore } from "$lib/stores/wizardStore.svelte";
-    import { Wallet, Users, Coins, FileText } from "lucide-svelte";
+    import { Wallet, Users, Coins, FileText, Package } from "lucide-svelte";
 
-    // Derived stats from wizard store
-    const tokenName = $derived(
-        wizardStore.tokenDetails.distributionName || "—",
-    );
+    // Derived stats from wizard store (new structure)
+    const tokenName = $derived(wizardStore.tokenDetails.tokenName || "—");
+    const tokenSymbol = $derived(wizardStore.tokenDetails.tokenSymbol || "");
     const tokenAddress = $derived(
         wizardStore.tokenDetails.tokenAddress
             ? `${wizardStore.tokenDetails.tokenAddress.slice(0, 6)}...${wizardStore.tokenDetails.tokenAddress.slice(-4)}`
             : "—",
     );
-    const totalSupply = $derived(
-        wizardStore.tokenDetails.totalAmount
-            ? Number(wizardStore.tokenDetails.totalAmount).toLocaleString()
+    const tokenTotalSupply = $derived(
+        wizardStore.tokenDetails.tokenTotalSupply || "—",
+    );
+    const distributionAmount = $derived(
+        wizardStore.tokenDetails.distributionAmount
+            ? Number(
+                  wizardStore.tokenDetails.distributionAmount,
+              ).toLocaleString()
             : "—",
+    );
+    const distributionName = $derived(
+        wizardStore.tokenDetails.distributionName || "—",
     );
     const recipientCount = $derived(wizardStore.recipients.length);
     const totalDistribution = $derived(
@@ -25,8 +32,8 @@
 
     // Check if any data is entered
     const hasData = $derived(
-        wizardStore.tokenDetails.distributionName.length > 0 ||
-            wizardStore.tokenDetails.tokenAddress !== null,
+        wizardStore.tokenDetails.tokenAddress !== null ||
+            wizardStore.tokenDetails.distributionName.length > 0,
     );
 </script>
 
@@ -38,7 +45,7 @@
     </h3>
 
     <div class="space-y-1">
-        <!-- Token Name -->
+        <!-- Token Name & Symbol -->
         <div
             class="flex items-center justify-between py-3 border-b-[0.5px] border-base-content/5 group"
         >
@@ -51,9 +58,9 @@
                 '—'
                     ? 'text-base-content'
                     : 'text-base-content/30'}"
-                title={wizardStore.tokenDetails.distributionName}
+                title={wizardStore.tokenDetails.tokenName || ""}
             >
-                {tokenName}
+                {tokenName}{tokenSymbol ? ` (${tokenSymbol})` : ""}
             </span>
         </div>
 
@@ -74,20 +81,39 @@
             </span>
         </div>
 
-        <!-- Supply -->
+        <!-- Token Total Supply (from contract) -->
+        <div
+            class="flex items-center justify-between py-3 border-b-[0.5px] border-base-content/5 group"
+        >
+            <div class="flex items-center gap-2">
+                <Package class="w-3.5 h-3.5 opacity-30" />
+                <span class="text-xs text-base-content/50">Total Supply</span>
+            </div>
+            <span
+                class="text-xs font-mono transition-colors {tokenTotalSupply !==
+                '—'
+                    ? 'text-base-content/70'
+                    : 'text-base-content/30'}"
+            >
+                {tokenTotalSupply}
+            </span>
+        </div>
+
+        <!-- Distribution Amount (user input) -->
         <div
             class="flex items-center justify-between py-3 border-b-[0.5px] border-base-content/5 group"
         >
             <div class="flex items-center gap-2">
                 <Coins class="w-3.5 h-3.5 opacity-30" />
-                <span class="text-xs text-base-content/50">Supply</span>
+                <span class="text-xs text-base-content/50">To Distribute</span>
             </div>
             <span
-                class="text-sm font-mono transition-colors {totalSupply !== '—'
-                    ? 'text-base-content'
+                class="text-sm font-mono font-medium transition-colors {distributionAmount !==
+                '—'
+                    ? 'text-primary'
                     : 'text-base-content/30'}"
             >
-                {totalSupply}
+                {distributionAmount}
             </span>
         </div>
 
@@ -109,16 +135,17 @@
             </span>
         </div>
 
-        <!-- Total Distribution -->
+        <!-- Distribution Name -->
         <div class="flex items-center justify-between py-3">
-            <span class="text-xs text-base-content/50">To Distribute</span>
+            <span class="text-xs text-base-content/50">Name</span>
             <span
-                class="text-sm font-mono font-medium tabular-nums transition-colors {totalDistribution !==
+                class="text-sm font-medium truncate max-w-[120px] transition-colors {distributionName !==
                 '—'
-                    ? 'text-primary'
+                    ? 'text-base-content'
                     : 'text-base-content/30'}"
+                title={wizardStore.tokenDetails.distributionName}
             >
-                {totalDistribution}
+                {distributionName}
             </span>
         </div>
     </div>
@@ -126,7 +153,7 @@
     <!-- Empty State Hint -->
     {#if !hasData}
         <p class="text-[10px] text-base-content/30 text-center pt-2">
-            Fill in the form to see preview
+            Enter contract address to see preview
         </p>
     {/if}
 </div>

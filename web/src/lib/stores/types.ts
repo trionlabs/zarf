@@ -17,10 +17,18 @@ import type { Address } from 'viem';
  * Token details for distribution setup (Step 1)
  */
 export interface TokenDetails {
-    distributionName: string;
-    iconUrl: string | null;
+    // Token Contract Info (fetched from API)
     tokenAddress: Address | null;
-    totalAmount: string; // String to avoid precision issues in input
+    tokenName: string | null;        // Fetched from contract
+    tokenSymbol: string | null;      // Fetched from contract (ticker)
+    tokenDecimals: number | null;    // Fetched from contract
+    tokenTotalSupply: string | null; // Fetched from contract
+    iconUrl: string | null;          // Fetched from API (if available)
+
+    // Distribution Config (user input)
+    distributionAmount: string;      // Amount to distribute (user input)
+    distributionName: string;        // Name of this distribution
+    distributionDescription: string; // Description of this distribution
 }
 
 /**

@@ -27,10 +27,18 @@ const STORAGE_KEY = 'zarf_wizard_state';
 const initialState: WizardState = {
     currentStep: 1,
     tokenDetails: {
-        distributionName: '',
-        iconUrl: null,
+        // Token Contract Info (fetched from API)
         tokenAddress: null,
-        totalAmount: ''
+        tokenName: null,
+        tokenSymbol: null,
+        tokenDecimals: null,
+        tokenTotalSupply: null,
+        iconUrl: null,
+
+        // Distribution Config (user input)
+        distributionAmount: '',
+        distributionName: '',
+        distributionDescription: '',
     },
     schedule: {
         cliffEndDate: '',
@@ -57,7 +65,8 @@ let state = $state<WizardState>(structuredClone(initialState));
 const canProceedFromStep1 = $derived(
     state.tokenDetails.distributionName.length >= 3 &&
     state.tokenDetails.tokenAddress !== null &&
-    parseFloat(state.tokenDetails.totalAmount) > 0
+    state.tokenDetails.tokenName !== null &&
+    parseFloat(state.tokenDetails.distributionAmount) > 0
 );
 
 const canProceedFromStep2 = $derived(

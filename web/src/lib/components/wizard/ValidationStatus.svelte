@@ -2,13 +2,8 @@
     import { wizardStore } from "$lib/stores/wizardStore.svelte";
     import { Check, X } from "lucide-svelte";
 
-    // Validation rules
+    // Validation rules based on new TokenDetails structure
     const validations = $derived([
-        {
-            label: "Token name",
-            valid: wizardStore.tokenDetails.distributionName.length >= 3,
-            touched: wizardStore.tokenDetails.distributionName.length > 0,
-        },
         {
             label: "Contract address",
             valid:
@@ -20,9 +15,19 @@
                 wizardStore.tokenDetails.tokenAddress.length > 0,
         },
         {
-            label: "Total supply",
-            valid: parseFloat(wizardStore.tokenDetails.totalAmount) > 0,
-            touched: wizardStore.tokenDetails.totalAmount.length > 0,
+            label: "Token verified",
+            valid: wizardStore.tokenDetails.tokenName !== null,
+            touched: wizardStore.tokenDetails.tokenAddress !== null,
+        },
+        {
+            label: "Distribution amount",
+            valid: parseFloat(wizardStore.tokenDetails.distributionAmount) > 0,
+            touched: wizardStore.tokenDetails.distributionAmount.length > 0,
+        },
+        {
+            label: "Distribution name",
+            valid: wizardStore.tokenDetails.distributionName.length >= 3,
+            touched: wizardStore.tokenDetails.distributionName.length > 0,
         },
         {
             label: "Cliff date",
