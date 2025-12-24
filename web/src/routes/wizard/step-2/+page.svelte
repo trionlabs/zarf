@@ -2,41 +2,75 @@
     import { wizardStore } from "$lib/stores/wizardStore.svelte";
     import { goto } from "$app/navigation";
     import { onMount } from "svelte";
+    import { readCSVFile, generateSampleCSV } from "$lib/csv/csvProcessor";
+    import type { WhitelistEntry } from "$lib/types";
 
     onMount(() => {
         wizardStore.goToStep(2);
     });
 
-    let cliffEndDate = $state(wizardStore.schedule.cliffEndDate);
-    let durationMonths = $state(
-        wizardStore.schedule.distributionDurationMonths,
+    let fileInput: HTMLInputElement;
+    let isProcessing = $state(false);
+    let error = $state<string | null>(null);
+    let recipients = $state<WhitelistEntry[]>(wizardStore.recipients);
+    let fileName = $state(wizardStore.csvFilename);
+
+    const canProceed = $derived(recipients.length > 0 && !isProcessing);
+    const totalAmount = $derived(
+        recipients.reduce((sum, r) => sum + r.amount, 0),
     );
 
-    // Get min date (today)
-    const today = new Date().toISOString().split("T")[0];
+    async function handleFileUpload(event: Event) {
+        const target = event.target as HTMLInputElement;
+        const file = target.files?.[0];
+        if (!file) return;
 
-    // Validation
-    // Validation
-    const isDateValid = $derived(cliffEndDate !== "" && cliffEndDate >= today);
-    const isDurationValid = $derived(
-        durationMonths > 0 && durationMonths <= 48,
-    );
-    const canProceed = $derived(isDateValid && isDurationValid);
+        processFile(file);
+    }
 
-    // UX State
-    const showDateInputError = $derived(cliffEndDate !== "" && !isDateValid);
-    const showDateMessage = $derived(
-        cliffEndDate !== "" && cliffEndDate < today,
-    );
-    const showSummary = $derived(isDateValid && isDurationValid);
+    async function processFile(file: File) {
+        isProcessing = true;
+        error = null;
+        recipients = [];
+
+        try {
+            if (!file.name.endsWith(".csv")) {
+                throw new Error("Please upload a CSV file");
+            }
+
+            recipients = await readCSVFile(file);
+            fileName = file.name;
+        } catch (e: unknown) {
+            if (e instanceof Error) {
+                error = e.message;
+            } else {
+                error = "Failed to parse CSV file";
+            }
+            fileName = null;
+        } finally {
+            isProcessing = false;
+        }
+    }
+
+    function handleDownloadSample() {
+        const content = generateSampleCSV();
+        const blob = new Blob([content], { type: "text/csv" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "zarf_sample_whitelist.csv";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
 
     function handleNext() {
-        wizardStore.setSchedule({
-            cliffEndDate,
-            distributionDurationMonths: durationMonths,
-        });
-        wizardStore.nextStep();
-        goto("/wizard/step-3");
+        if (recipients.length > 0 && fileName) {
+            wizardStore.setRecipients(recipients, fileName);
+            wizardStore.nextStep();
+            goto("/wizard/step-3");
+        }
     }
 
     function handleBack() {
@@ -47,77 +81,106 @@
 
 <div class="space-y-6">
     <div class="text-center">
-        <h2 class="text-2xl font-bold">Vesting Schedule</h2>
+        <h2 class="text-2xl font-bold">Upload Whitelist</h2>
         <p class="text-base-content/70">
-            Configure when tokens become available to claimants.
+            Import your distribution list via CSV.
         </p>
     </div>
 
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <!-- Cliff End Date -->
-        <label class="form-control w-full">
-            <div class="label">
-                <span class="label-text font-medium">Cliff End Date</span>
-            </div>
-            <input
-                type="date"
-                class="input input-bordered w-full"
-                class:input-error={showDateInputError}
-                bind:value={cliffEndDate}
-                min={today}
-            />
-            {#if showDateMessage}
-                <div class="label">
-                    <span class="label-text-alt text-error"
-                        >Date must be in the future</span
-                    >
-                </div>
-            {/if}
+    <!-- File Upload -->
+    <div class="form-control w-full">
+        <label class="label" for="csv-upload">
+            <span class="label-text">Select CSV File</span>
         </label>
-
-        <!-- Distribution Duration -->
-        <label class="form-control w-full">
-            <div class="label">
-                <span class="label-text font-medium">Duration</span>
-            </div>
-            <select
-                class="select select-bordered w-full"
-                bind:value={durationMonths}
+        <input
+            id="csv-upload"
+            type="file"
+            accept=".csv"
+            class="file-input file-input-bordered w-full"
+            onchange={handleFileUpload}
+            disabled={isProcessing}
+            bind:this={fileInput}
+        />
+        <label class="label">
+            <button
+                class="label-text-alt link link-primary no-underline"
+                onclick={handleDownloadSample}
             >
-                <option value={0} disabled>Select duration</option>
-                <option value={1}>1 month (Immediate)</option>
-                <option value={3}>3 months</option>
-                <option value={6}>6 months</option>
-                <option value={12}>12 months (1 year)</option>
-                <option value={24}>24 months (2 years)</option>
-                <option value={36}>36 months (3 years)</option>
-                <option value={48}>48 months (4 years)</option>
-            </select>
+                Download Sample CSV Layout
+            </button>
         </label>
     </div>
 
-    <!-- Minimal Vesting Preview -->
-    {#if showSummary}
-        <div role="alert" class="alert bg-base-200">
+    {#if isProcessing}
+        <div class="flex items-center gap-2 justify-center py-4">
+            <span class="loading loading-spinner"></span>
+            <span>Processing CSV...</span>
+        </div>
+    {/if}
+
+    {#if error}
+        <div role="alert" class="alert alert-error">
             <svg
                 xmlns="http://www.w3.org/2000/svg"
+                class="stroke-current shrink-0 h-6 w-6"
                 fill="none"
                 viewBox="0 0 24 24"
-                class="stroke-current shrink-0 w-6 h-6"
                 ><path
                     stroke-linecap="round"
                     stroke-linejoin="round"
                     stroke-width="2"
-                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                ></path></svg
+                    d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"
+                /></svg
             >
-            <div>
-                <h3 class="font-bold">Summary</h3>
+            <span>{error}</span>
+        </div>
+    {/if}
+
+    <!-- Preview Table -->
+    {#if recipients.length > 0}
+        <div class="space-y-4">
+            <div class="flex justify-between items-center px-1">
+                <h3 class="font-bold">{fileName}</h3>
                 <div class="text-sm">
-                    Cliff ends on <span class="font-bold">{cliffEndDate}</span>.
-                    Tokens vest linearly over
-                    <span class="font-bold">{durationMonths} months</span>.
+                    Total: <span class="font-mono font-bold"
+                        >{totalAmount.toLocaleString()}</span
+                    >
                 </div>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="table table-zebra w-full border border-base-200">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Email / Address</th>
+                            <th class="text-right">Allocation</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {#each recipients.slice(0, 5) as recipient, i}
+                            <tr>
+                                <th>{i + 1}</th>
+                                <td class="font-mono text-xs"
+                                    >{recipient.email}</td
+                                >
+                                <td class="text-right font-mono"
+                                    >{recipient.amount}</td
+                                >
+                            </tr>
+                        {/each}
+                        {#if recipients.length > 5}
+                            <tr>
+                                <td
+                                    colspan="3"
+                                    class="text-center text-xs opacity-50"
+                                >
+                                    ...and {recipients.length - 5} more
+                                </td>
+                            </tr>
+                        {/if}
+                    </tbody>
+                </table>
             </div>
         </div>
     {/if}
