@@ -3,6 +3,8 @@
     import { onMount } from "svelte";
     import ThemeToggle from "$lib/components/layout/ThemeToggle.svelte";
 
+    let { children } = $props();
+
     onMount(() => {
         wizardStore.restore();
     });
@@ -95,7 +97,7 @@
             class="card bg-base-100 w-full shadow-sm transition-all duration-300 ease-in-out"
         >
             <div class="card-body p-8 md:p-12">
-                <slot />
+                {@render children()}
             </div>
         </div>
     </div>
