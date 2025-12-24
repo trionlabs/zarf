@@ -53,55 +53,106 @@
 
     <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
         <!-- Token Summary -->
-        <div class="card bg-base-100/40 border border-base-content/10 shadow-sm p-6 space-y-4">
-            <h3 class="text-xs font-bold uppercase tracking-[0.2em] opacity-40">Configuration</h3>
-            
+        <div
+            class="card bg-base-100/40 border border-base-content/10 shadow-sm p-6 space-y-4"
+        >
+            <h3 class="text-xs font-bold uppercase tracking-[0.2em] opacity-40">
+                Configuration
+            </h3>
+
             <div class="space-y-3">
-                <div class="flex justify-between items-center py-2 border-b border-base-content/5">
-                    <span class="opacity-60 text-sm">Token Name</span>
-                    <span class="font-medium">{wizardStore.tokenDetails.distributionName}</span>
+                <div
+                    class="flex justify-between items-center py-2 border-b border-base-content/5"
+                >
+                    <span class="opacity-60 text-sm">Token</span>
+                    <span class="font-medium"
+                        >{wizardStore.tokenDetails.tokenName} ({wizardStore
+                            .tokenDetails.tokenSymbol})</span
+                    >
                 </div>
-                <div class="flex justify-between items-center py-2 border-b border-base-content/5">
+                <div
+                    class="flex justify-between items-center py-2 border-b border-base-content/5"
+                >
                     <span class="opacity-60 text-sm">Contract</span>
-                    <span class="font-mono text-xs opacity-80">{wizardStore.tokenDetails.tokenAddress}</span>
+                    <span class="font-mono text-xs opacity-80"
+                        >{wizardStore.tokenDetails.tokenAddress}</span
+                    >
                 </div>
-                <div class="flex justify-between items-center py-2 border-b border-base-content/5">
-                    <span class="opacity-60 text-sm">Total Supply</span>
-                    <span class="font-mono font-medium">{wizardStore.tokenDetails.totalAmount}</span>
+                <div
+                    class="flex justify-between items-center py-2 border-b border-base-content/5"
+                >
+                    <span class="opacity-60 text-sm">Distribution Name</span>
+                    <span class="font-medium"
+                        >{wizardStore.tokenDetails.distributionName}</span
+                    >
+                </div>
+                <div
+                    class="flex justify-between items-center py-2 border-b border-base-content/5"
+                >
+                    <span class="opacity-60 text-sm">Amount to Distribute</span>
+                    <span class="font-mono font-medium"
+                        >{wizardStore.tokenDetails.distributionAmount}</span
+                    >
                 </div>
             </div>
         </div>
 
         <!-- Schedule & Distribution -->
-        <div class="card bg-base-100/40 border border-base-content/10 shadow-sm p-6 space-y-4">
-            <h3 class="text-xs font-bold uppercase tracking-[0.2em] opacity-40">Distribution</h3>
-            
+        <div
+            class="card bg-base-100/40 border border-base-content/10 shadow-sm p-6 space-y-4"
+        >
+            <h3 class="text-xs font-bold uppercase tracking-[0.2em] opacity-40">
+                Distribution
+            </h3>
+
             <div class="space-y-3">
-                 <div class="flex justify-between items-center py-2 border-b border-base-content/5">
+                <div
+                    class="flex justify-between items-center py-2 border-b border-base-content/5"
+                >
                     <span class="opacity-60 text-sm">Recipients</span>
-                    <span class="font-medium">{wizardStore.recipients.length} entries</span>
+                    <span class="font-medium"
+                        >{wizardStore.recipients.length} entries</span
+                    >
                 </div>
-                <div class="flex justify-between items-center py-2 border-b border-base-content/5">
+                <div
+                    class="flex justify-between items-center py-2 border-b border-base-content/5"
+                >
                     <span class="opacity-60 text-sm">Cliff Date</span>
-                    <span class="font-mono font-medium">{wizardStore.schedule.cliffEndDate}</span>
+                    <span class="font-mono font-medium"
+                        >{wizardStore.schedule.cliffEndDate}</span
+                    >
                 </div>
-                <div class="flex justify-between items-center py-2 border-b border-base-content/5">
+                <div
+                    class="flex justify-between items-center py-2 border-b border-base-content/5"
+                >
                     <span class="opacity-60 text-sm">Vesting</span>
-                    <span class="font-medium">{wizardStore.schedule.distributionDurationMonths} Months (Linear)</span>
+                    <span class="font-medium"
+                        >{wizardStore.schedule.distributionDurationMonths} Months
+                        (Linear)</span
+                    >
                 </div>
             </div>
         </div>
     </div>
 
     <!-- Disclaimer -->
-    <div role="alert" class="alert bg-info/5 border-info/20 text-sm mb-12 text-base-content/70">
+    <div
+        role="alert"
+        class="alert bg-info/5 border-info/20 text-sm mb-12 text-base-content/70"
+    >
         <Check class="w-5 h-5 text-info" />
-        <span>Deployment is irreversible. Please verify all details above.</span>
+        <span>Deployment is irreversible. Please verify all details above.</span
+        >
     </div>
 
     <!-- Actions -->
-    <div class="flex justify-between items-center pt-8 border-t border-base-content/5">
-         <button class="btn btn-ghost hover:bg-base-content/5" onclick={handleBack}>
+    <div
+        class="flex justify-between items-center pt-8 border-t border-base-content/5"
+    >
+        <button
+            class="btn btn-ghost hover:bg-base-content/5"
+            onclick={handleBack}
+        >
             Back
         </button>
 
