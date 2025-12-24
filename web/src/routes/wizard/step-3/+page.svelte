@@ -2,174 +2,96 @@
     import { wizardStore } from "$lib/stores/wizardStore.svelte";
     import { goto } from "$app/navigation";
     import { onMount } from "svelte";
-    import { Check, ArrowRight, Loader2 } from "lucide-svelte";
+    import { Check, Copy, ExternalLink, ArrowRight } from "lucide-svelte";
     import { fly } from "svelte/transition";
 
     onMount(() => {
         wizardStore.goToStep(3);
     });
 
-    let isDeploying = $state(false);
-    let deployStatus = $state("");
+    // Mock contract address for demo
+    let contractAddress =
+        wizardStore.deployedContractAddress ||
+        "0x742d35Cc6634C0532925a3b844Bc454e4438f44e";
+    let copied = $state(false);
 
-    async function handleDeploy() {
-        isDeploying = true;
-        deployStatus = "Generating Merkle Tree...";
-
-        // Simulation of deployment process
-        try {
-            await new Promise((r) => setTimeout(r, 1000));
-
-            deployStatus = "Deploying Vesting Contract...";
-            await new Promise((r) => setTimeout(r, 1500));
-
-            deployStatus = "Verifying Contract...";
-            await new Promise((r) => setTimeout(r, 1000));
-
-            deployStatus = "Success!";
-            wizardStore.nextStep();
-            goto("/wizard/step-4");
-        } catch (e: unknown) {
-            deployStatus = "Deployment failed. Please try again.";
-            isDeploying = false;
-        }
+    function copyToClipboard() {
+        navigator.clipboard.writeText(contractAddress);
+        copied = true;
+        setTimeout(() => (copied = false), 2000);
     }
 
-    function handleBack() {
-        wizardStore.previousStep();
-        goto("/wizard/step-2");
+    function handleFinish() {
+        wizardStore.reset();
+        goto("/");
     }
 </script>
 
-<div class="h-full flex flex-col justify-center max-w-4xl mx-auto py-8">
-    <div class="mb-12 text-center">
-        <h2 class="text-4xl font-light tracking-tight text-base-content mb-3">
-            Review & Deploy
-        </h2>
-        <p class="text-lg text-base-content/50 font-light tracking-wide">
-            Verify your configuration before launching.
-        </p>
-    </div>
-
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
-        <!-- Token Summary -->
-        <div
-            class="card bg-base-100/40 border border-base-content/10 shadow-sm p-6 space-y-4"
-        >
-            <h3 class="text-xs font-bold uppercase tracking-[0.2em] opacity-40">
-                Configuration
-            </h3>
-
-            <div class="space-y-3">
-                <div
-                    class="flex justify-between items-center py-2 border-b border-base-content/5"
-                >
-                    <span class="opacity-60 text-sm">Token</span>
-                    <span class="font-medium"
-                        >{wizardStore.tokenDetails.tokenName} ({wizardStore
-                            .tokenDetails.tokenSymbol})</span
-                    >
-                </div>
-                <div
-                    class="flex justify-between items-center py-2 border-b border-base-content/5"
-                >
-                    <span class="opacity-60 text-sm">Contract</span>
-                    <span class="font-mono text-xs opacity-80"
-                        >{wizardStore.tokenDetails.tokenAddress}</span
-                    >
-                </div>
-                <div
-                    class="flex justify-between items-center py-2 border-b border-base-content/5"
-                >
-                    <span class="opacity-60 text-sm">Distribution Name</span>
-                    <span class="font-medium"
-                        >{wizardStore.tokenDetails.distributionName}</span
-                    >
-                </div>
-                <div
-                    class="flex justify-between items-center py-2 border-b border-base-content/5"
-                >
-                    <span class="opacity-60 text-sm">Amount to Distribute</span>
-                    <span class="font-mono font-medium"
-                        >{wizardStore.tokenDetails.distributionAmount}</span
-                    >
-                </div>
-            </div>
-        </div>
-
-        <!-- Schedule & Distribution -->
-        <div
-            class="card bg-base-100/40 border border-base-content/10 shadow-sm p-6 space-y-4"
-        >
-            <h3 class="text-xs font-bold uppercase tracking-[0.2em] opacity-40">
-                Distribution
-            </h3>
-
-            <div class="space-y-3">
-                <div
-                    class="flex justify-between items-center py-2 border-b border-base-content/5"
-                >
-                    <span class="opacity-60 text-sm">Recipients</span>
-                    <span class="font-medium"
-                        >{wizardStore.recipients.length} entries</span
-                    >
-                </div>
-                <div
-                    class="flex justify-between items-center py-2 border-b border-base-content/5"
-                >
-                    <span class="opacity-60 text-sm">Cliff Date</span>
-                    <span class="font-mono font-medium"
-                        >{wizardStore.schedule.cliffEndDate}</span
-                    >
-                </div>
-                <div
-                    class="flex justify-between items-center py-2 border-b border-base-content/5"
-                >
-                    <span class="opacity-60 text-sm">Vesting</span>
-                    <span class="font-medium"
-                        >{wizardStore.schedule.distributionDurationMonths} Months
-                        (Linear)</span
-                    >
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Disclaimer -->
+<div
+    class="h-full flex flex-col justify-center items-center max-w-2xl mx-auto py-12 text-center"
+>
     <div
-        role="alert"
-        class="alert bg-info/5 border-info/20 text-sm mb-12 text-base-content/70"
+        class="w-24 h-24 bg-success/10 text-success rounded-full flex items-center justify-center mb-8"
+        in:fly={{ y: 20, duration: 600 }}
     >
-        <Check class="w-5 h-5 text-info" />
-        <span>Deployment is irreversible. Please verify all details above.</span
-        >
+        <Check class="w-12 h-12" />
+    </div>
+
+    <h2
+        class="text-4xl font-light tracking-tight text-base-content mb-4"
+        in:fly={{ y: 20, duration: 600, delay: 100 }}
+    >
+        Deployment Complete
+    </h2>
+    <p
+        class="text-lg text-base-content/50 font-light tracking-wide mb-12"
+        in:fly={{ y: 20, duration: 600, delay: 200 }}
+    >
+        Your vesting contract is live and ready for distribution.
+    </p>
+
+    <!-- Contract Address Box -->
+    <div
+        class="w-full bg-base-100/40 border border-base-content/10 rounded-2xl p-6 mb-12 relative group overflow-hidden"
+        in:fly={{ y: 20, duration: 600, delay: 300 }}
+    >
+        <div
+            class="absolute inset-0 bg-gradient-to-r from-transparent via-base-content/5 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"
+        ></div>
+
+        <div class="flex flex-col gap-2">
+            <span
+                class="text-xs font-bold uppercase tracking-[0.2em] opacity-40"
+                >Contract Address</span
+            >
+            <div class="flex items-center justify-center gap-3">
+                <span class="font-mono text-lg">{contractAddress}</span>
+                <button
+                    class="btn btn-circle btn-ghost btn-sm"
+                    onclick={copyToClipboard}
+                >
+                    {#if copied}
+                        <Check class="w-4 h-4 text-success" />
+                    {:else}
+                        <Copy class="w-4 h-4 opacity-50" />
+                    {/if}
+                </button>
+            </div>
+        </div>
     </div>
 
     <!-- Actions -->
-    <div
-        class="flex justify-between items-center pt-8 border-t border-base-content/5"
-    >
+    <div class="flex gap-4" in:fly={{ y: 20, duration: 600, delay: 400 }}>
+        <a href="/dashboard" class="btn btn-outline h-14 px-8 rounded-full">
+            View Dashboard
+            <ExternalLink class="w-4 h-4 ml-2 opacity-60" />
+        </a>
         <button
-            class="btn btn-ghost hover:bg-base-content/5"
-            onclick={handleBack}
+            class="btn btn-primary h-14 px-10 rounded-full shadow-xl shadow-primary/20 hover:shadow-2xl hover:shadow-primary/30 transition-all duration-300 text-lg font-medium tracking-wide"
+            onclick={handleFinish}
         >
-            Back
+            Done
+            <ArrowRight class="w-5 h-5 ml-2" />
         </button>
-
-        <div class="flex flex-col items-end gap-2">
-            <button
-                class="btn btn-primary h-14 px-10 rounded-full shadow-xl shadow-primary/20 hover:shadow-2xl hover:shadow-primary/30 transition-all duration-300 text-lg font-medium tracking-wide min-w-[200px]"
-                disabled={isDeploying}
-                onclick={handleDeploy}
-            >
-                {#if isDeploying}
-                    <Loader2 class="w-5 h-5 animate-spin mr-2" />
-                    {deployStatus}
-                {:else}
-                    Deploy Contract
-                    <ArrowRight class="w-5 h-5 ml-2" />
-                {/if}
-            </button>
-        </div>
     </div>
 </div>

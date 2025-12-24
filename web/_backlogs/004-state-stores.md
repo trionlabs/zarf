@@ -828,7 +828,7 @@ Create test page: `routes/test/stores/+page.svelte`
 - [ ] Theme store persists and applies on load
 - [ ] All stores have `restore()` method
 - [ ] Test page demonstrates all store functionality
-- [ ] `pnpm run check` passes with zero errors
+- [ ] `pppnpm run check` passes with zero errors
 - [ ] No direct state mutations possible from external code
 
 ---

@@ -2,7 +2,7 @@
     import { wizardStore } from "$lib/stores/wizardStore.svelte";
     import { Wallet, Users, Coins, FileText, Package } from "lucide-svelte";
 
-    // Derived stats from wizard store (new structure)
+    // Derived stats from wizard store
     const tokenName = $derived(wizardStore.tokenDetails.tokenName || "—");
     const tokenSymbol = $derived(wizardStore.tokenDetails.tokenSymbol || "");
     const tokenAddress = $derived(
@@ -13,27 +13,34 @@
     const tokenTotalSupply = $derived(
         wizardStore.tokenDetails.tokenTotalSupply || "—",
     );
-    const distributionAmount = $derived(
-        wizardStore.tokenDetails.distributionAmount
-            ? Number(
-                  wizardStore.tokenDetails.distributionAmount,
-              ).toLocaleString()
-            : "—",
+
+    // Aggregated Stats from Distributions Basket + current editing
+    const totalDistributions = $derived(wizardStore.distributions.length);
+    const totalRecipients = $derived(
+        wizardStore.distributions.reduce(
+            (acc, d) => acc + d.recipients.length,
+            0,
+        ),
     );
-    const distributionName = $derived(
-        wizardStore.tokenDetails.distributionName || "—",
+    const savedAmount = $derived(
+        wizardStore.distributions.reduce(
+            (acc, d) => acc + parseFloat(d.amount || "0"),
+            0,
+        ),
     );
-    const recipientCount = $derived(wizardStore.recipients.length);
-    const totalDistribution = $derived(
-        wizardStore.totalRecipientsAmount > 0
-            ? wizardStore.totalRecipientsAmount.toLocaleString()
-            : "—",
+
+    // Total includes both saved distributions AND current being edited
+    const totalAmount = $derived(savedAmount + wizardStore.editingPoolAmount);
+
+    const distributionAmountDisplay = $derived(
+        totalAmount > 0 ? totalAmount.toLocaleString() : "—",
     );
 
     // Check if any data is entered
     const hasData = $derived(
         wizardStore.tokenDetails.tokenAddress !== null ||
-            wizardStore.tokenDetails.distributionName.length > 0,
+            totalDistributions > 0 ||
+            wizardStore.editingPoolAmount > 0,
     );
 </script>
 
@@ -41,7 +48,7 @@
     <h3
         class="text-[10px] font-semibold uppercase tracking-[0.15em] text-base-content/40"
     >
-        Distribution Summary
+        Basket Summary
     </h3>
 
     <div class="space-y-1">
@@ -81,7 +88,7 @@
             </span>
         </div>
 
-        <!-- Token Total Supply (from contract) -->
+        <!-- Token Total Supply -->
         <div
             class="flex items-center justify-between py-3 border-b-[0.5px] border-base-content/5 group"
         >
@@ -99,53 +106,56 @@
             </span>
         </div>
 
-        <!-- Distribution Amount (user input) -->
+        <!-- Total Distribute Amount -->
         <div
             class="flex items-center justify-between py-3 border-b-[0.5px] border-base-content/5 group"
         >
             <div class="flex items-center gap-2">
                 <Coins class="w-3.5 h-3.5 opacity-30" />
-                <span class="text-xs text-base-content/50">To Distribute</span>
+                <span class="text-xs text-base-content/50"
+                    >Total Distributing</span
+                >
             </div>
             <span
-                class="text-sm font-mono font-medium transition-colors {distributionAmount !==
+                class="text-sm font-mono font-medium transition-colors {distributionAmountDisplay !==
                 '—'
                     ? 'text-primary'
                     : 'text-base-content/30'}"
             >
-                {distributionAmount}
+                {distributionAmountDisplay}
             </span>
         </div>
 
-        <!-- Recipients -->
+        <!-- Total Recipients -->
         <div
             class="flex items-center justify-between py-3 border-b-[0.5px] border-base-content/5 group"
         >
             <div class="flex items-center gap-2">
                 <Users class="w-3.5 h-3.5 opacity-30" />
-                <span class="text-xs text-base-content/50">Recipients</span>
+                <span class="text-xs text-base-content/50"
+                    >Total Recipients</span
+                >
             </div>
             <span
-                class="text-sm font-medium tabular-nums transition-colors {recipientCount >
+                class="text-sm font-medium tabular-nums transition-colors {totalRecipients >
                 0
                     ? 'text-base-content'
                     : 'text-base-content/30'}"
             >
-                {recipientCount}
+                {totalRecipients}
             </span>
         </div>
 
-        <!-- Distribution Name -->
+        <!-- Distributions Count -->
         <div class="flex items-center justify-between py-3">
-            <span class="text-xs text-base-content/50">Name</span>
+            <span class="text-xs text-base-content/50">Distributions</span>
             <span
-                class="text-sm font-medium truncate max-w-[120px] transition-colors {distributionName !==
-                '—'
+                class="text-sm font-medium truncate max-w-[120px] transition-colors {totalDistributions >
+                0
                     ? 'text-base-content'
                     : 'text-base-content/30'}"
-                title={wizardStore.tokenDetails.distributionName}
             >
-                {distributionName}
+                {totalDistributions}
             </span>
         </div>
     </div>

@@ -14,7 +14,7 @@ import type { Address } from 'viem';
 // ============================================================================
 
 /**
- * Token details for distribution setup (Step 1)
+ * Token details for distribution setup (Step 0)
  */
 export interface TokenDetails {
     // Token Contract Info (fetched from API)
@@ -24,15 +24,10 @@ export interface TokenDetails {
     tokenDecimals: number | null;    // Fetched from contract
     tokenTotalSupply: string | null; // Fetched from contract
     iconUrl: string | null;          // Fetched from API (if available)
-
-    // Distribution Config (user input)
-    distributionAmount: string;      // Amount to distribute (user input)
-    distributionName: string;        // Name of this distribution
-    distributionDescription: string; // Description of this distribution
 }
 
 /**
- * Vesting schedule configuration (Step 2)
+ * Vesting schedule configuration
  */
 export interface Schedule {
     cliffEndDate: string; // ISO date string (YYYY-MM-DD)
@@ -40,38 +35,48 @@ export interface Schedule {
 }
 
 /**
- * Whitelist recipient entry (Step 3)
+ * Whitelist recipient entry
  */
 export interface Recipient {
     email: string;
     amount: number;
-    leafIndex?: number; // Assigned after Merkle tree generation
-    salt?: string; // Random salt for leaf privacy
+    leafIndex?: number; // assigned after merkle generation
+    salt?: string;
+}
+
+// Alias for compatibility if needed
+export type WhitelistEntry = Recipient;
+
+/**
+ * Single Distribution Entry (Step 1)
+ */
+export interface Distribution {
+    id: string; // UUID
+    name: string;
+    description: string;
+    amount: string; // Total amount for this distribution
+    schedule: Schedule;
+    recipients: Recipient[];
+    csvFilename?: string | null;
+    regulatoryRules: string[];
 }
 
 /**
- * Complete wizard state across all 6 steps
+ * Complete wizard state across all steps
  */
 export interface WizardState {
-    currentStep: number; // 1-6
+    currentStep: number; // 0-3
 
-    // Step 1: Token Details
+    // Step 0: Token Details
     tokenDetails: TokenDetails;
 
-    // Step 2: Schedule
-    schedule: Schedule;
+    // Step 1: Distributions (Basket)
+    distributions: Distribution[];
 
-    // Step 3: Recipients (CSV Upload)
-    recipients: Recipient[];
-    csvFilename: string | null;
+    // Step 2: Review & Deploy
+    merkleRoot: string | null; // Aggregate or per-distribution logic TBD
 
-    // Step 4: Regulatory Rules
-    regulatoryRules: string[]; // IDs of selected rules
-
-    // Step 5: Review & Deploy
-    merkleRoot: string | null; // Hex string
-
-    // Step 6: Deployment Result
+    // Step 3: Deployment Result
     deployedContractAddress: Address | null;
     txHash: string | null;
 }

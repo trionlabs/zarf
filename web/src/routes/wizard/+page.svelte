@@ -2,9 +2,9 @@
     import { onMount } from "svelte";
     import { goto } from "$app/navigation";
 
-    // Redirect to step 1 when visiting /wizard
+    // Redirect to step 0 (Token Entry) when visiting /wizard
     onMount(() => {
-        goto("/wizard/step-1", { replaceState: true });
+        goto("/wizard/step-0", { replaceState: true });
     });
 </script>
 

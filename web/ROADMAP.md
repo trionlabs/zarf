@@ -160,7 +160,7 @@ web/
 
 - All POC utilities migrated and typed
 - 4 global stores with clean APIs
-- Zero runtime errors on `pnpm check`
+- Zero runtime errors on `pppnpm check`
 
 ---
 

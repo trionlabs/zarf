@@ -75,7 +75,7 @@
   - **CRITICAL FIX:** Resolved `$state()` invalid placement in `Modal.svelte`.
   - **A11Y IMPROVED:** Associated `label` with `input` in `Input.svelte`.
   - **Theming:** Full migration to `oklch()` color format.
-  - **Verification:** 0 errors in `pnpm check` and `vite dev`.
+  - **Verification:** 0 errors in `pppnpm check` and `vite dev`.
 
 ### Audit Entry: 2025-12-24
 - **Target:** web/src/routes/+page.svelte, web/src/lib/components/layout/ThemeSelector.svelte

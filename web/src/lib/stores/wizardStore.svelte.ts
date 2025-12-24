@@ -15,7 +15,7 @@
  */
 
 import { browser } from '$app/environment';
-import type { WizardState, TokenDetails, Schedule, Recipient } from './types';
+import type { WizardState, TokenDetails, Schedule, Recipient, Distribution } from './types';
 import type { Address } from 'viem';
 
 const STORAGE_KEY = 'zarf_wizard_state';
@@ -25,28 +25,16 @@ const STORAGE_KEY = 'zarf_wizard_state';
 // ============================================================================
 
 const initialState: WizardState = {
-    currentStep: 1,
+    currentStep: 0,
     tokenDetails: {
-        // Token Contract Info (fetched from API)
         tokenAddress: null,
         tokenName: null,
         tokenSymbol: null,
         tokenDecimals: null,
         tokenTotalSupply: null,
         iconUrl: null,
-
-        // Distribution Config (user input)
-        distributionAmount: '',
-        distributionName: '',
-        distributionDescription: '',
     },
-    schedule: {
-        cliffEndDate: '',
-        distributionDurationMonths: 12
-    },
-    recipients: [],
-    csvFilename: null,
-    regulatoryRules: [],
+    distributions: [],
     merkleRoot: null,
     deployedContractAddress: null,
     txHash: null
@@ -62,65 +50,41 @@ let state = $state<WizardState>(structuredClone(initialState));
 // Derived Values (Computed)
 // ============================================================================
 
-const canProceedFromStep1 = $derived(
-    state.tokenDetails.distributionName.length >= 3 &&
-    state.tokenDetails.tokenAddress !== null &&
-    state.tokenDetails.tokenName !== null &&
-    parseFloat(state.tokenDetails.distributionAmount) > 0
+const totalRecipientsAmount = $derived(
+    state.distributions.reduce((total, dist) => {
+        return total + dist.recipients.reduce((sum, r) => sum + r.amount, 0);
+    }, 0)
 );
 
-const canProceedFromStep2 = $derived(
-    state.schedule.cliffEndDate !== '' &&
-    state.schedule.distributionDurationMonths > 0
+const totalDistributionCount = $derived(
+    state.distributions.length
 );
 
-const canProceedFromStep3 = $derived(
-    state.recipients.length > 0
-);
-
-const canProceedFromStep4 = $derived(
-    true // Regulatory rules are optional
-);
-
-const canProceedFromStep5 = $derived(
-    state.merkleRoot !== null
-);
+// Editing state (for live preview in StatsPanel)
+let editingPoolAmount = $state<number>(0);
 
 const isComplete = $derived(
-    state.currentStep === 6 && state.deployedContractAddress !== null
-);
-
-const totalRecipientsAmount = $derived(
-    state.recipients.reduce((sum, r) => sum + r.amount, 0)
+    state.currentStep === 3 && state.deployedContractAddress !== null
 );
 
 // ============================================================================
 // Persistence Helpers
 // ============================================================================
 
-/**
- * Persist state to localStorage
- * Clears storage if wizard is complete (step 6)
- */
 function persist() {
     if (!browser) return;
 
     try {
-        if (state.currentStep === 6 && state.deployedContractAddress) {
-            // Wizard complete, clear storage
+        if (state.currentStep === 3 && state.deployedContractAddress) {
             localStorage.removeItem(STORAGE_KEY);
             return;
         }
-
         localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     } catch (error) {
         console.warn('[WizardStore] Failed to persist:', error);
     }
 }
 
-/**
- * Restore state from localStorage
- */
 function restore() {
     if (!browser) return;
 
@@ -128,9 +92,8 @@ function restore() {
         const saved = localStorage.getItem(STORAGE_KEY);
         if (saved) {
             const parsed = JSON.parse(saved) as WizardState;
-
-            // Validate structure before applying
-            if (parsed.currentStep && parsed.tokenDetails) {
+            // Validate minimal structure
+            if (parsed.distributions && Array.isArray(parsed.distributions)) {
                 state = parsed;
             }
         }
@@ -149,15 +112,22 @@ function setTokenDetails(details: Partial<TokenDetails>) {
     persist();
 }
 
-function setSchedule(schedule: Partial<Schedule>) {
-    state.schedule = { ...state.schedule, ...schedule };
+function addDistribution(distribution: Distribution) {
+    state.distributions.push(distribution);
     persist();
 }
 
-function setRecipients(recipients: Recipient[], filename: string) {
-    state.recipients = recipients;
-    state.csvFilename = filename;
+function removeDistribution(id: string) {
+    state.distributions = state.distributions.filter(d => d.id !== id);
     persist();
+}
+
+function updateDistribution(id: string, updates: Partial<Distribution>) {
+    const index = state.distributions.findIndex(d => d.id === id);
+    if (index !== -1) {
+        state.distributions[index] = { ...state.distributions[index], ...updates };
+        persist();
+    }
 }
 
 function setMerkleRoot(root: string) {
@@ -165,34 +135,29 @@ function setMerkleRoot(root: string) {
     persist();
 }
 
-function setRegulatoryRules(rules: string[]) {
-    state.regulatoryRules = rules;
-    persist();
-}
-
 function setDeploymentResult(contractAddress: Address, txHash: string) {
     state.deployedContractAddress = contractAddress;
     state.txHash = txHash;
-    state.currentStep = 6;
-    persist(); // Will actually clear storage
+    state.currentStep = 3;
+    persist();
 }
 
 function nextStep() {
-    if (state.currentStep < 6) {
+    if (state.currentStep < 3) {
         state.currentStep++;
         persist();
     }
 }
 
 function previousStep() {
-    if (state.currentStep > 1) {
+    if (state.currentStep > 0) {
         state.currentStep--;
         persist();
     }
 }
 
 function goToStep(step: number) {
-    if (step >= 1 && step <= 6) {
+    if (step >= 0 && step <= 3) {
         state.currentStep = step;
         persist();
     }
@@ -210,38 +175,31 @@ function reset() {
 // ============================================================================
 
 export const wizardStore = {
-    // Getters (read-only via property access)
+    // Getters
     get currentStep() { return state.currentStep; },
     get tokenDetails() { return state.tokenDetails; },
-    get schedule() { return state.schedule; },
-    get recipients() { return state.recipients; },
-    get csvFilename() { return state.csvFilename; },
-    get regulatoryRules() { return state.regulatoryRules; },
+    get distributions() { return state.distributions; },
     get merkleRoot() { return state.merkleRoot; },
     get deployedContractAddress() { return state.deployedContractAddress; },
     get txHash() { return state.txHash; },
+    get editingPoolAmount() { return editingPoolAmount; },
 
-    // Derived getters
-    get canProceedFromStep1() { return canProceedFromStep1; },
-    get canProceedFromStep2() { return canProceedFromStep2; },
-    get canProceedFromStep3() { return canProceedFromStep3; },
-    get canProceedFromStep4() { return canProceedFromStep4; },
-    get canProceedFromStep5() { return canProceedFromStep5; },
-    get isComplete() { return isComplete; },
+    // Derived
     get totalRecipientsAmount() { return totalRecipientsAmount; },
+    get totalDistributionCount() { return totalDistributionCount; },
+    get isComplete() { return isComplete; },
 
-    // Mutation methods
+    // Actions
     setTokenDetails,
-    setSchedule,
-    setRecipients,
+    addDistribution,
+    removeDistribution,
+    updateDistribution,
     setMerkleRoot,
-    setRegulatoryRules,
     setDeploymentResult,
     nextStep,
     previousStep,
     goToStep,
     reset,
-
-    // Lifecycle
-    restore
+    restore,
+    setEditingPoolAmount(amount: number) { editingPoolAmount = amount; },
 };

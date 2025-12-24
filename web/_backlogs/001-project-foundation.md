@@ -15,7 +15,7 @@
 
 - [x] Svelte 5 (Runes): No `export let`, using `$state`, `$derived`, `$props`.
 - [x] Tailwind v4: CSS-first theme, no `tailwind.config.js` logic.
-- [x] Biome Ready: Lint & Format check (via pnpm install/check).
+- [x] Biome Ready: Lint & Format check (via pppnpm install/check).
 - [x] ZK Compatibility: N/A
 
 ## 2. Problem Analysis
@@ -56,7 +56,7 @@
 
 ## 6. Acceptance Criteria
 
-- [x] Project runs with `pnpm dev`.
+- [x] Project runs with `pppnpm dev`.
 - [x] Tailwind v4 interprets CSS-first theme correctly.
 - [x] GlassPanel follows the "Premium Glass Recipe" (Blur, Highlight, Saturate).
 - [x] Svelte 5 Runes used exclusively.

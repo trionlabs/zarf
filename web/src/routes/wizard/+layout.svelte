@@ -1,8 +1,16 @@
 <script lang="ts">
     import { wizardStore } from "$lib/stores/wizardStore.svelte";
+    import { goto } from "$app/navigation";
     import { onMount } from "svelte";
+    import { page } from "$app/state";
     import ThemeToggle from "$lib/components/layout/ThemeToggle.svelte";
     import ContextPanel from "$lib/components/wizard/ContextPanel.svelte";
+    import {
+        LayoutGrid,
+        PlusCircle,
+        HelpCircle,
+        ChevronRight,
+    } from "lucide-svelte";
 
     let { children } = $props();
 
@@ -10,243 +18,178 @@
         wizardStore.restore();
     });
 
-    interface Step {
-        id: number;
-        label: string;
-        match: (s: number) => boolean;
-    }
-
-    const mainSteps: Step[] = [
-        { id: 1, label: "Configuration", match: (s: number) => s === 1 },
-        { id: 2, label: "Distribution", match: (s: number) => s === 2 },
-        { id: 3, label: "Deploy", match: (s: number) => s === 3 },
-        { id: 4, label: "Success", match: (s: number) => s === 4 },
-    ];
-
-    let currentMainStep = $derived(
-        mainSteps.find((s) => s.match(wizardStore.currentStep)) || mainSteps[0],
-    );
+    // Determine active section from URL
+    let isManageView = $derived(page.url.pathname.startsWith("/manage"));
+    let isCreateView = $derived(page.url.pathname.startsWith("/wizard"));
 </script>
 
 <div
-    class="min-h-screen bg-base-100 font-sans selection:bg-primary selection:text-primary-content flex flex-col"
+    class="min-h-screen bg-base-200/30 font-sans selection:bg-primary selection:text-primary-content"
 >
-    <!-- Header -->
+    <!-- Ultra-thin Top Bar -->
     <header
-        class="w-full border-b-[0.5px] border-base-content/10 bg-base-100/95 backdrop-blur-xl sticky top-0 z-50"
+        class="h-12 bg-base-100 border-b border-base-content/5 flex items-center justify-between px-6 sticky top-0 z-50"
     >
-        <div class="flex items-center justify-between h-14 px-8">
-            <!-- Logo -->
-            <a
-                href="/"
-                class="flex items-center gap-2.5 hover:opacity-70 transition-opacity"
+        <!-- Logo -->
+        <a href="/" class="flex items-center gap-2 group">
+            <div
+                class="w-5 h-5 rounded bg-gradient-to-br from-primary/80 to-primary flex items-center justify-center"
             >
-                <div
-                    class="w-6 h-6 rounded-md flex items-center justify-center bg-base-content/5"
+                <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    class="w-3 h-3 stroke-primary-content"
+                    stroke-width="2.5"
                 >
-                    <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        class="w-3.5 h-3.5 stroke-current opacity-60"
-                    >
-                        <path
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            stroke-width="2"
-                            d="M13 10V3L4 14h7v7l9-11h-7z"
-                        />
-                    </svg>
-                </div>
-                <span class="text-sm font-semibold tracking-tight">Zarf</span>
+                    <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        d="M13 10V3L4 14h7v7l9-11h-7z"
+                    />
+                </svg>
+            </div>
+            <span
+                class="text-sm font-semibold tracking-tight opacity-80 group-hover:opacity-100 transition-opacity"
+                >Zarf</span
+            >
+        </a>
+
+        <!-- Minimal Actions -->
+        <div class="flex items-center gap-4">
+            <a
+                href="/docs"
+                class="text-[11px] text-base-content/40 hover:text-base-content transition-colors uppercase tracking-widest font-medium"
+            >
+                Docs
             </a>
-
-            <!-- Center: Breadcrumb-style Title -->
-            <div class="hidden md:flex items-center gap-2 text-xs">
-                <span class="text-base-content/30">Create Distribution</span>
-                <span class="text-base-content/20">/</span>
-                <span class="text-base-content/60 font-medium"
-                    >Step {wizardStore.currentStep}</span
-                >
-            </div>
-
-            <!-- Right: Nav + Theme -->
-            <div class="flex items-center gap-6">
-                <nav class="hidden md:flex items-center gap-5">
-                    <a
-                        href="/dashboard"
-                        class="text-xs text-base-content/40 hover:text-base-content transition-colors"
-                    >
-                        Dashboard
-                    </a>
-                    <a
-                        href="/docs"
-                        class="text-xs text-base-content/40 hover:text-base-content transition-colors"
-                    >
-                        Docs
-                    </a>
-                </nav>
-                <div class="border-l-[0.5px] border-base-content/10 pl-5">
-                    <ThemeToggle />
-                </div>
-            </div>
+            <div class="w-px h-4 bg-base-content/10"></div>
+            <ThemeToggle />
         </div>
     </header>
 
-    <!-- Main Content: Full Width 3-Column Grid -->
-    <div class="flex-1 grid grid-cols-1 lg:grid-cols-[200px_1fr_280px]">
-        <!-- Left Sidebar (Steps) - Hidden on mobile -->
+    <!-- Main Shell -->
+    <div class="flex min-h-[calc(100vh-3rem)]">
+        <!-- LEFT: Ultra-Slim Sidebar -->
         <aside
-            class="hidden lg:flex flex-col border-r-[0.5px] border-base-content/10 bg-base-100"
+            class="hidden lg:flex flex-col w-56 bg-base-100 border-r border-base-content/5 shrink-0"
         >
-            <div class="sticky top-16 p-8">
-                <!-- Section Title -->
-                <h3
-                    class="text-[10px] font-semibold uppercase tracking-[0.15em] text-base-content/40 mb-5"
-                >
-                    Progress
-                </h3>
-
-                <div class="space-y-1">
-                    {#each mainSteps as step}
-                        {@const isActive = currentMainStep.id === step.id}
-                        {@const isCompleted = currentMainStep.id > step.id}
-
-                        <div
-                            class="flex items-center justify-between py-3 border-b-[0.5px] border-base-content/5 group transition-all duration-300"
-                        >
-                            <div class="flex items-center gap-3">
-                                <!-- Step Indicator -->
-                                <div
-                                    class="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-medium transition-all duration-300 {isActive
-                                        ? 'bg-primary text-primary-content'
-                                        : isCompleted
-                                          ? 'bg-success/20 text-success'
-                                          : 'bg-base-content/5 text-base-content/30'}"
-                                >
-                                    {#if isCompleted}
-                                        <svg
-                                            xmlns="http://www.w3.org/2000/svg"
-                                            viewBox="0 0 24 24"
-                                            fill="none"
-                                            stroke="currentColor"
-                                            stroke-width="3"
-                                            class="w-3 h-3"
-                                        >
-                                            <polyline points="20 6 9 17 4 12" />
-                                        </svg>
-                                    {:else}
-                                        {step.id}
-                                    {/if}
-                                </div>
-
-                                <!-- Label -->
-                                <span
-                                    class="text-xs transition-all duration-300 {isActive
-                                        ? 'font-medium text-base-content'
-                                        : isCompleted
-                                          ? 'text-base-content/50 line-through'
-                                          : 'text-base-content/40'}"
-                                >
-                                    {step.label}
-                                </span>
-                            </div>
-
-                            <!-- Status indicator -->
-                            {#if isActive}
-                                <div
-                                    class="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"
-                                ></div>
-                            {/if}
-                        </div>
-                    {/each}
+            <div class="flex flex-col h-full p-4">
+                <!-- Section Label -->
+                <div class="px-3 mb-4">
+                    <span
+                        class="text-[10px] font-bold uppercase tracking-[0.2em] text-base-content/30"
+                        >Workspace</span
+                    >
                 </div>
 
-                <!-- Help Link -->
-                <div class="mt-12 pt-6 border-t border-base-content/5">
+                <!-- Primary Nav -->
+                <nav class="space-y-1">
+                    <a
+                        href="/wizard/step-0"
+                        class="group flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-all duration-200 {isCreateView
+                            ? 'bg-primary/5 text-primary font-medium'
+                            : 'text-base-content/50 hover:bg-base-200/50 hover:text-base-content'}"
+                    >
+                        <div class="flex items-center gap-3">
+                            <PlusCircle
+                                class="w-4 h-4 {isCreateView
+                                    ? 'text-primary'
+                                    : 'opacity-40 group-hover:opacity-70'}"
+                            />
+                            <span>Create</span>
+                        </div>
+                        {#if isCreateView}
+                            <ChevronRight class="w-3.5 h-3.5 opacity-40" />
+                        {/if}
+                    </a>
+
+                    <a
+                        href="/manage"
+                        class="group flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-all duration-200 {isManageView
+                            ? 'bg-primary/5 text-primary font-medium'
+                            : 'text-base-content/50 hover:bg-base-200/50 hover:text-base-content'}"
+                    >
+                        <div class="flex items-center gap-3">
+                            <LayoutGrid
+                                class="w-4 h-4 {isManageView
+                                    ? 'text-primary'
+                                    : 'opacity-40 group-hover:opacity-70'}"
+                            />
+                            <span>Manage</span>
+                        </div>
+                        {#if isManageView}
+                            <ChevronRight class="w-3.5 h-3.5 opacity-40" />
+                        {/if}
+                    </a>
+                </nav>
+
+                <!-- Spacer -->
+                <div class="flex-1"></div>
+
+                <!-- Footer -->
+                <div class="border-t border-base-content/5 pt-4 mt-4">
                     <a
                         href="/docs"
-                        class="text-xs font-medium flex items-center gap-2 opacity-40 hover:opacity-100 hover:text-primary transition-all"
+                        class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs text-base-content/30 hover:text-base-content/60 hover:bg-base-200/30 transition-all"
                     >
-                        <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke-width="1.5"
-                            stroke="currentColor"
-                            class="w-4 h-4"
-                        >
-                            <path
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                                d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z"
-                            />
-                        </svg>
-                        Need help?
+                        <HelpCircle class="w-3.5 h-3.5" />
+                        <span>Help Center</span>
                     </a>
                 </div>
             </div>
         </aside>
 
-        <!-- Mobile Horizontal Stepper -->
-        <div
-            class="lg:hidden border-b-[0.5px] border-base-content/10 p-4 bg-base-100"
-        >
-            <div class="flex items-center justify-center gap-3">
-                {#each mainSteps as step}
-                    {@const isActive = currentMainStep.id === step.id}
-                    {@const isCompleted = currentMainStep.id > step.id}
-
-                    <div class="flex items-center gap-3">
-                        <div
-                            class="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-medium border transition-all {isActive
-                                ? 'border-primary bg-primary text-primary-content'
-                                : isCompleted
-                                  ? 'border-success text-success'
-                                  : 'border-base-content/20 opacity-40'}"
-                        >
-                            {#if isCompleted}
-                                <svg
-                                    xmlns="http://www.w3.org/2000/svg"
-                                    viewBox="0 0 24 24"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    stroke-width="3"
-                                    class="w-3 h-3"
-                                >
-                                    <polyline points="20 6 9 17 4 12" />
-                                </svg>
-                            {:else}
-                                {step.id}
-                            {/if}
-                        </div>
-
-                        {#if step.id < 4}
-                            <div
-                                class="w-8 h-[1px] {isCompleted
-                                    ? 'bg-success'
-                                    : 'bg-base-content/10'}"
-                            ></div>
-                        {/if}
-                    </div>
-                {/each}
-            </div>
-        </div>
-
-        <!-- Main Content Area -->
-        <main class="bg-base-100 relative">
-            <div class="max-w-4xl px-6 md:px-12 pt-10 lg:pt-16">
-                {@render children()}
+        <!-- CENTER: Main Workspace -->
+        <main class="flex-1 overflow-x-hidden">
+            <!-- Inner Container with subtle inset feel -->
+            <div class="h-full bg-base-100/50 lg:rounded-tl-2xl">
+                <div class="w-full p-8 lg:p-12">
+                    {@render children()}
+                </div>
             </div>
         </main>
 
-        <!-- Right Context Panel - Hidden on mobile/tablet -->
+        <!-- RIGHT: Context Panel (Collapsible feeling) -->
         <aside
-            class="hidden lg:block border-l-[0.5px] border-base-content/10 bg-base-50"
+            class="hidden xl:block w-72 bg-base-100 border-l border-base-content/5 shrink-0"
         >
-            <div class="sticky top-16">
+            <div class="sticky top-12 h-[calc(100vh-3rem)] overflow-y-auto">
                 <ContextPanel />
             </div>
         </aside>
     </div>
+
+    <!-- Mobile Bottom Nav -->
+    <nav
+        class="lg:hidden fixed bottom-0 inset-x-0 bg-base-100/95 backdrop-blur-lg border-t border-base-content/10 z-50 safe-area-pb"
+    >
+        <div class="flex justify-around h-14">
+            <a
+                href="/wizard/step-0"
+                class="flex flex-col items-center justify-center flex-1 gap-0.5 {isCreateView
+                    ? 'text-primary'
+                    : 'text-base-content/40'}"
+            >
+                <PlusCircle class="w-5 h-5" />
+                <span class="text-[10px] font-medium">Create</span>
+            </a>
+            <a
+                href="/manage"
+                class="flex flex-col items-center justify-center flex-1 gap-0.5 {isManageView
+                    ? 'text-primary'
+                    : 'text-base-content/40'}"
+            >
+                <LayoutGrid class="w-5 h-5" />
+                <span class="text-[10px] font-medium">Manage</span>
+            </a>
+        </div>
+    </nav>
 </div>
+
+<style>
+    /* Safe area for mobile notch/home indicator */
+    .safe-area-pb {
+        padding-bottom: env(safe-area-inset-bottom, 0);
+    }
+</style>

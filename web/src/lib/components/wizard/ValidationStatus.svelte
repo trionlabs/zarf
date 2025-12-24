@@ -2,7 +2,7 @@
     import { wizardStore } from "$lib/stores/wizardStore.svelte";
     import { Check, X } from "lucide-svelte";
 
-    // Validation rules based on new TokenDetails structure
+    // Validation rules for Step 0 (Token Entry)
     const validations = $derived([
         {
             label: "Contract address",
@@ -17,27 +17,9 @@
         {
             label: "Token verified",
             valid: wizardStore.tokenDetails.tokenName !== null,
-            touched: wizardStore.tokenDetails.tokenAddress !== null,
-        },
-        {
-            label: "Distribution amount",
-            valid: parseFloat(wizardStore.tokenDetails.distributionAmount) > 0,
-            touched: wizardStore.tokenDetails.distributionAmount.length > 0,
-        },
-        {
-            label: "Distribution name",
-            valid: wizardStore.tokenDetails.distributionName.length >= 3,
-            touched: wizardStore.tokenDetails.distributionName.length > 0,
-        },
-        {
-            label: "Cliff date",
-            valid: wizardStore.schedule.cliffEndDate !== "",
-            touched: false, // Date picker doesn't have "touched" state
-        },
-        {
-            label: "Vesting duration",
-            valid: wizardStore.schedule.distributionDurationMonths > 0,
-            touched: true, // Always has default value
+            touched:
+                wizardStore.tokenDetails.tokenAddress !== null &&
+                wizardStore.tokenDetails.tokenAddress.length === 42,
         },
     ]);
 

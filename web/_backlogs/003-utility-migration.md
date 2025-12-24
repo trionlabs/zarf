@@ -494,7 +494,7 @@ export interface GooglePublicKey {
 1. Run TypeScript compiler:
 
    ```bash
-   pnpm run check
+   pppnpm run check
    ```
 
 2. Fix all type errors
@@ -518,7 +518,7 @@ export interface GooglePublicKey {
 ## 6. Acceptance Criteria
 
 - [ ] All 6 utility modules migrated to `web/src/lib/`
-- [ ] Zero TypeScript errors on `pnpm run check`
+- [ ] Zero TypeScript errors on `pppnpm run check`
 - [ ] All functions have JSDoc comments
 - [ ] All function signatures are typed (no `any`)
 - [ ] SSR-safe guards added to browser-only functions
@@ -616,7 +616,7 @@ export interface GooglePublicKey {
 **Achievements:**
 
 - ✅ All POC utilities successfully migrated to TypeScript
-- ✅ Zero TypeScript errors (`pnpm run check` passes)
+- ✅ Zero TypeScript errors (`pppnpm run check` passes)
 - ✅ Comprehensive JSDoc documentation added
 - ✅ Strict typing enforced (minimal `any` usage, only for Wagmi provider)
 - ✅ SSR-safe implementations with browser guards
