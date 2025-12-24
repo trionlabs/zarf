@@ -54,8 +54,7 @@
     );
 
     // --- Handlers ---
-    function handleNext() {
-        // Sync to store only on navigation (not on every keystroke)
+    $effect(() => {
         wizardStore.setTokenDetails({
             distributionName,
             iconUrl: iconUrl || null,
@@ -66,7 +65,9 @@
             cliffEndDate,
             distributionDurationMonths: durationMonths,
         });
+    });
 
+    function handleNext() {
         wizardStore.goToStep(2);
         goto("/wizard/step-2");
     }

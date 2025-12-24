@@ -65,9 +65,14 @@
         URL.revokeObjectURL(url);
     }
 
-    function handleNext() {
+    $effect(() => {
         if (recipients.length > 0 && fileName) {
             wizardStore.setRecipients(recipients, fileName);
+        }
+    });
+
+    function handleNext() {
+        if (recipients.length > 0 && fileName) {
             wizardStore.nextStep();
             goto("/wizard/step-3");
         }
