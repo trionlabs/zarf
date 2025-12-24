@@ -1,180 +1,103 @@
 <script lang="ts">
-    import ThemeSelector from "$lib/components/layout/ThemeSelector.svelte";
-    import { Mail, ShieldCheck, Zap, Lock, Eye, EyeOff } from "lucide-svelte";
+    import ThemeToggle from "$lib/components/layout/ThemeToggle.svelte";
 
-    let email = $state("");
-    let isModalOpen = $state(false);
-    let showPassword = $state(false);
-    let isLoading = $state(false);
-
-    function toggleModal() {
-        isModalOpen = !isModalOpen;
-    }
-
-    async function handleAction() {
-        isLoading = true;
-        await new Promise((r) => setTimeout(r, 2000));
-        isLoading = false;
-        toggleModal();
-    }
+    const features = [
+        {
+            title: "🔒 Zero-Knowledge Privacy",
+            description:
+                "Claim tokens without revealing your email. Built with Noir ZK circuits.",
+        },
+        {
+            title: "✅ No KYC Required",
+            description:
+                "Privacy-first distribution. Only email verification needed.",
+        },
+        {
+            title: "📅 Built-in Vesting",
+            description:
+                "Configure cliff periods and vesting schedules. All on-chain.",
+        },
+    ];
 </script>
 
 <svelte:head>
-    <title>Zarf | Core UI Components</title>
+    <title>Zarf - Privacy-Preserving Token Distribution</title>
+    <meta
+        name="description"
+        content="Create token distributions with built-in vesting and privacy-preserving claims using Zero-Knowledge proofs."
+    />
 </svelte:head>
 
-<main class="min-h-screen bg-base-100 p-8 md:p-16">
-    <div class="max-w-4xl mx-auto space-y-12">
-        <!-- Header -->
-        <header
-            class="flex flex-col md:flex-row md:items-center justify-between gap-6"
-        >
-            <div class="space-y-4">
-                <div class="flex gap-2">
-                    <span class="badge badge-primary">Multi Theme</span>
-                    <span class="badge badge-outline">DaisyUI v5</span>
-                </div>
-                <h1 class="text-5xl font-bold text-base-content">
-                    ZARF<span class="text-primary">.</span>UI
+<div class="min-h-screen flex flex-col">
+    <!-- Hero Section -->
+    <section class="hero min-h-screen bg-base-200">
+        <div class="hero-content text-center">
+            <div class="max-w-2xl">
+                <h1 class="text-5xl font-bold">
+                    Privacy-Preserving Token Distribution
                 </h1>
-                <p class="text-base-content/70 text-lg max-w-xl">
-                    Pure DaisyUI components with theme switching.
+                <p class="py-6 text-xl">
+                    Create vesting schedules and enable private token claims
+                    using Zero-Knowledge proofs. No KYC. No compromises.
                 </p>
-            </div>
 
-            <ThemeSelector themes={["nord", "wireframe"]} />
-        </header>
+                <div class="flex gap-4 justify-center flex-wrap">
+                    <a href="/wizard" class="btn btn-primary btn-lg">
+                        Create Distribution
+                    </a>
+                    <a href="/claim" class="btn btn-secondary btn-lg">
+                        Claim Tokens
+                    </a>
+                </div>
 
-        <!-- Buttons -->
-        <section class="space-y-4">
-            <h2 class="text-2xl font-semibold text-base-content">Buttons</h2>
-            <div class="flex flex-wrap gap-4">
-                <button class="btn btn-primary">Primary</button>
-                <button class="btn btn-secondary">Secondary</button>
-                <button class="btn btn-accent">Accent</button>
-                <button class="btn btn-neutral">Neutral</button>
-                <button class="btn btn-ghost">Ghost</button>
-                <button class="btn btn-outline">Outline</button>
-                <button class="btn btn-error">Error</button>
-            </div>
-        </section>
-
-        <!-- Inputs -->
-        <section class="space-y-4">
-            <h2 class="text-2xl font-semibold text-base-content">Inputs</h2>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <label class="form-control w-full">
-                    <div class="label">
-                        <span class="label-text">Email</span>
+                <div class="mt-8">
+                    <div class="badge badge-outline">
+                        Powered by Noir & Aztec
                     </div>
-                    <input
-                        type="email"
-                        placeholder="yaman@zarf.io"
-                        class="input input-bordered w-full"
-                        bind:value={email}
-                    />
-                </label>
-
-                <label class="form-control w-full">
-                    <div class="label">
-                        <span class="label-text">Password</span>
-                    </div>
-                    <input
-                        type={showPassword ? "text" : "password"}
-                        placeholder="••••••••"
-                        class="input input-bordered w-full"
-                    />
-                </label>
-
-                <label class="form-control w-full">
-                    <div class="label">
-                        <span class="label-text">With Error</span>
-                    </div>
-                    <input
-                        type="text"
-                        placeholder="0x..."
-                        class="input input-bordered input-error w-full"
-                    />
-                    <div class="label">
-                        <span class="label-text-alt text-error"
-                            >Verification pending</span
-                        >
-                    </div>
-                </label>
-
-                <label class="form-control w-full">
-                    <div class="label">
-                        <span class="label-text">Search</span>
-                    </div>
-                    <input
-                        type="text"
-                        placeholder="Search keys..."
-                        class="input input-bordered w-full"
-                    />
-                </label>
-            </div>
-        </section>
-
-        <!-- Badges -->
-        <section class="space-y-4">
-            <h2 class="text-2xl font-semibold text-base-content">Badges</h2>
-            <div class="flex flex-wrap gap-3">
-                <span class="badge badge-primary">Primary</span>
-                <span class="badge badge-secondary">Secondary</span>
-                <span class="badge badge-accent">Accent</span>
-                <span class="badge badge-neutral">Neutral</span>
-                <span class="badge badge-success">Success</span>
-                <span class="badge badge-warning">Warning</span>
-                <span class="badge badge-error">Error</span>
-                <span class="badge badge-outline">Outline</span>
-            </div>
-        </section>
-
-        <!-- Card -->
-        <section class="space-y-4">
-            <h2 class="text-2xl font-semibold text-base-content">Card</h2>
-            <div class="card bg-base-200">
-                <div class="card-body">
-                    <h3 class="card-title">Card Title</h3>
-                    <p class="text-base-content/70">
-                        This is a standard DaisyUI card. Try switching themes!
-                    </p>
-                    <div class="card-actions justify-end">
-                        <button class="btn btn-primary" onclick={toggleModal}
-                            >Open Modal</button
-                        >
+                    <div class="badge badge-outline ml-2">
+                        Deployed on Ethereum
                     </div>
                 </div>
             </div>
-        </section>
+        </div>
+    </section>
 
-        <!-- Modal -->
-        <dialog class="modal" class:modal-open={isModalOpen}>
-            <div class="modal-box">
-                <h3 class="text-lg font-bold">Modal Title</h3>
-                <p class="py-4 text-base-content/70">
-                    This is a standard DaisyUI modal.
-                </p>
-                <div class="modal-action">
-                    <button class="btn btn-ghost" onclick={toggleModal}
-                        >Close</button
-                    >
-                    <button
-                        class="btn btn-primary"
-                        onclick={handleAction}
-                        disabled={isLoading}
-                    >
-                        {#if isLoading}
-                            <span class="loading loading-spinner loading-sm"
-                            ></span>
-                        {/if}
-                        Confirm
-                    </button>
-                </div>
+    <!-- Features Section -->
+    <section class="py-20">
+        <div class="container mx-auto px-4">
+            <h2 class="text-3xl font-bold text-center mb-12">Why Zarf?</h2>
+
+            <div class="grid md:grid-cols-3 gap-8">
+                {#each features as feature}
+                    <div class="card shadow-xl">
+                        <div class="card-body">
+                            <h3 class="card-title">{feature.title}</h3>
+                            <p>{feature.description}</p>
+                        </div>
+                    </div>
+                {/each}
             </div>
-            <form method="dialog" class="modal-backdrop">
-                <button onclick={toggleModal}>close</button>
-            </form>
-        </dialog>
-    </div>
-</main>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer
+        class="footer footer-center p-10 bg-base-200 text-base-content mt-auto"
+    >
+        <nav>
+            <div class="grid grid-flow-col gap-4">
+                <a href="/wizard" class="link link-hover">Create Distribution</a
+                >
+                <a href="/claim" class="link link-hover">Claim Tokens</a>
+                <a href="/distributions" class="link link-hover"
+                    >My Distributions</a
+                >
+            </div>
+        </nav>
+
+        <aside class="flex items-center gap-4">
+            <p>© 2025 Zarf - Privacy-First Token Distribution</p>
+            <ThemeToggle />
+        </aside>
+    </footer>
+</div>
