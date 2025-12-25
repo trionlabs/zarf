@@ -12,24 +12,37 @@
     themeStore.restore();
   });
 
-  // Test functions
-  function testWizardStep1() {
+  // Test functions - Updated to match new wizardStore API
+  function testWizardTokenDetails() {
     wizardStore.setTokenDetails({
-      distributionName: "Test Token Distribution",
-      tokenAddress: "0x1234567890123456789012345678901234567890",
-      totalAmount: "1000000",
+      tokenAddress:
+        "0x1234567890123456789012345678901234567890" as `0x${string}`,
+      tokenName: "Test Token",
+      tokenSymbol: "TEST",
+      tokenDecimals: 18,
+      tokenTotalSupply: "1,000,000",
+      iconUrl: null,
     });
   }
 
-  function testWizardStep3() {
-    wizardStore.setRecipients(
-      [
+  function testWizardAddDistribution() {
+    wizardStore.addDistribution({
+      id: crypto.randomUUID(),
+      name: "Series A Investors",
+      description: "Test distribution for investors",
+      amount: "100000",
+      schedule: {
+        cliffEndDate: "2025-06-01",
+        distributionDurationMonths: 12,
+      },
+      recipients: [
         { email: "alice@example.com", amount: 1000 },
         { email: "bob@example.com", amount: 2000 },
         { email: "charlie@example.com", amount: 3000 },
       ],
-      "test.csv",
-    );
+      csvFilename: "test.csv",
+      regulatoryRules: [],
+    });
   }
 
   function testClaimFlow() {
@@ -53,6 +66,18 @@
       );
     }, 1000);
   }
+
+  // Derived values for display
+  const totalTokensInBasket = $derived(
+    wizardStore.distributions.reduce((sum, d) => sum + Number(d.amount), 0),
+  );
+  const totalRecipients = $derived(
+    wizardStore.distributions.reduce((sum, d) => sum + d.recipients.length, 0),
+  );
+  const hasValidToken = $derived(
+    wizardStore.tokenDetails.tokenAddress !== null &&
+      wizardStore.tokenDetails.tokenName !== null,
+  );
 </script>
 
 <div class="container mx-auto p-8 space-y-8">
@@ -71,35 +96,46 @@
       <div class="stats stats-vertical lg:stats-horizontal shadow">
         <div class="stat">
           <div class="stat-title">Current Step</div>
-          <div class="stat-value">{wizardStore.currentStep} / 6</div>
+          <div class="stat-value">{wizardStore.currentStep} / 3</div>
         </div>
 
         <div class="stat">
-          <div class="stat-title">Distribution Name</div>
+          <div class="stat-title">Token</div>
           <div class="stat-value text-xl">
-            {wizardStore.tokenDetails.distributionName || "None"}
+            {wizardStore.tokenDetails.tokenName || "None"}
+          </div>
+          <div class="stat-desc">
+            {wizardStore.tokenDetails.tokenSymbol || "—"}
           </div>
         </div>
 
         <div class="stat">
-          <div class="stat-title">Recipients</div>
-          <div class="stat-value">{wizardStore.recipients.length}</div>
+          <div class="stat-title">Distributions</div>
+          <div class="stat-value">{wizardStore.distributions.length}</div>
         </div>
 
         <div class="stat">
-          <div class="stat-title">Total Amount</div>
+          <div class="stat-title">Total Recipients</div>
+          <div class="stat-value">{totalRecipients}</div>
+        </div>
+
+        <div class="stat">
+          <div class="stat-title">Total Tokens</div>
           <div class="stat-value text-xl">
-            {wizardStore.totalRecipientsAmount}
+            {totalTokensInBasket.toLocaleString()}
           </div>
         </div>
       </div>
 
       <div class="flex flex-wrap gap-2 mt-4">
-        <button class="btn btn-sm btn-primary" onclick={testWizardStep1}>
-          Test Step 1 (Token Details)
+        <button class="btn btn-sm btn-primary" onclick={testWizardTokenDetails}>
+          Set Token Details
         </button>
-        <button class="btn btn-sm btn-primary" onclick={testWizardStep3}>
-          Test Step 3 (Recipients)
+        <button
+          class="btn btn-sm btn-primary"
+          onclick={testWizardAddDistribution}
+        >
+          Add Distribution
         </button>
         <button class="btn btn-sm" onclick={wizardStore.nextStep}>
           Next Step
@@ -112,8 +148,8 @@
         </button>
       </div>
 
-      <div class="alert" class:alert-success={wizardStore.canProceedFromStep1}>
-        <span>Can proceed from Step 1: {wizardStore.canProceedFromStep1}</span>
+      <div class="alert" class:alert-success={hasValidToken}>
+        <span>Token Valid: {hasValidToken ? "✅ Yes" : "❌ No"}</span>
       </div>
     </div>
   </section>
