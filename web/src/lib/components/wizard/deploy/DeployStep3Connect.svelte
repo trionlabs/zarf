@@ -87,7 +87,7 @@
 
     async function handleConnect() {
         try {
-            await walletStore.connect();
+            await walletStore.requestConnection();
         } catch (e) {
             // Error is managed in store
             console.error("Connection failed:", e);

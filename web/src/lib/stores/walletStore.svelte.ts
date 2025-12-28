@@ -41,6 +41,7 @@ interface WalletState {
     balance: WalletBalance | null;
     error: string | null;
     connectors: readonly Connector[];
+    isModalOpen: boolean; // Added
 }
 
 const initialState: WalletState = {
@@ -53,7 +54,8 @@ const initialState: WalletState = {
     chainId: null,
     balance: null,
     error: null,
-    connectors: []
+    connectors: [],
+    isModalOpen: false // Added
 };
 
 let state = $state<WalletState>(structuredClone(initialState));
@@ -89,6 +91,11 @@ function updateInternalState(account: { address?: Address, isConnected: boolean,
     state.isDisconnecting = false;
     state.isSwitchingNetwork = false;
     state.error = null; // Clear old errors on state change
+
+    // Auto-close modal if connected
+    if (state.isConnected) {
+        state.isModalOpen = false;
+    }
 
     // Balance Fetch Logic
     if (state.isConnected && state.address) {
@@ -137,6 +144,30 @@ async function init() {
     });
 }
 
+/**
+ * Smart Connection Request.
+ * Decides whether to auto-connect or open the selection modal.
+ * Call this from UI components instead of connect().
+ */
+async function requestConnection() {
+    state.connectors = getWalletConnectors(); // Refresh list first
+
+    if (state.connectors.length > 1) {
+        state.isModalOpen = true; // Multiple wallets -> Show Modal
+    } else if (state.connectors.length === 1) {
+        await connect(state.connectors[0]); // Single wallet -> Auto Connect
+    } else {
+        // No wallet detected
+        state.error = "No wallet detected. Please install MetaMask.";
+        // Optionally show modal anyway to guide user
+        state.isModalOpen = true;
+    }
+}
+
+function closeModal() {
+    state.isModalOpen = false;
+}
+
 async function refreshBalance() {
     if (!state.address || !state.isConnected) return;
     try {
@@ -150,6 +181,10 @@ async function refreshBalance() {
 async function connect(connector?: Connector) {
     if (!browser) return;
     if (state.isReconnecting) { state.error = 'Please wait, restoring previous session...'; return; }
+
+    // Close modal if open
+    state.isModalOpen = false;
+
     state.isConnecting = true;
     state.error = null;
     try {
@@ -203,6 +238,7 @@ export const walletStore = {
     get balance() { return state.balance; },
     get error() { return state.error; },
     get connectors() { return state.connectors; },
+    get isModalOpen() { return state.isModalOpen; }, // Exposed
 
     // Derived getters
     get isWrongNetwork() { return isWrongNetwork; },
@@ -213,11 +249,13 @@ export const walletStore = {
 
     // Actions
     init,
+    requestConnection, // Main entry point
     connect,
     disconnect,
     switchChain,
     refreshBalance,
     clearError,
+    closeModal, // Exposed
     destroy
 };
 

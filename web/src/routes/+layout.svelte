@@ -4,6 +4,7 @@
 	import { walletStore } from "$lib/stores/walletStore.svelte";
 	import { onMount } from "svelte";
 	import { browser } from "$app/environment";
+	import WalletSelectionModal from "$lib/components/wallet/WalletSelectionModal.svelte";
 
 	let { children } = $props();
 
@@ -39,5 +40,7 @@
 		</div>
 	</div>
 {/if}
+
+<WalletSelectionModal />
 
 {@render children()}

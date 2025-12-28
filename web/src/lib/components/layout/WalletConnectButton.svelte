@@ -2,14 +2,12 @@
   WalletConnectButton - Global Wallet Connection UI
   
   A smart button that shows:
-  - "Connect Wallet" when disconnected
+  - "Connect Wallet" when disconnected (Triggers Global Modal)
   - Address + Network badge when connected
   - Dropdown menu for Balance/Disconnect/Copy/Switch Network
-  - Wallet Selection Modal if multiple wallets detected
 
   FE_DEV.md Compliant:
-  - Uses DaisyUI dropdown & modal
-  - Template logic moved to $derived variables
+  - Uses DaisyUI dropdown
   - Only DaisyUI semantic colors
 -->
 <script lang="ts">
@@ -18,10 +16,8 @@
         MAINNET_CHAIN_ID,
         SEPOLIA_CHAIN_ID,
     } from "$lib/stores/walletStore.svelte";
-    import { type Connector } from "@wagmi/core";
 
     let copied = $state(false);
-    let modalRef = $state<HTMLDialogElement | null>(null);
 
     const statusIndicatorClass = $derived(
         walletStore.isWrongNetwork ? "bg-warning animate-pulse" : "bg-success",
@@ -45,28 +41,9 @@
 
     const canShowEtherscan = $derived(etherscanUrl !== null);
 
-    // Smart Connect Logic
+    // Actions
     async function handleConnectClick() {
-        // Always refresh connectors before check (in case dynamic injection happened)
-        // walletStore.connectors is reactive
-        const connectors = walletStore.connectors;
-
-        // If multiple connectors (e.g. MetaMask + Phantom), show modal
-        if (connectors.length > 1) {
-            modalRef?.showModal();
-        } else {
-            // If just one (or none), try direct connect
-            await performConnect();
-        }
-    }
-
-    async function performConnect(connector?: Connector) {
-        modalRef?.close();
-        try {
-            await walletStore.connect(connector);
-        } catch (e) {
-            /* Handled by store */
-        }
+        await walletStore.requestConnection();
     }
 
     async function handleDisconnect() {
@@ -100,53 +77,6 @@
         }
     }
 </script>
-
-<!-- Wallet Selection Modal -->
-<dialog bind:this={modalRef} class="modal">
-    <div class="modal-box">
-        <h3 class="font-bold text-lg mb-4">Connect Wallet</h3>
-        <p class="text-sm opacity-70 mb-4">
-            Multiple wallets detected. Please select one.
-        </p>
-
-        <div class="grid gap-2">
-            {#each walletStore.connectors as connector}
-                <button
-                    class="btn btn-outline justify-start gap-3 h-14"
-                    onclick={() => performConnect(connector)}
-                >
-                    <!-- Icon Placeholder (Wagmi gives connector.icon) -->
-                    {#if connector.icon}
-                        <img
-                            src={connector.icon}
-                            alt={connector.name}
-                            class="w-6 h-6"
-                        />
-                    {:else}
-                        <div
-                            class="w-6 h-6 rounded-full bg-base-300 flex items-center justify-center text-xs"
-                        >
-                            W
-                        </div>
-                    {/if}
-                    <div class="flex flex-col items-start">
-                        <span class="font-bold">{connector.name}</span>
-                        <span class="text-xs opacity-60">Injected Wallet</span>
-                    </div>
-                </button>
-            {/each}
-        </div>
-
-        <div class="modal-action">
-            <form method="dialog">
-                <button class="btn">Close</button>
-            </form>
-        </div>
-    </div>
-    <form method="dialog" class="modal-backdrop">
-        <button>close</button>
-    </form>
-</dialog>
 
 {#if walletStore.isConnected}
     <div class="dropdown dropdown-end">
