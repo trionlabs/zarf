@@ -8,12 +8,15 @@
 
 ---
 
-## 📊 Current Sprint (Phase 2)
+## 📊 Current Sprint (Phase 2 & 3)
 
 | ID | Title | Priority | Status | Effort | Phase |
 |:---|:------|:---------|:-------|:-------|:------|
 | [005](005-landing-page.md) | Landing Page | 🟡 High | 📝 To Do | 4h | 2 |
-| [006](006-wizard-foundation.md) | Wizard Foundation | 🔴 Critical | 📝 To Do | 8h | 2 |
+| [006](006-wizard-foundation.md) | Wizard Foundation | 🔴 Critical | ✅ Completed | 8h | 2 |
+| [007](007-multi-distribution-flow.md) | Multi-Dist Flow | 🔴 Critical | ✅ Completed | 12h | 2 |
+| [008](008-wallet-deployment-stability.md) | Wallet Stability | 🔴 Critical | 🚧 In Progress | 6h | 3 |
+| [009](009-better-wallet-and-tx-ux.md) | Wallet & TX UX | 🟡 High | 🚧 In Progress | 6h | 3 |
 
 ---
 
@@ -25,34 +28,37 @@
 |:---|:------|:---------|:-------|:-------|:-------------|
 | 001 | Project Setup & Config | 🔴 Critical | ✅ Completed | 4h | None |
 | 002 | Design System & Tokens | 🔴 Critical | ✅ Completed | 6h | 001 |
-| **003** | **Utility Migration from POC** | 🔴 Critical | ✅ **Completed** | 8h | 002 |
-| **004** | **Global State Stores** | 🔴 Critical | ✅ **Completed** | 6h | 003 |
+| **003** | **Utility Migration** | 🔴 Critical | ✅ **Completed** | 8h | 002 |
+| **004** | **Global Stores** | 🔴 Critical | ✅ **Completed** | 6h | 003 |
 
 ### Phase 2: Wizard Foundation (Week 2)
 
 | ID | Title | Priority | Status | Effort | Dependencies |
 |:---|:------|:---------|:-------|:-------|:-------------|
 | 005 | Landing Page | 🟡 High | 📝 To Do | 4h | 004 |
-| 006 | Wizard Foundation | 🔴 Critical | 📝 To Do | 8h | 004 |
-| 007 | Wizard Steps 1-3 | 🔴 Critical | 📝 To Do | 12h | 006 |
+| 006 | Wizard Foundation | 🔴 Critical | ✅ Completed | 8h | 004 |
+| 007 | Wizard Steps 1-3 | 🔴 Critical | ✅ Completed | 12h | 006 |
 
-### Phase 3: ZK Integration (Week 3)
+### Phase 3: Deployment & Stability (Week 3)
 
 | ID | Title | Priority | Status | Effort | Dependencies |
 |:---|:------|:---------|:-------|:-------|:-------------|
-| 008 | Web Worker for ZK Proofs | 🔴 Critical | 📝 To Do | 8h | 007 |
+| 008 | Wallet Stability | 🔴 Critical | ✅ Completed | 6h | 007 |
+| 009 | Wallet & TX UX | 🟡 High | ✅ Completed | 6h | 008 |
+| **010** | **Masterpiece Wallet** | 🟡 High | 📝 To Do | 6h | 009 |
+| 011 | ZK Worker | 🔴 Critical | 📝 To Do | 8h | 009 |
 
 ### Phase 4: Claim Portal (Week 3)
 
 | ID | Title | Priority | Status | Effort | Dependencies |
 |:---|:------|:---------|:-------|:-------|:-------------|
-| 009 | Claim Portal UI | 🔴 Critical | 📝 To Do | 10h | 008 |
+| 012 | Claim Portal UI | 🔴 Critical | 📝 To Do | 10h | 011 |
 
 ### Phase 5: Distribution Management (Week 4)
 
 | ID | Title | Priority | Status | Effort | Dependencies |
 |:---|:------|:---------|:-------|:-------|:-------------|
-| 010 | Distributions Page | 🟡 High | 📝 To Do | 8h | 009 |
+| 013 | Distributions Page | 🟡 High | 📝 To Do | 8h | 012 |
 
 ---
 
@@ -61,11 +67,9 @@
 | Phase | Backlogs | Completed | In Progress | To Do | % Done |
 |:------|:---------|:----------|:------------|:------|:-------|
 | **Phase 1** | 4 | 4 | 0 | 0 | **100%** ✅ |
-| **Phase 2** | 3 | 0 | 0 | 3 | 0% |
-| **Phase 3** | 1 | 0 | 0 | 1 | 0% |
-| **Phase 4** | 1 | 0 | 0 | 1 | 0% |
-| **Phase 5** | 1 | 0 | 0 | 1 | 0% |
-| **Total** | 10 | 4 | 0 | 6 | **40%** |
+| **Phase 2** | 3 | 2 | 0 | 1 | **66%** |
+| **Phase 3** | 3 | 0 | 2 | 1 | 0% |
+| **Total** | 12 | 6 | 2 | 4 | **50%** |
 
 ---
 
