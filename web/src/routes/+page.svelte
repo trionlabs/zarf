@@ -1,5 +1,6 @@
 <script lang="ts">
     import ThemeToggle from "$lib/components/layout/ThemeToggle.svelte";
+    import WalletConnectButton from "$lib/components/layout/WalletConnectButton.svelte";
 
     const features = [
         {
@@ -28,7 +29,44 @@
     />
 </svelte:head>
 
-<div class="min-h-screen flex flex-col">
+<div class="min-h-screen flex flex-col relative">
+    <!-- Landing Navbar -->
+    <header
+        class="absolute top-0 w-full z-50 px-6 py-4 flex items-center justify-between"
+    >
+        <div class="flex items-center gap-2 font-bold text-xl">
+            <div
+                class="w-8 h-8 rounded bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center text-primary-content"
+            >
+                <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    class="w-5 h-5 stroke-current"
+                    stroke-width="2.5"
+                >
+                    <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        d="M13 10V3L4 14h7v7l9-11h-7z"
+                    />
+                </svg>
+            </div>
+            Zarf
+        </div>
+
+        <div class="flex items-center gap-4">
+            <a
+                href="/docs"
+                class="link link-hover text-sm font-medium opacity-70 hover:opacity-100 hidden sm:block"
+                >Documentation</a
+            >
+            <div class="hidden sm:block w-px h-4 bg-base-content/20"></div>
+            <WalletConnectButton />
+            <div class="w-px h-4 bg-base-content/20"></div>
+            <ThemeToggle />
+        </div>
+    </header>
     <!-- Hero Section -->
     <section class="hero min-h-screen bg-base-200">
         <div class="hero-content text-center">
