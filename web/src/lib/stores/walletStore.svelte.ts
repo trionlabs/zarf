@@ -155,7 +155,11 @@ async function requestConnection() {
     if (state.connectors.length > 1) {
         state.isModalOpen = true; // Multiple wallets -> Show Modal
     } else if (state.connectors.length === 1) {
-        await connect(state.connectors[0]); // Single wallet -> Auto Connect
+        try {
+            await connect(state.connectors[0]); // Single wallet -> Auto Connect
+        } catch (e) {
+            // Error already set in state.error by connect()
+        }
     } else {
         // No wallet detected
         state.error = "No wallet detected. Please install MetaMask.";
@@ -166,6 +170,7 @@ async function requestConnection() {
 
 function closeModal() {
     state.isModalOpen = false;
+    state.error = null; // Clear lingering errors
 }
 
 async function refreshBalance() {
@@ -174,7 +179,7 @@ async function refreshBalance() {
         const bal = await wagmiGetBalance(state.address, state.chainId ?? undefined);
         state.balance = bal;
     } catch (e) {
-        console.warn('Failed to fetch balance', e);
+        if (import.meta.env.DEV) console.warn('Failed to fetch balance', e);
     }
 }
 

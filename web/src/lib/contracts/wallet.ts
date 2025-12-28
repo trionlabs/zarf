@@ -30,7 +30,6 @@ import { getAddress, formatEther, type Address } from 'viem';
 import { injected } from '@wagmi/connectors';
 import type { WalletConnection, WalletAccount } from '../types';
 
-// ... (constants and config unchanged)
 // ============================================================================
 // Constants
 // ============================================================================
@@ -137,7 +136,9 @@ export function getWalletConnectors(): readonly Connector[] {
     return wagmiGetConnectors(getWagmiConfig());
 }
 
-// ... (Account State and Utils unchanged)
+// ============================================================================
+// Account State
+// ============================================================================
 export function getWalletAccount(): WalletAccount {
     if (!browser) return { address: undefined, isConnected: false, chainId: undefined };
     const account = getAccount(getWagmiConfig());

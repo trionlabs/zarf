@@ -63,7 +63,7 @@
                     {/if}
                     <div class="flex flex-col items-start">
                         <span class="font-bold">{connector.name}</span>
-                        <span class="text-xs opacity-60">Injected Wallet</span>
+                        <span class="text-xs opacity-60">Detected Wallet</span>
                     </div>
                 </button>
             {/each}
