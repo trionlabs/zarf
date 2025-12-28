@@ -40,7 +40,7 @@ interface WalletState {
     chainId: number | null;
     balance: WalletBalance | null;
     error: string | null;
-    connectors: readonly Connector[]; // Added
+    connectors: readonly Connector[];
 }
 
 const initialState: WalletState = {
@@ -60,7 +60,7 @@ let state = $state<WalletState>(structuredClone(initialState));
 let unwatchFn: (() => void) | null = null;
 let isInitialized = false;
 
-// Derived Values unchanged
+// Derived Values
 const isWrongNetwork = $derived(state.isConnected && state.chainId !== null && !isSupportedChain(state.chainId));
 const networkName = $derived(state.chainId ? getChainName(state.chainId) : 'Unknown');
 const shortAddress = $derived(state.address ? formatAddress(state.address) : null);
@@ -68,19 +68,43 @@ const isLoading = $derived(state.isConnecting || state.isDisconnecting || state.
 const formattedBalance = $derived(state.balance ? `${parseFloat(state.balance.formatted).toFixed(4)} ${state.balance.symbol}` : null);
 
 // Private Helpers
-function syncFromWagmi() {
+
+/**
+ * Centralized state updater to prevent logic duplication.
+ * Updates core state, connector list, and triggers balance fetch if needed.
+ */
+function updateInternalState(account: { address?: Address, isConnected: boolean, chainId?: number }) {
     if (!browser) return;
-    const account = getWalletAccount();
+
+    const prevAddress = state.address;
+    const prevChainId = state.chainId;
+
     state.address = account.address ?? null;
     state.isConnected = account.isConnected;
     state.chainId = account.chainId ?? null;
-    state.connectors = getWalletConnectors(); // Refresh connector list
+    state.connectors = getWalletConnectors(); // Always refresh connectors
 
+    // Reset transient loading flags
+    state.isConnecting = false;
+    state.isDisconnecting = false;
+    state.isSwitchingNetwork = false;
+    state.error = null; // Clear old errors on state change
+
+    // Balance Fetch Logic
     if (state.isConnected && state.address) {
-        refreshBalance();
+        // Fetch if address/chain changed or valid connected state exists
+        if (state.address !== prevAddress || state.chainId !== prevChainId || !state.balance) {
+            refreshBalance();
+        }
     } else {
         state.balance = null;
     }
+}
+
+function syncFromWagmi() {
+    if (!browser) return;
+    const account = getWalletAccount();
+    updateInternalState({ ...account, address: account.address ?? undefined });
 }
 
 function sanitizeError(err: any): string {
@@ -99,26 +123,17 @@ async function init() {
     if (isInitialized) return;
     isInitialized = true;
     state.isReconnecting = true;
+
+    // 1. Attempt Auto-Reconnect
     try { await wagmiReconnect(); } catch (e) { } finally { state.isReconnecting = false; }
+
+    // 2. Initial Sync
     syncFromWagmi();
+
+    // 3. Setup Watcher
     if (unwatchFn) unwatchFn();
     unwatchFn = watchWalletAccount((account) => {
-        const prevAddress = state.address;
-        const prevChainId = state.chainId;
-        state.address = account.address ?? null;
-        state.isConnected = account.isConnected;
-        state.chainId = account.chainId ?? null;
-        state.isConnecting = false;
-        state.isDisconnecting = false;
-        state.isSwitchingNetwork = false;
-        state.error = null;
-        // Refresh connectors in case new wallet injected/detected
-        state.connectors = getWalletConnectors();
-        if (state.isConnected && state.address) {
-            if (state.address !== prevAddress || state.chainId !== prevChainId) refreshBalance();
-        } else {
-            state.balance = null;
-        }
+        updateInternalState({ ...account, address: account.address ?? undefined });
     });
 }
 
@@ -139,10 +154,8 @@ async function connect(connector?: Connector) {
     state.error = null;
     try {
         const result = await wagmiConnect(connector);
-        state.address = result.address;
-        state.chainId = result.chainId;
-        state.isConnected = true;
-        await refreshBalance();
+        // State update will be handled by watcher, but we can optimistically set it or wait.
+        // Wagmi watcher usually fires immediately.
         return result;
     } catch (err: any) {
         state.error = sanitizeError(err);
@@ -158,10 +171,7 @@ async function disconnect() {
     state.error = null;
     try {
         await wagmiDisconnect();
-        state.address = null;
-        state.isConnected = false;
-        state.chainId = null;
-        state.balance = null;
+        // State update handled by watcher
     } catch (err: any) { state.error = sanitizeError(err); } finally { state.isDisconnecting = false; }
 }
 
@@ -171,7 +181,7 @@ async function switchChain(chainId: number) {
     state.error = null;
     try {
         await wagmiSwitchChain(chainId);
-        state.chainId = chainId;
+        // State update handled by watcher
     } catch (err: any) { state.error = sanitizeError(err); } finally { state.isSwitchingNetwork = false; }
 }
 
@@ -192,7 +202,7 @@ export const walletStore = {
     get chainId() { return state.chainId; },
     get balance() { return state.balance; },
     get error() { return state.error; },
-    get connectors() { return state.connectors; }, // Exposed
+    get connectors() { return state.connectors; },
 
     // Derived getters
     get isWrongNetwork() { return isWrongNetwork; },
@@ -211,4 +221,11 @@ export const walletStore = {
     destroy
 };
 
-export { formatAddress, isSupportedChain, getChainName, wagmiConfig, MAINNET_CHAIN_ID, SEPOLIA_CHAIN_ID };
+export {
+    formatAddress,
+    isSupportedChain,
+    getChainName,
+    wagmiConfig,
+    MAINNET_CHAIN_ID,
+    SEPOLIA_CHAIN_ID
+};

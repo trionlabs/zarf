@@ -31,27 +31,6 @@ import { injected } from '@wagmi/connectors';
 import type { WalletConnection, WalletAccount } from '../types';
 
 // ... (constants and config unchanged)
-const WAGMI_CONSTANTS_BLOCK = `
-export const MAINNET_CHAIN_ID = mainnet.id; // 1
-export const SEPOLIA_CHAIN_ID = sepolia.id; // 11155111
-
-let _wagmiConfig: Config | null = null;
-function getWagmiConfig(): Config {
-    if (!_wagmiConfig) {
-        _wagmiConfig = createConfig({
-            chains: [mainnet, sepolia],
-            connectors: [injected()], // EIP-6963 support is automatic here
-            transports: {
-                [mainnet.id]: http(),
-                [sepolia.id]: http(),
-            },
-        });
-    }
-    return _wagmiConfig;
-}
-export const wagmiConfig = browser ? getWagmiConfig() : ({} as Config);
-`;
-
 // ============================================================================
 // Constants
 // ============================================================================

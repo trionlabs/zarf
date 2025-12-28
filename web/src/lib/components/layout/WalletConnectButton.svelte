@@ -13,7 +13,11 @@
   - Only DaisyUI semantic colors
 -->
 <script lang="ts">
-    import { walletStore } from "$lib/stores/walletStore.svelte";
+    import {
+        walletStore,
+        MAINNET_CHAIN_ID,
+        SEPOLIA_CHAIN_ID,
+    } from "$lib/stores/walletStore.svelte";
     import { type Connector } from "@wagmi/core";
 
     let copied = $state(false);
@@ -30,9 +34,9 @@
     const etherscanUrl = $derived.by(() => {
         if (!walletStore.address) return null;
         switch (walletStore.chainId) {
-            case 1:
+            case MAINNET_CHAIN_ID:
                 return `https://etherscan.io/address/${walletStore.address}`;
-            case 11155111:
+            case SEPOLIA_CHAIN_ID:
                 return `https://sepolia.etherscan.io/address/${walletStore.address}`;
             default:
                 return null;
@@ -43,6 +47,8 @@
 
     // Smart Connect Logic
     async function handleConnectClick() {
+        // Always refresh connectors before check (in case dynamic injection happened)
+        // walletStore.connectors is reactive
         const connectors = walletStore.connectors;
 
         // If multiple connectors (e.g. MetaMask + Phantom), show modal
@@ -99,6 +105,9 @@
 <dialog bind:this={modalRef} class="modal">
     <div class="modal-box">
         <h3 class="font-bold text-lg mb-4">Connect Wallet</h3>
+        <p class="text-sm opacity-70 mb-4">
+            Multiple wallets detected. Please select one.
+        </p>
 
         <div class="grid gap-2">
             {#each walletStore.connectors as connector}
@@ -114,7 +123,11 @@
                             class="w-6 h-6"
                         />
                     {:else}
-                        <div class="w-6 h-6 rounded-full bg-base-300"></div>
+                        <div
+                            class="w-6 h-6 rounded-full bg-base-300 flex items-center justify-center text-xs"
+                        >
+                            W
+                        </div>
                     {/if}
                     <div class="flex flex-col items-start">
                         <span class="font-bold">{connector.name}</span>
@@ -185,8 +198,9 @@
 
             <li>
                 <button
-                    onclick={() => handleSwitchNetwork(1)}
-                    class="justify-between {walletStore.chainId === 1
+                    onclick={() => handleSwitchNetwork(MAINNET_CHAIN_ID)}
+                    class="justify-between {walletStore.chainId ===
+                    MAINNET_CHAIN_ID
                         ? 'active font-bold'
                         : ''}"
                 >
@@ -194,7 +208,7 @@
                         <span class="w-2 h-2 rounded-full bg-blue-500"></span>
                         Ethereum
                     </div>
-                    {#if walletStore.chainId === 1}
+                    {#if walletStore.chainId === MAINNET_CHAIN_ID}
                         <svg
                             class="w-4 h-4"
                             fill="none"
@@ -213,8 +227,9 @@
 
             <li>
                 <button
-                    onclick={() => handleSwitchNetwork(11155111)}
-                    class="justify-between {walletStore.chainId === 11155111
+                    onclick={() => handleSwitchNetwork(SEPOLIA_CHAIN_ID)}
+                    class="justify-between {walletStore.chainId ===
+                    SEPOLIA_CHAIN_ID
                         ? 'active font-bold'
                         : ''}"
                 >
@@ -222,7 +237,7 @@
                         <span class="w-2 h-2 rounded-full bg-purple-500"></span>
                         Sepolia
                     </div>
-                    {#if walletStore.chainId === 11155111}
+                    {#if walletStore.chainId === SEPOLIA_CHAIN_ID}
                         <svg
                             class="w-4 h-4"
                             fill="none"
