@@ -25,3 +25,4 @@ _backlogs/
 reports/
 **/*.md
 **/_backlogs/
+.DS_Store
