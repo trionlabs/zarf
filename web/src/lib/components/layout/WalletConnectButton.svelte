@@ -5,16 +5,19 @@
   - "Connect Wallet" when disconnected
   - Address + Network badge when connected
   - Dropdown menu for Balance/Disconnect/Copy/Switch Network
-  
+  - Wallet Selection Modal if multiple wallets detected
+
   FE_DEV.md Compliant:
-  - Uses DaisyUI dropdown component (no custom CSS)
+  - Uses DaisyUI dropdown & modal
   - Template logic moved to $derived variables
   - Only DaisyUI semantic colors
 -->
 <script lang="ts">
     import { walletStore } from "$lib/stores/walletStore.svelte";
+    import { type Connector } from "@wagmi/core";
 
     let copied = $state(false);
+    let modalRef = $state<HTMLDialogElement | null>(null);
 
     const statusIndicatorClass = $derived(
         walletStore.isWrongNetwork ? "bg-warning animate-pulse" : "bg-success",
@@ -38,9 +41,23 @@
 
     const canShowEtherscan = $derived(etherscanUrl !== null);
 
-    async function handleConnect() {
+    // Smart Connect Logic
+    async function handleConnectClick() {
+        const connectors = walletStore.connectors;
+
+        // If multiple connectors (e.g. MetaMask + Phantom), show modal
+        if (connectors.length > 1) {
+            modalRef?.showModal();
+        } else {
+            // If just one (or none), try direct connect
+            await performConnect();
+        }
+    }
+
+    async function performConnect(connector?: Connector) {
+        modalRef?.close();
         try {
-            await walletStore.connect();
+            await walletStore.connect(connector);
         } catch (e) {
             /* Handled by store */
         }
@@ -51,9 +68,9 @@
         closeDropdown();
     }
 
-    async function handleSwitchNetwork() {
+    async function handleSwitchNetwork(chainId: number) {
         try {
-            await walletStore.switchToSepolia();
+            await walletStore.switchChain(chainId);
             closeDropdown();
         } catch (e) {
             /* Handled by store */
@@ -77,6 +94,46 @@
         }
     }
 </script>
+
+<!-- Wallet Selection Modal -->
+<dialog bind:this={modalRef} class="modal">
+    <div class="modal-box">
+        <h3 class="font-bold text-lg mb-4">Connect Wallet</h3>
+
+        <div class="grid gap-2">
+            {#each walletStore.connectors as connector}
+                <button
+                    class="btn btn-outline justify-start gap-3 h-14"
+                    onclick={() => performConnect(connector)}
+                >
+                    <!-- Icon Placeholder (Wagmi gives connector.icon) -->
+                    {#if connector.icon}
+                        <img
+                            src={connector.icon}
+                            alt={connector.name}
+                            class="w-6 h-6"
+                        />
+                    {:else}
+                        <div class="w-6 h-6 rounded-full bg-base-300"></div>
+                    {/if}
+                    <div class="flex flex-col items-start">
+                        <span class="font-bold">{connector.name}</span>
+                        <span class="text-xs opacity-60">Injected Wallet</span>
+                    </div>
+                </button>
+            {/each}
+        </div>
+
+        <div class="modal-action">
+            <form method="dialog">
+                <button class="btn">Close</button>
+            </form>
+        </div>
+    </div>
+    <form method="dialog" class="modal-backdrop">
+        <button>close</button>
+    </form>
+</dialog>
 
 {#if walletStore.isConnected}
     <div class="dropdown dropdown-end">
@@ -121,10 +178,23 @@
                 </div>
             </li>
 
-            <!-- Switch Network -->
-            {#if walletStore.isWrongNetwork}
-                <li>
-                    <button onclick={handleSwitchNetwork} class="text-warning">
+            <!-- Network Selection -->
+            <li class="menu-title px-4 py-1 mt-2">
+                <span class="text-xs font-normal opacity-60">Network</span>
+            </li>
+
+            <li>
+                <button
+                    onclick={() => handleSwitchNetwork(1)}
+                    class="justify-between {walletStore.chainId === 1
+                        ? 'active font-bold'
+                        : ''}"
+                >
+                    <div class="flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-blue-500"></span>
+                        Ethereum
+                    </div>
+                    {#if walletStore.chainId === 1}
                         <svg
                             class="w-4 h-4"
                             fill="none"
@@ -134,13 +204,40 @@
                                 stroke-linecap="round"
                                 stroke-linejoin="round"
                                 stroke-width="2"
-                                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                                d="M5 13l4 4L19 7"
                             /></svg
                         >
-                        Switch to Sepolia
-                    </button>
-                </li>
-            {/if}
+                    {/if}
+                </button>
+            </li>
+
+            <li>
+                <button
+                    onclick={() => handleSwitchNetwork(11155111)}
+                    class="justify-between {walletStore.chainId === 11155111
+                        ? 'active font-bold'
+                        : ''}"
+                >
+                    <div class="flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-purple-500"></span>
+                        Sepolia
+                    </div>
+                    {#if walletStore.chainId === 11155111}
+                        <svg
+                            class="w-4 h-4"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                            ><path
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                stroke-width="2"
+                                d="M5 13l4 4L19 7"
+                            /></svg
+                        >
+                    {/if}
+                </button>
+            </li>
 
             <div class="divider my-0"></div>
 
@@ -230,7 +327,7 @@
 {:else}
     <button
         class="btn btn-primary btn-sm gap-2"
-        onclick={handleConnect}
+        onclick={handleConnectClick}
         disabled={walletStore.isConnecting}
     >
         {#if walletStore.isConnecting}

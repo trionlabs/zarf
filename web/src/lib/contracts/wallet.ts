@@ -20,20 +20,43 @@ import {
     watchAccount,
     switchChain as wagmiSwitchChainAction,
     getBalance as wagmiGetBalance,
+    getConnectors as wagmiGetConnectors,
     type Config,
-    type GetBalanceReturnType
+    type GetBalanceReturnType,
+    type Connector
 } from '@wagmi/core';
 import { mainnet, sepolia } from 'viem/chains';
 import { getAddress, formatEther, type Address } from 'viem';
 import { injected } from '@wagmi/connectors';
 import type { WalletConnection, WalletAccount } from '../types';
 
+// ... (constants and config unchanged)
+const WAGMI_CONSTANTS_BLOCK = `
+export const MAINNET_CHAIN_ID = mainnet.id; // 1
+export const SEPOLIA_CHAIN_ID = sepolia.id; // 11155111
+
+let _wagmiConfig: Config | null = null;
+function getWagmiConfig(): Config {
+    if (!_wagmiConfig) {
+        _wagmiConfig = createConfig({
+            chains: [mainnet, sepolia],
+            connectors: [injected()], // EIP-6963 support is automatic here
+            transports: {
+                [mainnet.id]: http(),
+                [sepolia.id]: http(),
+            },
+        });
+    }
+    return _wagmiConfig;
+}
+export const wagmiConfig = browser ? getWagmiConfig() : ({} as Config);
+`;
+
 // ============================================================================
 // Constants
 // ============================================================================
-
-export const MAINNET_CHAIN_ID = mainnet.id; // 1
-export const SEPOLIA_CHAIN_ID = sepolia.id; // 11155111
+export const MAINNET_CHAIN_ID = mainnet.id;
+export const SEPOLIA_CHAIN_ID = sepolia.id;
 
 // ============================================================================
 // Wagmi Configuration (Lazy Initialization for SSR Safety)
@@ -45,7 +68,7 @@ function getWagmiConfig(): Config {
     if (!_wagmiConfig) {
         _wagmiConfig = createConfig({
             chains: [mainnet, sepolia],
-            connectors: [injected()],
+            connectors: [injected()], // EIP-6963 providers will be auto-discovered
             transports: {
                 [mainnet.id]: http(),
                 [sepolia.id]: http(),
@@ -55,33 +78,38 @@ function getWagmiConfig(): Config {
     return _wagmiConfig;
 }
 
-// Export for external use (e.g., viem client creation)
 export const wagmiConfig = browser ? getWagmiConfig() : ({} as Config);
 
 // ============================================================================
 // Connection Management
 // ============================================================================
 
-export async function connectWallet(): Promise<WalletConnection> {
+export async function connectWallet(connector?: Connector): Promise<WalletConnection> {
     if (!browser) {
         throw new Error('Cannot connect wallet during SSR');
     }
 
-    // ... (existing logic)
     const config = getWagmiConfig();
+
+    // If no specific connector provided, use the first available (default behavior)
+    // Or prefer EIP-6963 connectors if available
+    const connectors = wagmiGetConnectors(config);
+    const targetConnector = connector || connectors[0];
+
     try {
         const result = await connect(config, {
-            connector: injected(),
+            connector: targetConnector,
         });
+
         if (!result.accounts || result.accounts.length === 0) {
             throw new Error('No accounts returned from wallet');
         }
+
         return {
             address: result.accounts[0],
             chainId: result.chainId,
         };
     } catch (error) {
-        // ... (existing error handling)
         if (error instanceof Error) {
             if (error.message.includes('User rejected')) {
                 throw new Error('User rejected wallet connection');
@@ -110,20 +138,10 @@ export async function switchChain(chainId: number): Promise<void> {
     await wagmiSwitchChainAction(config, { chainId });
 }
 
-/**
- * Fetch native currency balance (ETH).
- * @param address - Wallet address
- * @param chainId - Chain ID (optional)
- */
 export async function getNativeBalance(address: Address, chainId?: number): Promise<{ value: bigint, formatted: string, symbol: string }> {
     if (!browser) return { value: BigInt(0), formatted: '0', symbol: 'ETH' };
-
     const config = getWagmiConfig();
-    const balance = await wagmiGetBalance(config, {
-        address,
-        chainId
-    });
-
+    const balance = await wagmiGetBalance(config, { address, chainId });
     return {
         value: balance.value,
         formatted: formatEther(balance.value),
@@ -131,49 +149,30 @@ export async function getNativeBalance(address: Address, chainId?: number): Prom
     };
 }
 
-// ============================================================================
-// Account State
-// ============================================================================
-
-export function getWalletAccount(): WalletAccount {
-    if (!browser) {
-        return {
-            address: undefined,
-            isConnected: false,
-            chainId: undefined,
-        };
-    }
-
-    const account = getAccount(getWagmiConfig());
-
-    return {
-        address: account.address,
-        isConnected: account.isConnected,
-        chainId: account.chainId,
-    };
+/**
+ * Get available wallet connectors.
+ * Can be used to list detected wallets (MetaMask, Phantom, etc.)
+ */
+export function getWalletConnectors(): readonly Connector[] {
+    if (!browser) return [];
+    return wagmiGetConnectors(getWagmiConfig());
 }
 
-export function watchWalletAccount(
-    callback: (account: WalletAccount) => void
-): () => void {
-    if (!browser) {
-        return () => { };
-    }
+// ... (Account State and Utils unchanged)
+export function getWalletAccount(): WalletAccount {
+    if (!browser) return { address: undefined, isConnected: false, chainId: undefined };
+    const account = getAccount(getWagmiConfig());
+    return { address: account.address, isConnected: account.isConnected, chainId: account.chainId };
+}
 
+export function watchWalletAccount(callback: (account: WalletAccount) => void): () => void {
+    if (!browser) return () => { };
     return watchAccount(getWagmiConfig(), {
         onChange: (account) => {
-            callback({
-                address: account.address,
-                isConnected: account.isConnected,
-                chainId: account.chainId,
-            });
+            callback({ address: account.address, isConnected: account.isConnected, chainId: account.chainId });
         },
     });
 }
-
-// ============================================================================
-// Utility Functions
-// ============================================================================
 
 export function formatAddress(address: Address | undefined, chars: number = 4): string {
     if (!address) return '';
