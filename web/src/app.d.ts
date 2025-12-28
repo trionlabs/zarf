@@ -18,6 +18,7 @@ interface Window {
 interface ImportMetaEnv {
 	readonly VITE_GOOGLE_CLIENT_ID?: string;
 	readonly VITE_VESTING_ADDRESS?: string;
+	readonly VITE_VERIFIER_ADDRESS?: string;
 	readonly VITE_JWK_REGISTRY_ADDRESS?: string;
 	readonly VITE_RPC_URL?: string;
 	readonly VITE_NETWORK?: string;

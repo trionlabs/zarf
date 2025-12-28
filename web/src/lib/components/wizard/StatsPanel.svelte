@@ -28,12 +28,18 @@
         return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
     });
 
-    // Aggregates
+    // Aggregates from saved distributions
     const distributions = $derived(wizardStore.distributions);
     const totalDistributions = $derived(distributions.length);
 
-    const totalRecipients = $derived(
+    // Saved recipients count
+    const savedRecipients = $derived(
         distributions.reduce((acc, d) => acc + d.recipients.length, 0),
+    );
+
+    // Total Recipients (Saved + Editing)
+    const totalRecipients = $derived(
+        savedRecipients + wizardStore.editingRecipientCount,
     );
 
     const savedAmount = $derived(
@@ -46,25 +52,72 @@
         totalAmount > 0 ? totalAmount.toLocaleString() : "—",
     );
 
-    // Schedule Summary (New Insight)
+    // Schedule Summary (combines saved + editing)
     const scheduleSummary = $derived.by(() => {
-        if (distributions.length === 0) return "—";
-
-        const durations = distributions.map(
-            (d) => d.schedule.distributionDurationMonths,
+        // Collect durations from saved distributions (always stored in months)
+        const savedDurations = distributions.map(
+            (d) => d.schedule.distributionDuration,
         );
-        const min = Math.min(...durations);
-        const max = Math.max(...durations);
+
+        // If we're editing, show the editing duration with its unit
+        if (wizardStore.editingVestingDuration > 0) {
+            const editDuration = wizardStore.editingVestingDuration;
+            const editUnit = wizardStore.editingDurationUnit || "months";
+
+            // Format unit label
+            const unitLabels: Record<string, string> = {
+                weeks: "Weeks",
+                months: "Months",
+                quarters: "Quarters",
+                years: "Years",
+            };
+            const unitLabel = unitLabels[editUnit] || "Months";
+
+            // If there are saved distributions, show a range
+            if (savedDurations.length > 0) {
+                // Convert editing duration to months for comparison
+                const editInMonths =
+                    editUnit === "weeks"
+                        ? editDuration / 4
+                        : editUnit === "quarters"
+                          ? editDuration * 3
+                          : editUnit === "years"
+                            ? editDuration * 12
+                            : editDuration;
+
+                const allMonths = [...savedDurations, editInMonths];
+                const min = Math.min(...allMonths);
+                const max = Math.max(...allMonths);
+
+                if (min === max) return `${Math.round(min)} Months`;
+                return `${Math.round(min)} - ${Math.round(max)} Months`;
+            }
+
+            // Only editing, show with current unit
+            return `${editDuration} ${unitLabel}`;
+        }
+
+        // Only saved distributions
+        if (savedDurations.length === 0) return "—";
+
+        const min = Math.min(...savedDurations);
+        const max = Math.max(...savedDurations);
 
         if (min === max) return `${min} Months`;
         return `${min} - ${max} Months`;
     });
 
-    // UI State
+    // UI State - Panel shows data when we have token, distributions, OR editing state
+    const isEditing = $derived(
+        wizardStore.editingPoolAmount > 0 ||
+            wizardStore.editingVestingDuration > 0 ||
+            wizardStore.editingRecipientCount > 0,
+    );
+
     const hasData = $derived(
         wizardStore.tokenDetails.tokenAddress !== null ||
             totalDistributions > 0 ||
-            wizardStore.editingPoolAmount > 0,
+            isEditing,
     );
 </script>
 

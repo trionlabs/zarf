@@ -19,6 +19,9 @@ contracts/broadcast/
 
 # notes, backlogs, docs & ai
 docs/
-.md 
 .agent
-.md 
+*.md
+_backlogs/
+reports/
+**/*.md
+**/_backlogs/

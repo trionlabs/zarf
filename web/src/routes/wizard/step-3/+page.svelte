@@ -6,7 +6,7 @@
     import { fly } from "svelte/transition";
 
     onMount(() => {
-        wizardStore.goToStep(3);
+        wizardStore.goToStep(2);
     });
 
     // Mock contract address for demo
@@ -82,16 +82,16 @@
 
     <!-- Actions -->
     <div class="flex gap-4" in:fly={{ y: 20, duration: 600, delay: 400 }}>
-        <a href="/dashboard" class="btn btn-outline h-14 px-8 rounded-full">
+        <a href="/dashboard" class="btn btn-outline h-12 px-8 rounded-full">
             View Dashboard
             <ExternalLink class="w-4 h-4 ml-2 opacity-60" />
         </a>
         <button
-            class="btn btn-primary h-14 px-10 rounded-full shadow-xl shadow-primary/20 hover:shadow-2xl hover:shadow-primary/30 transition-all duration-300 text-lg font-medium tracking-wide"
+            class="btn btn-primary h-12 px-10 rounded-full shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/30 transition-all duration-300 text-base font-medium tracking-wide"
             onclick={handleFinish}
         >
             Done
-            <ArrowRight class="w-5 h-5 ml-2" />
+            <ArrowRight class="w-4 h-4 ml-2" />
         </button>
     </div>
 </div>

@@ -142,3 +142,31 @@ export function generateUnlockMarkers(
     }
     return markers;
 }
+
+/**
+ * Converts duration and unit to total seconds for smart contract compatibility.
+ */
+export function durationToSeconds(duration: number, unit: DurationUnit): bigint {
+    const DAY = 24n * 60n * 60n;
+    switch (unit) {
+        case "weeks":
+            return BigInt(duration) * 7n * DAY;
+        case "months":
+            return BigInt(duration) * 30n * DAY;
+        case "quarters":
+            return BigInt(duration) * 90n * DAY;
+        case "years":
+            return BigInt(duration) * 365n * DAY;
+    }
+}
+
+/**
+ * Calculates the cliff duration in seconds relative to current time.
+ * If the date is in the past, returns 0.
+ */
+export function cliffDateToSeconds(cliffEndDate: string): bigint {
+    if (!cliffEndDate) return 0n;
+    const cliffMs = new Date(cliffEndDate).getTime();
+    const nowMs = Date.now();
+    return BigInt(Math.max(0, Math.floor((cliffMs - nowMs) / 1000)));
+}

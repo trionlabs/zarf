@@ -2,108 +2,89 @@
  * CSV Processing Utilities for Whitelist Management
  * 
  * Handles parsing, validation, and normalization of whitelist CSV files.
- * Expected format: email,amount
+ * Supported formats:
+ * - address,amount
+ * - email,amount
  * 
  * @module csv/csvProcessor
  */
 
-import type { WhitelistEntry } from '../types';
+import type { WhitelistEntry } from '../stores/types';
+import { isAddress } from 'viem';
 
 // ============================================================================
-// Email Validation
+// Validators & Normalizers
 // ============================================================================
 
 /**
- * Basic email format validation using regex
- * 
- * @param email - Email string to validate
- * @returns True if email appears valid
- * 
- * @example
- * ```typescript
- * isValidEmail('user@example.com'); // true
- * isValidEmail('invalid');          // false
- * ```
+ * Basic address format validation
  */
-function isValidEmail(email: string): boolean {
-    // Basic RFC 5322-like validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
+function isValidAddress(address: string): boolean {
+    return isAddress(address, { strict: false });
 }
 
 /**
- * Normalizes email for consistent hashing and comparison.
- * Applies Gmail-specific rules and removes plus-addressing.
- * 
- * Rules applied:
- * 1. Lowercase the entire email
- * 2. Trim whitespace
- * 3. For Gmail: Remove dots from local part (before @)
- * 4. Remove plus-addressing (everything after + until @)
- * 
- * @param email - Raw email address
- * @returns Normalized email address
- * 
- * @example
- * ```typescript
- * normalizeEmail('Alice@Example.com');         // 'alice@example.com'
- * normalizeEmail('ali.ce@gmail.com');          // 'alice@gmail.com'
- * normalizeEmail('alice+tag@gmail.com');       // 'alice@gmail.com'
- * normalizeEmail('ali.ce+tag@gmail.com');      // 'alice@gmail.com'
- * normalizeEmail('alice+newsletters@other.com'); // 'alice@other.com'
- * ```
+ * Basic email format validation
+ */
+function isValidEmail(email: string): boolean {
+    return email.includes('@') && email.length > 3;
+}
+
+/**
+ * Normalizes address for consistent hashing and comparison.
+ */
+export function normalizeAddress(address: string): string {
+    return address.toLowerCase().trim();
+}
+
+/**
+ * Normalize email for consistent hashing (Mirrors POC logic)
+ * - Lowercase
+ * - Trim whitespace
+ * - Remove dots from Gmail local part
+ * - Remove plus addressing
  */
 export function normalizeEmail(email: string): string {
-    let normalized = email.toLowerCase().trim();
+    let e = email.toLowerCase().trim();
 
-    // Gmail-specific: dots in local part are ignored
-    if (normalized.endsWith('@gmail.com')) {
-        const [local, domain] = normalized.split('@');
-        normalized = local.replace(/\./g, '') + '@' + domain;
+    // Gmail: dots in local part are ignored
+    if (e.endsWith('@gmail.com')) {
+        const [local, domain] = e.split('@');
+        e = local.replace(/\./g, '') + '@' + domain;
     }
 
-    // Strip plus-addressing: alice+tag@example.com → alice@example.com
-    const plusIdx = normalized.indexOf('+');
-    const atIdx = normalized.indexOf('@');
-
-    if (plusIdx > 0 && atIdx > plusIdx) {
-        normalized = normalized.slice(0, plusIdx) + normalized.slice(atIdx);
+    // Strip plus addressing: alice+tag@co.com → alice@co.com
+    const plusIdx = e.indexOf('+');
+    if (plusIdx > 0) {
+        const atIdx = e.indexOf('@');
+        e = e.slice(0, plusIdx) + e.slice(atIdx);
     }
 
-    return normalized;
+    return e;
 }
 
 // ============================================================================
 // CSV Parsing
 // ============================================================================
 
+export interface ParseResult {
+    entries: WhitelistEntry[];
+    errors: string[];
+}
+
 /**
  * Parse CSV content into whitelist entries.
  * Automatically handles:
  * - Header row detection (skips if present)
  * - Empty lines
- * - Invalid formats (warns in console, skips entry)
+ * - Email validation (Strictly enforces email format)
  * - Email normalization
- * 
- * @param content - Raw CSV file content as string
- * @returns Array of valid whitelist entries
- * 
- * @throws {Error} If content is empty after parsing
- * 
- * @example
- * ```typescript
- * const csv = `email,amount
- * alice@example.com,1000
- * bob@example.com,2000`;
- * 
- * const entries = parseCSV(csv);
- * // [{ email: 'alice@example.com', amount: 1000 }, ...]
- * ```
  */
-export function parseCSV(content: string): WhitelistEntry[] {
+export function parseCSV(content: string): ParseResult {
     const lines = content.trim().split('\n');
     const entries: WhitelistEntry[] = [];
     const errors: string[] = [];
+
 
     for (let i = 0; i < lines.length; i++) {
         const line = lines[i].trim();
@@ -112,80 +93,68 @@ export function parseCSV(content: string): WhitelistEntry[] {
         if (!line) continue;
 
         // Skip header row if present (case-insensitive)
-        if (i === 0 && line.toLowerCase().includes('email')) {
+        const lineLower = line.toLowerCase();
+        if (i === 0 && (
+            lineLower.includes('email') ||
+            lineLower.includes('amount') ||
+            lineLower.includes('number')
+        )) {
             continue;
         }
 
         const parts = line.split(',').map((p) => p.trim());
 
         if (parts.length < 2) {
-            const warning = `Line ${i + 1}: Invalid format (expected email,amount) - "${line}"`;
-            console.warn(warning);
-            errors.push(warning);
+            errors.push(`Line ${i + 1}: Invalid format (expected email, amount) - "${line}"`);
             continue;
         }
 
-        const [rawEmail, amountStr] = parts;
-
-        // Validate email format
-        if (!isValidEmail(rawEmail)) {
-            const warning = `Line ${i + 1}: Invalid email format - "${rawEmail}"`;
-            console.warn(warning);
-            errors.push(warning);
-            continue;
-        }
+        const [identifier, amountStr] = parts;
 
         // Parse and validate amount
-        const amount = parseInt(amountStr, 10);
+        const amount = parseFloat(amountStr);
         if (isNaN(amount) || amount <= 0) {
-            const warning = `Line ${i + 1}: Invalid amount (must be positive integer) - "${amountStr}"`;
-            console.warn(warning);
-            errors.push(warning);
+            errors.push(`Line ${i + 1}: Invalid amount (must be positive number) - "${amountStr}"`);
             continue;
         }
 
-        // Normalize email for consistent comparison
-        const email = normalizeEmail(rawEmail);
-
-        entries.push({ email, amount });
+        // Identifier Logic: Check for email OR address
+        if (isValidEmail(identifier)) {
+            const email = normalizeEmail(identifier);
+            // Allow duplicates in the list so the total amount matches the CSV file.
+            entries.push({ address: "", email, amount });
+        } else if (isValidAddress(identifier)) {
+            entries.push({ address: normalizeAddress(identifier), amount });
+        } else {
+            errors.push(`Line ${i + 1}: Invalid format (expected email or address) - "${identifier}"`);
+            continue;
+        }
     }
 
-    if (entries.length === 0) {
-        throw new Error(
-            `No valid entries found in CSV. Errors encountered:\n${errors.join('\n')}`
-        );
-    }
+    // Post-processing: Detect duplicates for error reporting
+    const emailCounts = new Map<string, number>();
+    entries.forEach(e => {
+        if (e.email) {
+            emailCounts.set(e.email, (emailCounts.get(e.email) || 0) + 1);
+        }
+    });
 
-    return entries;
+    emailCounts.forEach((count, email) => {
+        if (count > 1) {
+            errors.push(`Duplicate email found: ${email} (${count} occurrences)`);
+        }
+    });
+
+    return { entries, errors };
 }
 
 /**
  * Read a CSV file from File API and parse into whitelist entries.
  * 
  * @param file - File object from input[type="file"]
- * @returns Promise resolving to array of whitelist entries
- * 
- * @throws {Error} If file cannot be read or parsed
- * 
- * @example
- * ```typescript
- * // In Svelte component
- * async function handleFileUpload(event: Event) {
- *   const input = event.target as HTMLInputElement;
- *   const file = input.files?.[0];
- *   
- *   if (!file) return;
- *   
- *   try {
- *     const entries = await readCSVFile(file);
- *     console.log(`Loaded ${entries.length} entries`);
- *   } catch (error) {
- *     alert(`Failed to read CSV: ${error.message}`);
- *   }
- * }
- * ```
+ * @returns Promise resolving to ParseResult
  */
-export async function readCSVFile(file: File): Promise<WhitelistEntry[]> {
+export async function readCSVFile(file: File): Promise<ParseResult> {
     // Validate file type
     if (!file.name.endsWith('.csv')) {
         throw new Error(`Invalid file type: ${file.name}. Expected .csv file.`);
@@ -210,8 +179,8 @@ export async function readCSVFile(file: File): Promise<WhitelistEntry[]> {
                     throw new Error('File is empty');
                 }
 
-                const entries = parseCSV(content);
-                resolve(entries);
+                const result = parseCSV(content);
+                resolve(result);
             } catch (error) {
                 reject(
                     error instanceof Error
@@ -235,40 +204,17 @@ export async function readCSVFile(file: File): Promise<WhitelistEntry[]> {
 
 /**
  * Generate sample CSV content for testing.
- * Useful for development and demos.
- * 
- * @returns CSV string with sample data
- * 
- * @example
- * ```typescript
- * const sampleCSV = generateSampleCSV();
- * const blob = new Blob([sampleCSV], { type: 'text/csv' });
- * const file = new File([blob], 'sample.csv');
- * 
- * const entries = await readCSVFile(file);
- * ```
  */
 export function generateSampleCSV(): string {
     return `email,amount
 alice@example.com,1000
 bob@example.com,2000
 charlie@example.com,5000
-dave+test@example.com,3000
-eve.smith@gmail.com,4000
 yamancandev@gmail.com,10000`;
 }
 
 /**
  * Creates a File object from sample CSV for testing.
- * 
- * @returns File object containing sample CSV data
- * 
- * @example
- * ```typescript
- * const sampleFile = createSampleFile();
- * const entries = await readCSVFile(sampleFile);
- * // entries.length === 6
- * ```
  */
 export function createSampleFile(): File {
     const content = generateSampleCSV();

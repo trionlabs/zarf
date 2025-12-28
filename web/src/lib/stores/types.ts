@@ -31,14 +31,16 @@ export interface TokenDetails {
  */
 export interface Schedule {
     cliffEndDate: string; // ISO date string (YYYY-MM-DD)
-    distributionDurationMonths: number;
+    distributionDuration: number;
+    durationUnit: "weeks" | "months" | "quarters" | "years";
 }
 
 /**
  * Whitelist recipient entry
  */
 export interface Recipient {
-    email: string;
+    address: string; // Keep as primary identifier, but might be empty if email is used initially
+    email?: string;  // Add optional email field
     amount: number;
     leafIndex?: number; // assigned after merkle generation
     salt?: string;
@@ -46,6 +48,23 @@ export interface Recipient {
 
 // Alias for compatibility if needed
 export type WhitelistEntry = Recipient;
+
+/**
+ * Distribution State
+ */
+export type DistributionState =
+    | 'created'      // Draft / Waiting for launch
+    | 'launched'     // Active / Deposit made
+    | 'in_progress'  // Claiming started
+    | 'cancelled';   // Cancelled
+
+/**
+ * Single Distribution Entry (Step 1)
+ */
+/**
+ * Detailed deployment progress steps
+ */
+export type DeploymentStep = 'idle' | 'approving' | 'approved' | 'depositing' | 'deployed';
 
 /**
  * Single Distribution Entry (Step 1)
@@ -59,6 +78,16 @@ export interface Distribution {
     recipients: Recipient[];
     csvFilename?: string | null;
     regulatoryRules: string[];
+
+    // State Management
+    state: DistributionState;
+    createdAt: string;       // ISO timestamp
+    launchedAt?: string;     // Deposit timestamp
+    depositTxHash?: string;  // Deposit transaction hash
+    cancelledAt?: string;    // Cancel timestamp
+
+    // UI Deployment State
+    deploymentStep?: DeploymentStep;
 }
 
 /**

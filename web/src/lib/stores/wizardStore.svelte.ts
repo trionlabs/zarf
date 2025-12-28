@@ -60,8 +60,16 @@ const totalDistributionCount = $derived(
     state.distributions.length
 );
 
-// Editing state (for live preview in StatsPanel)
+// ============================================================================
+// Editing State (for live preview in StatsPanel during creation)
+// These are ephemeral and NOT persisted - they represent the "draft" distribution
+// ============================================================================
+
 let editingPoolAmount = $state<number>(0);
+let editingVestingDuration = $state<number>(0);
+let editingDurationUnit = $state<string>(""); // 'weeks' | 'months' | 'quarters' | 'years'
+let editingRecipientCount = $state<number>(0);
+let editingCliffDate = $state<string>("");
 
 const isComplete = $derived(
     state.currentStep === 3 && state.deployedContractAddress !== null
@@ -113,7 +121,13 @@ function setTokenDetails(details: Partial<TokenDetails>) {
 }
 
 function addDistribution(distribution: Distribution) {
-    state.distributions.push(distribution);
+    // Ensure initial state is set correctly
+    const newDist = {
+        ...distribution,
+        state: distribution.state || 'created',
+        createdAt: distribution.createdAt || new Date().toISOString()
+    };
+    state.distributions.push(newDist);
     persist();
 }
 
@@ -126,6 +140,37 @@ function updateDistribution(id: string, updates: Partial<Distribution>) {
     const index = state.distributions.findIndex(d => d.id === id);
     if (index !== -1) {
         state.distributions[index] = { ...state.distributions[index], ...updates };
+        persist();
+    }
+}
+
+/**
+ * Transitions a distribution to 'launched' state after successful deposit
+ */
+function moveDistributionToLaunched(id: string, txHash: string) {
+    const index = state.distributions.findIndex(d => d.id === id);
+    if (index !== -1) {
+        state.distributions[index] = {
+            ...state.distributions[index],
+            state: 'launched',
+            launchedAt: new Date().toISOString(),
+            depositTxHash: txHash
+        };
+        persist();
+    }
+}
+
+/**
+ * Transitions a distribution to 'cancelled' state
+ */
+function cancelDistribution(id: string) {
+    const index = state.distributions.findIndex(d => d.id === id);
+    if (index !== -1) {
+        state.distributions[index] = {
+            ...state.distributions[index],
+            state: 'cancelled',
+            cancelledAt: new Date().toISOString()
+        };
         persist();
     }
 }
@@ -183,6 +228,10 @@ export const wizardStore = {
     get deployedContractAddress() { return state.deployedContractAddress; },
     get txHash() { return state.txHash; },
     get editingPoolAmount() { return editingPoolAmount; },
+    get editingVestingDuration() { return editingVestingDuration; },
+    get editingDurationUnit() { return editingDurationUnit; },
+    get editingRecipientCount() { return editingRecipientCount; },
+    get editingCliffDate() { return editingCliffDate; },
 
     // Derived
     get totalRecipientsAmount() { return totalRecipientsAmount; },
@@ -194,6 +243,8 @@ export const wizardStore = {
     addDistribution,
     removeDistribution,
     updateDistribution,
+    moveDistributionToLaunched,
+    cancelDistribution,
     setMerkleRoot,
     setDeploymentResult,
     nextStep,
@@ -201,5 +252,19 @@ export const wizardStore = {
     goToStep,
     reset,
     restore,
+    // Editing State Setters (for live preview)
     setEditingPoolAmount(amount: number) { editingPoolAmount = amount; },
+    setEditingVestingDuration(months: number) { editingVestingDuration = months; },
+    setEditingRecipientCount(count: number) { editingRecipientCount = count; },
+    setEditingCliffDate(date: string) { editingCliffDate = date; },
+
+    /** Reset all editing states - call when cancelling or saving a distribution */
+    clearEditingState() {
+        editingPoolAmount = 0;
+        editingVestingDuration = 0;
+        editingDurationUnit = "";
+        editingRecipientCount = 0;
+        editingCliffDate = "";
+    },
+    setEditingDurationUnit(unit: string) { editingDurationUnit = unit; },
 };
