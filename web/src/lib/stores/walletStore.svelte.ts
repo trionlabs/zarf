@@ -2,13 +2,7 @@
  * Wallet Store - Svelte 5 Runes + Wagmi/Viem Integration
  * 
  * Single source of truth for wallet connection state.
- * Uses wagmi/core for connection management, Svelte 5 Runes for reactivity.
- * 
- * Supports: MetaMask, Rainbow, Rabbit Wallet, Brave, Coinbase (all injected wallets)
- * 
- * USAGE:
- * - Call init() ONCE in root +layout.svelte (not in components)
- * - Call destroy() on root layout unmount
+ * Supports ETH Balance Fetching.
  * 
  * @module stores/walletStore
  */
@@ -19,6 +13,7 @@ import {
     disconnectWallet as wagmiDisconnect,
     reconnectWallet as wagmiReconnect,
     switchChain as wagmiSwitchChain,
+    getNativeBalance as wagmiGetBalance,
     getWalletAccount,
     watchWalletAccount,
     formatAddress,
@@ -33,6 +28,12 @@ import type { Address } from 'viem';
 // Types
 // ============================================================================
 
+interface WalletBalance {
+    value: bigint;
+    formatted: string;
+    symbol: string;
+}
+
 interface WalletState {
     address: Address | null;
     isConnected: boolean;
@@ -41,6 +42,7 @@ interface WalletState {
     isReconnecting: boolean;
     isSwitchingNetwork: boolean;
     chainId: number | null;
+    balance: WalletBalance | null;
     error: string | null;
 }
 
@@ -56,6 +58,7 @@ const initialState: WalletState = {
     isReconnecting: false,
     isSwitchingNetwork: false,
     chainId: null,
+    balance: null,
     error: null
 };
 
@@ -85,6 +88,10 @@ const isLoading = $derived(
     state.isConnecting || state.isDisconnecting || state.isReconnecting || state.isSwitchingNetwork
 );
 
+const formattedBalance = $derived(
+    state.balance ? `${parseFloat(state.balance.formatted).toFixed(4)} ${state.balance.symbol}` : null
+);
+
 // ============================================================================
 // Private Helpers
 // ============================================================================
@@ -96,29 +103,22 @@ function syncFromWagmi() {
     state.address = account.address ?? null;
     state.isConnected = account.isConnected;
     state.chainId = account.chainId ?? null;
+
+    // Trigger balance fetch if connected
+    if (state.isConnected && state.address) {
+        refreshBalance();
+    } else {
+        state.balance = null;
+    }
 }
 
 function sanitizeError(err: any): string {
     const message = err?.message || '';
-
-    if (message.includes('rejected') || message.includes('denied')) {
-        return 'Request rejected by user';
-    }
-    if (message.includes('No wallet') || message.includes('No injected')) {
-        return 'No Ethereum wallet detected. Please install MetaMask.';
-    }
-    if (message.includes('already pending')) {
-        return 'A connection request is already pending. Check your wallet.';
-    }
-    if (message.includes('Chain not configured')) {
-        return 'Network switch failed. Please switch manually in your wallet.';
-    }
-
-    // Only log unexpected errors in development
-    if (import.meta.env.DEV) {
-        console.error('Wallet error:', err);
-    }
-
+    if (message.includes('rejected') || message.includes('denied')) return 'Request rejected by user';
+    if (message.includes('No wallet') || message.includes('No injected')) return 'No Ethereum wallet detected. Please install MetaMask.';
+    if (message.includes('already pending')) return 'A connection request is already pending. Check your wallet.';
+    if (message.includes('Chain not configured')) return 'Network switch failed. Please switch manually in your wallet.';
+    if (import.meta.env.DEV) console.error('Wallet error:', err);
     return 'An unexpected error occurred';
 }
 
@@ -127,31 +127,30 @@ function sanitizeError(err: any): string {
 // ============================================================================
 
 /**
- * Initialize wallet watcher. Call ONCE on app mount (in root layout).
- * Syncs initial state, attempts reconnect, and watches for changes.
+ * Initialize wallet watcher.
  */
 async function init() {
     if (!browser) return;
-    if (isInitialized) return; // Prevent duplicate init
+    if (isInitialized) return;
 
     isInitialized = true;
     state.isReconnecting = true;
 
     try {
-        // 1. Attempt Auto-Reconnect
         await wagmiReconnect();
     } catch (e) {
-        // Expected if no previous session - not an error
+        // Expected
     } finally {
         state.isReconnecting = false;
     }
 
-    // 2. Sync initial state
     syncFromWagmi();
 
-    // 3. Watch for account changes (connect, disconnect, switch)
     if (unwatchFn) unwatchFn();
     unwatchFn = watchWalletAccount((account) => {
+        const prevAddress = state.address;
+        const prevChainId = state.chainId;
+
         state.address = account.address ?? null;
         state.isConnected = account.isConnected;
         state.chainId = account.chainId ?? null;
@@ -159,12 +158,32 @@ async function init() {
         state.isDisconnecting = false;
         state.isSwitchingNetwork = false;
         state.error = null;
+
+        // Fetch balance on account or chain change
+        if (state.isConnected && state.address) {
+            if (state.address !== prevAddress || state.chainId !== prevChainId) {
+                refreshBalance();
+            }
+        } else {
+            state.balance = null;
+        }
     });
 }
 
 /**
- * Connect wallet. Triggers browser wallet popup.
+ * Fetch latest native balance.
  */
+async function refreshBalance() {
+    if (!state.address || !state.isConnected) return;
+
+    try {
+        const bal = await wagmiGetBalance(state.address, state.chainId ?? undefined);
+        state.balance = bal;
+    } catch (e) {
+        console.warn('Failed to fetch balance', e);
+    }
+}
+
 async function connect() {
     if (!browser) return;
     if (state.isReconnecting) {
@@ -180,6 +199,7 @@ async function connect() {
         state.address = result.address;
         state.chainId = result.chainId;
         state.isConnected = true;
+        await refreshBalance();
         return result;
     } catch (err: any) {
         state.error = sanitizeError(err);
@@ -189,21 +209,16 @@ async function connect() {
     }
 }
 
-/**
- * Disconnect wallet.
- */
 async function disconnect() {
     if (!browser) return;
-
     state.isDisconnecting = true;
     state.error = null;
-
     try {
         await wagmiDisconnect();
-        // Reset state but keep isInitialized
         state.address = null;
         state.isConnected = false;
         state.chainId = null;
+        state.balance = null;
     } catch (err: any) {
         state.error = sanitizeError(err);
     } finally {
@@ -211,36 +226,25 @@ async function disconnect() {
     }
 }
 
-/**
- * Switch to Sepolia network.
- */
 async function switchToSepolia() {
     if (!browser) return;
-
     state.isSwitchingNetwork = true;
     state.error = null;
-
     try {
         await wagmiSwitchChain(SEPOLIA_CHAIN_ID);
         state.chainId = SEPOLIA_CHAIN_ID;
+        // Balance will be auto-fetched by watcher
     } catch (err: any) {
         state.error = sanitizeError(err);
-        throw err;
     } finally {
         state.isSwitchingNetwork = false;
     }
 }
 
-/**
- * Clear error state.
- */
 function clearError() {
     state.error = null;
 }
 
-/**
- * Cleanup watcher. Call on app unmount (in root layout).
- */
 function destroy() {
     if (unwatchFn) {
         unwatchFn();
@@ -254,19 +258,21 @@ function destroy() {
 // ============================================================================
 
 export const walletStore = {
-    // State getters (reactive)
+    // State getters
     get address() { return state.address; },
     get isConnected() { return state.isConnected; },
     get isConnecting() { return state.isConnecting; },
     get isDisconnecting() { return state.isDisconnecting; },
     get isSwitchingNetwork() { return state.isSwitchingNetwork; },
     get chainId() { return state.chainId; },
+    get balance() { return state.balance; },
     get error() { return state.error; },
 
     // Derived getters
     get isWrongNetwork() { return isWrongNetwork; },
     get networkName() { return networkName; },
     get shortAddress() { return shortAddress; },
+    get formattedBalance() { return formattedBalance; },
     get isLoading() { return isLoading; },
 
     // Actions
@@ -274,9 +280,9 @@ export const walletStore = {
     connect,
     disconnect,
     switchToSepolia,
+    refreshBalance,
     clearError,
     destroy
 };
 
-// Re-export utilities
 export { formatAddress, isSupportedChain, getChainName, wagmiConfig };
