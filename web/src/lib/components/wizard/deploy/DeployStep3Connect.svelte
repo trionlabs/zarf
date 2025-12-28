@@ -1,5 +1,6 @@
 <script lang="ts">
-    import { walletStore, wagmiConfig } from "$lib/stores/walletStore.svelte";
+    import { walletStore } from "$lib/stores/walletStore.svelte";
+    import { wagmiConfig } from "$lib/contracts/wallet";
     import { deployStore } from "$lib/stores/deployStore.svelte";
     import { getPublicClient } from "@wagmi/core";
     import { ERC20ABI } from "$lib/contracts/abis/ERC20";

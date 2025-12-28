@@ -4,9 +4,12 @@
  * Provides a typed wrapper around Wagmi core for wallet interactions.
  * Supports MetaMask and other injected wallets.
  * 
+ * SSR-SAFE: All functions check for browser environment before accessing window.
+ * 
  * @module contracts/wallet
  */
 
+import { browser } from '$app/environment';
 import {
     createConfig,
     http,
@@ -15,6 +18,7 @@ import {
     reconnect,
     getAccount,
     watchAccount,
+    switchChain as wagmiSwitchChainAction,
     type Config
 } from '@wagmi/core';
 import { mainnet, sepolia } from 'viem/chains';
@@ -23,21 +27,38 @@ import { injected } from '@wagmi/connectors';
 import type { WalletConnection, WalletAccount } from '../types';
 
 // ============================================================================
-// Wagmi Configuration
+// Constants
 // ============================================================================
 
+export const MAINNET_CHAIN_ID = mainnet.id; // 1
+export const SEPOLIA_CHAIN_ID = sepolia.id; // 11155111
+
+// ============================================================================
+// Wagmi Configuration (Lazy Initialization for SSR Safety)
+// ============================================================================
+
+let _wagmiConfig: Config | null = null;
+
 /**
- * Wagmi configuration instance.
- * Supports Mainnet and Sepolia with HTTP transports.
+ * Get or create Wagmi configuration.
+ * Lazy initialization ensures SSR safety.
  */
-export const wagmiConfig: Config = createConfig({
-    chains: [mainnet, sepolia],
-    connectors: [injected()],
-    transports: {
-        [mainnet.id]: http(),
-        [sepolia.id]: http(),
-    },
-});
+function getWagmiConfig(): Config {
+    if (!_wagmiConfig) {
+        _wagmiConfig = createConfig({
+            chains: [mainnet, sepolia],
+            connectors: [injected()],
+            transports: {
+                [mainnet.id]: http(),
+                [sepolia.id]: http(),
+            },
+        });
+    }
+    return _wagmiConfig;
+}
+
+// Export for external use (e.g., viem client creation)
+export const wagmiConfig = browser ? getWagmiConfig() : ({} as Config);
 
 // ============================================================================
 // Connection Management
@@ -47,29 +68,21 @@ export const wagmiConfig: Config = createConfig({
  * Connect wallet using injected connector (MetaMask, Brave, etc.).
  * 
  * @returns Promise resolving to wallet address and chain ID
- * 
  * @throws {Error} If no injected wallet is available
  * @throws {Error} If user rejects connection
- * 
- * @example
- * ```typescript
- * try {
- *   const { address, chainId } = await connectWallet();
- *   console.log(`Connected to ${address} on chain ${chainId}`);
- * } catch (error) {
- *   if (error.message.includes('rejected')) {
- *     console.log('User rejected connection');
- *   }
- * }
- * ```
  */
 export async function connectWallet(): Promise<WalletConnection> {
+    if (!browser) {
+        throw new Error('Cannot connect wallet during SSR');
+    }
+
+    const config = getWagmiConfig();
+
     try {
-        const result = await connect(wagmiConfig, {
+        const result = await connect(config, {
             connector: injected(),
         });
 
-        // Ensure we got an account
         if (!result.accounts || result.accounts.length === 0) {
             throw new Error('No accounts returned from wallet');
         }
@@ -79,12 +92,11 @@ export async function connectWallet(): Promise<WalletConnection> {
             chainId: result.chainId,
         };
     } catch (error) {
-        // Re-throw with clearer error messages
         if (error instanceof Error) {
             if (error.message.includes('User rejected')) {
                 throw new Error('User rejected wallet connection');
             }
-            if (error.message.includes('No injected provider')) {
+            if (error.message.includes('No injected provider') || error.message.includes('Connector not found')) {
                 throw new Error('No wallet detected. Please install MetaMask or another Web3 wallet.');
             }
         }
@@ -94,31 +106,31 @@ export async function connectWallet(): Promise<WalletConnection> {
 
 /**
  * Disconnect the currently connected wallet.
- * 
- * @example
- * ```typescript
- * await disconnectWallet();
- * console.log('Wallet disconnected');
- * ```
  */
 export async function disconnectWallet(): Promise<void> {
-    await disconnect(wagmiConfig);
+    if (!browser) return;
+    await disconnect(getWagmiConfig());
 }
 
 /**
  * Attempt to reconnect to a previously connected wallet.
  * Useful for restoring session on page load.
- * 
- * @example
- * ```typescript
- * // On application startup
- * onMount(() => {
- *   reconnectWallet();
- * });
- * ```
  */
 export async function reconnectWallet(): Promise<void> {
-    await reconnect(wagmiConfig);
+    if (!browser) return;
+    await reconnect(getWagmiConfig());
+}
+
+/**
+ * Switch to a different chain.
+ * 
+ * @param chainId - Target chain ID
+ */
+export async function switchChain(chainId: number): Promise<void> {
+    if (!browser) return;
+
+    const config = getWagmiConfig();
+    await wagmiSwitchChainAction(config, { chainId });
 }
 
 // ============================================================================
@@ -128,22 +140,17 @@ export async function reconnectWallet(): Promise<void> {
 /**
  * Get current wallet account information.
  * Does not trigger a connection prompt - only returns existing state.
- * 
- * @returns Current account state (connected or not)
- * 
- * @example
- * ```typescript
- * const account = getWalletAccount();
- * 
- * if (account.isConnected) {
- *   console.log(`Connected: ${account.address}`);
- * } else {
- *   console.log('No wallet connected');
- * }
- * ```
  */
 export function getWalletAccount(): WalletAccount {
-    const account = getAccount(wagmiConfig);
+    if (!browser) {
+        return {
+            address: undefined,
+            isConnected: false,
+            chainId: undefined,
+        };
+    }
+
+    const account = getAccount(getWagmiConfig());
 
     return {
         address: account.address,
@@ -154,39 +161,18 @@ export function getWalletAccount(): WalletAccount {
 
 /**
  * Watch for wallet account changes (connect, disconnect, switch account).
- * Useful for reactive UI updates.
  * 
  * @param callback - Function called whenever account state changes
  * @returns Unsubscribe function to stop watching
- * 
- * @example
- * ```typescript
- * // In Svelte component
- * import { onMount, onDestroy } from 'svelte';
- * 
- * let walletAddress = $state<Address | undefined>(undefined);
- * let unwatch: (() => void) | null = null;
- * 
- * onMount(() => {
- *   unwatch = watchWalletAccount((account) => {
- *     walletAddress = account.address;
- *     if (account.isConnected) {
- *       console.log('Wallet connected:', account.address);
- *     } else {
- *       console.log('Wallet disconnected');
- *     }
- *   });
- * });
- * 
- * onDestroy(() => {
- *   unwatch?.();
- * });
- * ```
  */
 export function watchWalletAccount(
     callback: (account: WalletAccount) => void
 ): () => void {
-    return watchAccount(wagmiConfig, {
+    if (!browser) {
+        return () => { }; // No-op for SSR
+    }
+
+    return watchAccount(getWagmiConfig(), {
         onChange: (account) => {
             callback({
                 address: account.address,
@@ -203,78 +189,40 @@ export function watchWalletAccount(
 
 /**
  * Format Ethereum address for display.
- * Shortens to first and last N characters.
- * 
- * @param address - Full Ethereum address
- * @param chars - Number of characters to show on each end (default: 4)
- * @returns Formatted address like "0x1234...5678" or empty string if no address
- * 
- * @example
- * ```typescript
- * formatAddress('0x1234567890123456789012345678901234567890');
- * // "0x1234...7890"
- * 
- * formatAddress('0x1234567890123456789012345678901234567890', 6);
- * // "0x123456...567890"
- * 
- * formatAddress(undefined);
- * // ""
- * ```
+ * Uses EIP-55 checksummed format for security.
  */
-
-
 export function formatAddress(address: Address | undefined, chars: number = 4): string {
     if (!address) return '';
 
     try {
-        // Security: Ensure address is checksummed and valid
         const checksummedAddress = getAddress(address);
         return `${checksummedAddress.slice(0, chars + 2)}...${checksummedAddress.slice(-chars)}`;
     } catch (e) {
-        console.warn(`Security Warning: Invalid Ethereum address format detected: ${address}`);
-        return ''; // Fail safe: Return empty string instead of invalid address
+        if (import.meta.env.DEV) {
+            console.warn(`Invalid Ethereum address format: ${address}`);
+        }
+        return '';
     }
 }
 
 /**
  * Check if the current chain is supported.
- * 
- * @param chainId - Chain ID to check
- * @returns True if chain is supported (Mainnet or Sepolia)
- * 
- * @example
- * ```typescript
- * const account = getWalletAccount();
- * if (account.chainId && !isSupportedChain(account.chainId)) {
- *   alert('Please switch to Mainnet or Sepolia');
- * }
- * ```
  */
 export function isSupportedChain(chainId: number | undefined): boolean {
     if (!chainId) return false;
-    return chainId === mainnet.id || chainId === sepolia.id;
+    return chainId === MAINNET_CHAIN_ID || chainId === SEPOLIA_CHAIN_ID;
 }
 
 /**
  * Get human-readable chain name.
- * 
- * @param chainId - Chain ID
- * @returns Chain name or "Unknown"
- * 
- * @example
- * ```typescript
- * getChainName(1);        // "Ethereum"
- * getChainName(11155111); // "Sepolia"
- * getChainName(999);      // "Unknown"
- * ```
  */
 export function getChainName(chainId: number | undefined): string {
     if (!chainId) return 'Unknown';
 
     switch (chainId) {
-        case mainnet.id:
+        case MAINNET_CHAIN_ID:
             return 'Ethereum';
-        case sepolia.id:
+        case SEPOLIA_CHAIN_ID:
             return 'Sepolia';
         default:
             return 'Unknown';

@@ -4,26 +4,22 @@
   A smart button that shows:
   - "Connect Wallet" when disconnected
   - Address + Network badge when connected
-  - Dropdown menu for disconnect/copy
+  - Dropdown menu for disconnect/copy/switch network
   
   FE_DEV.md Compliant:
   - Uses DaisyUI dropdown component (no custom CSS)
   - Template logic moved to $derived variables
   - Only DaisyUI semantic colors
   
-  Supports: MetaMask, Rainbow, Rabbit Wallet, and other injected wallets.
+  NOTE: walletStore.init() is called ONCE in root +layout.svelte (not here)
+  NOTE: Error toast is rendered in root +layout.svelte (not here)
 -->
 <script lang="ts">
     import { walletStore } from "$lib/stores/walletStore.svelte";
-    import { onMount } from "svelte";
 
     // Local UI state
     let copied = $state(false);
-
-    onMount(() => {
-        walletStore.init();
-        return () => walletStore.destroy();
-    });
+    let dropdownRef = $state<HTMLDetailsElement | null>(null);
 
     // ============================================================================
     // Derived Values (FE_DEV: Clean Markup - no logic in templates)
@@ -37,11 +33,21 @@
         walletStore.isWrongNetwork ? "badge-warning" : "badge-ghost",
     );
 
-    const etherscanUrl = $derived(
-        walletStore.chainId === 1
-            ? `https://etherscan.io/address/${walletStore.address}`
-            : `https://sepolia.etherscan.io/address/${walletStore.address}`,
-    );
+    // Safe Etherscan URL with null checks and proper chain handling
+    const etherscanUrl = $derived.by(() => {
+        if (!walletStore.address) return null;
+
+        switch (walletStore.chainId) {
+            case 1:
+                return `https://etherscan.io/address/${walletStore.address}`;
+            case 11155111:
+                return `https://sepolia.etherscan.io/address/${walletStore.address}`;
+            default:
+                return null; // Unsupported chain - don't show link
+        }
+    });
+
+    const canShowEtherscan = $derived(etherscanUrl !== null);
 
     // ============================================================================
     // Actions
@@ -51,19 +57,41 @@
         try {
             await walletStore.connect();
         } catch (e) {
-            console.error("Connection failed:", e);
+            // Error is handled by walletStore and shown in global toast
         }
     }
 
     async function handleDisconnect() {
         await walletStore.disconnect();
+        closeDropdown();
+    }
+
+    async function handleSwitchNetwork() {
+        try {
+            await walletStore.switchToSepolia();
+            closeDropdown();
+        } catch (e) {
+            // Error handled by store
+        }
     }
 
     async function copyAddress() {
-        if (walletStore.address) {
+        if (!walletStore.address) return;
+
+        try {
             await navigator.clipboard.writeText(walletStore.address);
             copied = true;
             setTimeout(() => (copied = false), 2000);
+        } catch (e) {
+            // Fallback for browsers without clipboard API
+            console.warn("Clipboard API not available");
+        }
+    }
+
+    function closeDropdown() {
+        // Close DaisyUI dropdown by blurring the trigger
+        if (document.activeElement instanceof HTMLElement) {
+            document.activeElement.blur();
         }
     }
 </script>
@@ -71,7 +99,12 @@
 {#if walletStore.isConnected}
     <!-- Connected State - DaisyUI Dropdown -->
     <div class="dropdown dropdown-end">
-        <div tabindex="0" role="button" class="btn btn-ghost btn-sm gap-2">
+        <div
+            tabindex="0"
+            role="button"
+            class="btn btn-ghost btn-sm gap-2"
+            aria-label="Wallet menu: {walletStore.shortAddress}"
+        >
             <!-- Status indicator -->
             <span class="w-2 h-2 rounded-full {statusIndicatorClass}"></span>
             <!-- Address -->
@@ -99,6 +132,29 @@
             </li>
 
             <div class="divider my-0"></div>
+
+            <!-- Switch Network (only show if wrong network) -->
+            {#if walletStore.isWrongNetwork}
+                <li>
+                    <button onclick={handleSwitchNetwork} class="text-warning">
+                        <svg
+                            class="w-4 h-4"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                        >
+                            <path
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                stroke-width="2"
+                                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                            />
+                        </svg>
+                        Switch to Sepolia
+                    </button>
+                </li>
+                <div class="divider my-0"></div>
+            {/if}
 
             <!-- Copy Address -->
             <li>
@@ -137,29 +193,31 @@
                 </button>
             </li>
 
-            <!-- View on Etherscan -->
-            <li>
-                <a
-                    href={etherscanUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                >
-                    <svg
-                        class="w-4 h-4"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
+            <!-- View on Etherscan (only if supported chain) -->
+            {#if canShowEtherscan}
+                <li>
+                    <a
+                        href={etherscanUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
                     >
-                        <path
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            stroke-width="2"
-                            d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
-                        />
-                    </svg>
-                    View on Etherscan
-                </a>
-            </li>
+                        <svg
+                            class="w-4 h-4"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                        >
+                            <path
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                stroke-width="2"
+                                d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+                            />
+                        </svg>
+                        View on Etherscan
+                    </a>
+                </li>
+            {/if}
 
             <div class="divider my-0"></div>
 
@@ -190,6 +248,7 @@
         class="btn btn-primary btn-sm gap-2"
         onclick={handleConnect}
         disabled={walletStore.isConnecting}
+        aria-label="Connect your Ethereum wallet"
     >
         {#if walletStore.isConnecting}
             <span class="loading loading-spinner loading-xs"></span>
@@ -211,19 +270,4 @@
             Connect
         {/if}
     </button>
-{/if}
-
-<!-- Error Toast -->
-{#if walletStore.error}
-    <div class="toast toast-end toast-top z-50">
-        <div class="alert alert-error">
-            <span class="text-sm">{walletStore.error}</span>
-            <button
-                class="btn btn-ghost btn-xs"
-                onclick={() => walletStore.clearError()}
-            >
-                ✕
-            </button>
-        </div>
-    </div>
 {/if}
