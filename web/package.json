@@ -20,13 +20,17 @@
 		"svelte-check": "^4.3.4",
 		"tailwindcss": "^4.1.18",
 		"typescript": "^5.9.3",
-		"vite": "^7.2.6"
+		"vite": "^7.2.6",
+		"vite-plugin-node-polyfills": "^0.24.0",
+		"vite-plugin-top-level-await": "^1.6.0",
+		"vite-plugin-wasm": "^3.5.0"
 	},
 	"dependencies": {
 		"@aztec/bb.js": "^2.1.9",
 		"@noir-lang/acvm_js": "1.0.0-beta.17",
 		"@noir-lang/noir_js": "1.0.0-beta.17",
 		"@noir-lang/noirc_abi": "1.0.0-beta.17",
+		"@wagmi/connectors": "^7.0.5",
 		"@wagmi/core": "^3.0.1",
 		"clsx": "^2.1.1",
 		"daisyui": "^5.5.14",
@@ -35,5 +39,10 @@
 		"tailwind-merge": "^3.4.0",
 		"viem": "^2.43.3",
 		"wagmi": "^3.1.2"
+	},
+	"pnpm": {
+		"overrides": {
+			"rollup": "npm:@rollup/wasm-node"
+		}
 	}
 }

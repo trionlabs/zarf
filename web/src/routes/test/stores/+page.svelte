@@ -33,15 +33,18 @@
       amount: "100000",
       schedule: {
         cliffEndDate: "2025-06-01",
-        distributionDurationMonths: 12,
+        distributionDuration: 12,
+        durationUnit: "months",
       },
       recipients: [
-        { email: "alice@example.com", amount: 1000 },
-        { email: "bob@example.com", amount: 2000 },
-        { email: "charlie@example.com", amount: 3000 },
+        { address: "0x71C7656EC7ab88b098defB751B7401B5f6d8976F", amount: 1000 },
+        { address: "0x1234567890123456789012345678901234567890", amount: 2000 },
+        { address: "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd", amount: 3000 },
       ],
       csvFilename: "test.csv",
       regulatoryRules: [],
+      state: "created",
+      createdAt: new Date().toISOString(),
     });
   }
 
@@ -57,14 +60,12 @@
     });
   }
 
-  function testWalletConnect() {
-    walletStore.setConnecting(true);
-    setTimeout(() => {
-      walletStore.setConnected(
-        "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb",
-        11155111, // Sepolia
-      );
-    }, 1000);
+  async function testWalletConnect() {
+    try {
+      await walletStore.connect();
+    } catch (e) {
+      console.error("Connect failed:", e);
+    }
   }
 
   // Derived values for display
@@ -242,12 +243,9 @@
 
       <div class="flex flex-wrap gap-2 mt-4">
         <button class="btn btn-sm btn-primary" onclick={testWalletConnect}>
-          Simulate Connect
+          Connect Wallet
         </button>
-        <button
-          class="btn btn-sm btn-error"
-          onclick={walletStore.setDisconnected}
-        >
+        <button class="btn btn-sm btn-error" onclick={walletStore.disconnect}>
           Disconnect
         </button>
       </div>

@@ -9,106 +9,22 @@
 
 import {
     createConfig,
-    createConnector,
     http,
     connect,
     disconnect,
+    reconnect,
     getAccount,
     watchAccount,
     type Config
 } from '@wagmi/core';
 import { mainnet, sepolia } from 'viem/chains';
-import type { Address } from 'viem';
+import { getAddress, type Address } from 'viem';
+import { injected } from '@wagmi/connectors';
 import type { WalletConnection, WalletAccount } from '../types';
 
 // ============================================================================
 // Wagmi Configuration
 // ============================================================================
-
-/**
- * Minimal injected wallet connector for Wagmi v3
- * Implements only essential methods, production version will use @wagmi/connectors
- */
-function injected() {
-    return createConnector((config) => ({
-        id: 'injected',
-        name: 'Browser Wallet',
-        type: 'injected' as const,
-
-        async connect(params?: any) {
-            const provider = (await this.getProvider()) as any;
-            const accounts = (await provider.request({
-                method: 'eth_requestAccounts',
-            })) as Address[];
-            const chainId = await this.getChainId();
-            return { accounts, chainId } as any;
-        },
-
-        async disconnect() {
-            // Injected wallets typically don't support programmatic disconnect
-        },
-
-        async getAccounts() {
-            const provider = (await this.getProvider()) as any;
-            const accounts = (await provider.request({
-                method: 'eth_accounts',
-            })) as Address[];
-            return accounts;
-        },
-
-        async getChainId() {
-            const provider = (await this.getProvider()) as any;
-            const chainId = await provider.request({
-                method: 'eth_chainId',
-            });
-            return parseInt(chainId as string, 16);
-        },
-
-        async getProvider() {
-            if (typeof window !== 'undefined' && window.ethereum) {
-                return window.ethereum;
-            }
-            throw new Error('No injected wallet found');
-        },
-
-        async isAuthorized() {
-            try {
-                const accounts = await this.getAccounts();
-                return accounts.length > 0;
-            } catch {
-                return false;
-            }
-        },
-
-        onAccountsChanged(accounts: string[]) {
-            if (accounts.length === 0) {
-                config.emitter.emit('disconnect');
-            } else {
-                config.emitter.emit('change', { accounts: accounts as Address[] });
-            }
-        },
-
-        onChainChanged(chain: string) {
-            const chainId = parseInt(chain, 16);
-            config.emitter.emit('change', { chainId });
-        },
-
-        onDisconnect() {
-            config.emitter.emit('disconnect');
-        },
-
-        async setup() {
-            try {
-                const provider = (await this.getProvider()) as any;
-                provider.on?.('accountsChanged', this.onAccountsChanged.bind(this));
-                provider.on?.('chainChanged', this.onChainChanged.bind(this));
-                provider.on?.('disconnect', this.onDisconnect.bind(this));
-            } catch {
-                // Provider not available, skip setup
-            }
-        },
-    }));
-}
 
 /**
  * Wagmi configuration instance.
@@ -187,6 +103,22 @@ export async function connectWallet(): Promise<WalletConnection> {
  */
 export async function disconnectWallet(): Promise<void> {
     await disconnect(wagmiConfig);
+}
+
+/**
+ * Attempt to reconnect to a previously connected wallet.
+ * Useful for restoring session on page load.
+ * 
+ * @example
+ * ```typescript
+ * // On application startup
+ * onMount(() => {
+ *   reconnectWallet();
+ * });
+ * ```
+ */
+export async function reconnectWallet(): Promise<void> {
+    await reconnect(wagmiConfig);
 }
 
 // ============================================================================
@@ -289,16 +221,19 @@ export function watchWalletAccount(
  * // ""
  * ```
  */
+
+
 export function formatAddress(address: Address | undefined, chars: number = 4): string {
     if (!address) return '';
 
-    // Validate address format
-    if (!address.startsWith('0x') || address.length !== 42) {
-        console.warn(`Invalid address format: ${address}`);
-        return address;
+    try {
+        // Security: Ensure address is checksummed and valid
+        const checksummedAddress = getAddress(address);
+        return `${checksummedAddress.slice(0, chars + 2)}...${checksummedAddress.slice(-chars)}`;
+    } catch (e) {
+        console.warn(`Security Warning: Invalid Ethereum address format detected: ${address}`);
+        return ''; // Fail safe: Return empty string instead of invalid address
     }
-
-    return `${address.slice(0, chars + 2)}...${address.slice(-chars)}`;
 }
 
 /**

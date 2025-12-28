@@ -1,91 +1,174 @@
 /**
- * Wallet Store - Wallet Connection State
+ * Wallet Store - Svelte 5 Runes + Wagmi/Viem Integration
  * 
- * Manages wallet connection status, address, and chain ID.
- * Session-based (no persistence) - wallet state is ephemeral.
+ * Single source of truth for wallet connection state.
+ * Uses wagmi/core for connection management, Svelte 5 Runes for reactivity.
  * 
- * Integrates with utilities in `lib/contracts/wallet.ts`.
+ * Supports: MetaMask, Rainbow, Rabbit Wallet, Brave, Coinbase (all injected wallets)
  * 
  * @module stores/walletStore
  */
 
-import type { WalletState } from './types';
+import {
+    connectWallet as wagmiConnect,
+    disconnectWallet as wagmiDisconnect,
+    reconnectWallet as wagmiReconnect,
+    getWalletAccount,
+    watchWalletAccount,
+    formatAddress,
+    isSupportedChain,
+    getChainName,
+    wagmiConfig
+} from '$lib/contracts/wallet';
 import type { Address } from 'viem';
 
 // ============================================================================
-// Initial State
+// Types
+// ============================================================================
+
+interface WalletState {
+    address: Address | null;
+    isConnected: boolean;
+    isConnecting: boolean;
+    chainId: number | null;
+    error: string | null;
+}
+
+// ============================================================================
+// Internal State (Private)
 // ============================================================================
 
 const initialState: WalletState = {
     address: null,
     isConnected: false,
     isConnecting: false,
-    chainId: null
+    chainId: null,
+    error: null
 };
 
-// ============================================================================
-// Internal State (Private)
-// ============================================================================
-
 let state = $state<WalletState>(structuredClone(initialState));
+let unwatchFn: (() => void) | null = null;
 
 // ============================================================================
 // Derived Values (Computed)
 // ============================================================================
 
-/**
- * Check if connected to wrong network
- * Expected: Sepolia (11155111) or Mainnet (1)
- */
 const isWrongNetwork = $derived(
     state.isConnected &&
     state.chainId !== null &&
-    state.chainId !== 1 && // Mainnet
-    state.chainId !== 11155111 // Sepolia
+    !isSupportedChain(state.chainId)
 );
 
-const networkName = $derived(
-    state.chainId === 1 ? 'Ethereum Mainnet' :
-        state.chainId === 11155111 ? 'Sepolia Testnet' :
-            state.chainId ? `Chain ${state.chainId}` :
-                'Unknown'
-);
+const networkName = $derived(getChainName(state.chainId ?? undefined));
 
 const shortAddress = $derived(
-    state.address
-        ? `${state.address.slice(0, 6)}...${state.address.slice(-4)}`
-        : null
+    state.address ? formatAddress(state.address) : null
 );
 
 // ============================================================================
-// Mutation Actions
+// Private Helpers
 // ============================================================================
 
-function setConnecting(value: boolean) {
-    state.isConnecting = value;
+function syncFromWagmi() {
+    const account = getWalletAccount();
+    state.address = account.address ?? null;
+    state.isConnected = account.isConnected;
+    state.chainId = account.chainId ?? null;
 }
 
-function setConnected(address: Address, chainId: number) {
-    state.address = address;
-    state.isConnected = true;
-    state.isConnecting = false;
-    state.chainId = chainId;
+// ============================================================================
+// Public Actions
+// ============================================================================
+
+/**
+ * Initialize wallet watcher. Call once on app mount.
+ * Syncs initial state, attempts reconnect, and watches for changes.
+ */
+async function init() {
+    // 1. Attempt Auto-Reconnect
+    try {
+        await wagmiReconnect();
+    } catch (e) {
+        // Expected if no previous session
+    }
+
+    // 2. Sync initial state
+    syncFromWagmi();
+
+    // 3. Watch for account changes (connect, disconnect, switch)
+    if (unwatchFn) unwatchFn();
+    unwatchFn = watchWalletAccount((account) => {
+        state.address = account.address ?? null;
+        state.isConnected = account.isConnected;
+        state.chainId = account.chainId ?? null;
+        state.isConnecting = false;
+        state.error = null;
+    });
 }
 
-function setDisconnected() {
-    state = structuredClone(initialState);
+/**
+ * Connect wallet. Triggers browser wallet popup.
+ */
+async function connect() {
+    state.isConnecting = true;
+    state.error = null;
+
+    try {
+        const result = await wagmiConnect();
+        state.address = result.address;
+        state.chainId = result.chainId;
+        state.isConnected = true;
+        return result;
+    } catch (err: any) {
+        console.warn('Wallet connection error:', err);
+
+        // Security: Sanitize error messages for UI
+        let message = 'Failed to connect wallet';
+
+        if (err.message && (err.message.includes('rejected') || err.message.includes('denied'))) {
+            message = 'Connection request rejected by user';
+        } else if (err.message && err.message.includes('No wallet')) {
+            message = 'No Ethereum wallet detected. Please install MetaMask.';
+        } else {
+            // Log full error for devs, show generic error to user to avoid info leakage
+            console.error('Unexpected wallet error:', err);
+            message = 'Connection failed due to an unknown error';
+        }
+
+        state.error = message;
+        throw err;
+    } finally {
+        state.isConnecting = false;
+    }
 }
 
-function updateChainId(chainId: number) {
-    state.chainId = chainId;
+/**
+ * Disconnect wallet.
+ */
+async function disconnect() {
+    try {
+        await wagmiDisconnect();
+        state = structuredClone(initialState);
+    } catch (err: any) {
+        state.error = err.message || 'Failed to disconnect';
+    }
 }
 
-function updateAddress(address: Address) {
-    state.address = address;
+/**
+ * Clear error state.
+ */
+function clearError() {
+    state.error = null;
 }
 
-function reset() {
-    state = structuredClone(initialState);
+/**
+ * Cleanup watcher. Call on app unmount.
+ */
+function destroy() {
+    if (unwatchFn) {
+        unwatchFn();
+        unwatchFn = null;
+    }
 }
 
 // ============================================================================
@@ -93,22 +176,25 @@ function reset() {
 // ============================================================================
 
 export const walletStore = {
-    // Getters (read-only)
+    // State getters (reactive)
     get address() { return state.address; },
     get isConnected() { return state.isConnected; },
     get isConnecting() { return state.isConnecting; },
     get chainId() { return state.chainId; },
+    get error() { return state.error; },
 
     // Derived getters
     get isWrongNetwork() { return isWrongNetwork; },
     get networkName() { return networkName; },
     get shortAddress() { return shortAddress; },
 
-    // Mutation methods
-    setConnecting,
-    setConnected,
-    setDisconnected,
-    updateChainId,
-    updateAddress,
-    reset
+    // Actions
+    init,
+    connect,
+    disconnect,
+    clearError,
+    destroy
 };
+
+// Re-export utilities
+export { formatAddress, isSupportedChain, getChainName, wagmiConfig };
