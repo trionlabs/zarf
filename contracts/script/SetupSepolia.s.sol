@@ -83,9 +83,9 @@ contract SetupSepoliaScript is Script {
         vesting.deposit(depositAmount);
         console.log("Deposited", depositAmount, "tokens");
 
-        // Start vesting with 0 cliff, 1 year duration
-        vesting.startVesting(0, 365 days);
-        console.log("Started vesting with 1 year duration");
+        // Start vesting with 0 cliff, 1 year duration, 30-day period for monthly discrete unlocks
+        vesting.startVesting(0, 365 days, 30 days);
+        console.log("Started vesting with 30-day periodic unlocks");
 
         vm.stopBroadcast();
 

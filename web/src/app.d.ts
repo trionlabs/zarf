@@ -22,6 +22,8 @@ interface ImportMetaEnv {
 	readonly VITE_JWK_REGISTRY_ADDRESS?: string;
 	readonly VITE_RPC_URL?: string;
 	readonly VITE_NETWORK?: string;
+	readonly VITE_FACTORY_ADDRESS_SEPOLIA?: string;
+	readonly VITE_FACTORY_ADDRESS_MAINNET?: string;
 }
 
 interface ImportMeta {

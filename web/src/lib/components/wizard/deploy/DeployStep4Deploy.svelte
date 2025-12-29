@@ -2,11 +2,17 @@
     import { deployStore } from "$lib/stores/deployStore.svelte";
     import { wizardStore } from "$lib/stores/wizardStore.svelte";
     import {
-        DeployService,
-        type DeployConfig,
-        type DeployProgress,
-    } from "$lib/services/deploy";
-    import { durationToSeconds, cliffDateToSeconds } from "$lib/utils/vesting";
+        FactoryDeployService,
+        getFactoryAddress,
+        isFactoryAvailable,
+        type FactoryDeployConfig,
+        type FactoryDeployProgress,
+    } from "$lib/services/factoryDeploy";
+    import {
+        durationToSeconds,
+        cliffDateToSeconds,
+        unitToPeriodSeconds,
+    } from "$lib/utils/vesting";
     import { walletStore } from "$lib/stores/walletStore.svelte";
     import { goto } from "$app/navigation";
     import type { Address, Hash } from "viem";
@@ -14,47 +20,81 @@
     // Local state from stores
     let distribution = $derived(deployStore.distribution);
     let merkleResult = $derived(deployStore.merkleResult);
-    let deployProgress = $derived(deployStore.deployProgress);
-    let error = $derived(deployStore.error);
     let isDeployed = $derived(deployStore.isDeployed);
     let contractAddress = $derived(deployStore.contractAddress);
 
-    // Wallet state from store (reactive)
+    // Wallet state
     let walletAddress = $derived(walletStore.address);
+    let chainId = $derived(walletStore.chainId);
     let isWrongNetwork = $derived(walletStore.isWrongNetwork);
-    let isStarting = $state(false);
 
-    // Track tx hashes for each step
-    let stepTxHashes = $state<Record<string, Hash>>({});
+    // Local deployment state
+    let isDeploying = $state(false);
+    let currentStep = $state<
+        "idle" | "approve" | "create" | "complete" | "error"
+    >("idle");
+    let currentMessage = $state("");
+    let error = $state<string | null>(null);
+    let approveTxHash = $state<Hash | null>(null);
+    let createTxHash = $state<Hash | null>(null);
+
+    // Factory availability check
+    let factoryAddress = $derived(chainId ? getFactoryAddress(chainId) : null);
+    let factoryAvailable = $derived(
+        chainId ? isFactoryAvailable(chainId) : false,
+    );
 
     async function handleDeploy() {
-        if (!distribution || !merkleResult || !walletAddress) return;
+        if (!distribution || !merkleResult || !walletAddress || !chainId)
+            return;
 
-        // Critical Edge Case: Prevent execution on wrong network
+        // Auto-switch network if wrong
         if (isWrongNetwork) {
-            deployStore.setDeployError(
-                "Wrong Network. Please switch to Ethereum Mainnet or Sepolia.",
-            );
+            try {
+                currentMessage = "Switching to Sepolia network...";
+                await walletStore.switchChain(11155111); // Sepolia
+                // Wait for network switch to propagate
+                await new Promise((resolve) => setTimeout(resolve, 1000));
+            } catch (e: any) {
+                error =
+                    "Failed to switch network. Please switch manually in MetaMask.";
+                return;
+            }
+        }
+
+        // Re-check factory after potential network switch
+        const currentFactoryAddress = getFactoryAddress(chainId);
+        if (!currentFactoryAddress) {
+            error = "Factory contract not available on this network.";
             return;
         }
 
-        isStarting = true;
-        stepTxHashes = {};
+        isDeploying = true;
+        currentStep = "idle";
+        error = null;
+        approveTxHash = null;
+        createTxHash = null;
 
-        const config: DeployConfig = {
-            tokenAddress: (distribution as any).tokenDetails
-                ?.tokenAddress as Address,
-            verifierAddress: (import.meta.env.VITE_VERIFIER_ADDRESS ||
-                "0x0000000000000000000000000000000000000000") as Address,
-            jwkRegistryAddress: (import.meta.env.VITE_JWK_REGISTRY_ADDRESS ||
-                "0x0000000000000000000000000000000000000000") as Address,
-            merkleRoot: ("0x" +
-                merkleResult.root.toString(16)) as `0x${string}`,
-            allocations: merkleResult.claims.map((c: any) => ({
-                emailHash: ("0x" +
-                    (c.emailHash?.toString(16) || "0")) as `0x${string}`,
-                amount: BigInt(c.amount),
-            })),
+        // Prepare email hashes and amounts from merkle result
+        const emailHashes: Hash[] = merkleResult.claims.map((c: any) => {
+            const hex = c.emailHash?.toString(16) || "0";
+            return `0x${hex.padStart(64, "0")}` as Hash;
+        });
+
+        const amounts: bigint[] = merkleResult.claims.map((c: any) =>
+            BigInt(c.amount),
+        );
+
+        // Prepare merkle root
+        const merkleRootHex = merkleResult.root.toString(16);
+        const merkleRoot = `0x${merkleRootHex.padStart(64, "0")}` as Hash;
+
+        const config: FactoryDeployConfig = {
+            factoryAddress: currentFactoryAddress,
+            tokenAddress: wizardStore.tokenDetails.tokenAddress as Address,
+            merkleRoot,
+            emailHashes,
+            amounts,
             cliffSeconds: cliffDateToSeconds(
                 distribution.schedule.cliffEndDate,
             ),
@@ -62,54 +102,60 @@
                 distribution.schedule.distributionDuration,
                 distribution.schedule.durationUnit,
             ),
+            periodSeconds: unitToPeriodSeconds(
+                distribution.schedule.durationUnit,
+            ),
             totalAmount: BigInt(distribution.amount),
-            owner: walletAddress,
+            owner: walletAddress!, // Checked at function start
         };
 
-        // Verify Integrity
-        const allocationsSum = config.allocations.reduce(
-            (sum, a) => sum + a.amount,
-            0n,
-        );
+        // Verify integrity
+        const allocationsSum = amounts.reduce((sum, a) => sum + a, 0n);
         if (allocationsSum !== config.totalAmount) {
-            const msg = `Integrity Error: Allocations sum (${allocationsSum}) does not match distribution total (${config.totalAmount}). Please recreate the distribution.`;
-            console.error(msg);
-            deployStore.setDeployError(msg);
-            isStarting = false;
+            error = `Integrity Error: Allocations sum does not match distribution total. Please recreate the distribution.`;
+            isDeploying = false;
             return;
         }
 
-        const service = new DeployService(config, (progress) => {
-            deployStore.updateDeployProgress(progress);
+        const service = new FactoryDeployService(
+            config,
+            (progress: FactoryDeployProgress) => {
+                currentStep = progress.step;
+                currentMessage = progress.message;
 
-            // Track tx hash for current step
-            if (
-                progress.txHash &&
-                progress.step !== "error" &&
-                progress.step !== "complete"
-            ) {
-                stepTxHashes[progress.step] = progress.txHash;
-                stepTxHashes = { ...stepTxHashes }; // trigger reactivity
-            }
-        });
+                if (progress.txHash) {
+                    if (progress.step === "approve") {
+                        approveTxHash = progress.txHash;
+                    } else if (progress.step === "create") {
+                        createTxHash = progress.txHash;
+                    }
+                }
+
+                if (progress.step === "error") {
+                    error = progress.message;
+                }
+            },
+        );
 
         try {
-            const contractAddr = await service.executeFullDeploy();
-            if (contractAddr) {
-                deployStore.setDeployed(contractAddr);
+            const vestingAddress = await service.deploy();
+
+            if (vestingAddress) {
+                currentStep = "complete";
+                deployStore.setDeployed(vestingAddress);
 
                 // Persist to Global Store
-                const lastTxHash = deployProgress?.txHash || "0x";
                 wizardStore.moveDistributionToLaunched(
                     distribution.id,
-                    lastTxHash,
+                    createTxHash || "0x",
                 );
             }
         } catch (e: any) {
             console.error("Deploy failed:", e);
-            deployStore.setDeployError(e.message || "Deployment failed");
+            error = e.message || "Deployment failed";
+            currentStep = "error";
         } finally {
-            isStarting = false;
+            isDeploying = false;
         }
     }
 
@@ -117,11 +163,16 @@
         goto("/distributions");
     }
 
-    // Etherscan URL helper
+    function retry() {
+        error = null;
+        currentStep = "idle";
+        handleDeploy();
+    }
+
+    // Etherscan URL helpers
     function getEtherscanUrl(hash: Hash): string {
-        // Default to Sepolia, could be dynamic based on chainId
         const baseUrl =
-            walletStore.chainId === 1
+            chainId === 1
                 ? "https://etherscan.io"
                 : "https://sepolia.etherscan.io";
         return `${baseUrl}/tx/${hash}`;
@@ -129,75 +180,53 @@
 
     function getContractEtherscanUrl(address: Address): string {
         const baseUrl =
-            walletStore.chainId === 1
+            chainId === 1
                 ? "https://etherscan.io"
                 : "https://sepolia.etherscan.io";
         return `${baseUrl}/address/${address}`;
     }
 
-    // Progress Helper
+    // Step status helper
     function getStepStatus(
-        stepId: string,
-        currentStep: DeployProgress["step"] | undefined,
+        stepId: "approve" | "create",
     ): "pending" | "active" | "done" | "error" {
-        if (!currentStep) return "pending";
+        if (currentStep === "error") {
+            // Only the current/failed step shows error
+            if (stepId === "approve" && !approveTxHash) return "error";
+            if (stepId === "create" && approveTxHash && !createTxHash)
+                return "error";
+            if (stepId === "approve" && approveTxHash) return "done";
+            return "pending";
+        }
 
-        const steps = [
-            "deploy",
-            "merkle",
-            "allocations",
-            "approve",
-            "deposit",
-            "start",
-            "complete",
-        ];
+        if (currentStep === "complete" || isDeployed) {
+            return "done";
+        }
 
-        if (currentStep === "error") return "error";
+        if (currentStep === "approve") {
+            return stepId === "approve" ? "active" : "pending";
+        }
 
-        const currentIndex = steps.indexOf(currentStep);
-        const stepIndex = steps.indexOf(stepId);
+        if (currentStep === "create") {
+            return stepId === "approve" ? "done" : "active";
+        }
 
-        if (stepIndex < currentIndex) return "done";
-        if (stepIndex === currentIndex) return "active";
         return "pending";
     }
 
     const steps = [
         {
-            id: "deploy",
-            label: "Deploy Contract",
-            icon: "🚀",
-            description: "Creating vesting contract on-chain",
-        },
-        {
-            id: "merkle",
-            label: "Set Whitelist",
-            icon: "🌳",
-            description: "Setting Merkle root for verification",
-        },
-        {
-            id: "allocations",
-            label: "Set Allocations",
-            icon: "📝",
-            description: "Registering recipient allocations",
-        },
-        {
-            id: "approve",
+            id: "approve" as const,
             label: "Approve Tokens",
             icon: "✅",
-            description: "Approving token transfer",
+            description: "Allow factory contract to transfer your tokens",
         },
         {
-            id: "deposit",
-            label: "Deposit Tokens",
-            icon: "💰",
-            description: "Depositing tokens to contract",
-        },
-        {
-            id: "start",
-            label: "Start Vesting",
-            icon: "⏱️",
-            description: "Activating vesting schedule",
+            id: "create" as const,
+            label: "Create Distribution",
+            icon: "🚀",
+            description:
+                "Deploy contract, set allocations, fund & start vesting",
         },
     ];
 </script>
@@ -218,20 +247,56 @@
         {:else}
             <h2 class="text-3xl font-bold mb-2">Deploy Distribution</h2>
             <p class="text-base-content/70">
-                Execute 6 transactions to deploy your distribution contract.
+                Execute 2 transactions to deploy your distribution contract.
             </p>
+            <div class="badge badge-success badge-outline mt-2 gap-1">
+                <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                    <path
+                        fill-rule="evenodd"
+                        d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                        clip-rule="evenodd"
+                    />
+                </svg>
+                Factory Pattern: 2 TX instead of 6
+            </div>
         {/if}
     </div>
 
-    <!-- Transaction Pipeline -->
+    <!-- Factory Not Available Warning -->
+    {#if !factoryAvailable && chainId}
+        <div class="alert alert-warning mb-6">
+            <svg
+                class="w-6 h-6"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+            >
+                <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                />
+            </svg>
+            <div>
+                <h3 class="font-bold">Factory Not Available</h3>
+                <p class="text-sm">
+                    Factory contract is not deployed on this network yet.
+                </p>
+            </div>
+        </div>
+    {/if}
+
+    <!-- Transaction Pipeline (2 Steps) -->
     <div class="relative mb-8">
         <!-- Vertical line connector -->
         <div class="absolute left-6 top-8 bottom-8 w-0.5 bg-base-300"></div>
 
         <div class="space-y-4">
-            {#each steps as step, index}
-                {@const status = getStepStatus(step.id, deployProgress?.step)}
-                {@const txHash = stepTxHashes[step.id]}
+            {#each steps as step}
+                {@const status = getStepStatus(step.id)}
+                {@const txHash =
+                    step.id === "approve" ? approveTxHash : createTxHash}
 
                 <div
                     class="relative flex items-start gap-4 p-4 rounded-xl transition-all duration-300
@@ -343,42 +408,14 @@
                             {step.description}
                         </p>
 
-                        <!-- Allocations batch progress -->
-                        {#if step.id === "allocations" && status === "active" && deployProgress?.allocationsBatch}
-                            <div class="mt-2">
-                                <div class="flex justify-between text-xs mb-1">
-                                    <span
-                                        >Batch {deployProgress.allocationsBatch
-                                            .current} of {deployProgress
-                                            .allocationsBatch.total}</span
-                                    >
-                                    <span
-                                        >{Math.round(
-                                            (deployProgress.allocationsBatch
-                                                .current /
-                                                deployProgress.allocationsBatch
-                                                    .total) *
-                                                100,
-                                        )}%</span
-                                    >
-                                </div>
-                                <progress
-                                    class="progress progress-primary w-full h-2"
-                                    value={deployProgress.allocationsBatch
-                                        .current}
-                                    max={deployProgress.allocationsBatch.total}
-                                ></progress>
-                            </div>
-                        {/if}
-
                         <!-- Active step message -->
-                        {#if status === "active" && deployProgress?.message}
+                        {#if status === "active" && currentMessage}
                             <div
                                 class="mt-2 text-sm text-primary font-medium flex items-center gap-2"
                             >
                                 <span class="loading loading-dots loading-xs"
                                 ></span>
-                                {deployProgress.message}
+                                {currentMessage}
                             </div>
                         {/if}
                     </div>
@@ -407,7 +444,7 @@
                 <h3 class="font-bold">Transaction Failed</h3>
                 <p class="text-sm">{error}</p>
             </div>
-            <button class="btn btn-sm btn-outline" onclick={handleDeploy}>
+            <button class="btn btn-sm btn-outline" onclick={retry}>
                 Retry
             </button>
         </div>
@@ -415,22 +452,27 @@
 
     <!-- Actions -->
     <div class="flex flex-col items-center gap-4">
-        {#if !isDeployed && !deployProgress}
+        {#if !isDeployed && currentStep === "idle"}
             <!-- Big Launch Button -->
             <button
                 class="group relative btn btn-primary btn-lg px-12 text-lg shadow-xl
                     hover:shadow-2xl hover:shadow-primary/25 transition-all duration-300
                     disabled:opacity-50"
                 onclick={handleDeploy}
-                disabled={isStarting || !walletAddress || isWrongNetwork}
+                disabled={isDeploying ||
+                    !walletAddress ||
+                    isWrongNetwork ||
+                    !factoryAvailable}
             >
-                {#if isStarting}
+                {#if isDeploying}
                     <span class="loading loading-spinner"></span>
                     Preparing...
                 {:else if !walletAddress}
                     Connect Wallet First
                 {:else if isWrongNetwork}
                     Wrong Network
+                {:else if !factoryAvailable}
+                    Factory Not Available
                 {:else}
                     <span class="mr-2">🚀</span>
                     Launch Deployment
@@ -446,8 +488,8 @@
             </button>
 
             <p class="text-xs text-base-content/50 text-center max-w-md">
-                This will require 6 wallet confirmations. Keep this tab open
-                until complete.
+                This will require only 2 wallet confirmations. Much faster than
+                before!
             </p>
         {:else if isDeployed && contractAddress}
             <!-- Success State -->
@@ -494,8 +536,8 @@
                     </div>
                 </div>
             </div>
-        {:else if deployProgress}
-            <!-- In Progress - Show current status -->
+        {:else if currentStep !== "idle" && currentStep !== "error"}
+            <!-- In Progress -->
             <div class="text-center text-base-content/70">
                 <span class="loading loading-ring loading-lg"></span>
                 <p class="mt-2">

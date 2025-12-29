@@ -24,7 +24,7 @@ contract ZarfVesting {
     // ============ Events ============
     event AllocationSet(bytes32 indexed emailHash, uint256 amount);
     event Claimed(bytes32 indexed emailHash, address indexed recipient, uint256 amount);
-    event VestingStarted(uint256 startTime, uint256 cliffDuration, uint256 vestingDuration);
+    event VestingStarted(uint256 startTime, uint256 cliffDuration, uint256 vestingDuration, uint256 vestingPeriod);
     event MerkleRootSet(bytes32 merkleRoot);
     event Deposited(uint256 amount);
 
@@ -42,6 +42,7 @@ contract ZarfVesting {
     uint256 public vestingStart;
     uint256 public cliffDuration;
     uint256 public vestingDuration;
+    uint256 public vestingPeriod;
 
     // emailHash => total allocation
     mapping(bytes32 => uint256) public allocations;
@@ -71,14 +72,20 @@ contract ZarfVesting {
         emit MerkleRootSet(_merkleRoot);
     }
 
-    /// @notice Start the vesting schedule
+    /// @notice Start the vesting schedule with discrete periodic unlocks
     /// @param _cliffDuration Duration before any tokens vest (seconds)
     /// @param _vestingDuration Total vesting duration after cliff (seconds)
-    function startVesting(uint256 _cliffDuration, uint256 _vestingDuration) external onlyOwner {
+    /// @param _vestingPeriod Duration of each unlock period (seconds). E.g., 2592000 for ~30 days
+    /// @dev Tokens unlock in discrete periods. At 29 days with 30-day period, 0 tokens are claimable.
+    ///      At 30 days, 1 period's worth unlocks. This prevents partial-period exploitation.
+    function startVesting(uint256 _cliffDuration, uint256 _vestingDuration, uint256 _vestingPeriod) external onlyOwner {
+        require(_vestingPeriod > 0, "Period must be > 0");
+        require(_vestingDuration >= _vestingPeriod, "Duration must be >= period");
         vestingStart = block.timestamp;
         cliffDuration = _cliffDuration;
         vestingDuration = _vestingDuration;
-        emit VestingStarted(block.timestamp, _cliffDuration, _vestingDuration);
+        vestingPeriod = _vestingPeriod;
+        emit VestingStarted(block.timestamp, _cliffDuration, _vestingDuration, _vestingPeriod);
     }
 
     /// @notice Set allocation for an email hash
@@ -178,9 +185,12 @@ contract ZarfVesting {
 
     // ============ View Functions ============
 
-    /// @notice Calculate vested amount for an email hash
+    /// @notice Calculate vested amount for an email hash using discrete periodic unlocks
     /// @param emailHash The email hash to check
     /// @return The vested amount
+    /// @dev Uses integer division to ensure only COMPLETE periods count.
+    ///      Example: With 30-day period, at day 29 = 0 periods complete = 0 tokens.
+    ///      At day 30 = 1 period complete = (allocation * 1) / totalPeriods.
     function calculateVested(bytes32 emailHash) public view returns (uint256) {
         uint256 allocation = allocations[emailHash];
         if (allocation == 0) return 0;
@@ -198,9 +208,20 @@ contract ZarfVesting {
             return allocation;
         }
 
-        // During vesting: linear
+        // During vesting: DISCRETE PERIODIC UNLOCKS
+        // Only complete periods count - prevents partial-period exploitation
         uint256 vestedTime = elapsed - cliffDuration;
-        return (allocation * vestedTime) / vestingDuration;
+        
+        // Calculate completed periods using integer division (floors automatically)
+        // This is the core security fix: 29 days / 30 days = 0 periods
+        uint256 completedPeriods = vestedTime / vestingPeriod;
+        uint256 totalPeriods = vestingDuration / vestingPeriod;
+        
+        // Guard against division by zero (should not happen due to constructor checks)
+        if (totalPeriods == 0) return allocation;
+        
+        // Return proportional amount based on completed periods
+        return (allocation * completedPeriods) / totalPeriods;
     }
 
     /// @notice Get claimable amount for an email hash
@@ -214,7 +235,27 @@ contract ZarfVesting {
     /// @return start The vesting start timestamp
     /// @return cliff The cliff duration
     /// @return duration The vesting duration
-    function getVestingInfo() external view returns (uint256 start, uint256 cliff, uint256 duration) {
-        return (vestingStart, cliffDuration, vestingDuration);
+    /// @return period The unlock period duration
+    function getVestingInfo() external view returns (uint256 start, uint256 cliff, uint256 duration, uint256 period) {
+        return (vestingStart, cliffDuration, vestingDuration, vestingPeriod);
+    }
+
+    /// @notice Get the number of completed unlock periods
+    /// @return completed Number of periods that have unlocked
+    /// @return total Total number of periods in the vesting schedule
+    function getUnlockProgress() external view returns (uint256 completed, uint256 total) {
+        if (vestingStart == 0 || vestingPeriod == 0) return (0, 0);
+        
+        uint256 elapsed = block.timestamp - vestingStart;
+        if (elapsed < cliffDuration) return (0, vestingDuration / vestingPeriod);
+        
+        uint256 vestedTime = elapsed - cliffDuration;
+        uint256 completedPeriods = vestedTime / vestingPeriod;
+        uint256 totalPeriods = vestingDuration / vestingPeriod;
+        
+        // Cap at total periods
+        if (completedPeriods > totalPeriods) completedPeriods = totalPeriods;
+        
+        return (completedPeriods, totalPeriods);
     }
 }

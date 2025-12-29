@@ -56,8 +56,8 @@ contract ZarfVestingIntegrationTest is Test {
         token.approve(address(vesting), ALLOCATION);
         vesting.deposit(ALLOCATION);
 
-        // Start vesting
-        vesting.startVesting(CLIFF, VESTING_DURATION);
+        // Start vesting with discrete unlocks (1 second period for instant testing)
+        vesting.startVesting(CLIFF, VESTING_DURATION, VESTING_DURATION);
 
         // Warp past vesting period
         vm.warp(block.timestamp + CLIFF + VESTING_DURATION + 1);

@@ -1,5 +1,4 @@
 <script lang="ts">
-    import { onMount } from "svelte";
     import { deployStore } from "$lib/stores/deployStore.svelte";
     import { processWhitelist } from "$lib/services/merkleTree";
     import { fly } from "svelte/transition";
@@ -32,12 +31,13 @@
         }
     }
 
-    onMount(() => {
+    $effect(() => {
         // If we already have a result, don't regenerate
         if (merkleResult) return;
 
-        // If data is ready, start
-        if (distribution && !isGeneratingMerkle) {
+        // If data is ready and not already generating or error, start
+        // This fixes the race condition where distribution loads after mount
+        if (distribution && !isGeneratingMerkle && !merkleError) {
             generateTree();
         }
     });

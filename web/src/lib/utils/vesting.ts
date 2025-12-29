@@ -170,3 +170,30 @@ export function cliffDateToSeconds(cliffEndDate: string): bigint {
     const nowMs = Date.now();
     return BigInt(Math.max(0, Math.floor((cliffMs - nowMs) / 1000)));
 }
+
+/**
+ * Converts a duration unit to the period duration in seconds.
+ * Used for discrete/periodic vesting where tokens unlock in complete periods.
+ * 
+ * @example
+ * unitToPeriodSeconds("weeks") → 604800n (7 days)
+ * unitToPeriodSeconds("months") → 2592000n (30 days)
+ * 
+ * @dev This is critical for security: ensures users can only claim complete periods.
+ *      With 30-day period, at day 29 = 0 tokens claimable, at day 30 = 1 period unlocks.
+ */
+export function unitToPeriodSeconds(unit: DurationUnit): bigint {
+    const DAY = 24n * 60n * 60n;
+    switch (unit) {
+        case "weeks":
+            return 7n * DAY;           // 604,800 seconds
+        case "months":
+            return 30n * DAY;          // 2,592,000 seconds
+        case "quarters":
+            return 90n * DAY;          // 7,776,000 seconds
+        case "years":
+            return 365n * DAY;         // 31,536,000 seconds
+        default:
+            throw new Error(`Unsupported duration unit: ${unit}`);
+    }
+}

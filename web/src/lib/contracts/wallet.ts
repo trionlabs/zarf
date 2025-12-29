@@ -13,6 +13,7 @@ import { browser } from '$app/environment';
 import {
     createConfig,
     http,
+    fallback,
     connect,
     disconnect,
     reconnect,
@@ -44,12 +45,33 @@ let _wagmiConfig: Config | null = null;
 
 function getWagmiConfig(): Config {
     if (!_wagmiConfig) {
+        // Use Alchemy from env as primary, with public fallbacks
+        const sepoliaRpcs = [
+            // Priority 1: Alchemy (if available)
+            ...(import.meta.env.VITE_SEPOLIA_RPC_URL ? [http(import.meta.env.VITE_SEPOLIA_RPC_URL)] : []),
+            // Priority 2: Public nodes (free, no rate limits)
+            http('https://ethereum-sepolia-rpc.publicnode.com'),
+            http('https://rpc.sepolia.org'),
+            http('https://sepolia.drpc.org'),
+            http('https://1rpc.io/sepolia'),
+        ];
+
+        const mainnetRpcs = [
+            // Priority 1: Alchemy (if available)
+            ...(import.meta.env.VITE_MAINNET_RPC_URL ? [http(import.meta.env.VITE_MAINNET_RPC_URL)] : []),
+            // Priority 2: Public nodes
+            http('https://ethereum-rpc.publicnode.com'),
+            http('https://eth.llamarpc.com'),
+            http('https://rpc.ankr.com/eth'),
+            http('https://1rpc.io/eth'),
+        ];
+
         _wagmiConfig = createConfig({
             chains: [mainnet, sepolia],
-            connectors: [injected()], // EIP-6963 providers will be auto-discovered
+            connectors: [injected()],
             transports: {
-                [mainnet.id]: http(),
-                [sepolia.id]: http(),
+                [mainnet.id]: fallback(mainnetRpcs),
+                [sepolia.id]: fallback(sepoliaRpcs),
             },
         });
     }

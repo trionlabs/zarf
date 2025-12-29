@@ -15,6 +15,7 @@ export interface DeployConfig {
     allocations: { emailHash: Hash; amount: bigint }[];
     cliffSeconds: bigint;
     vestingSeconds: bigint;
+    vestingPeriodSeconds: bigint; // Duration of each unlock period (e.g., 2592000 for ~30 days)
     totalAmount: bigint;
     owner: Address;
 }
@@ -207,11 +208,14 @@ export class DeployService {
     }
 
     /**
-     * Step 6: Start Vesting
+     * Step 6: Start Vesting with Discrete Periodic Unlocks
+     * @dev Tokens unlock in complete periods only (e.g., every 30 days).
+     *      At 29 days with 30-day period, 0 tokens are claimable.
+     *      At 30 days, 1 period's worth unlocks.
      */
     async startVesting() {
         if (!this.contractAddress) throw new Error('Contract not deployed');
-        this.onProgress({ step: 'start', message: 'Starting vesting schedule...' });
+        this.onProgress({ step: 'start', message: 'Starting vesting schedule with periodic unlocks...' });
 
         const wallet = await this.getWallet();
         try {
@@ -219,7 +223,11 @@ export class DeployService {
                 address: this.contractAddress,
                 abi: ZarfVestingABI,
                 functionName: 'startVesting',
-                args: [this.config.cliffSeconds, this.config.vestingSeconds],
+                args: [
+                    this.config.cliffSeconds,
+                    this.config.vestingSeconds,
+                    this.config.vestingPeriodSeconds  // NEW: Period for discrete unlocks
+                ],
                 account: this.config.owner,
             });
             await this.waitTx(hash, 'start');
@@ -235,10 +243,20 @@ export class DeployService {
     async executeFullDeploy() {
         try {
             await this.deployContract();
+            await this.delay(2000); // Prevent RPC rate limiting
+
             await this.setMerkleRoot();
+            await this.delay(2000);
+
             await this.setAllocations();
+            await this.delay(2000);
+
             await this.approveToken();
+            await this.delay(2000);
+
             await this.deposit();
+            await this.delay(2000);
+
             await this.startVesting();
 
             this.onProgress({ step: 'complete', message: 'Distribution deployed successfully!' });
@@ -247,6 +265,10 @@ export class DeployService {
             // Error is already handled/reported in individual steps
             throw error;
         }
+    }
+
+    private delay(ms: number) {
+        return new Promise(resolve => setTimeout(resolve, ms));
     }
 
     private onError(step: DeployProgress['step'], error: any) {

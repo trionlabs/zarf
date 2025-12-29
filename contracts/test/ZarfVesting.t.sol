@@ -30,6 +30,7 @@ contract ZarfVestingTest is Test {
 
     uint256 public constant CLIFF = 30 days;
     uint256 public constant VESTING_DURATION = 365 days;
+    uint256 public constant VESTING_PERIOD = 30 days; // Monthly discrete unlocks
 
     function setUp() public {
         // Initialize mock pubkey limbs
@@ -57,8 +58,8 @@ contract ZarfVestingTest is Test {
         token.approve(address(vesting), TOTAL_SUPPLY);
         vesting.deposit(ALICE_ALLOCATION + BOB_ALLOCATION);
 
-        // Start vesting
-        vesting.startVesting(CLIFF, VESTING_DURATION);
+        // Start vesting with discrete periodic unlocks
+        vesting.startVesting(CLIFF, VESTING_DURATION, VESTING_PERIOD);
     }
 
     /// @dev Helper to create public inputs with mock pubkey
@@ -92,10 +93,11 @@ contract ZarfVestingTest is Test {
     }
 
     function test_VestingStarted() public view {
-        (uint256 start, uint256 cliff, uint256 duration) = vesting.getVestingInfo();
+        (uint256 start, uint256 cliff, uint256 duration, uint256 period) = vesting.getVestingInfo();
         assertEq(start, block.timestamp);
         assertEq(cliff, CLIFF);
         assertEq(duration, VESTING_DURATION);
+        assertEq(period, VESTING_PERIOD);
     }
 
     // ============ Vesting Calculation Tests ============

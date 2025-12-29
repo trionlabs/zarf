@@ -74,6 +74,23 @@
             <p class="text-xs text-primary font-medium mt-4">
                 Tokens will unlock instantly after lock period
             </p>
+        {:else}
+            <div
+                class="mt-4 p-3 bg-warning/5 border border-warning/10 rounded-lg flex gap-3 items-start"
+            >
+                <div class="mt-0.5 text-warning">⚠️</div>
+                <div class="text-xs space-y-1">
+                    <p class="font-medium text-warning">
+                        Discrete Periodic Unlocks
+                    </p>
+                    <p class="text-base-content/60 leading-relaxed">
+                        Tokens unlock in full <b>{durationUnit}</b> batches
+                        only. There is no continuous streaming; users must
+                        complete a full {durationUnit.slice(0, -1)} to claim that
+                        period's allocation.
+                    </p>
+                </div>
+            </div>
         {/if}
     </div>
 </div>

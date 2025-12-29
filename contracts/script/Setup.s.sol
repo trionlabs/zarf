@@ -71,9 +71,9 @@ contract SetupScript is Script {
         vesting.deposit(ALLOCATION);
         console.log("Deposited tokens");
 
-        // 5. Start vesting (0 cliff, 1 second duration for instant testing)
-        vesting.startVesting(0, 1);
-        console.log("Started vesting");
+        // 5. Start vesting (0 cliff, 1 second duration, 1 second period for instant testing)
+        vesting.startVesting(0, 1, 1);
+        console.log("Started vesting with discrete unlocks");
 
         vm.stopBroadcast();
 

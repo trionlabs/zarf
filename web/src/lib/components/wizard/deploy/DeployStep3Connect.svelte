@@ -2,6 +2,7 @@
     import { walletStore } from "$lib/stores/walletStore.svelte";
     import { wagmiConfig } from "$lib/contracts/wallet";
     import { deployStore } from "$lib/stores/deployStore.svelte";
+    import { wizardStore } from "$lib/stores/wizardStore.svelte";
     import { getPublicClient } from "@wagmi/core";
     import { ERC20ABI } from "$lib/contracts/abis/ERC20";
     import type { Address } from "viem";
@@ -46,8 +47,7 @@
             const client = getPublicClient(wagmiConfig);
             if (!client) throw new Error("No public client available");
 
-            const tokenAddress = (distribution as any).tokenDetails
-                ?.tokenAddress as Address;
+            const tokenAddress = wizardStore.tokenDetails.tokenAddress;
             if (!tokenAddress) throw new Error("No token address configured");
 
             const [balance, decimals, symbol] = await Promise.all([
