@@ -2,6 +2,7 @@
 	import "../app.css";
 	import favicon from "$lib/assets/favicon.svg";
 	import { walletStore } from "$lib/stores/walletStore.svelte";
+	import { authStore } from "$lib/stores/authStore.svelte";
 	import { onMount } from "svelte";
 	import { browser } from "$app/environment";
 	import WalletSelectionModal from "$lib/components/wallet/WalletSelectionModal.svelte";
@@ -12,6 +13,7 @@
 	onMount(() => {
 		if (browser) {
 			walletStore.init();
+			authStore.restoreGmailSession();
 		}
 		return () => walletStore.destroy();
 	});
