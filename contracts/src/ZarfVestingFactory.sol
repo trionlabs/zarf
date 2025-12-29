@@ -9,6 +9,21 @@ import {IERC20} from "forge-std/interfaces/IERC20.sol";
 /// @dev Reduces deployment from 6 TX to 2 TX (approve + createAndFundVesting)
 /// @author Zarf Team
 contract ZarfVestingFactory {
+    // ============ Structs ============
+
+    /// @notice Parameters for creating a vesting contract (avoids stack too deep)
+    struct CreateVestingParams {
+        string name;              // Human-readable name
+        string description;       // Description or category
+        address token;            // ERC20 token to vest
+        bytes32 merkleRoot;       // Merkle root for whitelist verification
+        bytes32[] emailHashes;    // Array of recipient email hashes
+        uint256[] amounts;        // Array of allocation amounts
+        uint256 cliffDuration;    // Cliff duration in seconds
+        uint256 vestingDuration;  // Total vesting duration in seconds
+        uint256 vestingPeriod;    // Duration of each unlock period in seconds
+    }
+
     // ============ Events ============
     
     /// @notice Emitted when a new vesting contract is created
@@ -60,34 +75,26 @@ contract ZarfVestingFactory {
 
     /// @notice Create a vesting contract without funding (for two-step deployment)
     /// @dev Use this if you want to fund the contract separately, or test deployment
-    /// @param token The ERC20 token to vest
-    /// @param merkleRoot The merkle root for whitelist verification
-    /// @param emailHashes Array of recipient email hashes (Pedersen hashes)
-    /// @param amounts Array of allocation amounts (must match emailHashes length)
-    /// @param cliffDuration Cliff duration in seconds before any tokens vest
-    /// @param vestingDuration Total vesting duration in seconds (after cliff)
-    /// @param vestingPeriod Duration of each unlock period in seconds
+    /// @param params Struct containing all vesting parameters
     /// @return vesting Address of the deployed vesting contract
-    function createVesting(
-        address token,
-        bytes32 merkleRoot,
-        bytes32[] calldata emailHashes,
-        uint256[] calldata amounts,
-        uint256 cliffDuration,
-        uint256 vestingDuration,
-        uint256 vestingPeriod
-    ) external returns (address vesting) {
+    function createVesting(CreateVestingParams calldata params) external returns (address vesting) {
         // Validation
-        if (emailHashes.length != amounts.length) revert ArrayLengthMismatch();
-        if (emailHashes.length == 0) revert ZeroAllocations();
+        if (params.emailHashes.length != params.amounts.length) revert ArrayLengthMismatch();
+        if (params.emailHashes.length == 0) revert ZeroAllocations();
 
-        // Deploy new vesting contract
-        ZarfVesting vest = new ZarfVesting(token, verifier, jwkRegistry);
+        // Deploy new vesting contract with metadata
+        ZarfVesting vest = new ZarfVesting(
+            params.name,
+            params.description,
+            params.token,
+            verifier,
+            jwkRegistry
+        );
         
         // Initialize all parameters in one go
-        vest.setMerkleRoot(merkleRoot);
-        vest.setAllocations(emailHashes, amounts);
-        vest.startVesting(cliffDuration, vestingDuration, vestingPeriod);
+        vest.setMerkleRoot(params.merkleRoot);
+        vest.setAllocations(params.emailHashes, params.amounts);
+        vest.startVesting(params.cliffDuration, params.vestingDuration, params.vestingPeriod);
         
         // Transfer ownership to the caller
         vest.transferOwnership(msg.sender);
@@ -97,46 +104,40 @@ contract ZarfVestingFactory {
         _trackDeployment(vesting, msg.sender);
         
         // Calculate total for event
-        uint256 total = _sumAmounts(amounts);
-        emit VestingCreated(vesting, msg.sender, token, total, emailHashes.length);
+        uint256 total = _sumAmounts(params.amounts);
+        emit VestingCreated(vesting, msg.sender, params.token, total, params.emailHashes.length);
     }
 
     /// @notice Create AND fund a vesting contract in one transaction
     /// @dev Caller must have approved this factory to spend `depositAmount` tokens
-    /// @param token The ERC20 token to vest
-    /// @param merkleRoot The merkle root for whitelist verification
-    /// @param emailHashes Array of recipient email hashes (Pedersen hashes)
-    /// @param amounts Array of allocation amounts (must match emailHashes length)
-    /// @param cliffDuration Cliff duration in seconds before any tokens vest
-    /// @param vestingDuration Total vesting duration in seconds (after cliff)
-    /// @param vestingPeriod Duration of each unlock period in seconds
+    /// @param params Struct containing all vesting parameters
     /// @param depositAmount Total tokens to transfer to the vesting contract
     /// @return vesting Address of the deployed vesting contract
     function createAndFundVesting(
-        address token,
-        bytes32 merkleRoot,
-        bytes32[] calldata emailHashes,
-        uint256[] calldata amounts,
-        uint256 cliffDuration,
-        uint256 vestingDuration,
-        uint256 vestingPeriod,
+        CreateVestingParams calldata params,
         uint256 depositAmount
     ) external returns (address vesting) {
         // Validation
-        if (emailHashes.length != amounts.length) revert ArrayLengthMismatch();
-        if (emailHashes.length == 0) revert ZeroAllocations();
+        if (params.emailHashes.length != params.amounts.length) revert ArrayLengthMismatch();
+        if (params.emailHashes.length == 0) revert ZeroAllocations();
 
-        // Deploy new vesting contract
-        ZarfVesting vest = new ZarfVesting(token, verifier, jwkRegistry);
+        // Deploy new vesting contract with metadata
+        ZarfVesting vest = new ZarfVesting(
+            params.name,
+            params.description,
+            params.token,
+            verifier,
+            jwkRegistry
+        );
         
         // Initialize all parameters
-        vest.setMerkleRoot(merkleRoot);
-        vest.setAllocations(emailHashes, amounts);
-        vest.startVesting(cliffDuration, vestingDuration, vestingPeriod);
+        vest.setMerkleRoot(params.merkleRoot);
+        vest.setAllocations(params.emailHashes, params.amounts);
+        vest.startVesting(params.cliffDuration, params.vestingDuration, params.vestingPeriod);
         
         // Pull tokens from caller directly to the vesting contract
         // Caller must have approved THIS factory contract for depositAmount
-        bool success = IERC20(token).transferFrom(msg.sender, address(vest), depositAmount);
+        bool success = IERC20(params.token).transferFrom(msg.sender, address(vest), depositAmount);
         if (!success) revert TransferFailed();
         
         // Transfer ownership to the caller
@@ -146,7 +147,7 @@ contract ZarfVestingFactory {
         vesting = address(vest);
         _trackDeployment(vesting, msg.sender);
         
-        emit VestingCreated(vesting, msg.sender, token, depositAmount, emailHashes.length);
+        emit VestingCreated(vesting, msg.sender, params.token, depositAmount, params.emailHashes.length);
     }
 
     // ============ View Functions ============

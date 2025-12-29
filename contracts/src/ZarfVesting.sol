@@ -32,6 +32,13 @@ contract ZarfVesting {
     /// @notice Number of pubkey limbs in public inputs (RSA-2048 = 18 limbs of 120 bits)
     uint256 public constant PUBKEY_LIMBS = 18;
 
+    // ============ Metadata (for on-chain discovery) ============
+    /// @notice Human-readable name for this vesting distribution (e.g., "Seed Round Investors")
+    string public name;
+    
+    /// @notice Description or category of this vesting (e.g., "Team Allocation Q1 2025")
+    string public description;
+
     // ============ State ============
     IERC20 public immutable token;
     IVerifier public immutable verifier;
@@ -56,7 +63,20 @@ contract ZarfVesting {
     }
 
     // ============ Constructor ============
-    constructor(address _token, address _verifier, address _jwkRegistry) {
+    /// @param _name Human-readable name for this distribution
+    /// @param _description Description or category
+    /// @param _token The ERC20 token to vest
+    /// @param _verifier The ZK verifier contract
+    /// @param _jwkRegistry The JWK registry for OAuth keys
+    constructor(
+        string memory _name,
+        string memory _description,
+        address _token,
+        address _verifier,
+        address _jwkRegistry
+    ) {
+        name = _name;
+        description = _description;
         token = IERC20(_token);
         verifier = IVerifier(_verifier);
         jwkRegistry = JWKRegistry(_jwkRegistry);
