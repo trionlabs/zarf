@@ -5,7 +5,8 @@ libs = ["lib"]
 
 # Optimizer settings for contract size reduction
 optimizer = true
-optimizer_runs = 1  # Minimum runs = smallest bytecode
+optimizer_runs = 200
+via_ir = false  # Minimum runs = smallest bytecode
 
 # Load environment variables from root .env
 dotenv = "../.env"

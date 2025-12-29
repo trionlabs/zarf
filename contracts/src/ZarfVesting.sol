@@ -2,8 +2,12 @@
 pragma solidity ^0.8.24;
 
 import {IVerifier} from "./interfaces/IVerifier.sol";
-import {IERC20} from "forge-std/interfaces/IERC20.sol";
 import {JWKRegistry} from "./JWKRegistry.sol";
+
+interface IERC20 {
+    function transfer(address to, uint256 amount) external returns (bool);
+    function transferFrom(address from, address to, uint256 amount) external returns (bool);
+}
 
 /// @title ZarfVesting
 /// @notice Vesting contract with ZK proof-based claims
@@ -20,6 +24,7 @@ contract ZarfVesting {
     error Unauthorized();
     error InvalidAllocation();
     error TransferFailed();
+    error AlreadyInitialized();
 
     // ============ Events ============
     event AllocationSet(bytes32 indexed emailHash, uint256 amount);
@@ -27,23 +32,21 @@ contract ZarfVesting {
     event VestingStarted(uint256 startTime, uint256 cliffDuration, uint256 vestingDuration, uint256 vestingPeriod);
     event MerkleRootSet(bytes32 merkleRoot);
     event Deposited(uint256 amount);
+    event Initialized(address token, address owner);
 
     // ============ Constants ============
-    /// @notice Number of pubkey limbs in public inputs (RSA-2048 = 18 limbs of 120 bits)
     uint256 public constant PUBKEY_LIMBS = 18;
 
-    // ============ Metadata (for on-chain discovery) ============
-    /// @notice Human-readable name for this vesting distribution (e.g., "Seed Round Investors")
+    // ============ Metadata ============
     string public name;
-    
-    /// @notice Description or category of this vesting (e.g., "Team Allocation Q1 2025")
     string public description;
 
     // ============ State ============
-    IERC20 public immutable token;
+    IERC20 public token;
     IVerifier public immutable verifier;
     JWKRegistry public immutable jwkRegistry;
     address public owner;
+    bool public initialized;
 
     bytes32 public merkleRoot;
     uint256 public vestingStart;
@@ -51,9 +54,7 @@ contract ZarfVesting {
     uint256 public vestingDuration;
     uint256 public vestingPeriod;
 
-    // emailHash => total allocation
     mapping(bytes32 => uint256) public allocations;
-    // emailHash => claimed amount
     mapping(bytes32 => uint256) public claimed;
 
     // ============ Modifiers ============
@@ -63,63 +64,58 @@ contract ZarfVesting {
     }
 
     // ============ Constructor ============
-    /// @param _name Human-readable name for this distribution
-    /// @param _description Description or category
-    /// @param _token The ERC20 token to vest
-    /// @param _verifier The ZK verifier contract
-    /// @param _jwkRegistry The JWK registry for OAuth keys
     constructor(
-        string memory _name,
-        string memory _description,
-        address _token,
         address _verifier,
         address _jwkRegistry
     ) {
-        name = _name;
-        description = _description;
-        token = IERC20(_token);
         verifier = IVerifier(_verifier);
         jwkRegistry = JWKRegistry(_jwkRegistry);
-        owner = msg.sender;
+    }
+
+    // ============ Initialization ============
+    /// @dev Atomic initialization to avoid stack too deep errors with large structs
+    function initialize(
+        address _owner,
+        address _token,
+        string memory _name,
+        string memory _description
+    ) external {
+        if (initialized) revert AlreadyInitialized();
+        initialized = true;
+
+        owner = _owner; // Factory becomes owner temporarily
+        token = IERC20(_token);
+        name = _name;
+        description = _description;
+        
+        emit Initialized(_token, _owner);
     }
 
     // ============ Admin Functions ============
 
-    /// @notice Set the merkle root for proof verification
-    /// @param _merkleRoot The merkle root from the whitelist
     function setMerkleRoot(bytes32 _merkleRoot) external onlyOwner {
         merkleRoot = _merkleRoot;
         emit MerkleRootSet(_merkleRoot);
     }
 
-    /// @notice Start the vesting schedule with discrete periodic unlocks
-    /// @param _cliffDuration Duration before any tokens vest (seconds)
-    /// @param _vestingDuration Total vesting duration after cliff (seconds)
-    /// @param _vestingPeriod Duration of each unlock period (seconds). E.g., 2592000 for ~30 days
-    /// @dev Tokens unlock in discrete periods. At 29 days with 30-day period, 0 tokens are claimable.
-    ///      At 30 days, 1 period's worth unlocks. This prevents partial-period exploitation.
     function startVesting(uint256 _cliffDuration, uint256 _vestingDuration, uint256 _vestingPeriod) external onlyOwner {
         require(_vestingPeriod > 0, "Period must be > 0");
         require(_vestingDuration >= _vestingPeriod, "Duration must be >= period");
+        
         vestingStart = block.timestamp;
+        
         cliffDuration = _cliffDuration;
         vestingDuration = _vestingDuration;
         vestingPeriod = _vestingPeriod;
         emit VestingStarted(block.timestamp, _cliffDuration, _vestingDuration, _vestingPeriod);
     }
 
-    /// @notice Set allocation for an email hash
-    /// @param emailHash The pedersen hash of the email
-    /// @param amount The total token allocation
     function setAllocation(bytes32 emailHash, uint256 amount) external onlyOwner {
         if (amount == 0) revert InvalidAllocation();
         allocations[emailHash] = amount;
         emit AllocationSet(emailHash, amount);
     }
 
-    /// @notice Batch set allocations
-    /// @param emailHashes Array of email hashes
-    /// @param amounts Array of allocation amounts
     function setAllocations(bytes32[] calldata emailHashes, uint256[] calldata amounts) external onlyOwner {
         require(emailHashes.length == amounts.length, "Length mismatch");
         for (uint256 i = 0; i < emailHashes.length; i++) {
@@ -129,45 +125,25 @@ contract ZarfVesting {
         }
     }
 
-    /// @notice Deposit tokens for distribution
-    /// @param amount Amount of tokens to deposit
     function deposit(uint256 amount) external onlyOwner {
-        bool success = token.transferFrom(msg.sender, address(this), amount);
-        if (!success) revert TransferFailed();
+        safeTransferFrom(token, msg.sender, address(this), amount);
         emit Deposited(amount);
     }
 
-    /// @notice Transfer ownership
-    /// @param newOwner New owner address
     function transferOwnership(address newOwner) external onlyOwner {
         owner = newOwner;
     }
 
     // ============ User Functions ============
 
-    /// @notice Claim vested tokens with ZK proof
-    /// @param proof The ZK proof bytes
-    /// @param publicInputs The public inputs (includes pubkey limbs, merkleRoot, emailHash, recipient)
-    /// @dev publicInputs layout: [pubkey_modulus_limbs[0..17], merkleRoot, emailHash, recipient]
-    ///      - First 18 elements: RSA pubkey modulus limbs (120 bits each)
-    ///      - Element 18: merkleRoot
-    ///      - Element 19: emailHash (return value 1 from circuit)
-    ///      - Element 20: recipient (return value 2 from circuit)
     function claim(bytes calldata proof, bytes32[] calldata publicInputs) external {
         if (vestingStart == 0) revert VestingNotStarted();
-
-        // Verify the ZK proof
         if (!verifier.verify(proof, publicInputs)) revert InvalidProof();
 
-        // Verify pubkey is a trusted key (e.g., Google OAuth)
-        // Copy first 18 public inputs (pubkey limbs) to memory and hash
         bytes32 keyHash;
         assembly {
-            // Allocate 576 bytes (18 * 32) on the stack via scratch space
             let ptr := mload(0x40)
-            // Copy each of the 18 pubkey limbs from calldata to memory
             for { let i := 0 } lt(i, 18) { i := add(i, 1) } {
-                // publicInputs[i] - calldataload at offset + i*32
                 let val := calldataload(add(publicInputs.offset, mul(i, 32)))
                 mstore(add(ptr, mul(i, 32)), val)
             }
@@ -175,94 +151,51 @@ contract ZarfVesting {
         }
         if (!jwkRegistry.isValidKeyHash(keyHash)) revert InvalidPubkey();
 
-        // Extract public inputs (last three elements after pubkey)
-        // Layout: [pubkey[0..17], merkleRoot, emailHash, recipient]
-        bytes32 proofMerkleRoot = publicInputs[PUBKEY_LIMBS]; // index 18
-        bytes32 emailHash = publicInputs[PUBKEY_LIMBS + 1]; // index 19
-        bytes32 proofRecipient = publicInputs[PUBKEY_LIMBS + 2]; // index 20
+        bytes32 proofMerkleRoot = publicInputs[PUBKEY_LIMBS];
+        bytes32 emailHash = publicInputs[PUBKEY_LIMBS + 1];
+        bytes32 proofRecipient = publicInputs[PUBKEY_LIMBS + 2];
 
-        // Verify merkle root matches
         if (proofMerkleRoot != merkleRoot) revert InvalidMerkleRoot();
-
-        // Verify recipient matches msg.sender (prevents front-running)
         if (proofRecipient != bytes32(uint256(uint160(msg.sender)))) revert InvalidRecipient();
 
-        // Calculate claimable amount
         uint256 vested = calculateVested(emailHash);
         uint256 claimable = vested - claimed[emailHash];
-
         if (claimable == 0) revert NothingToClaim();
 
-        // Update claimed amount
         claimed[emailHash] += claimable;
-
-        // Transfer tokens to caller
-        bool success = token.transfer(msg.sender, claimable);
-        if (!success) revert TransferFailed();
+        
+        safeTransfer(token, msg.sender, claimable);
 
         emit Claimed(emailHash, msg.sender, claimable);
     }
 
     // ============ View Functions ============
 
-    /// @notice Calculate vested amount for an email hash using discrete periodic unlocks
-    /// @param emailHash The email hash to check
-    /// @return The vested amount
-    /// @dev Uses integer division to ensure only COMPLETE periods count.
-    ///      Example: With 30-day period, at day 29 = 0 periods complete = 0 tokens.
-    ///      At day 30 = 1 period complete = (allocation * 1) / totalPeriods.
     function calculateVested(bytes32 emailHash) public view returns (uint256) {
         uint256 allocation = allocations[emailHash];
         if (allocation == 0) return 0;
         if (vestingStart == 0) return 0;
 
         uint256 elapsed = block.timestamp - vestingStart;
+        if (elapsed < cliffDuration) return 0;
+        if (elapsed >= cliffDuration + vestingDuration) return allocation;
 
-        // Before cliff: nothing vested
-        if (elapsed < cliffDuration) {
-            return 0;
-        }
-
-        // After cliff + vesting: fully vested
-        if (elapsed >= cliffDuration + vestingDuration) {
-            return allocation;
-        }
-
-        // During vesting: DISCRETE PERIODIC UNLOCKS
-        // Only complete periods count - prevents partial-period exploitation
         uint256 vestedTime = elapsed - cliffDuration;
-        
-        // Calculate completed periods using integer division (floors automatically)
-        // This is the core security fix: 29 days / 30 days = 0 periods
         uint256 completedPeriods = vestedTime / vestingPeriod;
         uint256 totalPeriods = vestingDuration / vestingPeriod;
         
-        // Guard against division by zero (should not happen due to constructor checks)
         if (totalPeriods == 0) return allocation;
-        
-        // Return proportional amount based on completed periods
         return (allocation * completedPeriods) / totalPeriods;
     }
 
-    /// @notice Get claimable amount for an email hash
-    /// @param emailHash The email hash to check
-    /// @return The claimable amount
     function getClaimable(bytes32 emailHash) external view returns (uint256) {
         return calculateVested(emailHash) - claimed[emailHash];
     }
 
-    /// @notice Get vesting info
-    /// @return start The vesting start timestamp
-    /// @return cliff The cliff duration
-    /// @return duration The vesting duration
-    /// @return period The unlock period duration
     function getVestingInfo() external view returns (uint256 start, uint256 cliff, uint256 duration, uint256 period) {
         return (vestingStart, cliffDuration, vestingDuration, vestingPeriod);
     }
 
-    /// @notice Get the number of completed unlock periods
-    /// @return completed Number of periods that have unlocked
-    /// @return total Total number of periods in the vesting schedule
     function getUnlockProgress() external view returns (uint256 completed, uint256 total) {
         if (vestingStart == 0 || vestingPeriod == 0) return (0, 0);
         
@@ -273,9 +206,19 @@ contract ZarfVesting {
         uint256 completedPeriods = vestedTime / vestingPeriod;
         uint256 totalPeriods = vestingDuration / vestingPeriod;
         
-        // Cap at total periods
         if (completedPeriods > totalPeriods) completedPeriods = totalPeriods;
-        
         return (completedPeriods, totalPeriods);
+    }
+
+    // ============ Internal Utils (SafeTransfer) ============
+
+    function safeTransfer(IERC20 _token, address to, uint256 amount) internal {
+        (bool success, bytes memory data) = address(_token).call(abi.encodeWithSelector(IERC20.transfer.selector, to, amount));
+        require(success && (data.length == 0 || abi.decode(data, (bool))), "TransferFailed");
+    }
+
+    function safeTransferFrom(IERC20 _token, address from, address to, uint256 amount) internal {
+        (bool success, bytes memory data) = address(_token).call(abi.encodeWithSelector(IERC20.transferFrom.selector, from, to, amount));
+        require(success && (data.length == 0 || abi.decode(data, (bool))), "TransferFailed");
     }
 }

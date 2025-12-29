@@ -48,7 +48,7 @@ export const FACTORY_ADDRESS = getFactoryAddress();
 export function getFactoryAddressForChain(chainId: number): string | undefined {
     switch (chainId) {
         case CHAIN_IDS.SEPOLIA:
-            return import.meta.env.VITE_FACTORY_ADDRESS_SEPOLIA;
+            return import.meta.env.VITE_FACTORY_ADDRESS_SEPOLIA || '0xf2fb07b180c5de4c3a73d63d39404092b6727aae';
         case CHAIN_IDS.MAINNET:
             return import.meta.env.VITE_FACTORY_ADDRESS_MAINNET;
         default:

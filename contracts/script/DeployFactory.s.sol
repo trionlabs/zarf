@@ -17,7 +17,8 @@ contract DeployFactory is Script {
         console.log("  Verifier:", verifier);
         console.log("  JWK Registry:", jwkRegistry);
 
-        vm.startBroadcast();
+        uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
+        vm.startBroadcast(deployerPrivateKey);
 
         ZarfVestingFactory factory = new ZarfVestingFactory(verifier, jwkRegistry);
 
