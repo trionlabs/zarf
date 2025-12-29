@@ -122,6 +122,8 @@
             ),
             totalAmount: totalAmountWei,
             owner: walletAddress!, // Checked at function start
+            name: distribution.name,
+            description: distribution.description || "",
         };
 
         // Verify integrity

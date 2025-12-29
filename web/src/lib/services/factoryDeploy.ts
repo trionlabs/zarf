@@ -41,6 +41,12 @@ export interface FactoryDeployConfig {
     totalAmount: bigint;
     /** Owner's wallet address */
     owner: Address;
+    /** Vesting name (metadata) */
+    name: string;
+    /** Vesting description (metadata) */
+    description: string;
+    /** Creation source (e.g. "zarf-web") */
+    source?: string;
 }
 
 export type FactoryDeployStep = 'approve' | 'create' | 'complete' | 'error';
@@ -153,16 +159,17 @@ export class FactoryDeployService {
                 address: this.config.factoryAddress,
                 abi: ZarfVestingFactoryABI,
                 functionName: 'createAndFundVesting',
-                args: [
-                    this.config.tokenAddress,
-                    this.config.merkleRoot,
-                    this.config.emailHashes,
-                    this.config.amounts,
-                    this.config.cliffSeconds,
-                    this.config.vestingSeconds,
-                    this.config.periodSeconds,
-                    this.config.totalAmount
-                ],
+                args: [{
+                    token: this.config.tokenAddress,
+                    merkleRoot: this.config.merkleRoot,
+                    emailHashes: this.config.emailHashes,
+                    amounts: this.config.amounts,
+                    cliffDuration: this.config.cliffSeconds,
+                    vestingDuration: this.config.vestingSeconds,
+                    vestingPeriod: this.config.periodSeconds,
+                    name: this.config.name,
+                    description: this.config.description
+                }, this.config.totalAmount],
                 account: this.config.owner,
             });
         }, 'create');
@@ -210,16 +217,42 @@ export class FactoryDeployService {
      * Parse VestingCreated event from transaction receipt
      */
     private parseVestingAddress(receipt: TransactionReceipt): Address {
-        // VestingCreated event signature
-        const eventSignature = 'VestingCreated(address,address,address,uint256,uint256)';
+        try {
+            // Use VIEM's decodeEventLog for robust parsing
+            for (const log of receipt.logs) {
+                try {
+                    const event = decodeEventLog({
+                        abi: ZarfVestingFactoryABI,
+                        data: log.data,
+                        topics: log.topics
+                    });
+
+                    if (event.eventName === 'VestingCreated') {
+                        // Args: owner, vestingContract, deploymentId, name
+                        return (event.args as any).vestingContract as Address;
+                    }
+                } catch (e) {
+                    // Ignore logs that don't match our ABI
+                    continue;
+                }
+            }
+        } catch (error) {
+            console.warn('Failed to parse VestingCreated event:', error);
+        }
+
+        // Fallback: Legacy manual parsing if decode fails
+        const eventSignature = 'VestingCreated(address,address,uint256,string)';
         const eventTopic = keccak256(toBytes(eventSignature));
 
         for (const log of receipt.logs) {
             if (log.topics[0] === eventTopic) {
-                // First indexed param is the vesting address
-                const vestingAddressRaw = log.topics[1];
+                // Second indexed param (index 1 in topics array) is vestingContract
+                // topics[0] = signature
+                // topics[1] = owner (indexed)
+                // topics[2] = vestingContract (indexed)
+                // topics[3] = deploymentId (indexed)
+                const vestingAddressRaw = log.topics[2];
                 if (vestingAddressRaw) {
-                    // Extract address from bytes32 topic (last 20 bytes)
                     return `0x${vestingAddressRaw.slice(-40)}` as Address;
                 }
             }
