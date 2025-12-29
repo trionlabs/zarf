@@ -21,6 +21,7 @@
     import { goto } from "$app/navigation";
     import type { Address, Hash } from "viem";
     import { parseUnits } from "viem";
+    import { onMount } from "svelte";
 
     // Local state from stores
     let distribution = $derived(deployStore.distribution);
@@ -40,14 +41,34 @@
     >("idle");
     let currentMessage = $state("");
     let error = $state<string | null>(null);
-    let approveTxHash = $state<Hash | null>(null);
-    let createTxHash = $state<Hash | null>(null);
+
+    // Use persisted state from store
+    // This enables recovery after refresh
+    let approveTxHash = $derived(deployStore.approveTxHash as Hash | null);
+    let createTxHash = $derived(deployStore.createTxHash as Hash | null);
 
     // Factory availability check
     let factoryAddress = $derived(chainId ? getFactoryAddress(chainId) : null);
     let factoryAvailable = $derived(
         chainId ? isFactoryAvailable(chainId) : false,
     );
+
+    // Recovery Logic (The "Resume" Handler)
+    onMount(() => {
+        // Check if we have pending transactions in store
+        if (deployStore.createTxHash) {
+            console.log("Found pending create TX, recovering state...");
+            currentStep = "create";
+            isDeploying = true; // Block UI
+            currentMessage = "Resuming deployment...";
+            // TODO: Ideally we should poll the receipt here to see if it's done
+        } else if (deployStore.approveTxHash) {
+            console.log("Found pending approval, recovering state...");
+            currentStep = "approve";
+            isDeploying = true;
+            currentMessage = "Resuming approval...";
+        }
+    });
 
     async function handleDeploy() {
         if (!distribution || !merkleResult || !walletAddress || !chainId)
@@ -77,8 +98,9 @@
         isDeploying = true;
         currentStep = "idle";
         error = null;
-        approveTxHash = null;
-        createTxHash = null;
+        // Do not reset hashes here, they are managed by store persistence
+        // approveTxHash = null;
+        // createTxHash = null;
 
         // Get token decimals (default to 18 if not set)
         const tokenDecimals = wizardStore.tokenDetails.tokenDecimals ?? 18;
@@ -142,9 +164,9 @@
 
                 if (progress.txHash) {
                     if (progress.step === "approve") {
-                        approveTxHash = progress.txHash;
+                        deployStore.setApproveTx(progress.txHash);
                     } else if (progress.step === "create") {
-                        createTxHash = progress.txHash;
+                        deployStore.setCreateTx(progress.txHash);
                     }
                 }
 

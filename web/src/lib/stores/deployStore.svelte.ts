@@ -29,71 +29,93 @@ export class DeployState {
     contractAddress = $state<Address | null>(null);
     isDeployed = $state(false);
 
+    // Recovery Fields (The Write-Ahead Log)
+    approveTxHash = $state<string | null>(null);
+    createTxHash = $state<string | null>(null);
+
     // External guards (Derived)
     canContinueToStep2 = $derived(!!this.merkleResult);
     canContinueToStep3 = $derived(this.isBackupDownloaded && this.isBackupConfirmed);
     canContinueToStep4 = $derived(this.isWalletConnected);
 
     constructor() {
-        // Attempt to restore session state to prevent "Salt Mismatch" disaster
-        this.load();
+        // No auto-load in constructor because we need distributionId
     }
 
-    // Persistence Logic
+    // Persistence Logic ("Write-Ahead Log")
     private save() {
-        if (typeof window === "undefined") return;
+        if (typeof window === "undefined" || !this.distribution?.id) return;
 
         try {
             const state = {
+                version: 2,
                 currentStep: this.currentStep,
-                distribution: this.distribution,
                 merkleResult: this.merkleResult, // Critical: contains salts
                 isBackupDownloaded: this.isBackupDownloaded,
                 isBackupConfirmed: this.isBackupConfirmed,
-                // Do not persist connection state (wallet must reconnect)
-                // Do not persist errors or loading states
+                // Recovery fields
+                approveTxHash: this.approveTxHash,
+                createTxHash: this.createTxHash,
+                timestamp: Date.now()
             };
-            sessionStorage.setItem("deployState", safeStringify(state));
+            const key = `deploy_state_${this.distribution.id}`;
+            localStorage.setItem(key, safeStringify(state));
         } catch (e) {
             console.warn("Failed to save deploy state", e);
         }
     }
 
-    private load() {
+    private load(distributionId: string) {
         if (typeof window === "undefined") return;
 
         try {
-            const raw = sessionStorage.getItem("deployState");
+            const key = `deploy_state_${distributionId}`;
+            const raw = localStorage.getItem(key);
             if (!raw) return;
 
             const state = safeParse(raw);
-            if (state && state.distribution && state.distribution.id) {
+
+            // Validate TTL (e.g., 24 hours). If too old, discard (security/stale data)
+            const ONE_DAY = 24 * 60 * 60 * 1000;
+            if (state.timestamp && (Date.now() - state.timestamp > ONE_DAY)) {
+                localStorage.removeItem(key);
+                return;
+            }
+
+            if (state) {
                 // Restore critical state
                 this.currentStep = state.currentStep || 1;
-                this.distribution = state.distribution;
                 this.merkleResult = state.merkleResult;
                 this.isBackupDownloaded = !!state.isBackupDownloaded;
                 this.isBackupConfirmed = !!state.isBackupConfirmed;
+
+                // Restore recovery state
+                this.approveTxHash = state.approveTxHash || null;
+                this.createTxHash = state.createTxHash || null;
             }
         } catch (e) {
             console.warn("Failed to load deploy state", e);
-            sessionStorage.removeItem("deployState");
         }
     }
 
     // Actions
     initDistribution(dist: Distribution) {
-        // If switching distributions, reset
+        // If switching distributions or initializing fresh
         if (this.distribution?.id !== dist.id) {
-            this.reset();
-            this.distribution = dist;
-            this.save();
+            this.distribution = dist; // Set it first so we can load
+            this.load(dist.id); // Attempt recovery
+
+            // If load didn't fetch merkle result, it means this is a fresh start
+            if (!this.merkleResult) {
+                this.reset(true); // Soft reset
+                this.distribution = dist;
+            }
         } else {
-            // Same dist, keep state (it might be loaded from storage)
-            // But ensure distribution object is fresh from wizardStore
+            // Re-sync object reference
             this.distribution = dist;
-            // Don't save here to avoid overwriting merkleResult if it exists
         }
+        // Always save to ensure fresh timestamp
+        this.save();
     }
 
     goToStep(step: DeployStep) {
@@ -143,21 +165,30 @@ export class DeployState {
     setWalletState(connected: boolean, address: Address | null) {
         this.isWalletConnected = connected;
         this.walletAddress = address;
-        // Do not save wallet state
     }
 
     // Deploy Actions
     updateDeployProgress(progress: DeployProgress) {
         this.deployProgress = progress;
-        // Could save progress, but might be tricky with non-serializable objects (if any)
+    }
+
+    // Persist Transaction Hashes (The Write-Ahead Log)
+    setApproveTx(hash: string) {
+        this.approveTxHash = hash;
+        this.save();
+    }
+
+    setCreateTx(hash: string) {
+        this.createTxHash = hash;
+        this.save();
     }
 
     setDeployed(address: Address) {
         this.isDeployed = true;
         this.contractAddress = address;
-        // Clear storage on success to clean up
-        if (typeof window !== "undefined") {
-            sessionStorage.removeItem("deployState");
+        // Clean up log on success
+        if (typeof window !== "undefined" && this.distribution?.id) {
+            localStorage.removeItem(`deploy_state_${this.distribution.id}`);
         }
     }
 
@@ -165,11 +196,11 @@ export class DeployState {
         this.error = error;
     }
 
-    reset() {
+    reset(keepDistribution = false) {
         this.currentStep = 1;
         this.isLoading = false;
         this.error = null;
-        this.distribution = null;
+        if (!keepDistribution) this.distribution = null;
         this.merkleResult = null;
         this.isGeneratingMerkle = false;
         this.merkleError = null;
@@ -180,9 +211,11 @@ export class DeployState {
         this.deployProgress = null;
         this.contractAddress = null;
         this.isDeployed = false;
+        this.approveTxHash = null;
+        this.createTxHash = null;
 
-        if (typeof window !== "undefined") {
-            sessionStorage.removeItem("deployState");
+        if (typeof window !== "undefined" && this.distribution?.id) {
+            localStorage.removeItem(`deploy_state_${this.distribution.id}`);
         }
     }
 }
