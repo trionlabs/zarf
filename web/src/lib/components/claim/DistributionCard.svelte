@@ -23,7 +23,8 @@
 
     function handleLogin() {
         const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || "";
-        const REDIRECT_URI = window.location.origin + "/claim"; // Return to same page
+        const REDIRECT_URI = window.location.origin + "/claim"; // Return directly to claim page
+        console.log("Initiating Google Login with Redirect URI:", REDIRECT_URI);
         initiateGoogleLogin(CLIENT_ID, REDIRECT_URI);
     }
 </script>

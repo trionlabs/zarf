@@ -33,10 +33,8 @@
     }
 
     function handleDeploy() {
-        // For now, navigate to success page
-        // In future, this will trigger wallet connection flow
-        wizardStore.nextStep();
-        goto("/wizard/step-3");
+        // Navigate to the actual deployment wizard for this distribution
+        goto(`/wizard/deploy?id=${distribution.id}`);
     }
 
     // Format date for display

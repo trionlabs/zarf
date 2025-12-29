@@ -64,6 +64,7 @@ export function initiateGoogleLogin(
         response_type: 'id_token',
         scope: 'openid email profile',
         nonce: nonce || crypto.randomUUID(),
+        prompt: 'select_account', // Force account selection
     });
 
     window.location.href = `${GOOGLE_AUTH_ENDPOINT}?${params.toString()}`;

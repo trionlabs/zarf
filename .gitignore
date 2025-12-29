@@ -26,5 +26,5 @@ reports/
 **/*.md
 **/_backlogs/
 .DS_Store
-whitelist2.csv
-
+!whitelist.sample.csv
+.csv
