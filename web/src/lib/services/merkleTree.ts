@@ -11,7 +11,7 @@ let initPromise: Promise<Barretenberg> | null = null;
 // Types
 export interface ClaimData {
     email: string;
-    amount: number;
+    amount: bigint;
     salt: string;
     leafIndex: number;
     leaf: bigint;
@@ -98,7 +98,7 @@ export async function pedersenHashPair(left: bigint, right: bigint): Promise<big
  * Compute leaf hash from email, amount, and salt
  * leaf = pedersen(email_hash, amount, salt)
  */
-export async function computeLeaf(email: string, amount: number, salt: string): Promise<{ leaf: bigint; emailHash: bigint }> {
+export async function computeLeaf(email: string, amount: bigint, salt: string): Promise<{ leaf: bigint; emailHash: bigint }> {
     const bb = await initBarretenberg();
 
     // First hash the email bytes
@@ -106,7 +106,7 @@ export async function computeLeaf(email: string, amount: number, salt: string): 
     const emailHash = await pedersenHashBytes(emailBytes);
 
     // Then hash (emailHash, amount, salt)
-    const fields = [new Fr(emailHash), new Fr(BigInt(amount)), new Fr(BigInt(salt))];
+    const fields = [new Fr(emailHash), new Fr(amount), new Fr(BigInt(salt))];
     const leafHash = await bb.pedersenHash(fields, 0);
 
     return {
@@ -264,7 +264,7 @@ export async function verifyMerkleProof(leaf: bigint, proof: MerkleProof, root: 
  * Input: [{ email, amount }]
  * Output: { root, claims: [{ email, amount, salt, leafIndex, leaf }] }
  */
-export async function processWhitelist(entries: { email: string; amount: number }[]): Promise<MerkleTreeResult> {
+export async function processWhitelist(entries: { email: string; amount: bigint }[]): Promise<MerkleTreeResult> {
     const claims: ClaimData[] = [];
     const leaves: bigint[] = [];
 

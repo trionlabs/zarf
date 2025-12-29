@@ -19,7 +19,7 @@
             // Convert everything to hex strings for safe storage
             return {
                 email: claim.email,
-                amount: claim.amount,
+                amount: claim.amount.toString(),
                 salt: claim.salt, // Critical!
                 leafIndex: claim.leafIndex,
                 leaf: "0x" + claim.leaf.toString(16),

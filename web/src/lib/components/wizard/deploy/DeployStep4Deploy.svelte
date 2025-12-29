@@ -76,7 +76,11 @@
         approveTxHash = null;
         createTxHash = null;
 
+        // Get token decimals (default to 18 if not set)
+        const tokenDecimals = wizardStore.tokenDetails.tokenDecimals ?? 18;
+
         // Prepare email hashes and amounts from merkle result
+        // amounts are ALREADY in wei (from DeployStep1), so we just BigInt them
         const emailHashes: Hash[] = merkleResult.claims.map((c: any) => {
             const hex = c.emailHash?.toString(16) || "0";
             return `0x${hex.padStart(64, "0")}` as Hash;
@@ -89,6 +93,12 @@
         // Prepare merkle root
         const merkleRootHex = merkleResult.root.toString(16);
         const merkleRoot = `0x${merkleRootHex.padStart(64, "0")}` as Hash;
+
+        // Convert total amount to wei using token decimals
+        const totalAmountWei = parseUnits(
+            String(distribution.amount),
+            tokenDecimals,
+        );
 
         const config: FactoryDeployConfig = {
             factoryAddress: currentFactoryAddress,
@@ -106,7 +116,7 @@
             periodSeconds: unitToPeriodSeconds(
                 distribution.schedule.durationUnit,
             ),
-            totalAmount: BigInt(distribution.amount),
+            totalAmount: totalAmountWei,
             owner: walletAddress!, // Checked at function start
         };
 
