@@ -2,7 +2,8 @@
     import { page } from "$app/stores";
     
     const contracts = [
-        { name: "Vesting", address: import.meta.env.VITE_VESTING_ADDRESS },
+        { name: "My Vesting", address: "0x4d9616C078676C3Fc959A375DE23BD55a597B1D3" },
+        { name: "Vesting (Env)", address: import.meta.env.VITE_VESTING_ADDRESS },
         { name: "Token (Test)", address: import.meta.env.VITE_ZRFT_TEST_TOKEN },
         { name: "Factory", address: import.meta.env.VITE_FACTORY_ADDRESS_SEPOLIA },
         { name: "JWK Registry", address: import.meta.env.VITE_JWK_REGISTRY_ADDRESS },
@@ -23,7 +24,7 @@
     </button>
 
     {#if isOpen}
-        <div class="p-2 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-2 border-t border-base-content/10">
+        <div class="p-2 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-2 border-t border-base-content/10">
             {#each contracts as c}
                 <div class="flex flex-col overflow-hidden">
                     <span class="text-[10px] uppercase opacity-50 font-bold tracking-wider">{c.name}</span>
