@@ -6,6 +6,7 @@
 	import { onMount } from "svelte";
 	import { browser } from "$app/environment";
 	import WalletSelectionModal from "$lib/components/wallet/WalletSelectionModal.svelte";
+	import ContractFooter from "$lib/components/ui/ContractFooter.svelte";
 
 	let { children } = $props();
 
@@ -46,3 +47,5 @@
 <WalletSelectionModal />
 
 {@render children()}
+
+<ContractFooter />
