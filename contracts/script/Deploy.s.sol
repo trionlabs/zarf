@@ -27,6 +27,8 @@ contract DeployScript is Script {
 
         // 3. Deploy ZarfVesting
         ZarfVesting vesting = new ZarfVesting(
+            "Default Vesting",
+            "Deployed via DeployScript",
             tokenAddress,
             address(verifier),
             address(jwkRegistry)
@@ -66,6 +68,8 @@ contract DeployWithMockTokenScript is Script {
 
         // 4. Deploy ZarfVesting
         ZarfVesting vesting = new ZarfVesting(
+            "Mock Token Vesting",
+            "Deployed with mock token",
             address(token),
             address(verifier),
             address(jwkRegistry)
@@ -111,6 +115,8 @@ contract DeployTestnetScript is Script {
 
         // 4. Deploy ZarfVesting
         ZarfVesting vesting = new ZarfVesting(
+            "Testnet Vesting",
+            "Deployed with mock verifier - FOR TESTING ONLY",
             address(token),
             address(verifier),
             address(jwkRegistry)
