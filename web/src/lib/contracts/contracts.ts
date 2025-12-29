@@ -58,6 +58,11 @@ const VESTING_ABI = parseAbi([
     'function claimed(bytes32 emailHash) external view returns (uint256)',
     'function allocations(bytes32 emailHash) external view returns (uint256)',
 
+    // Read functions - Metadata
+    'function name() external view returns (string)',
+    'function owner() external view returns (address)',
+    'function token() external view returns (address)',
+
     // Read functions - Vesting parameters
     'function vestingStart() external view returns (uint256)',
     'function cliffDuration() external view returns (uint256)',
@@ -71,6 +76,14 @@ const VESTING_ABI = parseAbi([
     'error InvalidPubkey()',
     'error NothingToClaim()',
     'error VestingNotStarted()',
+]);
+
+/**
+ * ERC20 Metadata ABI
+ */
+const ERC20_ABI = parseAbi([
+    'function symbol() external view returns (string)',
+    'function decimals() external view returns (uint8)',
 ]);
 
 /**
@@ -207,6 +220,43 @@ function getWalletClient(): WalletClient {
  * console.log('Block:', result.receipt.blockNumber);
  * ```
  */
+/**
+ * Read metadata from a Vesting Contract.
+ * Used for the "Import Distribution" feature.
+ * 
+ * @param address - Contract address
+ */
+export async function readVestingContract(address: Address) {
+    const publicClient = getPublicClient();
+
+    try {
+        const [name, owner, token, merkleRoot] = await Promise.all([
+            publicClient.readContract({ address, abi: VESTING_ABI, functionName: 'name' }),
+            publicClient.readContract({ address, abi: VESTING_ABI, functionName: 'owner' }),
+            publicClient.readContract({ address, abi: VESTING_ABI, functionName: 'token' }),
+            publicClient.readContract({ address, abi: VESTING_ABI, functionName: 'merkleRoot' }),
+        ]);
+
+        // Fetch token metadata
+        const [symbol, decimals] = await Promise.all([
+            publicClient.readContract({ address: token, abi: ERC20_ABI, functionName: 'symbol' }),
+            publicClient.readContract({ address: token, abi: ERC20_ABI, functionName: 'decimals' }),
+        ]);
+
+        return {
+            name,
+            owner,
+            token,
+            merkleRoot,
+            tokenSymbol: symbol,
+            tokenDecimals: decimals
+        };
+    } catch (error) {
+        console.error('Failed to read vesting contract:', error);
+        throw new Error('Invalid Vesting Address or Network Error');
+    }
+}
+
 export async function submitClaim(
     proof: string,
     publicInputs: (string | bigint)[],
