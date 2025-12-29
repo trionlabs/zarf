@@ -12,7 +12,7 @@ import { sepolia } from 'viem/chains';
 import { ZarfVestingFactoryABI } from '$lib/contracts/abis/ZarfVestingFactory';
 import { ZarfVestingABI } from '$lib/contracts/abis/ZarfVesting';
 import { ERC20ABI } from '$lib/contracts/abis/ERC20';
-import { FACTORY_ADDRESS } from '$lib/config/contracts';
+import { FACTORY_ADDRESS } from '../config/contracts';
 
 // ============ Public Client (Lazy Initialization) ============
 
