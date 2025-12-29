@@ -335,6 +335,7 @@ export async function submitClaim(
         args: [proofBytes as `0x${string}`, formattedInputs],
         account,
         chain,
+        gas: 1200000n, // Explicit buffer for ZK Verifier (approx 800k-1M)
     });
 
     console.log('[Contracts] Transaction submitted:', hash);
