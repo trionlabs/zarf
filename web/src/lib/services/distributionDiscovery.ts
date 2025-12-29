@@ -145,6 +145,21 @@ export async function fetchOwnerDeploymentAddresses(owner: Address): Promise<Add
  * @param contractAddress Vesting contract address
  * @returns Contract metadata or null if failed
  */
+/**
+ * Sanitize and truncate strings from untrusted on-chain sources
+ * Prevents UI breakage and basic injection attempts
+ */
+function sanitizeString(str: string, maxLength: number): string {
+    if (!str) return '';
+    // Remove control characters and non-printable chars
+    let clean = str.replace(/[\x00-\x1F\x7F-\x9F]/g, '');
+    // Truncate
+    if (clean.length > maxLength) {
+        clean = clean.substring(0, maxLength);
+    }
+    return clean;
+}
+
 export async function fetchContractMetadata(
     contractAddress: Address
 ): Promise<OnChainVestingContract | null> {
@@ -205,8 +220,17 @@ export async function fetchContractMetadata(
             return null;
         }
 
-        const name = results[0].status === 'success' ? results[0].result as string : 'Unknown';
-        const description = results[1].status === 'success' ? results[1].result as string : '';
+        // Sanitize strings immediately
+        const name = sanitizeString(
+            results[0].status === 'success' ? results[0].result as string : 'Unknown Distribution',
+            50 // Max 50 chars for name
+        );
+
+        const description = sanitizeString(
+            results[1].status === 'success' ? results[1].result as string : '',
+            200 // Max 200 chars for description
+        );
+
         const tokenAddress = results[2].result as Address;
         const owner = results[3].result as Address;
         const vestingStart = results[4].status === 'success' ? results[4].result as bigint : 0n;
@@ -237,7 +261,10 @@ export async function fetchContractMetadata(
             allowFailure: true // Resilience: handle non-standard tokens
         });
 
-        const tokenSymbol = tokenResults[0].status === 'success' ? tokenResults[0].result as string : '???';
+        const tokenSymbol = sanitizeString(
+            tokenResults[0].status === 'success' ? tokenResults[0].result as string : '???',
+            10 // Max 10 chars for symbol
+        );
         const tokenDecimals = tokenResults[1].status === 'success' ? tokenResults[1].result as number : 18;
         const tokenBalance = tokenResults[2].status === 'success' ? tokenResults[2].result as bigint : 0n;
 
