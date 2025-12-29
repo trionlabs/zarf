@@ -49,6 +49,21 @@ contract ZarfVestingFactoryTest is Test {
         token.transfer(alice, 1_000_000 ether);
     }
 
+    // Helper to create params struct
+    function _createParams() internal view returns (ZarfVestingFactory.CreateVestingParams memory) {
+        return ZarfVestingFactory.CreateVestingParams({
+            name: "Test Vesting",
+            description: "Test description",
+            token: address(token),
+            merkleRoot: merkleRoot,
+            emailHashes: emailHashes,
+            amounts: amounts,
+            cliffDuration: 30 days,
+            vestingDuration: 365 days,
+            vestingPeriod: 30 days
+        });
+    }
+
     // ============ Constructor Tests ============
 
     function test_Constructor_SetsImmutables() public view {
@@ -59,15 +74,7 @@ contract ZarfVestingFactoryTest is Test {
     // ============ createVesting Tests ============
 
     function test_CreateVesting_DeploysContract() public {
-        address vesting = factory.createVesting(
-            address(token),
-            merkleRoot,
-            emailHashes,
-            amounts,
-            30 days,  // cliff
-            365 days, // duration
-            30 days   // period
-        );
+        address vesting = factory.createVesting(_createParams());
 
         // Verify contract was deployed
         assertTrue(vesting != address(0));
@@ -75,44 +82,27 @@ contract ZarfVestingFactoryTest is Test {
     }
 
     function test_CreateVesting_SetsOwnership() public {
-        address vesting = factory.createVesting(
-            address(token),
-            merkleRoot,
-            emailHashes,
-            amounts,
-            30 days,
-            365 days,
-            30 days
-        );
+        address vesting = factory.createVesting(_createParams());
 
         // Caller should be the owner
         assertEq(ZarfVesting(vesting).owner(), owner);
     }
 
+    function test_CreateVesting_SetsMetadata() public {
+        address vesting = factory.createVesting(_createParams());
+
+        assertEq(ZarfVesting(vesting).name(), "Test Vesting");
+        assertEq(ZarfVesting(vesting).description(), "Test description");
+    }
+
     function test_CreateVesting_SetsMerkleRoot() public {
-        address vesting = factory.createVesting(
-            address(token),
-            merkleRoot,
-            emailHashes,
-            amounts,
-            30 days,
-            365 days,
-            30 days
-        );
+        address vesting = factory.createVesting(_createParams());
 
         assertEq(ZarfVesting(vesting).merkleRoot(), merkleRoot);
     }
 
     function test_CreateVesting_SetsAllocations() public {
-        address vesting = factory.createVesting(
-            address(token),
-            merkleRoot,
-            emailHashes,
-            amounts,
-            30 days,
-            365 days,
-            30 days
-        );
+        address vesting = factory.createVesting(_createParams());
 
         // Verify allocations
         assertEq(ZarfVesting(vesting).allocations(emailHashes[0]), amounts[0]);
@@ -121,15 +111,7 @@ contract ZarfVestingFactoryTest is Test {
     }
 
     function test_CreateVesting_SetsVestingSchedule() public {
-        address vesting = factory.createVesting(
-            address(token),
-            merkleRoot,
-            emailHashes,
-            amounts,
-            30 days,
-            365 days,
-            30 days
-        );
+        address vesting = factory.createVesting(_createParams());
 
         ZarfVesting v = ZarfVesting(vesting);
         assertEq(v.cliffDuration(), 30 days);
@@ -139,15 +121,7 @@ contract ZarfVestingFactoryTest is Test {
     }
 
     function test_CreateVesting_TracksDeployment() public {
-        address vesting = factory.createVesting(
-            address(token),
-            merkleRoot,
-            emailHashes,
-            amounts,
-            30 days,
-            365 days,
-            30 days
-        );
+        address vesting = factory.createVesting(_createParams());
 
         assertEq(factory.getDeploymentCount(), 1);
         assertEq(factory.deployments(0), vesting);
@@ -161,15 +135,7 @@ contract ZarfVestingFactoryTest is Test {
         // Record logs to capture the event
         vm.recordLogs();
 
-        address vesting = factory.createVesting(
-            address(token),
-            merkleRoot,
-            emailHashes,
-            amounts,
-            30 days,
-            365 days,
-            30 days
-        );
+        address vesting = factory.createVesting(_createParams());
 
         // Get recorded logs
         Vm.Log[] memory logs = vm.getRecordedLogs();
@@ -195,36 +161,25 @@ contract ZarfVestingFactoryTest is Test {
     }
 
     function test_CreateVesting_RevertOnArrayMismatch() public {
+        ZarfVestingFactory.CreateVestingParams memory params = _createParams();
+        
+        // Create mismatched amounts array
         uint256[] memory wrongAmounts = new uint256[](2);
         wrongAmounts[0] = 1000 ether;
         wrongAmounts[1] = 2000 ether;
+        params.amounts = wrongAmounts;
 
         vm.expectRevert(ZarfVestingFactory.ArrayLengthMismatch.selector);
-        factory.createVesting(
-            address(token),
-            merkleRoot,
-            emailHashes,  // 3 items
-            wrongAmounts, // 2 items
-            30 days,
-            365 days,
-            30 days
-        );
+        factory.createVesting(params);
     }
 
     function test_CreateVesting_RevertOnEmptyArrays() public {
-        bytes32[] memory emptyHashes = new bytes32[](0);
-        uint256[] memory emptyAmounts = new uint256[](0);
+        ZarfVestingFactory.CreateVestingParams memory params = _createParams();
+        params.emailHashes = new bytes32[](0);
+        params.amounts = new uint256[](0);
 
         vm.expectRevert(ZarfVestingFactory.ZeroAllocations.selector);
-        factory.createVesting(
-            address(token),
-            merkleRoot,
-            emptyHashes,
-            emptyAmounts,
-            30 days,
-            365 days,
-            30 days
-        );
+        factory.createVesting(params);
     }
 
     // ============ createAndFundVesting Tests ============
@@ -237,16 +192,7 @@ contract ZarfVestingFactoryTest is Test {
 
         uint256 balanceBefore = token.balanceOf(owner);
 
-        address vesting = factory.createAndFundVesting(
-            address(token),
-            merkleRoot,
-            emailHashes,
-            amounts,
-            30 days,
-            365 days,
-            30 days,
-            depositAmount
-        );
+        address vesting = factory.createAndFundVesting(_createParams(), depositAmount);
 
         // Tokens should be in vesting contract
         assertEq(token.balanceOf(vesting), depositAmount);
@@ -257,16 +203,7 @@ contract ZarfVestingFactoryTest is Test {
         uint256 depositAmount = 6000 ether;
         token.approve(address(factory), depositAmount);
 
-        address vesting = factory.createAndFundVesting(
-            address(token),
-            merkleRoot,
-            emailHashes,
-            amounts,
-            30 days,
-            365 days,
-            30 days,
-            depositAmount
-        );
+        address vesting = factory.createAndFundVesting(_createParams(), depositAmount);
 
         ZarfVesting v = ZarfVesting(vesting);
 
@@ -285,16 +222,7 @@ contract ZarfVestingFactoryTest is Test {
         token.approve(address(factory), depositAmount / 2);
 
         vm.expectRevert(); // Will revert on transferFrom
-        factory.createAndFundVesting(
-            address(token),
-            merkleRoot,
-            emailHashes,
-            amounts,
-            30 days,
-            365 days,
-            30 days,
-            depositAmount
-        );
+        factory.createAndFundVesting(_createParams(), depositAmount);
     }
 
     function test_CreateAndFundVesting_RevertOnInsufficientBalance() public {
@@ -305,16 +233,7 @@ contract ZarfVestingFactoryTest is Test {
         token.approve(address(factory), depositAmount);
 
         vm.expectRevert(); // Will revert on transferFrom
-        factory.createAndFundVesting(
-            address(token),
-            merkleRoot,
-            emailHashes,
-            amounts,
-            30 days,
-            365 days,
-            30 days,
-            depositAmount
-        );
+        factory.createAndFundVesting(_createParams(), depositAmount);
         vm.stopPrank();
     }
 
@@ -322,21 +241,21 @@ contract ZarfVestingFactoryTest is Test {
 
     function test_MultipleDeployments_TrackedCorrectly() public {
         // Owner deploys 2
-        address v1 = factory.createVesting(
-            address(token), merkleRoot, emailHashes, amounts,
-            30 days, 365 days, 30 days
-        );
-        address v2 = factory.createVesting(
-            address(token), merkleRoot, emailHashes, amounts,
-            60 days, 180 days, 30 days
-        );
+        address v1 = factory.createVesting(_createParams());
+        
+        ZarfVestingFactory.CreateVestingParams memory params2 = _createParams();
+        params2.name = "Vesting 2";
+        params2.cliffDuration = 60 days;
+        params2.vestingDuration = 180 days;
+        address v2 = factory.createVesting(params2);
 
         // Alice deploys 1
         vm.prank(alice);
-        address v3 = factory.createVesting(
-            address(token), merkleRoot, emailHashes, amounts,
-            0, 365 days, 7 days
-        );
+        ZarfVestingFactory.CreateVestingParams memory params3 = _createParams();
+        params3.name = "Alice Vesting";
+        params3.cliffDuration = 0;
+        params3.vestingPeriod = 7 days;
+        address v3 = factory.createVesting(params3);
 
         // Verify counts
         assertEq(factory.getDeploymentCount(), 3);
@@ -362,16 +281,20 @@ contract ZarfVestingFactoryTest is Test {
             largeAmounts[i] = 100 ether;
         }
 
+        ZarfVestingFactory.CreateVestingParams memory params = ZarfVestingFactory.CreateVestingParams({
+            name: "Large Vesting",
+            description: "100 recipients test",
+            token: address(token),
+            merkleRoot: merkleRoot,
+            emailHashes: largeHashes,
+            amounts: largeAmounts,
+            cliffDuration: 30 days,
+            vestingDuration: 365 days,
+            vestingPeriod: 30 days
+        });
+
         uint256 gasBefore = gasleft();
-        address vesting = factory.createVesting(
-            address(token),
-            merkleRoot,
-            largeHashes,
-            largeAmounts,
-            30 days,
-            365 days,
-            30 days
-        );
+        address vesting = factory.createVesting(params);
         uint256 gasUsed = gasBefore - gasleft();
 
         // Verify it worked
@@ -393,16 +316,20 @@ contract ZarfVestingFactoryTest is Test {
             largeAmounts[i] = 50 ether;
         }
 
+        ZarfVestingFactory.CreateVestingParams memory params = ZarfVestingFactory.CreateVestingParams({
+            name: "Large Vesting 2",
+            description: "200 recipients test",
+            token: address(token),
+            merkleRoot: merkleRoot,
+            emailHashes: largeHashes,
+            amounts: largeAmounts,
+            cliffDuration: 30 days,
+            vestingDuration: 365 days,
+            vestingPeriod: 30 days
+        });
+
         uint256 gasBefore = gasleft();
-        address vesting = factory.createVesting(
-            address(token),
-            merkleRoot,
-            largeHashes,
-            largeAmounts,
-            30 days,
-            365 days,
-            30 days
-        );
+        address vesting = factory.createVesting(params);
         uint256 gasUsed = gasBefore - gasleft();
 
         assertTrue(vesting != address(0));

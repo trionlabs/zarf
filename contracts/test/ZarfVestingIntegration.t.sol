@@ -46,7 +46,7 @@ contract ZarfVestingIntegrationTest is Test {
 
         // Deploy token and vesting contract
         token = new MockERC20("Zarf Token", "ZARF", TOTAL_SUPPLY);
-        vesting = new ZarfVesting(address(token), address(verifier), address(jwkRegistry));
+        vesting = new ZarfVesting("Integration Test", "Integration test vesting", address(token), address(verifier), address(jwkRegistry));
 
         // Setup vesting
         vesting.setMerkleRoot(merkleRoot);

@@ -47,7 +47,7 @@ contract ZarfVestingTest is Test {
         jwkRegistry.registerKey("mock-kid", mockPubkeyLimbs);
 
         // Deploy vesting with JWK registry
-        vesting = new ZarfVesting(address(token), address(verifier), address(jwkRegistry));
+        vesting = new ZarfVesting("Test Vesting", "Unit test distribution", address(token), address(verifier), address(jwkRegistry));
 
         // Setup vesting
         vesting.setMerkleRoot(merkleRoot);
