@@ -8,6 +8,10 @@ import { waitForTransactionReceipt } from '@wagmi/core';
 // --- Types ---
 
 export interface DeployConfig {
+    /** Human-readable name for this distribution */
+    name: string;
+    /** Description or category */
+    description: string;
     tokenAddress: Address;
     verifierAddress: Address;
     jwkRegistryAddress: Address;
@@ -72,6 +76,8 @@ export class DeployService {
                 abi: ZarfVestingABI,
                 bytecode: ZarfVestingBytecode,
                 args: [
+                    this.config.name,
+                    this.config.description,
                     this.config.tokenAddress,
                     this.config.verifierAddress,
                     this.config.jwkRegistryAddress

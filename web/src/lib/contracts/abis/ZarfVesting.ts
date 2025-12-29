@@ -1,6 +1,8 @@
 export const ZarfVestingABI = [
     {
         "inputs": [
+            { "internalType": "string", "name": "_name", "type": "string" },
+            { "internalType": "string", "name": "_description", "type": "string" },
             { "internalType": "address", "name": "_token", "type": "address" },
             { "internalType": "address", "name": "_verifier", "type": "address" },
             { "internalType": "address", "name": "_jwkRegistry", "type": "address" }
@@ -68,6 +70,20 @@ export const ZarfVestingABI = [
         "inputs": [],
         "name": "PUBKEY_LIMBS",
         "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "name",
+        "outputs": [{ "internalType": "string", "name": "", "type": "string" }],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [],
+        "name": "description",
+        "outputs": [{ "internalType": "string", "name": "", "type": "string" }],
         "stateMutability": "view",
         "type": "function"
     },

@@ -4,8 +4,25 @@
  * Auto-generated from Solidity contract.
  * Provides typed interface for factory deployment operations.
  * 
+ * Updated: 2025-12-29 - Added struct-based createVesting pattern with name/description metadata
+ * 
  * @module contracts/abis/ZarfVestingFactory
  */
+
+/**
+ * CreateVestingParams struct - matches Solidity struct
+ */
+export interface CreateVestingParams {
+    name: string;
+    description: string;
+    token: `0x${string}`;
+    merkleRoot: `0x${string}`;
+    emailHashes: readonly `0x${string}`[];
+    amounts: readonly bigint[];
+    cliffDuration: bigint;
+    vestingDuration: bigint;
+    vestingPeriod: bigint;
+}
 
 export const ZarfVestingFactoryABI = [
     // Events
@@ -78,19 +95,37 @@ export const ZarfVestingFactoryABI = [
         outputs: [{ name: 'count', type: 'uint256' }],
         stateMutability: 'view'
     },
+    {
+        type: 'function',
+        name: 'ownerDeployments',
+        inputs: [
+            { name: '', type: 'address' },
+            { name: '', type: 'uint256' }
+        ],
+        outputs: [{ type: 'address' }],
+        stateMutability: 'view'
+    },
 
-    // Write functions
+    // Write functions - Using struct pattern (CreateVestingParams)
     {
         type: 'function',
         name: 'createVesting',
         inputs: [
-            { name: 'token', type: 'address' },
-            { name: 'merkleRoot', type: 'bytes32' },
-            { name: 'emailHashes', type: 'bytes32[]' },
-            { name: 'amounts', type: 'uint256[]' },
-            { name: 'cliffDuration', type: 'uint256' },
-            { name: 'vestingDuration', type: 'uint256' },
-            { name: 'vestingPeriod', type: 'uint256' }
+            {
+                name: 'params',
+                type: 'tuple',
+                components: [
+                    { name: 'name', type: 'string' },
+                    { name: 'description', type: 'string' },
+                    { name: 'token', type: 'address' },
+                    { name: 'merkleRoot', type: 'bytes32' },
+                    { name: 'emailHashes', type: 'bytes32[]' },
+                    { name: 'amounts', type: 'uint256[]' },
+                    { name: 'cliffDuration', type: 'uint256' },
+                    { name: 'vestingDuration', type: 'uint256' },
+                    { name: 'vestingPeriod', type: 'uint256' }
+                ]
+            }
         ],
         outputs: [{ name: 'vesting', type: 'address' }],
         stateMutability: 'nonpayable'
@@ -99,13 +134,21 @@ export const ZarfVestingFactoryABI = [
         type: 'function',
         name: 'createAndFundVesting',
         inputs: [
-            { name: 'token', type: 'address' },
-            { name: 'merkleRoot', type: 'bytes32' },
-            { name: 'emailHashes', type: 'bytes32[]' },
-            { name: 'amounts', type: 'uint256[]' },
-            { name: 'cliffDuration', type: 'uint256' },
-            { name: 'vestingDuration', type: 'uint256' },
-            { name: 'vestingPeriod', type: 'uint256' },
+            {
+                name: 'params',
+                type: 'tuple',
+                components: [
+                    { name: 'name', type: 'string' },
+                    { name: 'description', type: 'string' },
+                    { name: 'token', type: 'address' },
+                    { name: 'merkleRoot', type: 'bytes32' },
+                    { name: 'emailHashes', type: 'bytes32[]' },
+                    { name: 'amounts', type: 'uint256[]' },
+                    { name: 'cliffDuration', type: 'uint256' },
+                    { name: 'vestingDuration', type: 'uint256' },
+                    { name: 'vestingPeriod', type: 'uint256' }
+                ]
+            },
             { name: 'depositAmount', type: 'uint256' }
         ],
         outputs: [{ name: 'vesting', type: 'address' }],
