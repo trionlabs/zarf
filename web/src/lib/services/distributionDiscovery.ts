@@ -108,6 +108,30 @@ export function invalidateCache(owner?: Address): void {
     }
 }
 
+/**
+ * Manually add a contract to the cache (Optimistic UI)
+ * Call this immediately after a successful deployment
+ */
+export function addOptimisticContract(owner: Address, contract: OnChainVestingContract): void {
+    const cached = getCachedResult(owner);
+
+    // Create new result based on cache or empty state
+    const currentContracts = cached ? cached.contracts : [];
+    const newContracts = [contract, ...currentContracts];
+
+    // Deduplicate by address
+    const uniqueContracts = Array.from(new Map(newContracts.map(c => [c.address, c])).values());
+
+    const newResult: DiscoveryResult = {
+        contracts: uniqueContracts,
+        total: uniqueContracts.length,
+        fetchedAt: Date.now()
+    };
+
+    setCacheResult(owner, newResult);
+    console.log('[DiscoveryService] Optimistically added contract:', contract.address);
+}
+
 // ============ Discovery Functions ============
 
 /**

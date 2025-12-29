@@ -13,6 +13,10 @@
         cliffDateToSeconds,
         unitToPeriodSeconds,
     } from "$lib/utils/vesting";
+    import {
+        addOptimisticContract,
+        type OnChainVestingContract,
+    } from "$lib/services/distributionDiscovery";
     import { walletStore } from "$lib/stores/walletStore.svelte";
     import { goto } from "$app/navigation";
     import type { Address, Hash } from "viem";
@@ -160,6 +164,39 @@
                     distribution.id,
                     createTxHash || "0x",
                 );
+
+                // Optimistic UI Update (Ruthless Review Item #5)
+                // Add to discovery cache immediately so it shows up in dashboard
+                const optimisticContract: OnChainVestingContract = {
+                    address: vestingAddress,
+                    name: distribution.name,
+                    description: distribution.description || "",
+                    token: wizardStore.tokenDetails.tokenAddress as Address,
+                    tokenSymbol:
+                        wizardStore.tokenDetails.tokenSymbol || "TOKEN",
+                    tokenDecimals: wizardStore.tokenDetails.tokenDecimals || 18,
+                    owner: walletAddress,
+                    vestingStart: BigInt(Math.floor(Date.now() / 1000)), // Approx
+                    cliffDuration: BigInt(
+                        cliffDateToSeconds(distribution.schedule.cliffEndDate),
+                    ),
+                    vestingDuration: BigInt(
+                        durationToSeconds(
+                            distribution.schedule.distributionDuration,
+                            distribution.schedule.durationUnit,
+                        ),
+                    ),
+                    vestingPeriod: BigInt(
+                        unitToPeriodSeconds(distribution.schedule.durationUnit),
+                    ),
+                    tokenBalance: totalAmountWei,
+                };
+
+                try {
+                    addOptimisticContract(walletAddress, optimisticContract);
+                } catch (err) {
+                    console.warn("Optimistic cache update failed", err);
+                }
             }
         } catch (e: any) {
             console.error("Deploy failed:", e);
