@@ -16,6 +16,7 @@
     import { walletStore } from "$lib/stores/walletStore.svelte";
     import { goto } from "$app/navigation";
     import type { Address, Hash } from "viem";
+    import { parseUnits } from "viem";
 
     // Local state from stores
     let distribution = $derived(deployStore.distribution);

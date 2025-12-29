@@ -60,10 +60,57 @@ export type FactoryProgressCallback = (progress: FactoryDeployProgress) => void;
 export class FactoryDeployService {
     private config: FactoryDeployConfig;
     private onProgress: FactoryProgressCallback;
+    private readonly MAX_RETRIES = 3;
+    private readonly INITIAL_RETRY_DELAY = 2000; // 2 seconds
 
     constructor(config: FactoryDeployConfig, onProgress: FactoryProgressCallback) {
         this.config = config;
         this.onProgress = onProgress;
+    }
+
+    /**
+     * Retry wrapper with exponential backoff for RPC errors
+     */
+    private async withRetry<T>(
+        operation: () => Promise<T>,
+        operationName: string
+    ): Promise<T> {
+        let lastError: any;
+
+        for (let attempt = 0; attempt <= this.MAX_RETRIES; attempt++) {
+            try {
+                return await operation();
+            } catch (error: any) {
+                lastError = error;
+                const message = error?.message || '';
+
+                // Check if this is a retryable RPC error
+                const isRpcError =
+                    message.includes('too many errors') ||
+                    message.includes('rate limit') ||
+                    message.includes('ResourceUnavailable') ||
+                    message.includes('resource not available') ||
+                    error?.code === -32002;
+
+                if (isRpcError && attempt < this.MAX_RETRIES) {
+                    const delayMs = this.INITIAL_RETRY_DELAY * Math.pow(2, attempt);
+                    const waitSeconds = Math.ceil(delayMs / 1000);
+
+                    this.onProgress({
+                        step: operationName as any,
+                        message: `RPC rate limited. Retrying in ${waitSeconds}s... (attempt ${attempt + 2}/${this.MAX_RETRIES + 1})`
+                    });
+
+                    await this.delay(delayMs);
+                    continue;
+                }
+
+                // Not a retryable error or max retries exceeded
+                throw error;
+            }
+        }
+
+        throw lastError;
     }
 
     /**
@@ -72,15 +119,16 @@ export class FactoryDeployService {
     async approveFactory(): Promise<Hash> {
         this.onProgress({ step: 'approve', message: 'Requesting token approval...' });
 
-        const wallet = await getWalletClient(wagmiConfig);
-
-        const hash = await wallet.writeContract({
-            address: this.config.tokenAddress,
-            abi: ERC20ABI,
-            functionName: 'approve',
-            args: [this.config.factoryAddress, this.config.totalAmount],
-            account: this.config.owner,
-        });
+        const hash = await this.withRetry(async () => {
+            const wallet = await getWalletClient(wagmiConfig);
+            return wallet.writeContract({
+                address: this.config.tokenAddress,
+                abi: ERC20ABI,
+                functionName: 'approve',
+                args: [this.config.factoryAddress, this.config.totalAmount],
+                account: this.config.owner,
+            });
+        }, 'approve');
 
         this.onProgress({ step: 'approve', message: 'Waiting for approval confirmation...', txHash: hash });
 
@@ -99,24 +147,25 @@ export class FactoryDeployService {
     async createAndFundVesting(): Promise<{ hash: Hash; vestingAddress: Address }> {
         this.onProgress({ step: 'create', message: 'Creating and funding vesting contract...' });
 
-        const wallet = await getWalletClient(wagmiConfig);
-
-        const hash = await wallet.writeContract({
-            address: this.config.factoryAddress,
-            abi: ZarfVestingFactoryABI,
-            functionName: 'createAndFundVesting',
-            args: [
-                this.config.tokenAddress,
-                this.config.merkleRoot,
-                this.config.emailHashes,
-                this.config.amounts,
-                this.config.cliffSeconds,
-                this.config.vestingSeconds,
-                this.config.periodSeconds,
-                this.config.totalAmount
-            ],
-            account: this.config.owner,
-        });
+        const hash = await this.withRetry(async () => {
+            const wallet = await getWalletClient(wagmiConfig);
+            return wallet.writeContract({
+                address: this.config.factoryAddress,
+                abi: ZarfVestingFactoryABI,
+                functionName: 'createAndFundVesting',
+                args: [
+                    this.config.tokenAddress,
+                    this.config.merkleRoot,
+                    this.config.emailHashes,
+                    this.config.amounts,
+                    this.config.cliffSeconds,
+                    this.config.vestingSeconds,
+                    this.config.periodSeconds,
+                    this.config.totalAmount
+                ],
+                account: this.config.owner,
+            });
+        }, 'create');
 
         this.onProgress({ step: 'create', message: 'Waiting for contract creation...', txHash: hash });
 
@@ -204,8 +253,8 @@ export class FactoryDeployService {
         if (message.includes('TransferFailed')) {
             return 'Token transfer failed';
         }
-        if (message.includes('rate limit') || message.includes('too many')) {
-            return 'RPC rate limit exceeded. Please wait a moment and retry.';
+        if (message.includes('rate limit') || message.includes('too many') || message.includes('resource not available') || message.includes('ResourceUnavailable') || error?.code === -32002) {
+            return 'MetaMask RPC rate limited. Fix: Open MetaMask → Settings → Networks → Sepolia → Change RPC URL to: https://ethereum-sepolia-rpc.publicnode.com';
         }
 
         // Return original message for development, sanitize in production
