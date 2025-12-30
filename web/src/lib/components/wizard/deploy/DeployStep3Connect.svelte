@@ -11,6 +11,14 @@
     // Distribution from deploy store
     let distribution = $derived(deployStore.distribution);
 
+    // Clean Markup: Extract template logic to $derived
+    const showNetworkName = $derived(
+        walletStore.isConnected && walletStore.networkName,
+    );
+    const showBalanceCheck = $derived(
+        walletStore.isConnected && distribution !== null,
+    );
+
     // Balance check state
     let checkState = $state({
         isLoading: false,
@@ -134,7 +142,7 @@
                                 ? walletStore.shortAddress
                                 : "Please connect your wallet"}
                         </p>
-                        {#if walletStore.isConnected && walletStore.networkName}
+                        {#if showNetworkName}
                             <p class="text-xs opacity-40">
                                 {walletStore.networkName}
                             </p>
@@ -190,7 +198,7 @@
     </div>
 
     <!-- 2. Token Balance Check -->
-    {#if walletStore.isConnected && distribution}
+    {#if showBalanceCheck}
         <div class="card bg-base-100 border border-base-300 shadow-sm">
             <div class="card-body">
                 <h3 class="card-title text-sm uppercase opacity-50">
@@ -226,7 +234,9 @@
                                     ? 'text-success'
                                     : 'text-error'}"
                             >
-                                {Number(distribution.amount).toLocaleString()}
+                                {Number(
+                                    distribution?.amount ?? 0,
+                                ).toLocaleString()}
                                 {checkState.symbol}
                             </div>
                             <div class="text-xs opacity-50">

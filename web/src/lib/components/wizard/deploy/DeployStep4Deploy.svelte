@@ -53,6 +53,10 @@
         chainId ? isFactoryAvailable(chainId) : false,
     );
 
+    // Clean Markup: Extract template logic to $derived
+    const showFactoryWarning = $derived(!factoryAvailable && Boolean(chainId));
+    const showNotDeployedIdle = $derived(!isDeployed && currentStep === "idle");
+
     // Recovery Logic (The "Resume" Handler)
     onMount(() => {
         // Check if we have pending transactions in store
@@ -335,7 +339,7 @@
     </div>
 
     <!-- Factory Not Available Warning -->
-    {#if !factoryAvailable && chainId}
+    {#if showFactoryWarning}
         <div class="alert alert-warning mb-6">
             <svg
                 class="w-6 h-6"
@@ -524,7 +528,7 @@
 
     <!-- Actions -->
     <div class="flex flex-col items-center gap-4">
-        {#if !isDeployed && currentStep === "idle"}
+        {#if showNotDeployedIdle}
             <!-- Big Launch Button -->
             <button
                 class="group relative btn btn-primary btn-lg px-12 text-lg shadow-xl

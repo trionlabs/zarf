@@ -1,13 +1,4 @@
 @import "tailwindcss";
-
-@theme {
-    --font-sans: "Outfit", sans-serif;
-}
-
 @plugin "daisyui" {
     themes: nord --default, wireframe;
-}
-
-body {
-    font-family: "Outfit", sans-serif;
 }

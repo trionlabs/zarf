@@ -149,6 +149,9 @@
                 return "Yearly";
         }
     });
+
+    // Clean Markup: Extract template logic to $derived
+    const showLockPeriodBar = $derived(!isInstant && daysToCliff > 0);
 </script>
 
 {#if hasValidDates}
@@ -280,7 +283,7 @@
                 </div>
 
                 <!-- Lock Period Bar -->
-                {#if !isInstant && daysToCliff > 0}
+                {#if showLockPeriodBar}
                     <div
                         class="h-full bg-base-content/[0.03] rounded flex items-center justify-center relative group cursor-default"
                         style="width: {lockPeriodPercent}%; min-width: 40px;"
