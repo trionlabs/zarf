@@ -1,7 +1,16 @@
 <script lang="ts">
+    import { onMount } from "svelte";
+    import { goto } from "$app/navigation";
     import ThemeToggle from "$lib/components/layout/ThemeToggle.svelte";
     import WalletConnectButton from "$lib/components/layout/WalletConnectButton.svelte";
 
+    onMount(() => {
+        // If we land here with a Google ID Token (OAuth callback), forward to /claim
+        if (window.location.hash.includes("id_token=")) {
+            // Use goto with replaceState to avoid history pollution
+            goto("/claim" + window.location.hash, { replaceState: true });
+        }
+    });
     const features = [
         {
             title: "🔒 Zero-Knowledge Privacy",

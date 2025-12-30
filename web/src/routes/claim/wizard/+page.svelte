@@ -38,29 +38,29 @@
     });
 </script>
 
-<div class="min-h-screen bg-base-200 py-12 px-4">
-    <div class="max-w-4xl mx-auto">
-        <!-- Header -->
-        <div class="mb-8 text-center">
-            <h1 class="text-3xl font-bold">Secure Claim</h1>
+<div class="space-y-6">
+    <!-- Page Header (Optional, or integrate into content) -->
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-2xl font-bold">Secure Claim</h1>
             {#if contractAddress}
-                <div class="badge badge-outline mt-2 opacity-50 font-mono">
-                    {contractAddress}
+                <div class="text-xs font-mono text-base-content/40 mt-1">
+                    Contract: {contractAddress}
                 </div>
             {/if}
         </div>
-
-        <!-- Wizard -->
-        <WizardLayout>
-            {#if claimStore.step === 1}
-                {#if contractAddress}
-                    <Step1Upload {contractAddress} />
-                {/if}
-            {:else if claimStore.step === 2}
-                <Step2Proof />
-            {:else if claimStore.step === 3}
-                <Step3Review />
-            {/if}
-        </WizardLayout>
     </div>
+
+    <!-- Wizard Content -->
+    <WizardLayout>
+        {#if claimStore.step === 1}
+            {#if contractAddress}
+                <Step1Upload {contractAddress} />
+            {/if}
+        {:else if claimStore.step === 2}
+            <Step2Proof />
+        {:else if claimStore.step === 3}
+            <Step3Review />
+        {/if}
+    </WizardLayout>
 </div>

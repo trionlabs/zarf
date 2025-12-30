@@ -3,15 +3,15 @@
     import { authStore } from "$lib/stores/authStore.svelte";
     import { readVestingContract } from "$lib/contracts/contracts";
     import { validateClaimData } from "$lib/utils/inputValidator";
+    import { UploadCloud, FileJson, AlertCircle } from "lucide-svelte";
     import type { Address } from "viem";
 
     let { contractAddress } = $props<{ contractAddress: string }>();
 
     let isDragging = $state(false);
     let error = $state<string | null>(null);
-    let dragCounter = 0; // To handle child events
+    let dragCounter = 0;
 
-    // Helper to read file
     async function handleFile(file: File) {
         error = null;
         try {
@@ -44,16 +44,14 @@
             }
 
             // 3. Chain Validation (Root Match)
-            // Fetch contract data to verify the root matches
             const contractData = await readVestingContract(
                 contractAddress as Address,
             );
             const chainRoot = contractData.merkleRoot;
 
-            // Normalize for comparison
             if (data.merkleRoot.toLowerCase() !== chainRoot.toLowerCase()) {
                 throw new Error(
-                    `Integrity Check Failed. File root (${data.merkleRoot.slice(0, 6)}...) does not match Contract root (${chainRoot.slice(0, 6)}...). This file is not for this distribution.`,
+                    `File mismatch. The uploaded file is for a different distribution.`,
                 );
             }
 
@@ -97,16 +95,23 @@
     }
 </script>
 
-<div class="card bg-base-100 shadow-xl max-w-2xl mx-auto mt-8">
-    <div class="card-body">
-        <h2 class="card-title justify-center mb-6">Upload Credentials</h2>
+<div
+    class="card bg-base-100 border border-base-content/10 shadow-sm transition-all duration-200"
+>
+    <div class="card-body p-8 space-y-6">
+        <div>
+            <h2 class="card-title text-lg font-bold">Upload Credentials</h2>
+            <p class="text-sm text-base-content/60">
+                Please upload the <code>claim-data.json</code> file provided to you.
+            </p>
+        </div>
 
         <!-- Drag Drop Zone -->
         <div
-            class="border-4 border-dashed rounded-xl p-12 text-center transition-colors duration-200 cursor-pointer relative"
-            class:border-primary={isDragging}
-            class:bg-base-200={isDragging}
-            class:border-base-300={!isDragging}
+            class="group relative border-2 border-dashed rounded-3xl p-12 text-center transition-all duration-300 cursor-pointer overflow-hidden
+            {isDragging
+                ? 'border-primary bg-primary/5 scale-[1.01]'
+                : 'border-base-content/10 hover:border-primary/40 hover:bg-base-200/40'}"
             role="button"
             tabindex="0"
             ondrop={onDrop}
@@ -128,54 +133,45 @@
                     handleFile(e.currentTarget.files[0])}
             />
 
-            {#if isDragging}
-                <p
-                    class="text-primary font-bold text-xl scale-110 transform transition-transform"
+            <div
+                class="flex flex-col items-center gap-5 transition-transform duration-300 relative z-10 {isDragging
+                    ? 'scale-105'
+                    : ''}"
+            >
+                <div
+                    class="w-20 h-20 rounded-3xl bg-base-100 border border-base-content/10 flex items-center justify-center shadow-sm group-hover:scale-110 group-hover:shadow-md transition-all duration-500 ease-out"
                 >
-                    Drop it here!
-                </p>
-            {:else}
-                <div class="flex flex-col items-center gap-4">
-                    <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke-width="1.5"
-                        stroke="currentColor"
-                        class="w-16 h-16 text-base-content/40"
-                    >
-                        <path
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"
+                    {#if isDragging}
+                        <UploadCloud
+                            class="w-8 h-8 text-primary animate-bounce"
                         />
-                    </svg>
-                    <div>
-                        <p class="text-lg font-medium">
-                            Drag & Drop your claim file
-                        </p>
-                        <p class="text-sm opacity-60">
-                            or click to browse (claim-data.json)
-                        </p>
-                    </div>
+                    {:else}
+                        <FileJson
+                            class="w-8 h-8 text-base-content/40 group-hover:text-primary transition-colors"
+                        />
+                    {/if}
                 </div>
-            {/if}
+
+                <div class="space-y-1">
+                    <p
+                        class="text-xl font-bold tracking-tight text-base-content/90 group-hover:text-primary transition-colors"
+                    >
+                        {isDragging ? "Drop to upload" : "Click to upload"}
+                    </p>
+                    <p
+                        class="text-sm text-base-content/50 font-mono opacity-70"
+                    >
+                        claim-data.json
+                    </p>
+                </div>
+            </div>
         </div>
 
         {#if error}
-            <div class="alert alert-error mt-4 shadow-lg">
-                <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    class="stroke-current shrink-0 h-6 w-6"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    ><path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        stroke-width="2"
-                        d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"
-                    /></svg
-                >
+            <div
+                class="alert alert-error text-xs shadow-sm border border-error/20 bg-error/10"
+            >
+                <AlertCircle class="w-4 h-4" />
                 <span>{error}</span>
             </div>
         {/if}

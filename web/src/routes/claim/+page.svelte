@@ -8,6 +8,10 @@
     } from "$lib/auth/googleAuth";
     import DistributionCard from "$lib/components/claim/DistributionCard.svelte";
     import ImportContractInput from "$lib/components/claim/ImportContractInput.svelte";
+    import PageHeader from "$lib/components/ui/PageHeader.svelte";
+
+    import { page } from "$app/state";
+    import { goto } from "$app/navigation";
 
     let isAuthenticating = $state(false);
 
@@ -38,28 +42,30 @@
     });
 
     // 2. State for import flow
-    let importedAddress = $state<string | null>(null);
+    // derived from URL to survive redirects/reloads
+    let importedAddress = $derived(page.url.searchParams.get("address"));
 
     function handleImport(address: string) {
-        importedAddress = address;
+        const url = new URL(window.location.href);
+        url.searchParams.set("address", address);
+        goto(url.toString(), { replaceState: true });
     }
 </script>
 
 <div
-    class="min-h-screen bg-base-200 flex flex-col items-center justify-center p-4"
+    class="h-full flex flex-col relative max-w-5xl w-full px-4 md:px-0 transition-all duration-300"
 >
-    <div class="max-w-md w-full space-y-8">
-        <!-- Logo / Header -->
-        <div class="text-center">
-            <h1 class="text-4xl font-bold tracking-tight">Zarf Claim</h1>
-            <p class="mt-2 text-base-content/60">
-                Private vesting claims via ZK Proofs.
-            </p>
-        </div>
+    <PageHeader
+        title="Claim Portal"
+        description="Connect your wallet and import a distribution contract to check your eligibility."
+    />
 
+    <div class="flex-1 space-y-8 animate-in fade-in zoom-in duration-300">
         {#if !importedAddress}
             <!-- 1. Import Step -->
-            <ImportContractInput onImport={handleImport} />
+            <section class="max-w-2xl">
+                <ImportContractInput onImport={handleImport} />
+            </section>
         {:else}
             <!-- 2. Gate Step (Blurred until Auth) -->
             <DistributionCard

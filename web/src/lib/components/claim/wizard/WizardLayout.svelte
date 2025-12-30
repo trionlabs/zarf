@@ -40,12 +40,6 @@
     </div>
 {/if}
 
-<div class="steps steps-horizontal w-full mb-8">
-    <div class="step" class:step-primary={step >= 1}>Upload</div>
-    <div class="step" class:step-primary={step >= 2}>Proof</div>
-    <div class="step" class:step-primary={step >= 3}>Review</div>
-</div>
-
 <div class="mt-4">
     {@render children()}
 </div>

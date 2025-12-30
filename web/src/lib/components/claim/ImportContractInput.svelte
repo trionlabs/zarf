@@ -1,11 +1,13 @@
 <script lang="ts">
     import { readVestingContract } from "$lib/contracts/contracts";
+    import { ArrowRight } from "lucide-svelte";
+    import AddressInput from "$lib/components/ui/AddressInput.svelte";
     import type { Address } from "viem";
 
     let { onImport } = $props<{ onImport: (addr: string) => void }>();
 
     let address = $state("");
-    let error = $state("");
+    let error = $state<string | null>(null);
     let isLoading = $state(false);
 
     async function handleSubmit() {
@@ -15,54 +17,40 @@
         }
 
         isLoading = true;
-        error = "";
+        error = null;
 
         try {
-            // Validate it's a real Zarf contract
             await readVestingContract(address as Address);
             onImport(address);
         } catch (e) {
-            error =
-                "Could not find a valid Zarf Vesting contract at this address.";
+            error = "Could not find a valid Zarf Vesting contract";
         } finally {
             isLoading = false;
         }
     }
 </script>
 
-<div class="card bg-base-100 shadow-xl">
-    <div class="card-body">
-        <h2 class="card-title justify-center mb-4">Import Distribution</h2>
+<div class="space-y-2">
+    <label class="label pl-1" for="contract-input">
+        <span class="label-text font-medium text-base-content/80"
+            >Contract Information</span
+        >
+    </label>
 
-        <div class="form-control w-full">
-            <label class="label">
-                <span class="label-text">Vesting Contract Address</span>
-            </label>
-            <div class="join">
-                <input
-                    type="text"
-                    placeholder="0x..."
-                    class="input input-bordered join-item w-full font-mono"
-                    bind:value={address}
-                    class:input-error={!!error}
-                />
-                <button
-                    class="btn btn-primary join-item"
-                    onclick={handleSubmit}
-                    disabled={isLoading}
-                >
-                    {#if isLoading}
-                        <span class="loading loading-spinner loading-sm"></span>
-                    {:else}
-                        Import
-                    {/if}
-                </button>
-            </div>
-            {#if error}
-                <label class="label">
-                    <span class="label-text-alt text-error">{error}</span>
-                </label>
-            {/if}
+    <AddressInput
+        bind:value={address}
+        placeholder="0x..."
+        {error}
+        {isLoading}
+        onAction={handleSubmit}
+        actionIcon={ArrowRight}
+    />
+
+    {#if !error}
+        <div class="label pb-0 pl-1">
+            <span class="label-text-alt text-base-content/40 font-light">
+                Paste the distribution contract address to verify eligibility.
+            </span>
         </div>
-    </div>
+    {/if}
 </div>
