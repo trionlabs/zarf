@@ -29,6 +29,17 @@ export type ProofRequest = {
     };
 };
 
+interface NoirJwtResult {
+    base64_decode_offset: number;
+    redc_params_limbs: string[];
+    signature_limbs: string[];
+    pubkey_modulus_limbs: string[];
+    data: {
+        storage: number[];
+        len: number;
+    };
+}
+
 // ============ State ============
 let initialized = false;
 let cachedCircuit: any = null;
@@ -65,6 +76,22 @@ function padMerkleProof(siblings: string[], indices: string[]) {
     };
 }
 
+/**
+ * Fetch circuit with retry logic
+ */
+async function fetchCircuit(url: string, retries = 3): Promise<any> {
+    for (let i = 0; i < retries; i++) {
+        try {
+            const response = await fetch(url);
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            return await response.json();
+        } catch (e) {
+            if (i === retries - 1) throw e;
+            await new Promise((r) => setTimeout(r, 1000 * (i + 1)));
+        }
+    }
+}
+
 // ============ Logic ============
 
 async function initialize() {
@@ -78,9 +105,8 @@ async function initialize() {
         initAbi(new URL('/wasm/noirc_abi_wasm_bg.wasm', baseUrl)),
     ]);
 
-    // 2. Load Circuit
-    const response = await fetch('/circuits/zarf.json');
-    cachedCircuit = await response.json();
+    // 2. Load Circuit with Retry
+    cachedCircuit = await fetchCircuit('/circuits/zarf.json');
 
     // 3. Init Prover
     cachedNoir = new Noir(cachedCircuit);
@@ -103,11 +129,11 @@ async function generateProof(payload: ProofRequest['payload']) {
     postMessage({ type: 'PROGRESS', message: 'Generating Inputs from JWT...' });
 
     // 1. Generate JWT specific inputs (limbs, etc)
-    const jwtInputs = await generateInputs({
+    const jwtInputs = (await generateInputs({
         jwt,
         pubkey: publicKey,
         maxSignedDataLength: 1024,
-    });
+    })) as unknown as NoirJwtResult;
 
     // 2. Pad Email to 64 bytes
     const emailBytes = Array.from(new TextEncoder().encode(email));
@@ -122,8 +148,8 @@ async function generateProof(payload: ProofRequest['payload']) {
     const inputs = {
         // JWT data
         data: {
-            storage: (jwtInputs as any).data.storage,
-            len: (jwtInputs as any).data.len,
+            storage: jwtInputs.data.storage,
+            len: jwtInputs.data.len,
         },
         base64_decode_offset: jwtInputs.base64_decode_offset,
         redc_params_limbs: jwtInputs.redc_params_limbs,
@@ -147,7 +173,7 @@ async function generateProof(payload: ProofRequest['payload']) {
     const { witness } = await cachedNoir.execute(inputs);
 
     postMessage({ type: 'PROGRESS', message: 'Proving (might take 30-60s)...' });
-    // @ts-ignore - UltraHonkBackend types might differ slightly in web, assume generateProof exists
+    
     const proof = await cachedBackend.generateProof(witness, { keccak: true });
 
     // 5. Format Output
