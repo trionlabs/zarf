@@ -17,6 +17,10 @@
     import type { Distribution } from "$lib/stores/types";
     import DistributionCard from "$lib/components/wizard/DistributionCard.svelte";
     import DistributionDetailPanel from "$lib/components/wizard/DistributionDetailPanel.svelte";
+    import OnChainCard from "$lib/components/distributions/OnChainCard.svelte";
+    import OnChainDetailPanel from "$lib/components/distributions/OnChainDetailPanel.svelte";
+    import DistributionEmptyState from "$lib/components/distributions/DistributionEmptyState.svelte";
+    import PageHeader from "$lib/components/ui/PageHeader.svelte";
     import { getWalletAccount } from "$lib/contracts/wallet";
     import {
         discoverOwnerVestings,
@@ -33,6 +37,20 @@
     let onChainContracts = $state<OnChainVestingContract[]>([]);
     let onChainTotal = $state(0);
     let lastFetchedAt = $state<number | null>(null);
+
+    // Derived Logic for Refresh Button (Clean Markup)
+    let refreshIconClass = $derived(onChainLoading ? "animate-spin" : "");
+
+    // Derived date formatting
+    let refreshLabel = $derived.by(() => {
+        if (!lastFetchedAt) return "Refresh";
+        const seconds = Math.floor((Date.now() - lastFetchedAt) / 1000);
+        if (seconds < 60) return "just now";
+        const minutes = Math.floor(seconds / 60);
+        if (minutes < 60) return `${minutes}m ago`;
+        const hours = Math.floor(minutes / 60);
+        return `${hours}h ago`;
+    });
 
     onMount(() => {
         wizardStore.restore();
@@ -89,6 +107,27 @@
         wizardStore.distributions.filter((d) => d.state === "cancelled"),
     );
 
+    // Derived counts for UI (Clean Markup)
+    const vaultCount = $derived(onChainContracts.length);
+    const draftsCount = $derived(draftDistributions.length);
+    const cancelledCount = $derived(cancelledDistributions.length);
+    // Use derived total for clean templates
+    const totalCount = $derived(vaultCount + draftsCount);
+    // Explicit derived boolean for snippet logic
+    const hasDrafts = $derived(draftDistributions.length > 0);
+
+    // Tab visibility logic
+    const isVaultTab = $derived(activeTab === "vault");
+    const isDraftsTab = $derived(activeTab === "drafts");
+    const isCancelledTab = $derived(activeTab === "cancelled");
+
+    // Empty state logic
+    const showVaultEmpty = $derived(
+        isVaultTab && !onChainLoading && !onChainError && vaultCount === 0,
+    );
+    const showDraftsEmpty = $derived(isDraftsTab && draftsCount === 0);
+    const showCancelledEmpty = $derived(isCancelledTab && cancelledCount === 0);
+
     // Tab configs - Now with Vault (on-chain) as primary
     const tabs = [
         {
@@ -132,21 +171,6 @@
         selectedOnChain = null;
     }
 
-    // Derived values for clean markup (FE_DEV.md: Derived-First Rule)
-    const vaultCount = $derived(onChainContracts.length);
-    const draftsCount = $derived(draftDistributions.length);
-    const cancelledCount = $derived(cancelledDistributions.length);
-    const totalCount = $derived(vaultCount + draftsCount);
-    const refreshIconClass = $derived(onChainLoading ? "animate-spin" : "");
-    const refreshLabel = $derived(
-        lastFetchedAt ? formatTimeAgo(lastFetchedAt) : "Refresh",
-    );
-    const isVaultTab = $derived(activeTab === "vault");
-    const isDraftsTab = $derived(activeTab === "drafts");
-    const isCancelledTab = $derived(activeTab === "cancelled");
-    const hasOnChainContracts = $derived(onChainContracts.length > 0);
-    const hasDrafts = $derived(draftDistributions.length > 0);
-
     function getTabCount(tabId: TabType): number {
         switch (tabId) {
             case "vault":
@@ -156,21 +180,6 @@
             case "cancelled":
                 return cancelledCount;
         }
-    }
-
-    function formatTokenBalance(balance: bigint, decimals: number): string {
-        const divisor = BigInt(10 ** decimals);
-        const integerPart = balance / divisor;
-        return integerPart.toLocaleString();
-    }
-
-    function formatTimeAgo(timestamp: number): string {
-        const seconds = Math.floor((Date.now() - timestamp) / 1000);
-        if (seconds < 60) return "just now";
-        const minutes = Math.floor(seconds / 60);
-        if (minutes < 60) return `${minutes}m ago`;
-        const hours = Math.floor(minutes / 60);
-        return `${hours}h ago`;
     }
 </script>
 
@@ -185,114 +194,103 @@
 
         <!-- Main Content -->
         <div class="drawer-content">
-            <div class="max-w-6xl mx-auto px-6 py-8">
-                <!-- Header -->
-                <header class="mb-8">
-                    <div class="flex items-center justify-between mb-6">
-                        <div>
-                            <h1 class="text-2xl font-bold tracking-tight">
-                                Distributions
-                            </h1>
-                            <p class="text-sm text-base-content/50 mt-1">
-                                Manage all your token distributions in one place
-                            </p>
-                        </div>
-                        <button
-                            class="btn btn-primary gap-2"
-                            onclick={() => goto("/wizard/step-0")}
-                        >
-                            <Plus class="w-4 h-4" />
-                            New Distribution
-                        </button>
-                    </div>
+            <div class="max-w-6xl mx-auto">
+                <!-- Header Component -->
+                <div class="flex items-center justify-between">
+                    <PageHeader
+                        title="Distributions"
+                        description="Manage all your token distributions in one place"
+                    />
 
-                    <!-- Quick Stats -->
-                    <div class="grid grid-cols-3 gap-4 mb-8">
-                        <div
-                            class="stat bg-base-100 rounded-xl border border-base-content/5 p-4"
-                        >
-                            <div
-                                class="stat-title text-xs flex items-center gap-1"
-                            >
-                                <Cloud class="w-3 h-3" />
-                                On-Chain (Vault)
-                            </div>
-                            <div class="stat-value text-2xl text-success">
-                                {onChainContracts.length}
-                            </div>
-                        </div>
-                        <div
-                            class="stat bg-base-100 rounded-xl border border-base-content/5 p-4"
-                        >
-                            <div class="stat-title text-xs">Drafts</div>
-                            <div class="stat-value text-2xl text-warning">
-                                {draftDistributions.length}
-                            </div>
-                        </div>
-                        <div
-                            class="stat bg-base-100 rounded-xl border border-base-content/5 p-4"
-                        >
-                            <div class="stat-title text-xs">Total</div>
-                            <div class="stat-value text-2xl">
-                                {onChainContracts.length +
-                                    draftDistributions.length}
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Tabs -->
-                    <div
-                        class="flex gap-2 border-b border-base-content/10 pb-px"
+                    <button
+                        class="btn btn-primary gap-2"
+                        onclick={() => goto("/wizard/step-0")}
                     >
-                        {#each tabs as tab}
-                            {@const isActive = activeTab === tab.id}
-                            {@const count = getTabCount(tab.id)}
-                            {@const Icon = tab.icon}
-                            <button
-                                class="flex items-center gap-2 px-4 py-3 text-sm font-medium transition-all border-b-2 -mb-px
-                            {isActive
-                                    ? `${tab.color} border-current`
-                                    : 'text-base-content/50 border-transparent hover:text-base-content'}"
-                                onclick={() => (activeTab = tab.id)}
-                            >
-                                <Icon class="w-4 h-4" />
-                                {tab.label}
-                                <span
-                                    class="badge badge-sm {isActive
-                                        ? tab.bgColor + ' ' + tab.color
-                                        : 'bg-base-content/10'}"
-                                >
-                                    {count}
-                                </span>
-                            </button>
-                        {/each}
+                        <Plus class="w-4 h-4" />
+                        New Distribution
+                    </button>
+                </div>
 
-                        <!-- Refresh button for Vault tab -->
-                        {#if activeTab === "vault"}
-                            <button
-                                class="ml-auto flex items-center gap-2 px-3 py-2 text-xs text-base-content/50 hover:text-base-content transition-colors"
-                                onclick={() => fetchOnChainContracts(true)}
-                                disabled={onChainLoading}
-                            >
-                                <RefreshCw
-                                    class="w-3 h-3 {onChainLoading
-                                        ? 'animate-spin'
-                                        : ''}"
-                                />
-                                {lastFetchedAt
-                                    ? formatTimeAgo(lastFetchedAt)
-                                    : "Refresh"}
-                            </button>
-                        {/if}
+                <!-- Quick Stats -->
+                <div class="grid grid-cols-3 gap-4 mb-10">
+                    <div
+                        class="stat bg-base-100 rounded-xl border border-base-content/5 p-4"
+                    >
+                        <div class="stat-title text-xs flex items-center gap-1">
+                            <Cloud class="w-3 h-3" />
+                            On-Chain (Vault)
+                        </div>
+                        <div class="stat-value text-2xl text-success">
+                            {vaultCount}
+                        </div>
                     </div>
-                </header>
+                    <div
+                        class="stat bg-base-100 rounded-xl border border-base-content/5 p-4"
+                    >
+                        <div class="stat-title text-xs">Drafts</div>
+                        <div class="stat-value text-2xl text-warning">
+                            {draftsCount}
+                        </div>
+                    </div>
+                    <div
+                        class="stat bg-base-100 rounded-xl border border-base-content/5 p-4"
+                    >
+                        <div class="stat-title text-xs">Total</div>
+                        <div class="stat-value text-2xl">
+                            {totalCount}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tabs -->
+                <div
+                    class="flex gap-2 border-b border-base-content/10 pb-px mb-6"
+                >
+                    {#each tabs as tab}
+                        {@const isActive = activeTab === tab.id}
+                        {@const count = getTabCount(tab.id)}
+                        {@const Icon = tab.icon}
+
+                        <!-- Dynamic class logic via conditional rendering or derived is preferred over complex template literals, 
+                             but here keeping it simple as it's readable and local to the loop -->
+                        <button
+                            class="flex items-center gap-2 px-4 py-3 text-sm font-medium transition-all border-b-2 -mb-px
+                            {isActive
+                                ? `${tab.color} border-current`
+                                : 'text-base-content/50 border-transparent hover:text-base-content'}"
+                            onclick={() => (activeTab = tab.id)}
+                        >
+                            <Icon class="w-4 h-4" />
+                            {tab.label}
+                            <span
+                                class="badge badge-sm {isActive
+                                    ? tab.bgColor + ' ' + tab.color
+                                    : 'bg-base-content/10'}"
+                            >
+                                {count}
+                            </span>
+                        </button>
+                    {/each}
+
+                    <!-- Refresh button for Vault tab -->
+                    {#if isVaultTab}
+                        <button
+                            class="ml-auto flex items-center gap-2 px-3 py-2 text-xs text-base-content/50 hover:text-base-content transition-colors"
+                            onclick={() => fetchOnChainContracts(true)}
+                            disabled={onChainLoading}
+                        >
+                            <RefreshCw class="w-3 h-3 {refreshIconClass}" />
+                            {refreshLabel}
+                        </button>
+                    {/if}
+                </div>
 
                 <!-- Content -->
                 <div in:fade={{ duration: 150 }}>
                     <!-- VAULT TAB: On-Chain Contracts -->
-                    {#if activeTab === "vault"}
+                    {#if isVaultTab}
                         {#if onChainLoading}
-                            <!-- Loading State -->
+                            <!-- Loading State (Inline temporarily, or could be extracted to separate Spinner component) -->
                             <div
                                 class="grid md:grid-cols-2 xl:grid-cols-2 gap-4"
                             >
@@ -315,71 +313,56 @@
                                 {/each}
                             </div>
                         {:else if onChainError}
-                            <!-- Error State -->
-                            <div
-                                class="flex flex-col items-center justify-center py-16 text-center"
+                            <!-- Error State via EmptyState Component -->
+                            <DistributionEmptyState
+                                icon={AlertCircle}
+                                title="Failed to load contracts"
+                                description={onChainError}
+                                color="bg-error/10"
+                                iconColor="text-error/50"
                             >
-                                <div
-                                    class="w-16 h-16 rounded-full bg-error/10 flex items-center justify-center mb-4"
-                                >
-                                    <AlertCircle
-                                        class="w-8 h-8 text-error/50"
-                                    />
-                                </div>
-                                <h3 class="font-medium text-lg mb-2">
-                                    Failed to load contracts
-                                </h3>
-                                <p
-                                    class="text-sm text-base-content/50 max-w-sm mb-6"
-                                >
-                                    {onChainError}
-                                </p>
-                                <button
-                                    class="btn btn-primary gap-2"
-                                    onclick={() => fetchOnChainContracts(true)}
-                                >
-                                    <RefreshCw class="w-4 h-4" />
-                                    Try Again
-                                </button>
-                            </div>
-                        {:else if onChainContracts.length === 0}
-                            <!-- Empty State -->
-                            <div
-                                class="flex flex-col items-center justify-center py-16 text-center"
-                            >
-                                <div
-                                    class="w-16 h-16 rounded-full bg-success/10 flex items-center justify-center mb-4"
-                                >
-                                    <Cloud class="w-8 h-8 text-success/50" />
-                                </div>
-                                <h3 class="font-medium text-lg mb-2">
-                                    No on-chain distributions
-                                </h3>
-                                <p
-                                    class="text-sm text-base-content/50 max-w-sm mb-6"
-                                >
-                                    Deploy your first distribution to see it
-                                    here. Your active contracts are fetched
-                                    directly from the blockchain.
-                                </p>
-                                {#if draftDistributions.length > 0}
+                                {#snippet action()}
                                     <button
                                         class="btn btn-primary gap-2"
-                                        onclick={() => (activeTab = "drafts")}
+                                        onclick={() =>
+                                            fetchOnChainContracts(true)}
                                     >
-                                        View Drafts
-                                        <ArrowRight class="w-4 h-4" />
+                                        <RefreshCw class="w-4 h-4" />
+                                        Try Again
                                     </button>
-                                {:else}
-                                    <button
-                                        class="btn btn-primary gap-2"
-                                        onclick={() => goto("/wizard/step-0")}
-                                    >
-                                        <Plus class="w-4 h-4" />
-                                        Create Distribution
-                                    </button>
-                                {/if}
-                            </div>
+                                {/snippet}
+                            </DistributionEmptyState>
+                        {:else if showVaultEmpty}
+                            <!-- Empty State via Component -->
+                            <DistributionEmptyState
+                                icon={Cloud}
+                                title="No on-chain distributions"
+                                description="Deploy your first distribution to see it here. Your active contracts are fetched directly from the blockchain."
+                                color="bg-success/10"
+                                iconColor="text-success/50"
+                            >
+                                {#snippet action()}
+                                    {#if hasDrafts}
+                                        <button
+                                            class="btn btn-primary gap-2"
+                                            onclick={() =>
+                                                (activeTab = "drafts")}
+                                        >
+                                            View Drafts
+                                            <ArrowRight class="w-4 h-4" />
+                                        </button>
+                                    {:else}
+                                        <button
+                                            class="btn btn-primary gap-2"
+                                            onclick={() =>
+                                                goto("/wizard/step-0")}
+                                        >
+                                            <Plus class="w-4 h-4" />
+                                            Create Distribution
+                                        </button>
+                                    {/if}
+                                {/snippet}
+                            </DistributionEmptyState>
                         {:else}
                             <!-- On-Chain Contract Cards -->
                             <div
@@ -387,104 +370,35 @@
                             >
                                 {#each onChainContracts as contract (contract.address)}
                                     <div in:fade={{ duration: 150 }}>
-                                        <button
-                                            class="card bg-base-100 border border-base-content/5 hover:border-success/30 hover:shadow-lg transition-all w-full text-left cursor-pointer"
-                                            onclick={() =>
-                                                selectOnChainContract(contract)}
-                                        >
-                                            <div class="card-body p-5">
-                                                <div
-                                                    class="flex items-start justify-between"
-                                                >
-                                                    <div>
-                                                        <div
-                                                            class="flex items-center gap-2 mb-1"
-                                                        >
-                                                            <span
-                                                                class="badge badge-success badge-xs"
-                                                                >On-Chain</span
-                                                            >
-                                                        </div>
-                                                        <h3
-                                                            class="font-semibold text-lg"
-                                                        >
-                                                            {contract.name ||
-                                                                "Unnamed"}
-                                                        </h3>
-                                                        <p
-                                                            class="text-sm text-base-content/50 line-clamp-1"
-                                                        >
-                                                            {contract.description ||
-                                                                "No description"}
-                                                        </p>
-                                                    </div>
-                                                    <div class="text-right">
-                                                        <div
-                                                            class="text-lg font-bold"
-                                                        >
-                                                            {formatTokenBalance(
-                                                                contract.tokenBalance,
-                                                                contract.tokenDecimals,
-                                                            )}
-                                                        </div>
-                                                        <div
-                                                            class="text-xs text-base-content/50"
-                                                        >
-                                                            {contract.tokenSymbol}
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                <div class="divider my-2"></div>
-                                                <div
-                                                    class="flex items-center justify-between text-xs text-base-content/50"
-                                                >
-                                                    <span class="font-mono"
-                                                        >{contract.address.slice(
-                                                            0,
-                                                            8,
-                                                        )}...{contract.address.slice(
-                                                            -6,
-                                                        )}</span
-                                                    >
-                                                    <Rocket
-                                                        class="w-4 h-4 text-success"
-                                                    />
-                                                </div>
-                                            </div>
-                                        </button>
+                                        <OnChainCard
+                                            {contract}
+                                            onSelect={selectOnChainContract}
+                                        />
                                     </div>
                                 {/each}
                             </div>
                         {/if}
 
                         <!-- DRAFTS TAB -->
-                    {:else if activeTab === "drafts"}
-                        {#if draftDistributions.length === 0}
-                            <div
-                                class="flex flex-col items-center justify-center py-16 text-center"
+                    {:else if isDraftsTab}
+                        {#if showDraftsEmpty}
+                            <DistributionEmptyState
+                                icon={FileText}
+                                title="No drafts yet"
+                                description="Create a new distribution to get started with token vesting."
+                                color="bg-warning/10"
+                                iconColor="text-warning/50"
                             >
-                                <div
-                                    class="w-16 h-16 rounded-full bg-warning/10 flex items-center justify-center mb-4"
-                                >
-                                    <FileText class="w-8 h-8 text-warning/50" />
-                                </div>
-                                <h3 class="font-medium text-lg mb-2">
-                                    No drafts yet
-                                </h3>
-                                <p
-                                    class="text-sm text-base-content/50 max-w-sm mb-6"
-                                >
-                                    Create a new distribution to get started
-                                    with token vesting.
-                                </p>
-                                <button
-                                    class="btn btn-primary gap-2"
-                                    onclick={() => goto("/wizard/step-0")}
-                                >
-                                    <Plus class="w-4 h-4" />
-                                    Create Distribution
-                                </button>
-                            </div>
+                                {#snippet action()}
+                                    <button
+                                        class="btn btn-primary gap-2"
+                                        onclick={() => goto("/wizard/step-0")}
+                                    >
+                                        <Plus class="w-4 h-4" />
+                                        Create Distribution
+                                    </button>
+                                {/snippet}
+                            </DistributionEmptyState>
                         {:else}
                             <div
                                 class="grid md:grid-cols-2 xl:grid-cols-2 gap-4"
@@ -501,26 +415,15 @@
                         {/if}
 
                         <!-- CANCELLED TAB -->
-                    {:else if activeTab === "cancelled"}
-                        {#if cancelledDistributions.length === 0}
-                            <div
-                                class="flex flex-col items-center justify-center py-16 text-center"
-                            >
-                                <div
-                                    class="w-16 h-16 rounded-full bg-base-content/5 flex items-center justify-center mb-4"
-                                >
-                                    <Ban class="w-8 h-8 text-base-content/20" />
-                                </div>
-                                <h3 class="font-medium text-lg mb-2">
-                                    No cancelled distributions
-                                </h3>
-                                <p
-                                    class="text-sm text-base-content/50 max-w-sm"
-                                >
-                                    That's a good thing! All your distributions
-                                    are running smoothly.
-                                </p>
-                            </div>
+                    {:else if isCancelledTab}
+                        {#if showCancelledEmpty}
+                            <DistributionEmptyState
+                                icon={Ban}
+                                title="No cancelled distributions"
+                                description="That's a good thing! All your distributions are running smoothly."
+                                color="bg-base-content/5"
+                                iconColor="text-base-content/20"
+                            />
                         {:else}
                             <div
                                 class="grid md:grid-cols-2 xl:grid-cols-2 gap-4"
@@ -556,80 +459,10 @@
                         onClose={closeDrawer}
                     />
                 {:else if selectedOnChain}
-                    <!-- On-Chain Contract Detail -->
-                    <div class="p-5">
-                        <div class="flex items-center justify-between mb-6">
-                            <span class="badge badge-success">On-Chain</span>
-                            <button
-                                class="btn btn-ghost btn-sm"
-                                onclick={closeDrawer}>✕</button
-                            >
-                        </div>
-                        <h2 class="text-xl font-bold mb-2">
-                            {selectedOnChain.name || "Unnamed"}
-                        </h2>
-                        <p class="text-sm text-base-content/50 mb-6">
-                            {selectedOnChain.description || "No description"}
-                        </p>
-
-                        <div class="space-y-4">
-                            <div class="bg-base-200/50 rounded-lg p-4">
-                                <div class="text-xs text-base-content/50 mb-1">
-                                    Contract Address
-                                </div>
-                                <div class="font-mono text-sm break-all">
-                                    {selectedOnChain.address}
-                                </div>
-                            </div>
-
-                            <div class="bg-base-200/50 rounded-lg p-4">
-                                <div class="text-xs text-base-content/50 mb-1">
-                                    Token Balance
-                                </div>
-                                <div class="text-2xl font-bold">
-                                    {formatTokenBalance(
-                                        selectedOnChain.tokenBalance,
-                                        selectedOnChain.tokenDecimals,
-                                    )}
-                                    <span
-                                        class="text-sm font-normal text-base-content/50"
-                                        >{selectedOnChain.tokenSymbol}</span
-                                    >
-                                </div>
-                            </div>
-
-                            <div class="grid grid-cols-2 gap-3">
-                                <div class="bg-base-200/50 rounded-lg p-3">
-                                    <div class="text-xs text-base-content/50">
-                                        Cliff
-                                    </div>
-                                    <div class="font-medium">
-                                        {Number(selectedOnChain.cliffDuration) /
-                                            86400}d
-                                    </div>
-                                </div>
-                                <div class="bg-base-200/50 rounded-lg p-3">
-                                    <div class="text-xs text-base-content/50">
-                                        Duration
-                                    </div>
-                                    <div class="font-medium">
-                                        {Number(
-                                            selectedOnChain.vestingDuration,
-                                        ) / 86400}d
-                                    </div>
-                                </div>
-                            </div>
-
-                            <a
-                                href="https://sepolia.etherscan.io/address/{selectedOnChain.address}"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                class="btn btn-outline btn-block mt-4"
-                            >
-                                View on Etherscan
-                            </a>
-                        </div>
-                    </div>
+                    <OnChainDetailPanel
+                        contract={selectedOnChain}
+                        onClose={closeDrawer}
+                    />
                 {:else}
                     <div
                         class="h-full flex items-center justify-center text-base-content/30 p-8 text-center"
