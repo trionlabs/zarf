@@ -20,10 +20,10 @@
             return {
                 email: claim.email,
                 amount: claim.amount.toString(),
-                salt: claim.salt, // Critical!
+                salt: claim.salt, // Critical! (This is the 8-char Secret Code)
                 leafIndex: claim.leafIndex,
                 leaf: "0x" + claim.leaf.toString(16),
-                emailHash: "0x" + (claim.emailHash?.toString(16) || "0"),
+                identityCommitment: claim.identityCommitment, // Public Identifier
                 merkleProof: {
                     siblings: proof.siblings.map(
                         (sib: bigint) => "0x" + sib.toString(16),

@@ -157,28 +157,60 @@ export async function pedersenHashPair(left: bigint, right: bigint): Promise<big
  * 
  * @example
  * ```typescript
- * const salt = generateSalt();
- * const leaf = await computeLeaf('alice@example.com', 1000, salt);
+ * const code = generateSecureCode();
+ * const leaf = await computeLeaf('alice@example.com', 1000, code);
  * ```
  */
 export async function computeLeaf(
     email: string,
     amount: number,
-    salt: string | bigint
+    code: string
 ): Promise<bigint> {
     const bb = await initBarretenberg();
 
-    // Hash the email bytes
-    const emailBytes = stringToBytes(email.toLowerCase().trim(), MAX_EMAIL_LENGTH);
-    const emailHash = await pedersenHashBytes(emailBytes);
+    // 1. Compute Identity Commitment
+    const identityCommitment = await computeIdentityCommitment(email, code);
 
-    // Combine email_hash, amount, and salt
-    const saltBigInt = typeof salt === 'string' ? BigInt(salt) : salt;
-    const fields = [new Fr(emailHash), new Fr(BigInt(amount)), new Fr(saltBigInt)];
+    // 2. Leaf = Pedersen(IdentityCommitment, Amount)
+    // Note: We use 0 as the 3rd element because Pedersen hash usually takes ~2 inputs for efficiency in trees,
+    // but here we are hashing 2 elements. Barretenberg's pedersenHash takes an array.
+    // In our circuit, the leaf construction might vary.
+    // Based on ADR-012: Leaf = Pedersen(IdentityCommitment, amount)
 
+    const fields = [new Fr(identityCommitment), new Fr(BigInt(amount))];
     const leafHash = await bb.pedersenHash(fields, 0);
 
     return BigInt(leafHash.toString());
+}
+
+/**
+ * Compute Identity Commitment for a user.
+ * 
+ * Formula: Identity = Pedersen(email, Pedersen(code))
+ * 
+ * @param email - User's email
+ * @param code - 8-char secure code
+ * @returns Identity Commitment as bigint
+ */
+export async function computeIdentityCommitment(email: string, code: string): Promise<bigint> {
+    const bb = await initBarretenberg();
+
+    // 1. Hash the email (as bytes)
+    const emailBytes = stringToBytes(email.toLowerCase().trim(), MAX_EMAIL_LENGTH);
+    const emailHash = await pedersenHashBytes(emailBytes);
+
+    // 2. Hash the code (as bytes)
+    // Code is 8 chars. We treat it as bytes.
+    const codeBytes = new TextEncoder().encode(code);
+    // Pad to 31 bytes to fit in a field cleanly or just hash the bytes directly?
+    // Using pedersenHashBytes simply maps each byte to a field.
+    // For 8 chars, that's 8 field elements.
+    const codeHash = await pedersenHashBytes(codeBytes);
+
+    // 3. Identity = Pedersen(emailHash, codeHash)
+    const identity = await bb.pedersenHash([new Fr(emailHash), new Fr(codeHash)], 0);
+
+    return BigInt(identity.toString());
 }
 
 /**
@@ -187,14 +219,40 @@ export async function computeLeaf(
  * @returns Random salt as hex string
  * 
  * @example
- * ```typescript
- * const salt = generateSalt();
- * // "0x1a2b3c4d..."
+ * const code = generateSecureCode();
+ * // "Xk9mP2qL"
  * ```
  */
-export function generateSalt(): string {
-    const randomFr = Fr.random();
-    return randomFr.toString();
+/**
+ * Generate a random salt within BN254 field modulus.
+ * 
+ * @returns Random 8-character alphanumeric code
+ */
+export function generateSecureCode(): string {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789'; // Base58-like (no I, l, O, 0)
+    const length = 8;
+    const randomValues = new Uint8Array(length);
+
+    // Web Crypto API (Browser & Modern Node)
+    if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+        crypto.getRandomValues(randomValues);
+    } else if (typeof window !== 'undefined' && window.crypto) {
+        window.crypto.getRandomValues(randomValues);
+    } else {
+        // Fallback for very old environments or strict contexts without crypto
+        // Using Math.random is NOT cryptographically secure but prevents build errors.
+        // For production keys, strict crypto is required.
+        console.warn('Warning: Using non-secure RNG for salt generation');
+        for (let i = 0; i < length; i++) {
+            randomValues[i] = Math.floor(Math.random() * 256);
+        }
+    }
+
+    let result = '';
+    for (let i = 0; i < length; i++) {
+        result += chars[randomValues[i] % chars.length];
+    }
+    return result;
 }
 
 // ============================================================================
@@ -469,13 +527,21 @@ export async function processWhitelist(
     // Compute leaf for each entry
     for (let i = 0; i < entries.length; i++) {
         const { email, amount } = entries[i];
-        const salt = generateSalt();
+        const salt = generateSecureCode(); // Renamed to salt in Interface for compatibility, but holds CODE
+
+        // Compute Identity Commitment for public identification (Unlinkable)
+        const identityCommitmentBigInt = await computeIdentityCommitment(email, salt);
+        const identityCommitment = '0x' + identityCommitmentBigInt.toString(16);
+
+        // Compute Leaf: H(IdentityCommitment, Amount)
+        // We reuse computeLeaf which does this internally.
         const leaf = await computeLeaf(email, amount, salt);
 
         claims.push({
             email: email.toLowerCase().trim(),
             amount,
-            salt,
+            salt, // Holds the CODE: e.g. "Xk9mP2qL"
+            identityCommitment, // Add the computed commitment
             leafIndex: i,
             leaf,
         });

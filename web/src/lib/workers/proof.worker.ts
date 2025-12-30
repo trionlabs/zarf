@@ -17,7 +17,7 @@ export type ProofRequest = {
         publicKey: any; // JWK
         claimData: {
             email: string;
-            salt: string;
+            salt: string; // Now holds the 8-char Secret Code (e.g. "Xk9mP2qL")
             amount: string; // Hex string '0x...'
             merkleProof: {
                 siblings: string[];
@@ -56,6 +56,16 @@ function toHex(value: string | number | bigint): string {
         return value;
     }
     return '0x' + BigInt(value).toString(16);
+}
+
+/**
+ * Convert ASCII string to Hex string of its bytes
+ * e.g. "ABC" -> "0x414243"
+ */
+function toHexFromBytes(str: string): string {
+    const encoder = new TextEncoder();
+    const bytes = encoder.encode(str);
+    return '0x' + Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
 /**
@@ -159,7 +169,9 @@ async function generateProof(payload: ProofRequest['payload']) {
             len: email.length,
         },
         // Merkle proof data
-        salt: toHex(salt),
+        // NEW (ADR-012): Pass the 8-char code as 'secret' (converted to hex bytes)
+        // Circuit expects field, so we pack the ASCII bytes into a field.
+        secret: toHexFromBytes(salt),
         amount: toHex(amount),
         merkle_siblings: siblings,
         merkle_path_indices: indices,
@@ -173,7 +185,7 @@ async function generateProof(payload: ProofRequest['payload']) {
     const { witness } = await cachedNoir.execute(inputs);
 
     postMessage({ type: 'PROGRESS', message: 'Proving (might take 30-60s)...' });
-    
+
     const proof = await cachedBackend.generateProof(witness, { keccak: true });
 
     // 5. Format Output
@@ -182,15 +194,16 @@ async function generateProof(payload: ProofRequest['payload']) {
         .join('');
 
     // Extract critical public inputs to return for verification/logging
-    // [19] = email_hash (nullifier)
+    // Extract critical public inputs to return for verification/logging
+    // [19] = identity_commitment (formerly email_hash)
     // [20] = recipient
-    const emailHash = proof.publicInputs[19];
+    const identityCommitment = proof.publicInputs[19];
     const proofRecipient = proof.publicInputs[20];
 
     return {
         proof: proofHex,
         publicInputs: proof.publicInputs,
-        emailHash,
+        identityCommitment, // Renamed from emailHash
         merkleRoot: toHex(merkleRoot),
         recipient: proofRecipient
     };

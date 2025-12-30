@@ -109,10 +109,20 @@
         // Get token decimals (default to 18 if not set)
         const tokenDecimals = wizardStore.tokenDetails.tokenDecimals ?? 18;
 
-        // Prepare email hashes and amounts from merkle result
+        // Prepare identity commitments and amounts from merkle result
         // amounts are ALREADY in wei (from DeployStep1), so we just BigInt them
-        const emailHashes: Hash[] = merkleResult.claims.map((c: any) => {
-            const hex = c.emailHash?.toString(16) || "0";
+        const commitments: Hash[] = merkleResult.claims.map((c: any) => {
+            // Use identityCommitment if available, fallback to deprecated emailHash for older cached data
+            const commitment =
+                c.identityCommitment || c.emailHash?.toString(16);
+
+            // Format to 32-byte hex
+            let hex = commitment;
+            if (typeof hex === "string" && hex.startsWith("0x")) {
+                hex = hex.slice(2);
+            }
+            if (!hex) hex = "0";
+
             return `0x${hex.padStart(64, "0")}` as Hash;
         });
 
@@ -134,7 +144,7 @@
             factoryAddress: currentFactoryAddress,
             tokenAddress: wizardStore.tokenDetails.tokenAddress as Address,
             merkleRoot,
-            emailHashes,
+            commitments,
             amounts,
             cliffSeconds: cliffDateToSeconds(
                 distribution.schedule.cliffEndDate,

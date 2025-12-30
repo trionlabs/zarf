@@ -39,7 +39,8 @@ export interface MerkleTreeData {
 export interface MerkleClaim {
     email: string;
     amount: number;
-    salt: string;        // Hex string
+    salt: string;        // Hex string (Holds the 8-char secret code)
+    identityCommitment: string; // Pedersen(email, secret) - Public Identifier
     leaf: bigint;
     leafIndex: number;
 }
@@ -108,7 +109,7 @@ export interface DecodedJWT {
  * Public inputs for ZK proof verification
  */
 export interface ZKPublicInputs {
-    emailHash: string;      // Poseidon hash of email
+    identityCommitment: string;      // Pedersen(email, secret) - Public Identifier
     merkleRoot: string;     // Merkle root (hex)
     recipient: Address;     // Recipient wallet address
     amount: number;         // Claimed amount
@@ -121,7 +122,7 @@ export interface ZKProof {
     proof: string;                    // Hex-encoded proof bytes
     publicInputs: ZKPublicInputs;     // Public inputs object
     // Convenience duplicates (same as publicInputs)
-    emailHash: string;
+    identityCommitment: string;       // REPLACED emailHash
     merkleRoot: string;
     recipient: Address;
     amount: number;

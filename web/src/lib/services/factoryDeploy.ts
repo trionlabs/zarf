@@ -27,9 +27,9 @@ export interface FactoryDeployConfig {
     tokenAddress: Address;
     /** Merkle root for whitelist verification */
     merkleRoot: Hash;
-    /** Array of email hashes (Pedersen hashes) */
-    emailHashes: Hash[];
-    /** Array of allocation amounts (must match emailHashes length) */
+    /** Array of identity commitments (Pedersen hashes) */
+    commitments: Hash[];
+    /** Array of allocation amounts (must match commitments length) */
     amounts: bigint[];
     /** Cliff duration in seconds */
     cliffSeconds: bigint;
@@ -162,7 +162,7 @@ export class FactoryDeployService {
                 args: [{
                     token: this.config.tokenAddress,
                     merkleRoot: this.config.merkleRoot,
-                    emailHashes: this.config.emailHashes,
+                    commitments: this.config.commitments,
                     amounts: this.config.amounts,
                     cliffDuration: this.config.cliffSeconds,
                     vestingDuration: this.config.vestingSeconds,
