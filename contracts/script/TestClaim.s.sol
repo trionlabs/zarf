@@ -21,8 +21,9 @@ contract TestClaimScript is Script {
         console.log("Recipient token balance:", token.balanceOf(RECIPIENT));
         console.log("Vesting token balance:", token.balanceOf(VESTING));
 
-        bytes32 emailHash = 0x0e0831b9d4f5db98fab220b5f9af70836bfee0d501df4980f79952dfb69d2bb2;
-        console.log("Claimable amount:", vesting.getClaimable(emailHash));
+        // ADR-012: This is now an identity commitment, not a raw email hash
+        bytes32 commitment = 0x0e0831b9d4f5db98fab220b5f9af70836bfee0d501df4980f79952dfb69d2bb2;
+        console.log("Claimable amount:", vesting.getClaimable(commitment));
 
         // Load proof and public inputs
         bytes memory proof = _getProof();
@@ -41,7 +42,7 @@ contract TestClaimScript is Script {
         console.log("\n=== After Claim ===");
         console.log("Recipient token balance:", token.balanceOf(RECIPIENT));
         console.log("Vesting token balance:", token.balanceOf(VESTING));
-        console.log("Claimed amount:", vesting.claimed(emailHash));
+        console.log("Claimed amount:", vesting.claimed(commitment));
 
         console.log("\n=== CLAIM SUCCESSFUL! ===");
     }

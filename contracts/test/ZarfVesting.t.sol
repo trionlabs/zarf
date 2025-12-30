@@ -18,8 +18,9 @@ contract ZarfVestingTest is Test {
     address public bob = address(0xB0B);
 
     bytes32 public merkleRoot = bytes32(uint256(0x1234));
-    bytes32 public aliceEmailHash = bytes32(uint256(0xA11CE));
-    bytes32 public bobEmailHash = bytes32(uint256(0xB0B));
+    // ADR-012: These are now identity commitments, not raw email hashes
+    bytes32 public aliceCommitment = bytes32(uint256(0xA11CE));
+    bytes32 public bobCommitment = bytes32(uint256(0xB0B));
 
     // Mock pubkey limbs (18 limbs for RSA-2048)
     bytes32[18] public mockPubkeyLimbs;
@@ -46,13 +47,14 @@ contract ZarfVestingTest is Test {
         // Register mock pubkey in JWK registry
         jwkRegistry.registerKey("mock-kid", mockPubkeyLimbs);
 
-        // Deploy vesting with JWK registry
-        vesting = new ZarfVesting("Test Vesting", "Unit test distribution", address(token), address(verifier), address(jwkRegistry));
+        // Deploy vesting with new 2-arg constructor + initialize pattern
+        vesting = new ZarfVesting(address(verifier), address(jwkRegistry));
+        vesting.initialize(owner, address(token), "Test Vesting", "Unit test distribution");
 
         // Setup vesting
         vesting.setMerkleRoot(merkleRoot);
-        vesting.setAllocation(aliceEmailHash, ALICE_ALLOCATION);
-        vesting.setAllocation(bobEmailHash, BOB_ALLOCATION);
+        vesting.setAllocation(aliceCommitment, ALICE_ALLOCATION);
+        vesting.setAllocation(bobCommitment, BOB_ALLOCATION);
 
         // Deposit tokens
         token.approve(address(vesting), TOTAL_SUPPLY);
@@ -63,7 +65,7 @@ contract ZarfVestingTest is Test {
     }
 
     /// @dev Helper to create public inputs with mock pubkey
-    function _createPublicInputs(bytes32 _merkleRoot, address recipient, bytes32 emailHash)
+    function _createPublicInputs(bytes32 _merkleRoot, address recipient, bytes32 commitment)
         internal
         view
         returns (bytes32[] memory)
@@ -73,9 +75,9 @@ contract ZarfVestingTest is Test {
         for (uint256 i = 0; i < 18; i++) {
             inputs[i] = mockPubkeyLimbs[i];
         }
-        // Last 3: merkleRoot, emailHash, recipient
+        // Last 3: merkleRoot, commitment (ADR-012), recipient
         inputs[18] = _merkleRoot;
-        inputs[19] = emailHash;
+        inputs[19] = commitment;
         inputs[20] = bytes32(uint256(uint160(recipient)));
         return inputs;
     }
@@ -88,8 +90,8 @@ contract ZarfVestingTest is Test {
         assertEq(address(vesting.jwkRegistry()), address(jwkRegistry));
         assertEq(vesting.owner(), owner);
         assertEq(vesting.merkleRoot(), merkleRoot);
-        assertEq(vesting.allocations(aliceEmailHash), ALICE_ALLOCATION);
-        assertEq(vesting.allocations(bobEmailHash), BOB_ALLOCATION);
+        assertEq(vesting.allocations(aliceCommitment), ALICE_ALLOCATION);
+        assertEq(vesting.allocations(bobCommitment), BOB_ALLOCATION);
     }
 
     function test_VestingStarted() public view {
@@ -103,38 +105,38 @@ contract ZarfVestingTest is Test {
     // ============ Vesting Calculation Tests ============
 
     function test_NoVestingBeforeCliff() public view {
-        uint256 vested = vesting.calculateVested(aliceEmailHash);
+        uint256 vested = vesting.calculateVested(aliceCommitment);
         assertEq(vested, 0);
     }
 
     function test_NoVestingAtCliffMinus1() public {
         vm.warp(block.timestamp + CLIFF - 1);
-        uint256 vested = vesting.calculateVested(aliceEmailHash);
+        uint256 vested = vesting.calculateVested(aliceCommitment);
         assertEq(vested, 0);
     }
 
     function test_VestingStartsAtCliff() public {
         vm.warp(block.timestamp + CLIFF);
-        uint256 vested = vesting.calculateVested(aliceEmailHash);
+        uint256 vested = vesting.calculateVested(aliceCommitment);
         // At exactly cliff, 0 time has passed in vesting period
         assertEq(vested, 0);
     }
 
     function test_HalfVestedAtHalfway() public {
         vm.warp(block.timestamp + CLIFF + VESTING_DURATION / 2);
-        uint256 vested = vesting.calculateVested(aliceEmailHash);
+        uint256 vested = vesting.calculateVested(aliceCommitment);
         assertEq(vested, ALICE_ALLOCATION / 2);
     }
 
     function test_FullyVestedAtEnd() public {
         vm.warp(block.timestamp + CLIFF + VESTING_DURATION);
-        uint256 vested = vesting.calculateVested(aliceEmailHash);
+        uint256 vested = vesting.calculateVested(aliceCommitment);
         assertEq(vested, ALICE_ALLOCATION);
     }
 
     function test_FullyVestedAfterEnd() public {
         vm.warp(block.timestamp + CLIFF + VESTING_DURATION + 365 days);
-        uint256 vested = vesting.calculateVested(aliceEmailHash);
+        uint256 vested = vesting.calculateVested(aliceCommitment);
         assertEq(vested, ALICE_ALLOCATION);
     }
 
@@ -146,7 +148,7 @@ contract ZarfVestingTest is Test {
 
         // Create mock proof and public inputs
         bytes memory proof = "";
-        bytes32[] memory publicInputs = _createPublicInputs(merkleRoot, alice, aliceEmailHash);
+        bytes32[] memory publicInputs = _createPublicInputs(merkleRoot, alice, aliceCommitment);
 
         // Claim as alice
         vm.prank(alice);
@@ -154,7 +156,7 @@ contract ZarfVestingTest is Test {
 
         // Verify
         assertEq(token.balanceOf(alice), ALICE_ALLOCATION);
-        assertEq(vesting.claimed(aliceEmailHash), ALICE_ALLOCATION);
+        assertEq(vesting.claimed(aliceCommitment), ALICE_ALLOCATION);
     }
 
     function test_ClaimPartialVesting() public {
@@ -162,18 +164,18 @@ contract ZarfVestingTest is Test {
         vm.warp(block.timestamp + CLIFF + VESTING_DURATION / 2);
 
         bytes memory proof = "";
-        bytes32[] memory publicInputs = _createPublicInputs(merkleRoot, alice, aliceEmailHash);
+        bytes32[] memory publicInputs = _createPublicInputs(merkleRoot, alice, aliceCommitment);
 
         vm.prank(alice);
         vesting.claim(proof, publicInputs);
 
         assertEq(token.balanceOf(alice), ALICE_ALLOCATION / 2);
-        assertEq(vesting.claimed(aliceEmailHash), ALICE_ALLOCATION / 2);
+        assertEq(vesting.claimed(aliceCommitment), ALICE_ALLOCATION / 2);
     }
 
     function test_ClaimMultipleTimes() public {
         bytes memory proof = "";
-        bytes32[] memory publicInputs = _createPublicInputs(merkleRoot, alice, aliceEmailHash);
+        bytes32[] memory publicInputs = _createPublicInputs(merkleRoot, alice, aliceCommitment);
 
         // First claim at 25%
         vm.warp(block.timestamp + CLIFF + VESTING_DURATION / 4);
@@ -196,7 +198,7 @@ contract ZarfVestingTest is Test {
 
     function test_RevertClaimBeforeCliff() public {
         bytes memory proof = "";
-        bytes32[] memory publicInputs = _createPublicInputs(merkleRoot, alice, aliceEmailHash);
+        bytes32[] memory publicInputs = _createPublicInputs(merkleRoot, alice, aliceCommitment);
 
         vm.prank(alice);
         vm.expectRevert(ZarfVesting.NothingToClaim.selector);
@@ -207,7 +209,7 @@ contract ZarfVestingTest is Test {
         vm.warp(block.timestamp + CLIFF + VESTING_DURATION);
 
         bytes memory proof = "";
-        bytes32[] memory publicInputs = _createPublicInputs(bytes32(uint256(0x9999)), alice, aliceEmailHash);
+        bytes32[] memory publicInputs = _createPublicInputs(bytes32(uint256(0x9999)), alice, aliceCommitment);
 
         vm.prank(alice);
         vm.expectRevert(ZarfVesting.InvalidMerkleRoot.selector);
@@ -229,7 +231,7 @@ contract ZarfVestingTest is Test {
         vm.warp(block.timestamp + CLIFF + VESTING_DURATION);
 
         bytes memory proof = "";
-        bytes32[] memory publicInputs = _createPublicInputs(merkleRoot, alice, aliceEmailHash);
+        bytes32[] memory publicInputs = _createPublicInputs(merkleRoot, alice, aliceCommitment);
 
         vm.prank(alice);
         vesting.claim(proof, publicInputs);
@@ -245,7 +247,7 @@ contract ZarfVestingTest is Test {
         vm.warp(block.timestamp + CLIFF + VESTING_DURATION);
 
         bytes memory proof = "";
-        bytes32[] memory publicInputs = _createPublicInputs(merkleRoot, alice, aliceEmailHash);
+        bytes32[] memory publicInputs = _createPublicInputs(merkleRoot, alice, aliceCommitment);
 
         // Bob tries to claim - should fail because recipient doesn't match
         vm.prank(bob);
@@ -262,7 +264,7 @@ contract ZarfVestingTest is Test {
             publicInputs[i] = bytes32(uint256(100 + i)); // Different pubkey
         }
         publicInputs[18] = merkleRoot;
-        publicInputs[19] = aliceEmailHash;
+        publicInputs[19] = aliceCommitment;
         publicInputs[20] = bytes32(uint256(uint160(alice)));
 
         vm.prank(alice);
@@ -281,7 +283,7 @@ contract ZarfVestingTest is Test {
     function test_OnlyOwnerCanSetAllocation() public {
         vm.prank(alice);
         vm.expectRevert(ZarfVesting.Unauthorized.selector);
-        vesting.setAllocation(aliceEmailHash, 1000);
+        vesting.setAllocation(aliceCommitment, 1000);
     }
 
     function test_BatchSetAllocations() public {
@@ -305,7 +307,7 @@ contract ZarfVestingTest is Test {
 
         // Old owner can no longer set allocations
         vm.expectRevert(ZarfVesting.Unauthorized.selector);
-        vesting.setAllocation(aliceEmailHash, 1000);
+        vesting.setAllocation(aliceCommitment, 1000);
     }
 
     // ============ Edge Cases ============
@@ -317,7 +319,7 @@ contract ZarfVestingTest is Test {
 
         // Alice's proof with alice as recipient
         bytes memory proof = "";
-        bytes32[] memory publicInputs = _createPublicInputs(merkleRoot, alice, aliceEmailHash);
+        bytes32[] memory publicInputs = _createPublicInputs(merkleRoot, alice, aliceCommitment);
 
         // Bob tries to front-run - FAILS
         vm.prank(bob);

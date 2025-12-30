@@ -25,14 +25,12 @@ contract DeployScript is Script {
         HonkVerifier verifier = new HonkVerifier();
         console.log("HonkVerifier deployed at:", address(verifier));
 
-        // 3. Deploy ZarfVesting
+        // 3. Deploy ZarfVesting (new 2-arg constructor + initialize pattern)
         ZarfVesting vesting = new ZarfVesting(
-            "Default Vesting",
-            "Deployed via DeployScript",
-            tokenAddress,
             address(verifier),
             address(jwkRegistry)
         );
+        vesting.initialize(msg.sender, tokenAddress, "Default Vesting", "Deployed via DeployScript");
         console.log("ZarfVesting deployed at:", address(vesting));
 
         vm.stopBroadcast();
@@ -66,14 +64,12 @@ contract DeployWithMockTokenScript is Script {
         HonkVerifier verifier = new HonkVerifier();
         console.log("HonkVerifier deployed at:", address(verifier));
 
-        // 4. Deploy ZarfVesting
+        // 4. Deploy ZarfVesting (new 2-arg constructor + initialize pattern)
         ZarfVesting vesting = new ZarfVesting(
-            "Mock Token Vesting",
-            "Deployed with mock token",
-            address(token),
             address(verifier),
             address(jwkRegistry)
         );
+        vesting.initialize(msg.sender, address(token), "Mock Token Vesting", "Deployed with mock token");
         console.log("ZarfVesting deployed at:", address(vesting));
 
         // 5. Mint tokens to deployer for testing
@@ -113,14 +109,12 @@ contract DeployTestnetScript is Script {
         console.log("MockHonkVerifier deployed at:", address(verifier));
         console.log("WARNING: Using MOCK verifier - proofs are NOT verified!");
 
-        // 4. Deploy ZarfVesting
+        // 4. Deploy ZarfVesting (new 2-arg constructor + initialize pattern)
         ZarfVesting vesting = new ZarfVesting(
-            "Testnet Vesting",
-            "Deployed with mock verifier - FOR TESTING ONLY",
-            address(token),
             address(verifier),
             address(jwkRegistry)
         );
+        vesting.initialize(msg.sender, address(token), "Testnet Vesting", "Deployed with mock verifier - FOR TESTING ONLY");
         console.log("ZarfVesting deployed at:", address(vesting));
 
         // 5. Mint tokens to deployer for testing

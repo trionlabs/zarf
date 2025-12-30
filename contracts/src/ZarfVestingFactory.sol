@@ -2,12 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {ZarfVesting} from "./ZarfVesting.sol";
-
-// Define generic IERC20 for SafeTransfer logic (avoids imports)
-interface IERC20 {
-    function transfer(address to, uint256 amount) external returns (bool);
-    function transferFrom(address from, address to, uint256 amount) external returns (bool);
-}
+import {IERC20} from "./interfaces/IERC20.sol";
 
 /// @title ZarfVestingFactory
 /// @notice Factory for deploying fully-initialized vesting contracts in minimal transactions
@@ -22,7 +17,8 @@ contract ZarfVestingFactory {
         string description;       // Description or category
         address token;            // ERC20 token to vest
         bytes32 merkleRoot;       // Merkle root for whitelist verification
-        bytes32[] emailHashes;    // Array of recipient email hashes
+        // ADR-012: Changed from emailHashes to commitments for privacy
+        bytes32[] commitments;    // Array of identity commitments (Pedersen(emailHash, secretHash))
         uint256[] amounts;        // Array of allocation amounts
         uint256 cliffDuration;    // Cliff duration in seconds
         uint256 vestingDuration;  // Total vesting duration in seconds
@@ -71,8 +67,8 @@ contract ZarfVestingFactory {
         CreateVestingParams calldata params,
         uint256 totalAmount
     ) external returns (address vesting) {
-        if (params.emailHashes.length != params.amounts.length) revert ArrayLengthMismatch();
-        if (params.emailHashes.length == 0) revert ZeroAllocations();
+        if (params.commitments.length != params.amounts.length) revert ArrayLengthMismatch();
+        if (params.commitments.length == 0) revert ZeroAllocations();
 
         // 1. Pull tokens from caller (must be approved)
         // Use SafeTransferFrom
@@ -94,15 +90,16 @@ contract ZarfVestingFactory {
         // 6. Track deployment
         _trackDeployment(vesting, msg.sender);
         
-        emit VestingCreated(vesting, msg.sender, params.token, totalAmount, params.emailHashes.length);
+        emit VestingCreated(vesting, msg.sender, params.token, totalAmount, params.commitments.length);
     }
     
     function createVesting(CreateVestingParams calldata params) external returns (address vesting) {
-         if (params.emailHashes.length != params.amounts.length) revert ArrayLengthMismatch();
+         if (params.commitments.length != params.amounts.length) revert ArrayLengthMismatch();
+         if (params.commitments.length == 0) revert ZeroAllocations();
          vesting = _deployAndInitialize(params, msg.sender);
          _trackDeployment(vesting, msg.sender);
          uint256 total = _sumAmounts(params.amounts);
-         emit VestingCreated(vesting, msg.sender, params.token, total, params.emailHashes.length);
+         emit VestingCreated(vesting, msg.sender, params.token, total, params.commitments.length);
     }
 
     // ============ Internal Deployment Logic ============
@@ -122,7 +119,7 @@ contract ZarfVestingFactory {
         vest.initialize(address(this), params.token, params.name, params.description);
         
         // 4. Set Allocations
-        vest.setAllocations(params.emailHashes, params.amounts);
+        vest.setAllocations(params.commitments, params.amounts);
         
         // 5. Set Merkle Root
         vest.setMerkleRoot(params.merkleRoot);

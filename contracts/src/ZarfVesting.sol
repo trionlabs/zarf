@@ -2,12 +2,8 @@
 pragma solidity ^0.8.24;
 
 import {IVerifier} from "./interfaces/IVerifier.sol";
+import {IERC20} from "./interfaces/IERC20.sol";
 import {JWKRegistry} from "./JWKRegistry.sol";
-
-interface IERC20 {
-    function transfer(address to, uint256 amount) external returns (bool);
-    function transferFrom(address from, address to, uint256 amount) external returns (bool);
-}
 
 /// @title ZarfVesting
 /// @notice Vesting contract with ZK proof-based claims
@@ -27,8 +23,8 @@ contract ZarfVesting {
     error AlreadyInitialized();
 
     // ============ Events ============
-    event AllocationSet(bytes32 indexed emailHash, uint256 amount);
-    event Claimed(bytes32 indexed emailHash, address indexed recipient, uint256 amount);
+    event AllocationSet(bytes32 indexed commitment, uint256 amount);
+    event Claimed(bytes32 indexed commitment, address indexed recipient, uint256 amount);
     event VestingStarted(uint256 startTime, uint256 cliffDuration, uint256 vestingDuration, uint256 vestingPeriod);
     event MerkleRootSet(bytes32 merkleRoot);
     event Deposited(uint256 amount);
@@ -54,8 +50,10 @@ contract ZarfVesting {
     uint256 public vestingDuration;
     uint256 public vestingPeriod;
 
-    mapping(bytes32 => uint256) public allocations;
-    mapping(bytes32 => uint256) public claimed;
+    // ADR-012: Changed from emailHash to commitment for privacy
+    // commitment = Pedersen(emailHash, secretHash) - unlinkable identity
+    mapping(bytes32 => uint256) public allocations;  // commitment -> amount
+    mapping(bytes32 => uint256) public claimed;       // commitment -> claimedAmount
 
     // ============ Modifiers ============
     modifier onlyOwner() {
@@ -110,18 +108,18 @@ contract ZarfVesting {
         emit VestingStarted(block.timestamp, _cliffDuration, _vestingDuration, _vestingPeriod);
     }
 
-    function setAllocation(bytes32 emailHash, uint256 amount) external onlyOwner {
+    function setAllocation(bytes32 commitment, uint256 amount) external onlyOwner {
         if (amount == 0) revert InvalidAllocation();
-        allocations[emailHash] = amount;
-        emit AllocationSet(emailHash, amount);
+        allocations[commitment] = amount;
+        emit AllocationSet(commitment, amount);
     }
 
-    function setAllocations(bytes32[] calldata emailHashes, uint256[] calldata amounts) external onlyOwner {
-        require(emailHashes.length == amounts.length, "Length mismatch");
-        for (uint256 i = 0; i < emailHashes.length; i++) {
+    function setAllocations(bytes32[] calldata commitments, uint256[] calldata amounts) external onlyOwner {
+        require(commitments.length == amounts.length, "Length mismatch");
+        for (uint256 i = 0; i < commitments.length; i++) {
             if (amounts[i] == 0) revert InvalidAllocation();
-            allocations[emailHashes[i]] = amounts[i];
-            emit AllocationSet(emailHashes[i], amounts[i]);
+            allocations[commitments[i]] = amounts[i];
+            emit AllocationSet(commitments[i], amounts[i]);
         }
     }
 
@@ -152,27 +150,28 @@ contract ZarfVesting {
         if (!jwkRegistry.isValidKeyHash(keyHash)) revert InvalidPubkey();
 
         bytes32 proofMerkleRoot = publicInputs[PUBKEY_LIMBS];
-        bytes32 emailHash = publicInputs[PUBKEY_LIMBS + 1];
+        // ADR-012: Now receives commitment instead of emailHash
+        bytes32 commitment = publicInputs[PUBKEY_LIMBS + 1];
         bytes32 proofRecipient = publicInputs[PUBKEY_LIMBS + 2];
 
         if (proofMerkleRoot != merkleRoot) revert InvalidMerkleRoot();
         if (proofRecipient != bytes32(uint256(uint160(msg.sender)))) revert InvalidRecipient();
 
-        uint256 vested = calculateVested(emailHash);
-        uint256 claimable = vested - claimed[emailHash];
+        uint256 vested = calculateVested(commitment);
+        uint256 claimable = vested - claimed[commitment];
         if (claimable == 0) revert NothingToClaim();
 
-        claimed[emailHash] += claimable;
+        claimed[commitment] += claimable;
         
         safeTransfer(token, msg.sender, claimable);
 
-        emit Claimed(emailHash, msg.sender, claimable);
+        emit Claimed(commitment, msg.sender, claimable);
     }
 
     // ============ View Functions ============
 
-    function calculateVested(bytes32 emailHash) public view returns (uint256) {
-        uint256 allocation = allocations[emailHash];
+    function calculateVested(bytes32 commitment) public view returns (uint256) {
+        uint256 allocation = allocations[commitment];
         if (allocation == 0) return 0;
         if (vestingStart == 0) return 0;
 
@@ -188,8 +187,8 @@ contract ZarfVesting {
         return (allocation * completedPeriods) / totalPeriods;
     }
 
-    function getClaimable(bytes32 emailHash) external view returns (uint256) {
-        return calculateVested(emailHash) - claimed[emailHash];
+    function getClaimable(bytes32 commitment) external view returns (uint256) {
+        return calculateVested(commitment) - claimed[commitment];
     }
 
     function getVestingInfo() external view returns (uint256 start, uint256 cliff, uint256 duration, uint256 period) {

@@ -22,7 +22,9 @@ contract ZarfVestingIntegrationTest is Test {
 
     // Test data from fixtures/testProof.json
     bytes32 public merkleRoot;
-    bytes32 public emailHash;
+    // ADR-012: This is now an identity commitment, not a raw email hash
+    // Note: Fixture still uses 'emailHash' key for backwards compatibility until new proof is generated
+    bytes32 public commitment;
     address public recipient;
 
     uint256 public constant TOTAL_SUPPLY = 1_000_000 ether;
@@ -34,7 +36,8 @@ contract ZarfVestingIntegrationTest is Test {
         string memory json = vm.readFile(_getFixturePath());
 
         merkleRoot = bytes32(vm.parseUint(vm.parseJsonString(json, ".testData.merkleRoot")));
-        emailHash = bytes32(vm.parseUint(vm.parseJsonString(json, ".testData.emailHash")));
+        // ADR-012: Parsing from 'emailHash' key but storing as 'commitment'
+        commitment = bytes32(vm.parseUint(vm.parseJsonString(json, ".testData.emailHash")));
         recipient = vm.parseJsonAddress(json, ".testData.recipient");
 
         // Deploy JWK registry and register test pubkey
@@ -44,13 +47,14 @@ contract ZarfVestingIntegrationTest is Test {
         // Deploy real HonkVerifier
         verifier = new HonkVerifier();
 
-        // Deploy token and vesting contract
+        // Deploy token and vesting contract (new 2-arg constructor + initialize pattern)
         token = new MockERC20("Zarf Token", "ZARF", TOTAL_SUPPLY);
-        vesting = new ZarfVesting("Integration Test", "Integration test vesting", address(token), address(verifier), address(jwkRegistry));
+        vesting = new ZarfVesting(address(verifier), address(jwkRegistry));
+        vesting.initialize(owner, address(token), "Integration Test", "Integration test vesting");
 
         // Setup vesting
         vesting.setMerkleRoot(merkleRoot);
-        vesting.setAllocation(emailHash, ALLOCATION);
+        vesting.setAllocation(commitment, ALLOCATION);
 
         // Deposit tokens
         token.approve(address(vesting), ALLOCATION);
@@ -79,10 +83,10 @@ contract ZarfVestingIntegrationTest is Test {
         bytes32[] memory publicInputs = _getTestPublicInputs();
 
         // Verify public inputs structure
-        // Layout: [pubkey[0..17], merkleRoot, emailHash, recipient]
+        // Layout: [pubkey[0..17], merkleRoot, commitment (ADR-012), recipient]
         assertEq(publicInputs.length, 21, "Should have 21 public inputs");
         assertEq(publicInputs[18], merkleRoot, "Merkle root should match");
-        assertEq(publicInputs[19], emailHash, "Email hash should match");
+        assertEq(publicInputs[19], commitment, "Commitment should match");
         assertEq(publicInputs[20], bytes32(uint256(uint160(recipient))), "Recipient should match");
 
         // Claim as recipient
@@ -91,7 +95,7 @@ contract ZarfVestingIntegrationTest is Test {
 
         // Verify tokens transferred
         assertEq(token.balanceOf(recipient), ALLOCATION, "Recipient should receive tokens");
-        assertEq(vesting.claimed(emailHash), ALLOCATION, "Claimed amount should be recorded");
+        assertEq(vesting.claimed(commitment), ALLOCATION, "Claimed amount should be recorded");
     }
 
     /**
