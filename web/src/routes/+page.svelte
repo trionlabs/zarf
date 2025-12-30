@@ -6,7 +6,6 @@
 
     onMount(() => {
         // If we land here with a Google ID Token (OAuth callback), forward to /claim
-        // If we land here with a Google ID Token (OAuth callback), forward to /claim
         if (window.location.hash.includes("id_token=")) {
             // Parse state provided during login to restore context (e.g. contract address)
             const params = new URLSearchParams(
