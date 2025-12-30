@@ -52,6 +52,15 @@
             showSub: false,
         },
     ]);
+
+    // Clean Markup: Extract template logic to $derived
+    function shouldShowSubNav(item: NavItem): boolean {
+        return item.isActive && item.subComponent !== null && item.showSub;
+    }
+
+    const showClaimEmail = $derived(
+        currentPath.startsWith("/claim") && Boolean(authStore.gmail.email),
+    );
 </script>
 
 <aside
@@ -91,7 +100,7 @@
                     {/if}
                 </a>
 
-                {#if item.isActive && item.subComponent && item.showSub}
+                {#if shouldShowSubNav(item)}
                     <item.subComponent />
                 {/if}
             {/each}
@@ -102,7 +111,7 @@
 
         <!-- Footer -->
         <div class="border-t border-base-content/5 pt-4 mt-4 space-y-2">
-            {#if currentPath.startsWith("/claim") && authStore.gmail.email}
+            {#if showClaimEmail}
                 <div
                     class="px-3 py-2 rounded-lg bg-base-200/50 text-xs text-base-content/70 flex items-center gap-2 truncate"
                 >
