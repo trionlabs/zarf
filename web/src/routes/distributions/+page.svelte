@@ -13,7 +13,9 @@
         Cloud,
         RefreshCw,
         AlertCircle,
+        Wallet,
     } from "lucide-svelte";
+    import { walletStore } from "$lib/stores/walletStore.svelte";
     import type { Distribution } from "$lib/stores/types";
     import DistributionCard from "$lib/components/wizard/DistributionCard.svelte";
     import DistributionDetailPanel from "$lib/components/wizard/DistributionDetailPanel.svelte";
@@ -289,8 +291,28 @@
                 <div in:fade={{ duration: 150 }}>
                     <!-- VAULT TAB: On-Chain Contracts -->
                     {#if isVaultTab}
-                        {#if onChainLoading}
-                            <!-- Loading State (Inline temporarily, or could be extracted to separate Spinner component) -->
+                        {#if !walletStore.isConnected}
+                            <!-- Wallet Not Connected State -->
+                            <DistributionEmptyState
+                                icon={Wallet}
+                                title="Connect Wallet"
+                                description="Connect your wallet to view your active distributions fetched directly from the blockchain."
+                                color="bg-primary/10"
+                                iconColor="text-primary"
+                            >
+                                {#snippet action()}
+                                    <button
+                                        class="btn btn-primary gap-2"
+                                        onclick={() =>
+                                            walletStore.requestConnection()}
+                                    >
+                                        <Wallet class="w-4 h-4" />
+                                        Connect Wallet
+                                    </button>
+                                {/snippet}
+                            </DistributionEmptyState>
+                        {:else if onChainLoading}
+                            <!-- Loading State -->
                             <div
                                 class="grid md:grid-cols-2 xl:grid-cols-2 gap-4"
                             >
