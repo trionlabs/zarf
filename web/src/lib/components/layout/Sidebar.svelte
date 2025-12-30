@@ -51,14 +51,6 @@
             subComponent: null,
             showSub: false,
         },
-        {
-            label: "Manage",
-            href: "/manage",
-            icon: LayoutGrid,
-            isActive: currentPath.startsWith("/manage"),
-            subComponent: null,
-            showSub: false,
-        },
     ]);
 </script>
 
