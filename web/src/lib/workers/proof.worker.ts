@@ -122,8 +122,8 @@ async function generateProof(payload: ProofRequest['payload']) {
     const inputs = {
         // JWT data
         data: {
-            storage: jwtInputs.data.storage,
-            len: jwtInputs.data.len,
+            storage: (jwtInputs as any).data.storage,
+            len: (jwtInputs as any).data.len,
         },
         base64_decode_offset: jwtInputs.base64_decode_offset,
         redc_params_limbs: jwtInputs.redc_params_limbs,
