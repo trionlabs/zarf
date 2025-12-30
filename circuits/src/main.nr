@@ -42,6 +42,20 @@ fn verify_merkle_proof(
     current
 }
 
+/// Compute secret hash from secret code field
+/// The secret is already converted to Field by the prover (frontend)
+/// Secret = Pedersen hash of 8-char alphanumeric code
+fn hash_secret(secret: Field) -> Field {
+    pedersen_hash([secret])
+}
+
+/// Compute IdentityCommitment = Pedersen(emailHash, secretHash)
+/// This creates an unlinkable identity - same email with different secrets
+/// produces completely different commitments
+fn compute_identity_commitment(email_hash: Field, secret_hash: Field) -> Field {
+    pedersen_hash([email_hash, secret_hash])
+}
+
 fn main(
     // Private inputs - JWT data
     data: BoundedVec<u8, MAX_DATA_LENGTH>,
@@ -56,6 +70,8 @@ fn main(
     merkle_path_indices: [Field; TREE_DEPTH],
     // Private input - recipient (returned as public output)
     recipient: Field,
+    // Private input - Secret code (ADR-012: for unlinkable identity)
+    secret: Field,
     // Public inputs
     pubkey_modulus_limbs: pub [u128; 18],
     merkle_root: pub Field,
@@ -73,20 +89,29 @@ fn main(
     // 2. Verify the email claim in JWT matches private expected_email
     jwt.assert_claim_string("email".as_bytes(), expected_email);
 
-    // 3. Compute email hash (public commitment)
+    // 3. Compute email hash (intermediate value, NOT exposed publicly)
     let email_hash = hash_email(expected_email);
 
-    // 4. Compute leaf from email_hash, amount, salt
-    let leaf = compute_leaf(email_hash, amount, salt);
+    // 4. Compute secret hash (ADR-012)
+    let secret_hash = hash_secret(secret);
 
-    // 5. Verify Merkle proof - computed root must match public merkle_root
+    // 5. Compute IdentityCommitment (ADR-012)
+    // This replaces the raw email_hash as the public identity
+    // Same email + different secret = different identity (unlinkability)
+    let identity_commitment = compute_identity_commitment(email_hash, secret_hash);
+
+    // 6. Compute leaf from identity_commitment, amount, salt
+    // Note: Leaf now uses identity_commitment instead of email_hash
+    let leaf = compute_leaf(identity_commitment, amount, salt);
+
+    // 7. Verify Merkle proof - computed root must match public merkle_root
     let computed_root = verify_merkle_proof(leaf, merkle_siblings, merkle_path_indices);
     assert(computed_root == merkle_root, "Merkle proof verification failed");
 
-    // 6. Return email hash and recipient as public outputs
-    // Both values are cryptographically bound to the proof
+    // 8. Return identity_commitment and recipient as public outputs
+    // identity_commitment replaces email_hash (ADR-012 privacy upgrade)
     // Contract verifies msg.sender == recipient to prevent front-running
-    (email_hash, recipient)
+    (identity_commitment, recipient)
 }
 
 #[test]
@@ -100,4 +125,57 @@ fn test_hash_email() {
     let hash = hash_email(email);
     // Just check it doesn't panic
     assert(hash != 0);
+}
+
+#[test]
+fn test_hash_secret() {
+    // Test that secret hashing works
+    let secret: Field = 12345678; // Simulated secret code as Field
+    let hash = hash_secret(secret);
+    assert(hash != 0);
+    assert(hash != secret); // Hash should differ from input
+}
+
+#[test]
+fn test_identity_commitment() {
+    // Test that identity commitment is computed correctly
+    let mut email: BoundedVec<u8, MAX_EMAIL_LENGTH> = BoundedVec::new();
+    let test_bytes = "alice@example.com".as_bytes();
+    for b in test_bytes {
+        email.push(b);
+    }
+    
+    let email_hash = hash_email(email);
+    let secret: Field = 98765432;
+    let secret_hash = hash_secret(secret);
+    
+    let commitment = compute_identity_commitment(email_hash, secret_hash);
+    assert(commitment != 0);
+    assert(commitment != email_hash); // Commitment should differ from email_hash
+}
+
+#[test]
+fn test_identity_unlinkability() {
+    // CRITICAL TEST: Same email with different secrets = different commitments
+    // This proves the unlinkability property of ADR-012
+    let mut email: BoundedVec<u8, MAX_EMAIL_LENGTH> = BoundedVec::new();
+    let test_bytes = "bob@example.com".as_bytes();
+    for b in test_bytes {
+        email.push(b);
+    }
+    
+    let email_hash = hash_email(email);
+    
+    // Two different secrets
+    let secret1: Field = 11111111;
+    let secret2: Field = 22222222;
+    
+    let secret_hash1 = hash_secret(secret1);
+    let secret_hash2 = hash_secret(secret2);
+    
+    let commitment1 = compute_identity_commitment(email_hash, secret_hash1);
+    let commitment2 = compute_identity_commitment(email_hash, secret_hash2);
+    
+    // MUST be different - this is the core privacy property
+    assert(commitment1 != commitment2, "Unlinkability failed: same email with different secrets must produce different commitments");
 }
