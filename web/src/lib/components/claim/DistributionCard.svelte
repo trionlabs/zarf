@@ -26,7 +26,10 @@
         // Use just origin (like POC) - /claim path not registered in Google Console
         const REDIRECT_URI = window.location.origin + "/";
         console.log("Initiating Google Login with Redirect URI:", REDIRECT_URI);
-        initiateGoogleLogin(CLIENT_ID, REDIRECT_URI);
+
+        // Pass contract address as state to preserve context
+        const state = JSON.stringify({ address: contractAddress });
+        initiateGoogleLogin(CLIENT_ID, REDIRECT_URI, state);
     }
 </script>
 

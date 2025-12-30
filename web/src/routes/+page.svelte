@@ -6,9 +6,31 @@
 
     onMount(() => {
         // If we land here with a Google ID Token (OAuth callback), forward to /claim
+        // If we land here with a Google ID Token (OAuth callback), forward to /claim
         if (window.location.hash.includes("id_token=")) {
+            // Parse state provided during login to restore context (e.g. contract address)
+            const params = new URLSearchParams(
+                window.location.hash.substring(1),
+            );
+            const stateRaw = params.get("state");
+            let redirectQuery = "";
+
+            if (stateRaw) {
+                try {
+                    // Try to decode URL-encoded JSON state
+                    const state = JSON.parse(decodeURIComponent(stateRaw));
+                    if (state.address) {
+                        redirectQuery = `?address=${state.address}`;
+                    }
+                } catch (e) {
+                    console.warn("Failed to parse auth state", e);
+                }
+            }
+
             // Use goto with replaceState to avoid history pollution
-            goto("/claim" + window.location.hash, { replaceState: true });
+            goto("/claim" + redirectQuery + window.location.hash, {
+                replaceState: true,
+            });
         }
     });
     const features = [

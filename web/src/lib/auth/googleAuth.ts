@@ -54,6 +54,7 @@ function assertBrowser(): void {
 export function initiateGoogleLogin(
     clientId: string,
     redirectUri: string,
+    state: string | null = null,
     nonce: string | null = null
 ): void {
     assertBrowser();
@@ -66,6 +67,10 @@ export function initiateGoogleLogin(
         nonce: nonce || crypto.randomUUID(),
         prompt: 'select_account', // Force account selection
     });
+
+    if (state) {
+        params.append('state', state);
+    }
 
     window.location.href = `${GOOGLE_AUTH_ENDPOINT}?${params.toString()}`;
 }

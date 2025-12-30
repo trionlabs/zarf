@@ -194,7 +194,7 @@
 
         <!-- Main Content -->
         <div class="drawer-content">
-            <div class="max-w-6xl mx-auto">
+            <div class="max-w-6xl">
                 <!-- Header Component -->
                 <div class="flex items-center justify-between">
                     <PageHeader
