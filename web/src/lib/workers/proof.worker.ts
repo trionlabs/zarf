@@ -1,10 +1,12 @@
 /// <reference lib="webworker" />
 
-import initACVM from '@noir-lang/acvm_js';
-import initAbi from '@noir-lang/noirc_abi';
-import { Noir } from '@noir-lang/noir_js';
-import { UltraHonkBackend } from '@aztec/bb.js';
-import { generateInputs } from 'noir-jwt';
+// Dynamic imports - loaded at runtime to avoid WASM access errors at module load
+// These will be populated in initialize()
+let Noir: any;
+let UltraHonkBackend: any;
+let generateInputs: any;
+let initACVM: any;
+let initAbi: any;
 
 // ============ Constants ============
 const TREE_DEPTH = 20;
@@ -43,8 +45,8 @@ interface NoirJwtResult {
 // ============ State ============
 let initialized = false;
 let cachedCircuit: any = null;
-let cachedNoir: Noir | null = null;
-let cachedBackend: UltraHonkBackend | null = null;
+let cachedNoir: any = null;
+let cachedBackend: any = null;
 
 // ============ Helpers ============
 
@@ -109,21 +111,68 @@ async function initialize() {
 
     const baseUrl = self.location.origin;
 
-    // 1. Init WASM
-    await Promise.all([
-        initACVM(new URL('/wasm/acvm_js_bg.wasm', baseUrl)),
-        initAbi(new URL('/wasm/noirc_abi_wasm_bg.wasm', baseUrl)),
-    ]);
+    try {
+        console.log('[Worker] Starting initialization...');
 
-    // 2. Load Circuit with Retry
-    cachedCircuit = await fetchCircuit('/circuits/zarf.json');
+        // 1. Dynamic import of modules (deferred to avoid WASM access at module load)
+        postMessage({ type: 'PROGRESS', message: 'Loading modules...' });
+        console.log('[Worker] Dynamically importing modules...');
 
-    // 3. Init Prover
-    cachedNoir = new Noir(cachedCircuit);
-    cachedBackend = new UltraHonkBackend(cachedCircuit.bytecode);
+        const [acvmModule, abiModule, noirModule, bbModule, jwtModule] = await Promise.all([
+            import('@noir-lang/acvm_js'),
+            import('@noir-lang/noirc_abi'),
+            import('@noir-lang/noir_js'),
+            import('@aztec/bb.js'),
+            import('noir-jwt'),
+        ]);
 
-    initialized = true;
-    console.log('[Worker] Initialized Noir + Backend');
+        initACVM = acvmModule.default;
+        initAbi = abiModule.default;
+        Noir = noirModule.Noir;
+        UltraHonkBackend = bbModule.UltraHonkBackend;
+        generateInputs = jwtModule.generateInputs;
+
+        console.log('[Worker] Modules imported successfully');
+
+        // 2. Init WASM modules using fetch()
+        postMessage({ type: 'PROGRESS', message: 'Loading WASM modules...' });
+        console.log('[Worker] Loading WASM from:', baseUrl);
+
+        const [acvmWasm, abiWasm] = await Promise.all([
+            fetch(`${baseUrl}/wasm/acvm_js_bg.wasm`),
+            fetch(`${baseUrl}/wasm/noirc_abi_wasm_bg.wasm`),
+        ]);
+
+        await Promise.all([
+            initACVM(acvmWasm),
+            initAbi(abiWasm),
+        ]);
+        console.log('[Worker] ACVM/ABI WASM loaded successfully');
+
+        // 3. Load Circuit with Retry
+        postMessage({ type: 'PROGRESS', message: 'Loading ZK Circuit (1.4MB)...' });
+        cachedCircuit = await fetchCircuit(`${baseUrl}/circuits/zarf.json`);
+        console.log('[Worker] Circuit loaded successfully');
+
+        // 4. Init Noir instance
+        postMessage({ type: 'PROGRESS', message: 'Initializing Noir...' });
+        cachedNoir = new Noir(cachedCircuit);
+        console.log('[Worker] Noir initialized');
+
+        // 5. Init UltraHonkBackend - single thread for worker context
+        postMessage({ type: 'PROGRESS', message: 'Initializing Prover Backend (may take 10-20s)...' });
+        console.log('[Worker] Creating UltraHonkBackend...');
+        cachedBackend = new UltraHonkBackend(cachedCircuit.bytecode, { threads: 1 });
+        console.log('[Worker] Backend initialized successfully');
+
+        initialized = true;
+        postMessage({ type: 'PROGRESS', message: 'Initialization complete!' });
+        console.log('[Worker] Fully initialized');
+    } catch (error: any) {
+        console.error('[Worker] Initialization failed:', error);
+        postMessage({ type: 'ERROR', message: `Initialization failed: ${error.message || String(error)}` });
+        throw error;
+    }
 }
 
 /**
@@ -194,7 +243,6 @@ async function generateProof(payload: ProofRequest['payload']) {
         .join('');
 
     // Extract critical public inputs to return for verification/logging
-    // Extract critical public inputs to return for verification/logging
     // [19] = identity_commitment (formerly email_hash)
     // [20] = recipient
     const identityCommitment = proof.publicInputs[19];
@@ -202,10 +250,18 @@ async function generateProof(payload: ProofRequest['payload']) {
 
     return {
         proof: proofHex,
-        publicInputs: proof.publicInputs,
-        identityCommitment, // Renamed from emailHash
+        publicValues: proof.publicInputs, // Raw array required by contract
+        publicInputs: {
+            identityCommitment,
+            merkleRoot: toHex(merkleRoot),
+            recipient: proofRecipient,
+            amount: BigInt(amount)
+        },
+        // Convenience duplicates
+        identityCommitment,
         merkleRoot: toHex(merkleRoot),
-        recipient: proofRecipient
+        recipient: proofRecipient,
+        amount: BigInt(amount)
     };
 }
 

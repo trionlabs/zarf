@@ -163,7 +163,7 @@ export async function pedersenHashPair(left: bigint, right: bigint): Promise<big
  */
 export async function computeLeaf(
     email: string,
-    amount: number,
+    amount: bigint,
     code: string
 ): Promise<bigint> {
     const bb = await initBarretenberg();
@@ -177,7 +177,7 @@ export async function computeLeaf(
     // In our circuit, the leaf construction might vary.
     // Based on ADR-012: Leaf = Pedersen(IdentityCommitment, amount)
 
-    const fields = [new Fr(identityCommitment), new Fr(BigInt(amount))];
+    const fields = [new Fr(identityCommitment), new Fr(amount)];
     const leafHash = await bb.pedersenHash(fields, 0);
 
     return BigInt(leafHash.toString());
@@ -199,13 +199,18 @@ export async function computeIdentityCommitment(email: string, code: string): Pr
     const emailBytes = stringToBytes(email.toLowerCase().trim(), MAX_EMAIL_LENGTH);
     const emailHash = await pedersenHashBytes(emailBytes);
 
-    // 2. Hash the code (as bytes)
-    // Code is 8 chars. We treat it as bytes.
-    const codeBytes = new TextEncoder().encode(code);
-    // Pad to 31 bytes to fit in a field cleanly or just hash the bytes directly?
-    // Using pedersenHashBytes simply maps each byte to a field.
-    // For 8 chars, that's 8 field elements.
-    const codeHash = await pedersenHashBytes(codeBytes);
+    // 2. Hash the code (Packed as single Field)
+    // Circuit expects: hash_secret(secret: Field) -> pedersen([secret])
+    // So we must pack the 8 ASCII bytes into one BigInt.
+
+    // "ABC" -> 0x414243
+    const encoder = new TextEncoder();
+    const codeBytes = encoder.encode(code);
+    const codeHex = '0x' + Array.from(codeBytes).map(b => b.toString(16).padStart(2, '0')).join('');
+    const codeField = BigInt(codeHex);
+
+    const codeHashResult = await bb.pedersenHash([new Fr(codeField)], 0);
+    const codeHash = BigInt(codeHashResult.toString());
 
     // 3. Identity = Pedersen(emailHash, codeHash)
     const identity = await bb.pedersenHash([new Fr(emailHash), new Fr(codeHash)], 0);
@@ -233,11 +238,24 @@ export function generateSecureCode(): string {
     const length = 8;
     const randomValues = new Uint8Array(length);
 
-    // Web Crypto API (Browser & Modern Node)
+    // Use Web Crypto API (Browser & Modern Node 19+) for CSP compliance and security
     if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
         crypto.getRandomValues(randomValues);
     } else if (typeof window !== 'undefined' && window.crypto) {
         window.crypto.getRandomValues(randomValues);
+    } else if (typeof process !== 'undefined' && process.versions != null && process.versions.node != null) {
+        // Fallback for Node.js environments (e.g. tests) - Dynamic import to avoid Bundler errors
+        // This block needs to be `await`ed or handled with a callback/promise.
+        // For synchronous `generateSecureCode`, we'll use a synchronous fallback.
+        // @ts-ignore
+        try {
+            // eslint-disable-next-line @typescript-eslint/no-var-requires
+            const nodeCrypto = require('crypto');
+            nodeCrypto.randomFillSync(randomValues);
+        } catch (e) {
+            console.warn("Node.js crypto not available, falling back to Math.random for secure code generation.");
+            for (let k = 0; k < length; k++) randomValues[k] = Math.floor(Math.random() * 256);
+        }
     } else {
         // Fallback for very old environments or strict contexts without crypto
         // Using Math.random is NOT cryptographically secure but prevents build errors.
@@ -515,7 +533,7 @@ export async function verifyMerkleProof(
  * ```
  */
 export async function processWhitelist(
-    entries: WhitelistEntry[]
+    entries: { email: string; amount: bigint }[]
 ): Promise<MerkleTreeData> {
     if (entries.length === 0) {
         throw new Error('Cannot process empty whitelist');

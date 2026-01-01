@@ -18,9 +18,9 @@ fn hash_email(email: BoundedVec<u8, MAX_EMAIL_LENGTH>) -> Field {
     pedersen_hash(fields)
 }
 
-/// Compute leaf hash: pedersen(email_hash, amount, salt)
-fn compute_leaf(email_hash: Field, amount: Field, salt: Field) -> Field {
-    pedersen_hash([email_hash, amount, salt])
+/// Compute leaf hash: pedersen(identity_commitment, amount)
+fn compute_leaf(identity_commitment: Field, amount: Field) -> Field {
+    pedersen_hash([identity_commitment, amount])
 }
 
 /// Verify Merkle proof and return computed root
@@ -64,7 +64,6 @@ fn main(
     signature_limbs: [u128; 18],
     expected_email: BoundedVec<u8, MAX_EMAIL_LENGTH>,
     // Private inputs - Merkle proof
-    salt: Field,
     amount: Field,
     merkle_siblings: [Field; TREE_DEPTH],
     merkle_path_indices: [Field; TREE_DEPTH],
@@ -100,9 +99,10 @@ fn main(
     // Same email + different secret = different identity (unlinkability)
     let identity_commitment = compute_identity_commitment(email_hash, secret_hash);
 
-    // 6. Compute leaf from identity_commitment, amount, salt
+    // 6. Compute leaf from identity_commitment, amount
     // Note: Leaf now uses identity_commitment instead of email_hash
-    let leaf = compute_leaf(identity_commitment, amount, salt);
+    // REFACTOR: Removed 'salt' input
+    let leaf = compute_leaf(identity_commitment, amount);
 
     // 7. Verify Merkle proof - computed root must match public merkle_root
     let computed_root = verify_merkle_proof(leaf, merkle_siblings, merkle_path_indices);

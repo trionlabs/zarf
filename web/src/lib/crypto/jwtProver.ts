@@ -162,6 +162,16 @@ export function isProofGenerationSupported(): boolean {
 // ============================================================================
 
 /**
+ * Convert ASCII string to Hex string of its bytes
+ * e.g. "ABC" -> "0x414243"
+ */
+function toHexFromBytes(str: string): string {
+    const encoder = new TextEncoder();
+    const bytes = encoder.encode(str);
+    return '0x' + Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+/**
  * Convert value to hex string.
  * 
  * @param value - Value to convert (string, number, or bigint)
@@ -328,7 +338,7 @@ export async function generateJwtProof(
             },
 
             // Merkle proof data
-            salt: toHex(salt),
+            secret: toHexFromBytes(salt), // New (ADR-012)
             amount: toHex(amount),
             merkle_siblings: siblings,
             merkle_path_indices: indices,
@@ -366,14 +376,15 @@ export async function generateJwtProof(
 
         return {
             proof: proofHex,
+            publicValues: proof.publicInputs, // Raw array for contract
             publicInputs: {
-                emailHash,
+                identityCommitment: emailHash,
                 merkleRoot: toHex(merkleRoot),
                 recipient: proofRecipient as Address,
                 amount,
             },
             // Convenience duplicates
-            emailHash,
+            identityCommitment: emailHash,
             merkleRoot: toHex(merkleRoot),
             recipient: proofRecipient as Address,
             amount,
