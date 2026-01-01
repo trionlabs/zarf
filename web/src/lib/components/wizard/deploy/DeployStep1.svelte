@@ -1,6 +1,6 @@
 <script lang="ts">
     import { deployStore } from "$lib/stores/deployStore.svelte";
-    import { processWhitelist } from "$lib/services/merkleTree";
+    import { processWhitelist } from "$lib/crypto/merkleTree";
     import { fly } from "svelte/transition";
 
     import { wizardStore } from "$lib/stores/wizardStore.svelte";

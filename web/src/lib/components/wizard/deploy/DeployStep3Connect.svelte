@@ -7,6 +7,15 @@
     import { ERC20ABI } from "$lib/contracts/abis/ERC20";
     import type { Address } from "viem";
     import { formatUnits } from "viem";
+    import {
+        Wallet,
+        Loader2,
+        CheckCircle2,
+        AlertCircle,
+        LogOut,
+        CreditCard,
+        Coins,
+    } from "lucide-svelte";
 
     // Distribution from deploy store
     let distribution = $derived(deployStore.distribution);
@@ -107,90 +116,157 @@
     }
 </script>
 
-<div class="p-8">
-    <div class="mb-6">
-        <h2 class="text-2xl font-bold mb-2">Connect Wallet</h2>
-        <p class="text-base-content/70">
-            Connect the wallet that holds the tokens you want to distribute.
-        </p>
+<div class="max-w-2xl mx-auto py-4">
+    <div class="mb-8 flex items-start gap-4">
+        <div
+            class="w-12 h-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center shrink-0"
+        >
+            <Wallet class="w-6 h-6" />
+        </div>
+        <div>
+            <h2 class="text-2xl font-bold text-base-content">Connect Wallet</h2>
+            <p class="text-base-content/60 mt-1">
+                Connect the wallet that holds the tokens you want to distribute
+                to your recipients.
+            </p>
+        </div>
     </div>
 
     <!-- 1. Wallet Connection -->
-    <div class="card bg-base-100 border border-base-300 shadow-sm mb-6">
-        <div class="card-body">
-            <div class="flex items-center justify-between">
-                <div class="flex items-center gap-3">
-                    <div
-                        class="w-10 h-10 rounded-full flex items-center justify-center {walletStore.isConnected
-                            ? 'bg-success/10 text-success'
-                            : 'bg-base-300 text-base-content/50'}"
-                    >
+    <div
+        class="card bg-base-100 shadow-xl shadow-base-200/50 border border-base-200 overflow-hidden group transition-all duration-300 hover:shadow-2xl hover:shadow-base-200/50 hover:-translate-y-0.5"
+    >
+        <!-- Status Indicator Bar -->
+        <div
+            class="h-1 w-full {walletStore.isConnected
+                ? 'bg-success'
+                : 'bg-base-300'} transition-colors duration-300"
+        ></div>
+
+        <div class="card-body p-6 sm:p-8">
+            <div
+                class="flex flex-col sm:flex-row items-center justify-between gap-6"
+            >
+                <div class="flex items-center gap-4 w-full sm:w-auto">
+                    <div class="relative">
+                        <div
+                            class="w-14 h-14 rounded-full flex items-center justify-center
+                            {walletStore.isConnected
+                                ? 'bg-success/10 text-success'
+                                : 'bg-base-200/50 text-base-content/30'} 
+                            transition-colors duration-300"
+                        >
+                            {#if walletStore.isConnected}
+                                <Wallet class="w-6 h-6" />
+                            {:else}
+                                <CreditCard class="w-6 h-6" />
+                            {/if}
+                        </div>
                         {#if walletStore.isConnected}
-                            ●
-                        {:else}
-                            ?
+                            <div
+                                class="absolute -bottom-1 -right-1 bg-base-100 rounded-full p-1 border border-base-100"
+                            >
+                                <div
+                                    class="w-4 h-4 bg-success rounded-full border-2 border-base-100 indicator-item"
+                                ></div>
+                            </div>
                         {/if}
                     </div>
+
                     <div>
-                        <h3 class="font-bold">
+                        <h3 class="font-bold text-lg">
                             {walletStore.isConnected
                                 ? "Wallet Connected"
                                 : "No Wallet Connected"}
                         </h3>
-                        <p class="text-sm font-mono opacity-60">
-                            {walletStore.isConnected
-                                ? walletStore.shortAddress
-                                : "Please connect your wallet"}
-                        </p>
-                        {#if showNetworkName}
-                            <p class="text-xs opacity-40">
-                                {walletStore.networkName}
+                        {#if walletStore.isConnected}
+                            <p
+                                class="font-mono text-sm opacity-60 bg-base-200/50 px-2 py-0.5 rounded text-center sm:text-left mt-1 inline-block"
+                            >
+                                {walletStore.shortAddress}
                             </p>
+                        {:else}
+                            <p class="text-sm opacity-60 text-balance">
+                                Connect your wallet to proceed
+                            </p>
+                        {/if}
+                        {#if showNetworkName}
+                            <div
+                                class="flex items-center gap-1.5 mt-2 text-xs opacity-50"
+                            >
+                                <div
+                                    class="w-1.5 h-1.5 rounded-full bg-base-content/50"
+                                ></div>
+                                {walletStore.networkName}
+                            </div>
                         {/if}
                     </div>
                 </div>
 
-                {#if !walletStore.isConnected}
-                    <button
-                        class="btn btn-primary"
-                        onclick={handleConnect}
-                        disabled={walletStore.isConnecting}
-                    >
-                        {#if walletStore.isConnecting}
-                            <span class="loading loading-spinner"></span>
-                        {:else}
-                            Connect Wallet
-                        {/if}
-                    </button>
-                {:else}
-                    <div class="flex items-center gap-2">
-                        {#if walletStore.isWrongNetwork}
-                            <div class="badge badge-error badge-outline">
-                                Wrong Network
-                            </div>
-                        {:else}
-                            <div class="badge badge-success badge-outline">
-                                Connected
-                            </div>
-                        {/if}
+                <div
+                    class="flex flex-col items-stretch sm:items-end gap-2 w-full sm:w-auto"
+                >
+                    {#if !walletStore.isConnected}
                         <button
-                            class="btn btn-ghost btn-sm"
-                            onclick={handleDisconnect}
+                            class="btn btn-primary btn-lg shadow-primary/20 shadow-lg min-w-[160px]"
+                            onclick={handleConnect}
+                            disabled={walletStore.isConnecting}
                         >
-                            Disconnect
+                            {#if walletStore.isConnecting}
+                                <Loader2 class="w-5 h-5 animate-spin" />
+                                Connecting...
+                            {:else}
+                                Connect Wallet
+                            {/if}
                         </button>
-                    </div>
-                {/if}
+                    {:else}
+                        <div
+                            class="flex items-center justify-center sm:justify-end gap-2 w-full"
+                        >
+                            {#if walletStore.isWrongNetwork}
+                                <div class="badge badge-error gap-1 py-3 px-4">
+                                    <AlertCircle class="w-4 h-4" />
+                                    Wrong Network
+                                </div>
+                            {:else}
+                                <div
+                                    class="badge badge-success badge-soft gap-1 py-3 px-4"
+                                >
+                                    <CheckCircle2 class="w-4 h-4" />
+                                    Connected
+                                </div>
+                            {/if}
+                            <button
+                                class="btn btn-ghost btn-square btn-sm tooltip tooltip-bottom"
+                                data-tip="Disconnect"
+                                onclick={handleDisconnect}
+                            >
+                                <LogOut
+                                    class="w-4 h-4 opacity-60 hover:opacity-100"
+                                />
+                            </button>
+                        </div>
+                    {/if}
+                </div>
             </div>
 
             {#if walletStore.error}
-                <div class="text-error text-sm mt-2">{walletStore.error}</div>
+                <div
+                    class="mt-4 p-3 bg-error/10 text-error rounded-xl text-sm flex items-start gap-2"
+                >
+                    <AlertCircle class="w-5 h-5 shrink-0 mt-0.5" />
+                    <span>{walletStore.error}</span>
+                </div>
             {/if}
 
             {#if walletStore.isWrongNetwork}
-                <div class="alert alert-warning mt-3">
+                <div
+                    class="mt-4 p-3 bg-warning/10 text-warning-content rounded-xl text-sm flex items-start gap-2 border border-warning/20"
+                >
+                    <AlertCircle class="w-5 h-5 shrink-0 mt-0.5 text-warning" />
                     <span
-                        >⚠️ Please switch to Ethereum Mainnet or Sepolia Testnet</span
+                        >Please switch to Ethereum Mainnet or Sepolia Testnet to
+                        continue.</span
                     >
                 </div>
             {/if}
@@ -199,66 +275,119 @@
 
     <!-- 2. Token Balance Check -->
     {#if showBalanceCheck}
-        <div class="card bg-base-100 border border-base-300 shadow-sm">
-            <div class="card-body">
-                <h3 class="card-title text-sm uppercase opacity-50">
-                    Token Balance Check
-                </h3>
+        <div class="relative mt-6">
+            <div
+                class="absolute inset-0 bg-gradient-to-b from-base-200/50 to-transparent rounded-3xl -z-10 blur-xl opacity-50"
+            ></div>
 
+            <div
+                class="card bg-base-100 border border-base-200 shadow-sm relative overflow-hidden"
+            >
                 {#if checkState.isLoading}
-                    <div class="flex items-center gap-2 py-4">
-                        <span class="loading loading-spinner loading-sm"></span>
-                        <span>Checking balance...</span>
+                    <div
+                        class="card-body py-12 flex flex-col items-center justify-center text-center gap-4 animate-pulse"
+                    >
+                        <div
+                            class="w-12 h-12 bg-base-200 rounded-full flex items-center justify-center"
+                        >
+                            <Loader2 class="w-6 h-6 animate-spin opacity-50" />
+                        </div>
+                        <div>
+                            <div
+                                class="h-4 w-32 bg-base-200 rounded mx-auto mb-2"
+                            ></div>
+                            <p class="text-sm opacity-50">
+                                Verifying token balance...
+                            </p>
+                        </div>
                     </div>
                 {:else if checkState.error}
-                    <div class="alert alert-error text-sm">
-                        {checkState.error}
+                    <div class="card-body">
+                        <div class="alert alert-error shadow-sm">
+                            <AlertCircle class="w-6 h-6" />
+                            <div>
+                                <h3 class="font-bold">Check Failed</h3>
+                                <div class="text-xs">{checkState.error}</div>
+                            </div>
+                        </div>
                     </div>
                 {:else if checkState.symbol}
-                    <div class="flex items-center justify-between py-2">
-                        <div>
-                            <div class="text-2xl font-mono font-bold">
-                                {Number(
-                                    formatUnits(
-                                        checkState.balance,
-                                        checkState.decimals,
-                                    ),
-                                ).toLocaleString()}
-                                {checkState.symbol}
-                            </div>
-                            <div class="text-xs opacity-50">Your Balance</div>
-                        </div>
-                        <div class="text-right">
-                            <div
-                                class="text-xl font-mono font-bold {checkState.hasEnoughBalance
-                                    ? 'text-success'
-                                    : 'text-error'}"
-                            >
-                                {Number(
-                                    distribution?.amount ?? 0,
-                                ).toLocaleString()}
-                                {checkState.symbol}
-                            </div>
-                            <div class="text-xs opacity-50">
-                                Required Amount
-                            </div>
-                        </div>
-                    </div>
-
-                    {#if !checkState.hasEnoughBalance}
-                        <div class="alert alert-error mt-4">
-                            <span
-                                >⚠️ You do not have enough tokens to fund this
-                                distribution.</span
-                            >
-                        </div>
-                    {:else}
+                    <div class="card-body p-0">
                         <div
-                            class="alert alert-success bg-success/10 mt-4 border-none"
+                            class="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-base-200"
                         >
-                            <span>✅ Sufficient balance available.</span>
+                            <!-- Current Balance -->
+                            <div class="p-6 sm:p-8 flex flex-col gap-1">
+                                <span
+                                    class="text-sm uppercase tracking-wider opacity-50 font-semibold flex items-center gap-2"
+                                >
+                                    <Wallet class="w-4 h-4" /> Your Balance
+                                </span>
+                                <div
+                                    class="text-3xl sm:text-4xl font-mono font-bold tracking-tight text-base-content mt-2 truncate"
+                                >
+                                    {Number(
+                                        formatUnits(
+                                            checkState.balance,
+                                            checkState.decimals,
+                                        ),
+                                    ).toLocaleString(undefined, {
+                                        maximumFractionDigits: 4,
+                                    })}
+                                    <span
+                                        class="text-lg text-base-content/40 ml-1 font-sans font-normal"
+                                        >{checkState.symbol}</span
+                                    >
+                                </div>
+                            </div>
+
+                            <!-- Required Amount -->
+                            <div
+                                class="p-6 sm:p-8 flex flex-col gap-1 bg-base-200/30"
+                            >
+                                <span
+                                    class="text-sm uppercase tracking-wider opacity-50 font-semibold flex items-center gap-2"
+                                >
+                                    <Coins class="w-4 h-4" /> Required
+                                </span>
+                                <div
+                                    class="text-3xl sm:text-4xl font-mono font-bold tracking-tight mt-2 truncate {checkState.hasEnoughBalance
+                                        ? 'text-success'
+                                        : 'text-error'}"
+                                >
+                                    {Number(
+                                        distribution?.amount ?? 0,
+                                    ).toLocaleString()}
+                                    <span
+                                        class="text-lg opacity-40 ml-1 font-sans font-normal text-base-content"
+                                        >{checkState.symbol}</span
+                                    >
+                                </div>
+                            </div>
                         </div>
-                    {/if}
+
+                        <!-- Status Footer -->
+                        {#if !checkState.hasEnoughBalance}
+                            <div
+                                class="p-4 bg-error/10 border-t border-error/10 flex items-center gap-3 text-error"
+                            >
+                                <AlertCircle class="w-5 h-5 shrink-0" />
+                                <span class="font-medium text-sm"
+                                    >Insufficient balance to fund this
+                                    distribution.</span
+                                >
+                            </div>
+                        {:else}
+                            <div
+                                class="p-4 bg-success/10 border-t border-success/10 flex items-center gap-3 text-success"
+                            >
+                                <CheckCircle2 class="w-5 h-5 shrink-0" />
+                                <span class="font-medium text-sm"
+                                    >You have sufficient funds to proceed.</span
+                                >
+                            </div>
+                        {/if}
+                    </div>
                 {/if}
             </div>
         </div>

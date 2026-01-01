@@ -1,6 +1,6 @@
 <script lang="ts">
     import { deployStore } from "$lib/stores/deployStore.svelte";
-    import { getMerkleProof } from "$lib/services/merkleTree";
+    import { getMerkleProof } from "$lib/crypto/merkleTree";
     import { fly } from "svelte/transition";
 
     // Direct derived state
@@ -25,9 +25,7 @@
                 leaf: "0x" + claim.leaf.toString(16),
                 identityCommitment: claim.identityCommitment, // Public Identifier
                 merkleProof: {
-                    siblings: proof.siblings.map(
-                        (sib: bigint) => "0x" + sib.toString(16),
-                    ),
+                    siblings: proof.siblings,
                     indices: proof.indices,
                 },
             };

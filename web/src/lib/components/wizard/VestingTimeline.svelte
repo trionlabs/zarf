@@ -92,16 +92,32 @@
 
     const formatDateLong = (date: Date | null) => {
         if (!date) return "—";
-        return date.toLocaleDateString("en-US", {
+        const dateStr = date.toLocaleDateString("en-US", {
             weekday: "short",
             month: "short",
             day: "numeric",
             year: "numeric",
         });
+
+        if (durationUnit === "hours" || durationUnit === "minutes") {
+            return `${dateStr} @ ${date.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false })}`;
+        }
+        return dateStr;
     };
 
     const formatDateShort = (date: Date | null) => {
         if (!date) return "—";
+
+        if (durationUnit === "hours" || durationUnit === "minutes") {
+            return date.toLocaleString("en-US", {
+                month: "short",
+                day: "numeric",
+                hour: "2-digit",
+                minute: "2-digit",
+                hour12: false,
+            });
+        }
+
         return date.toLocaleDateString("en-US", {
             month: "short",
             day: "numeric",
@@ -139,6 +155,10 @@
     // Frequency label
     const frequencyLabel = $derived.by(() => {
         switch (durationUnit) {
+            case "minutes":
+                return "Every Minute";
+            case "hours":
+                return "Hourly";
             case "weeks":
                 return "Weekly";
             case "months":

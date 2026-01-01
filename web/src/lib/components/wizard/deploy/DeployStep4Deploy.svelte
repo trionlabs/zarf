@@ -702,12 +702,36 @@
             </div>
         {:else if currentStep !== "idle" && currentStep !== "error"}
             <!-- In Progress -->
-            <div class="text-center text-base-content/70">
+            <div
+                class="flex flex-col items-center gap-4 text-center text-base-content/70"
+            >
                 <span class="loading loading-ring loading-lg"></span>
-                <p class="mt-2">
+                <p>
                     Deployment in progress... Please confirm transactions in
                     your wallet.
                 </p>
+
+                {#if currentMessage}
+                    <p class="text-sm text-primary">{currentMessage}</p>
+                {/if}
+
+                <!-- Show contract address if already known -->
+                {#if contractAddress}
+                    <div class="mt-2 p-3 bg-success/10 rounded-lg">
+                        <p class="text-xs text-success font-medium mb-1">
+                            Contract Address:
+                        </p>
+                        <code class="text-xs font-mono">{contractAddress}</code>
+                    </div>
+                {/if}
+
+                <!-- Reset button for stuck states -->
+                <button
+                    class="btn btn-ghost btn-xs text-error opacity-50 hover:opacity-100 mt-4"
+                    onclick={resetDeployState}
+                >
+                    Reset Stuck State
+                </button>
             </div>
         {/if}
     </div>
