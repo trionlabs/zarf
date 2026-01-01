@@ -5,6 +5,7 @@
         FactoryDeployService,
         getFactoryAddress,
         isFactoryAvailable,
+        parseVestingAddressFromReceipt,
         type FactoryDeployConfig,
         type FactoryDeployProgress,
     } from "$lib/services/factoryDeploy";
@@ -19,9 +20,20 @@
     } from "$lib/services/distributionDiscovery";
     import { walletStore } from "$lib/stores/walletStore.svelte";
     import { goto } from "$app/navigation";
+    import {
+        Check,
+        Rocket,
+        AlertTriangle,
+        ExternalLink,
+        Loader2,
+        Sparkles,
+        AlertCircle,
+    } from "lucide-svelte";
     import type { Address, Hash } from "viem";
     import { parseUnits } from "viem";
     import { onMount } from "svelte";
+    import { waitForTransactionReceipt } from "@wagmi/core";
+    import { wagmiConfig } from "$lib/contracts/wallet";
 
     // Local state from stores
     let distribution = $derived(deployStore.distribution);
@@ -57,22 +69,88 @@
     const showFactoryWarning = $derived(!factoryAvailable && Boolean(chainId));
     const showNotDeployedIdle = $derived(!isDeployed && currentStep === "idle");
 
-    // Recovery Logic (The "Resume" Handler)
-    onMount(() => {
-        // Check if we have pending transactions in store
+    // Recovery Logic: Resume pending transactions after page refresh
+    onMount(async () => {
         if (deployStore.createTxHash) {
-            console.log("Found pending create TX, recovering state...");
+            if (import.meta.env.DEV)
+                console.log("Recovering pending create TX...");
             currentStep = "create";
-            isDeploying = true; // Block UI
-            currentMessage = "Resuming deployment...";
-            // TODO: Ideally we should poll the receipt here to see if it's done
+            isDeploying = true;
+            currentMessage = "Checking deployment status...";
+
+            try {
+                const receipt = await waitForTransactionReceipt(wagmiConfig, {
+                    hash: deployStore.createTxHash as Hash,
+                });
+
+                if (receipt.status === "success") {
+                    let recoveredAddress: Address | null = null;
+                    try {
+                        recoveredAddress =
+                            parseVestingAddressFromReceipt(receipt);
+                    } catch (err) {
+                        if (import.meta.env.DEV)
+                            console.warn("Failed to parse logs", err);
+                    }
+
+                    if (recoveredAddress && distribution) {
+                        deployStore.setDeployed(recoveredAddress);
+                        wizardStore.moveDistributionToLaunched(
+                            distribution.id,
+                            receipt.transactionHash,
+                        );
+                    }
+
+                    currentStep = "complete";
+                    isDeploying = false;
+                    currentMessage = "Deployment confirmed.";
+                } else {
+                    error = "Transaction failed on-chain.";
+                    isDeploying = false;
+                    currentStep = "error";
+                }
+            } catch (e: unknown) {
+                if (import.meta.env.DEV)
+                    console.error("Failed to check create tx", e);
+                currentMessage = "Waiting for confirmation...";
+            }
         } else if (deployStore.approveTxHash) {
-            console.log("Found pending approval, recovering state...");
+            if (import.meta.env.DEV)
+                console.log("Recovering pending approval TX...");
             currentStep = "approve";
             isDeploying = true;
-            currentMessage = "Resuming approval...";
+            currentMessage = "Checking approval status...";
+
+            try {
+                const receipt = await waitForTransactionReceipt(wagmiConfig, {
+                    hash: deployStore.approveTxHash as Hash,
+                });
+
+                if (receipt.status === "success") {
+                    currentStep = "idle";
+                    isDeploying = false;
+                } else {
+                    error = "Approval transaction failed.";
+                    isDeploying = false;
+                    currentStep = "error";
+                }
+            } catch (e: unknown) {
+                if (import.meta.env.DEV)
+                    console.error("Failed to check approve tx", e);
+                currentMessage = "Waiting for approval confirmation...";
+            }
         }
     });
+
+    function resetDeployState() {
+        if (confirm("Are you sure you want to reset the deployment state?")) {
+            deployStore.reset(true);
+            isDeploying = false;
+            currentStep = "idle";
+            error = null;
+            currentMessage = "";
+        }
+    }
 
     async function handleDeploy() {
         if (!distribution || !merkleResult || !walletAddress || !chainId)
@@ -85,7 +163,7 @@
                 await walletStore.switchChain(11155111); // Sepolia
                 // Wait for network switch to propagate
                 await new Promise((resolve) => setTimeout(resolve, 1000));
-            } catch (e: any) {
+            } catch (e: unknown) {
                 error =
                     "Failed to switch network. Please switch manually in MetaMask.";
                 return;

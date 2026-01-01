@@ -60,6 +60,13 @@ export interface FactoryDeployProgress {
 export type FactoryProgressCallback = (progress: FactoryDeployProgress) => void;
 
 // ============================================================================
+// Constants
+// ============================================================================
+
+/** VestingCreated event signature for log parsing */
+export const VESTING_CREATED_EVENT = 'VestingCreated(address,address,uint256,string)' as const;
+
+// ============================================================================
 // Service Class
 // ============================================================================
 
@@ -107,7 +114,7 @@ export class FactoryDeployService {
                         message: `RPC rate limited. Retrying in ${waitSeconds}s... (attempt ${attempt + 2}/${this.MAX_RETRIES + 1})`
                     });
 
-                    await this.delay(delayMs);
+                    await delay(delayMs);
                     continue;
                 }
 
@@ -121,12 +128,34 @@ export class FactoryDeployService {
 
     /**
      * Step 1: Approve Factory to spend tokens
+     * @returns Transaction hash if approval was needed, null if skipped
      */
-    async approveFactory(): Promise<Hash> {
+    async approveFactory(): Promise<Hash | null> {
+        this.onProgress({ step: 'approve', message: 'Checking existing token allowance...' });
+
+        const wallet = await getWalletClient(wagmiConfig);
+        const publicClient = getPublicClient(wagmiConfig);
+
+        if (!publicClient) {
+            throw new Error('Public client not available. Please check your wallet connection.');
+        }
+
+        // Check current allowance
+        const allowance = await publicClient.readContract({
+            address: this.config.tokenAddress,
+            abi: ERC20ABI,
+            functionName: 'allowance',
+            args: [this.config.owner, this.config.factoryAddress]
+        });
+
+        if (allowance >= this.config.totalAmount) {
+            this.onProgress({ step: 'approve', message: 'Existing allowance sufficient. Skipping approval.' });
+            return null; // No transaction needed
+        }
+
         this.onProgress({ step: 'approve', message: 'Requesting token approval...' });
 
         const hash = await this.withRetry(async () => {
-            const wallet = await getWalletClient(wagmiConfig);
             return wallet.writeContract({
                 address: this.config.tokenAddress,
                 abi: ERC20ABI,
@@ -162,7 +191,7 @@ export class FactoryDeployService {
                 args: [{
                     token: this.config.tokenAddress,
                     merkleRoot: this.config.merkleRoot,
-                    commitments: this.config.commitments,
+                    emailHashes: this.config.commitments, // Map new commitments to old ABI field
                     amounts: this.config.amounts,
                     cliffDuration: this.config.cliffSeconds,
                     vestingDuration: this.config.vestingSeconds,
@@ -197,7 +226,7 @@ export class FactoryDeployService {
             await this.approveFactory();
 
             // Small delay to ensure RPC state is synced
-            await this.delay(1000);
+            await delay(1000);
 
             // TX 2: Create & Fund
             const { vestingAddress } = await this.createAndFundVesting();
@@ -206,8 +235,8 @@ export class FactoryDeployService {
 
             return vestingAddress;
 
-        } catch (error: any) {
-            const message = this.sanitizeError(error);
+        } catch (error: unknown) {
+            const message = sanitizeError(error);
             this.onProgress({ step: 'error', message });
             throw error;
         }
@@ -217,82 +246,90 @@ export class FactoryDeployService {
      * Parse VestingCreated event from transaction receipt
      */
     private parseVestingAddress(receipt: TransactionReceipt): Address {
+        return parseVestingAddressFromReceipt(receipt);
+    }
+}
+
+// ============================================================================
+// Utility Functions (Exported for reuse)
+// ============================================================================
+
+/**
+ * Parse VestingCreated event from transaction receipt to extract deployed contract address.
+ * Can be used for recovery scenarios outside the service class.
+ */
+export function parseVestingAddressFromReceipt(receipt: TransactionReceipt): Address {
+    // Try VIEM's decodeEventLog for robust parsing
+    for (const log of receipt.logs) {
         try {
-            // Use VIEM's decodeEventLog for robust parsing
-            for (const log of receipt.logs) {
-                try {
-                    const event = decodeEventLog({
-                        abi: ZarfVestingFactoryABI,
-                        data: log.data,
-                        topics: log.topics
-                    });
+            const event = decodeEventLog({
+                abi: ZarfVestingFactoryABI,
+                data: log.data,
+                topics: log.topics
+            });
 
-                    if (event.eventName === 'VestingCreated') {
-                        // Args: owner, vestingContract, deploymentId, name
-                        return (event.args as any).vestingContract as Address;
-                    }
-                } catch (e) {
-                    // Ignore logs that don't match our ABI
-                    continue;
-                }
+            if (event.eventName === 'VestingCreated') {
+                const args = event.args as unknown as { vestingContract: Address };
+                return args.vestingContract;
             }
-        } catch (error) {
-            console.warn('Failed to parse VestingCreated event:', error);
+        } catch {
+            // Ignore logs that don't match our ABI
+            continue;
         }
+    }
 
-        // Fallback: Legacy manual parsing if decode fails
-        const eventSignature = 'VestingCreated(address,address,uint256,string)';
-        const eventTopic = keccak256(toBytes(eventSignature));
+    // Fallback: Manual topic parsing
+    const eventTopic = keccak256(toBytes(VESTING_CREATED_EVENT));
 
-        for (const log of receipt.logs) {
-            if (log.topics[0] === eventTopic) {
-                // Second indexed param (index 1 in topics array) is vestingContract
-                // topics[0] = signature
-                // topics[1] = owner (indexed)
-                // topics[2] = vestingContract (indexed)
-                // topics[3] = deploymentId (indexed)
-                const vestingAddressRaw = log.topics[2];
-                if (vestingAddressRaw) {
-                    return `0x${vestingAddressRaw.slice(-40)}` as Address;
-                }
+    for (const log of receipt.logs) {
+        if (log.topics[0] === eventTopic) {
+            // topics[2] is vestingContract (indexed)
+            const vestingAddressRaw = log.topics[2];
+            if (vestingAddressRaw) {
+                return `0x${vestingAddressRaw.slice(-40)}` as Address;
             }
         }
-
-        throw new Error('VestingCreated event not found in transaction receipt');
     }
 
-    private delay(ms: number): Promise<void> {
-        return new Promise(resolve => setTimeout(resolve, ms));
+    throw new Error('VestingCreated event not found in transaction receipt');
+}
+
+// ============================================================================
+// Helper Functions (Internal to module)
+// ============================================================================
+
+function delay(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function sanitizeError(error: unknown): string {
+    const message = (error as { message?: string })?.message || '';
+
+    if (message.includes('rejected') || message.includes('denied')) {
+        return 'Transaction rejected by user';
+    }
+    if (message.includes('insufficient allowance')) {
+        return 'Insufficient token approval. Please approve more tokens.';
+    }
+    if (message.includes('insufficient balance')) {
+        return 'Insufficient token balance';
+    }
+    if (message.includes('ArrayLengthMismatch')) {
+        return 'Allocation data mismatch: email hashes and amounts must have same length';
+    }
+    if (message.includes('ZeroAllocations')) {
+        return 'No allocations provided';
+    }
+    if (message.includes('TransferFailed')) {
+        return 'Token transfer failed';
+    }
+    const code = (error as { code?: number })?.code;
+    if (message.includes('rate limit') || message.includes('too many') || message.includes('resource not available') || message.includes('ResourceUnavailable') || code === -32002) {
+        return 'MetaMask RPC rate limited. Fix: Open MetaMask → Settings → Networks → Sepolia → Change RPC URL to: https://ethereum-sepolia-rpc.publicnode.com';
     }
 
-    private sanitizeError(error: any): string {
-        const message = error?.message || '';
-
-        if (message.includes('rejected') || message.includes('denied')) {
-            return 'Transaction rejected by user';
-        }
-        if (message.includes('insufficient allowance')) {
-            return 'Insufficient token approval. Please approve more tokens.';
-        }
-        if (message.includes('insufficient balance')) {
-            return 'Insufficient token balance';
-        }
-        if (message.includes('ArrayLengthMismatch')) {
-            return 'Allocation data mismatch: email hashes and amounts must have same length';
-        }
-        if (message.includes('ZeroAllocations')) {
-            return 'No allocations provided';
-        }
-        if (message.includes('TransferFailed')) {
-            return 'Token transfer failed';
-        }
-        if (message.includes('rate limit') || message.includes('too many') || message.includes('resource not available') || message.includes('ResourceUnavailable') || error?.code === -32002) {
-            return 'MetaMask RPC rate limited. Fix: Open MetaMask → Settings → Networks → Sepolia → Change RPC URL to: https://ethereum-sepolia-rpc.publicnode.com';
-        }
-
-        // Return original message for development, sanitize in production
-        return import.meta.env.DEV ? message : 'Transaction failed. Please try again.';
-    }
+    // Return original message for development, sanitize in production
+    return import.meta.env.DEV ? message : 'Transaction failed. Please try again.';
 }
 
 // ============================================================================
