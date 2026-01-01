@@ -12,21 +12,27 @@ import "../src/TestToken.sol";
 contract DeployTestToken is Script {
     function run() external {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
+        address targetAddress = 0x822eEa13f8f91a2A6dFeD760393883dFAc0E3D87;
         
         vm.startBroadcast(deployerPrivateKey);
         
-        // Deploy ZRFT token with 100K supply
+        // Deploy ZRFTST token with 1M supply
         TestToken token = new TestToken(
-            "ZRFTEST",      // name
-            "ZRFT",         // symbol  
-            100_000         // initial supply (100K tokens)
+            "Zarf Test Token", // name
+            "ZRFTST",         // symbol
+            1_000_000         // initial supply (1M tokens)
         );
+        
+        // Transfer all tokens to the target address if the deployer is not the target
+        if (msg.sender != targetAddress) {
+            token.transfer(targetAddress, token.totalSupply());
+        }
         
         console.log("TestToken deployed at:", address(token));
         console.log("Name:", token.name());
         console.log("Symbol:", token.symbol());
         console.log("Total Supply:", token.totalSupply());
-        console.log("Deployer Balance:", token.balanceOf(msg.sender));
+        console.log("Target Balance:", token.balanceOf(targetAddress));
         
         vm.stopBroadcast();
     }

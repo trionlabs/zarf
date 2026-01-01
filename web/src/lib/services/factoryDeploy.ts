@@ -64,7 +64,7 @@ export type FactoryProgressCallback = (progress: FactoryDeployProgress) => void;
 // ============================================================================
 
 /** VestingCreated event signature for log parsing */
-export const VESTING_CREATED_EVENT = 'VestingCreated(address,address,uint256,string)' as const;
+export const VESTING_CREATED_EVENT = 'VestingCreated(address,address,address,uint256,uint256)' as const;
 
 // ============================================================================
 // Service Class
@@ -269,8 +269,8 @@ export function parseVestingAddressFromReceipt(receipt: TransactionReceipt): Add
             });
 
             if (event.eventName === 'VestingCreated') {
-                const args = event.args as unknown as { vestingContract: Address };
-                return args.vestingContract;
+                const args = event.args as unknown as { vesting: Address };
+                return args.vesting;
             }
         } catch {
             // Ignore logs that don't match our ABI
@@ -283,8 +283,8 @@ export function parseVestingAddressFromReceipt(receipt: TransactionReceipt): Add
 
     for (const log of receipt.logs) {
         if (log.topics[0] === eventTopic) {
-            // topics[2] is vestingContract (indexed)
-            const vestingAddressRaw = log.topics[2];
+            // topics[1] is vestingContract (first indexed parameter)
+            const vestingAddressRaw = log.topics[1];
             if (vestingAddressRaw) {
                 return `0x${vestingAddressRaw.slice(-40)}` as Address;
             }

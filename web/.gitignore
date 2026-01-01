@@ -28,3 +28,4 @@ reports/
 *.md
 **/*.md
 **/_backlogs/
+*.json

@@ -19,7 +19,7 @@ import {
     type Address
 } from 'viem';
 import { sepolia } from 'viem/chains';
-import type { VestingInfo, TransactionResult } from '../types';
+import type { VestingInfo, TransactionResult, VestingSchedule } from '../types';
 
 // ============================================================================
 // Configuration
@@ -68,6 +68,10 @@ const VESTING_ABI = parseAbi([
     'function cliffDuration() external view returns (uint256)',
     'function vestingDuration() external view returns (uint256)',
     'function merkleRoot() external view returns (bytes32)',
+
+    'function vestingPeriod() external view returns (uint256)',
+    'function getVestingInfo() external view returns (uint256 start, uint256 cliff, uint256 duration, uint256 period)',
+    'function getUnlockProgress() external view returns (uint256 completed, uint256 total)',
 
     // Errors
     'error InvalidProof()',
@@ -260,10 +264,12 @@ export async function readVestingContract(address: Address) {
 export async function submitClaim(
     proof: string,
     publicInputs: (string | bigint)[],
-    account: Address
+    account: Address,
+    contractAddress?: Address
 ): Promise<{ hash: Hash; receipt: any }> {
-    if (!VESTING_ADDRESS) {
-        throw new Error('Vesting contract not configured. Set VITE_VESTING_ADDRESS in .env file.');
+    const targetAddress = contractAddress || VESTING_ADDRESS;
+    if (!targetAddress) {
+        throw new Error('Vesting contract not configured. Set VITE_VESTING_ADDRESS in .env file or pass explicit address.');
     }
 
     // Ensure wallet is on Sepolia
@@ -286,6 +292,7 @@ export async function submitClaim(
     });
 
     console.log('[Contracts] Submitting claim:', {
+        targetAddress,
         proof: proofBytes.slice(0, 20) + '...',
         publicInputsCount: formattedInputs.length,
         account,
@@ -294,7 +301,7 @@ export async function submitClaim(
     // Simulate transaction to catch errors before sending
     try {
         await publicClient.simulateContract({
-            address: VESTING_ADDRESS,
+            address: targetAddress,
             abi: VESTING_ABI,
             functionName: 'claim',
             args: [proofBytes as `0x${string}`, formattedInputs],
@@ -329,7 +336,7 @@ export async function submitClaim(
 
     // Submit transaction
     const hash = await walletClient.writeContract({
-        address: VESTING_ADDRESS,
+        address: targetAddress,
         abi: VESTING_ABI,
         functionName: 'claim',
         args: [proofBytes as `0x${string}`, formattedInputs],
@@ -424,14 +431,16 @@ export async function getVestingInfo(): Promise<VestingInfo | null> {
  * ```
  */
 export async function getClaimStatus(
-    emailHash: string
+    emailHash: string,
+    contractAddress?: Address
 ): Promise<{
     allocation: string;
     claimed: string;
     vested: string;
     claimable: string;
 } | null> {
-    if (!VESTING_ADDRESS) {
+    const targetAddress = contractAddress || VESTING_ADDRESS;
+    if (!targetAddress) {
         return null;
     }
 
@@ -440,25 +449,25 @@ export async function getClaimStatus(
     try {
         const [allocation, claimed, vested, claimable] = await Promise.all([
             publicClient.readContract({
-                address: VESTING_ADDRESS,
+                address: targetAddress,
                 abi: VESTING_ABI,
                 functionName: 'allocations',
                 args: [emailHash as `0x${string}`],
             }),
             publicClient.readContract({
-                address: VESTING_ADDRESS,
+                address: targetAddress,
                 abi: VESTING_ABI,
                 functionName: 'claimed',
                 args: [emailHash as `0x${string}`],
             }),
             publicClient.readContract({
-                address: VESTING_ADDRESS,
+                address: targetAddress,
                 abi: VESTING_ABI,
                 functionName: 'calculateVested',
                 args: [emailHash as `0x${string}`],
             }),
             publicClient.readContract({
-                address: VESTING_ADDRESS,
+                address: targetAddress,
                 abi: VESTING_ABI,
                 functionName: 'getClaimable',
                 args: [emailHash as `0x${string}`],
@@ -473,6 +482,92 @@ export async function getClaimStatus(
         };
     } catch (error) {
         console.warn('[Contracts] Failed to fetch claim status:', error);
+        return null;
+    }
+}
+
+/**
+ * Get vesting schedule parameters.
+ * 
+ * @param contractAddress - Optional override
+ * @returns Vesting schedule or null
+ */
+export async function getVestingSchedule(
+    contractAddress?: Address
+): Promise<VestingSchedule | null> {
+    const targetAddress = contractAddress || VESTING_ADDRESS;
+    if (!targetAddress) return null;
+
+    const publicClient = getPublicClient();
+
+    try {
+        // Try to get structured info first
+        try {
+            const [start, cliff, duration, period] = await publicClient.readContract({
+                address: targetAddress,
+                abi: VESTING_ABI,
+                functionName: 'getVestingInfo',
+            });
+
+            return {
+                vestingStart: Number(start),
+                cliffDuration: Number(cliff),
+                vestingDuration: Number(duration),
+                vestingPeriod: Number(period)
+            };
+        } catch {
+            // Fallback to individual calls
+            const [start, cliff, duration, period] = await Promise.all([
+                publicClient.readContract({ address: targetAddress, abi: VESTING_ABI, functionName: 'vestingStart' }),
+                publicClient.readContract({ address: targetAddress, abi: VESTING_ABI, functionName: 'cliffDuration' }),
+                publicClient.readContract({ address: targetAddress, abi: VESTING_ABI, functionName: 'vestingDuration' }),
+                publicClient.readContract({ address: targetAddress, abi: VESTING_ABI, functionName: 'vestingPeriod' })
+            ]);
+
+            return {
+                vestingStart: Number(start),
+                cliffDuration: Number(cliff),
+                vestingDuration: Number(duration),
+                vestingPeriod: Number(period)
+            };
+        }
+    } catch (error) {
+        console.warn('[Contracts] Failed to fetch vesting schedule:', error);
+        // Fallback for contracts without period (backward compatibility)
+        if (error instanceof Error) {
+            return null;
+        }
+        return null;
+    }
+}
+
+/**
+ * Get vesting unlock progress.
+ * 
+ * @param contractAddress - Optional override
+ * @returns Progress stats or null
+ */
+export async function getUnlockProgress(
+    contractAddress?: Address
+): Promise<{ completed: number; total: number } | null> {
+    const targetAddress = contractAddress || VESTING_ADDRESS;
+    if (!targetAddress) return null;
+
+    const publicClient = getPublicClient();
+
+    try {
+        const [completed, total] = await publicClient.readContract({
+            address: targetAddress,
+            abi: VESTING_ABI,
+            functionName: 'getUnlockProgress',
+        });
+
+        return {
+            completed: Number(completed),
+            total: Number(total)
+        };
+    } catch (error) {
+        console.warn('[Contracts] Failed to fetch unlock progress:', error);
         return null;
     }
 }
