@@ -54,7 +54,7 @@ function restore() {
     try {
         const saved = localStorage.getItem(STORAGE_KEY);
 
-        if (saved === 'nord' || saved === 'wireframe') {
+        if (saved === 'nord' || saved === 'wireframe' || saved === 'dim') {
             currentTheme = saved;
             document.documentElement.setAttribute('data-theme', saved);
         } else {

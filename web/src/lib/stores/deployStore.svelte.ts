@@ -1,6 +1,6 @@
 import type { Distribution, Recipient } from './types.js';
+import type { MerkleTreeData } from '../types.js';
 import type { DeployProgress, DeployConfig } from '../services/deploy.js';
-import type { MerkleTreeResult } from '../services/merkleTree.js';
 import type { Address } from 'viem';
 import { safeParse, safeStringify } from '../utils/json.js';
 
@@ -14,7 +14,7 @@ export class DeployState {
 
     // Data
     distribution = $state<Distribution | null>(null);
-    merkleResult = $state<MerkleTreeResult | null>(null);
+    merkleResult = $state<MerkleTreeData | null>(null);
     isGeneratingMerkle = $state(false);
     merkleError = $state<string | null>(null);
 
@@ -139,7 +139,7 @@ export class DeployState {
         this.merkleError = null;
     }
 
-    setMerkleResult(result: MerkleTreeResult) {
+    setMerkleResult(result: MerkleTreeData) {
         this.isGeneratingMerkle = false;
         this.merkleResult = result;
         this.save(); // Critical save point

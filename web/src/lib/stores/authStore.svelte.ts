@@ -43,6 +43,7 @@ const initialWalletState: WalletSession = {
 
 let gmailState = $state<GmailSession>(initialGmailState);
 let walletState = $state<WalletSession>(initialWalletState);
+let isHydrated = $state(false); // Tracks if client-side restoration has completed
 
 // ============================================================================
 // Actions
@@ -55,6 +56,11 @@ function setGmailSession(data: Partial<GmailSession>) {
     // Persist JWT to sessionStorage (strictly for refresh survival)
     if (browser && data.jwt) {
         sessionStorage.setItem(STORAGE_KEYS.GMAIL_JWT, data.jwt);
+    }
+
+    // If setting session on client, also mark as hydrated
+    if (browser) {
+        isHydrated = true;
     }
 }
 
@@ -75,9 +81,11 @@ function setWalletSession(data: Partial<WalletSession>) {
 
 /**
  * Restores session from storage and validates JWT integrity.
+ * Always marks isHydrated = true at the end, regardless of session state.
  */
 function restoreGmailSession() {
     if (!browser) return;
+
     const jwt = sessionStorage.getItem(STORAGE_KEYS.GMAIL_JWT);
     if (jwt) {
         try {
@@ -87,20 +95,21 @@ function restoreGmailSession() {
             if (payload.exp < now) {
                 console.warn('[AuthStore] Session expired, clearing...');
                 clearGmailSession();
-                return;
+            } else {
+                gmailState.email = payload.email;
+                gmailState.jwt = jwt;
+                gmailState.expiresAt = payload.exp;
+                gmailState.isAuthenticated = true;
+                console.log('[AuthStore] Session restored for:', payload.email);
             }
-
-            gmailState.email = payload.email;
-            gmailState.jwt = jwt;
-            gmailState.expiresAt = payload.exp;
-            gmailState.isAuthenticated = true;
-            
-            console.log('[AuthStore] Session restored for:', payload.email);
         } catch (e) {
             console.error('[AuthStore] Failed to restore session:', e);
             clearGmailSession();
         }
     }
+
+    // Always mark as hydrated after restoration attempt
+    isHydrated = true;
 }
 
 // ============================================================================
@@ -110,6 +119,9 @@ function restoreGmailSession() {
 export const authStore = {
     get gmail() { return gmailState; },
     get wallet() { return walletState; },
+
+    // Hydration-Safe Getter: Ensures we never show "Authenticated" during SSR/Hydration mismatch
+    get isAuthenticated() { return gmailState.isAuthenticated && isHydrated; },
 
     setGmailSession,
     clearGmailSession,

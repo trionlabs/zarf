@@ -188,6 +188,16 @@ export interface VestingInfo {
 }
 
 /**
+ * Vesting schedule parameters
+ */
+export interface VestingSchedule {
+    vestingStart: number;
+    cliffDuration: number;
+    vestingDuration: number;
+    vestingPeriod: number;
+}
+
+/**
  * Transaction result
  */
 export interface TransactionResult {

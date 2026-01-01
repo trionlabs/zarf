@@ -7,6 +7,7 @@
 
 export interface ClaimData {
     email: string;
+    emailHash: string;  // Pedersen hash of email - needed for contract queries (getClaimable)
     salt: string;
     amount: string;
     merkleProof: {
@@ -39,22 +40,27 @@ export function validateClaimData(json: any): { success: boolean; data?: ClaimDa
         return { success: false, error: 'Invalid salt. Must be a 0x-prefixed hex string.' };
     }
 
-    // 3. Amount
+    // 3. EmailHash (Pedersen hash of email - for contract queries)
+    if (!json.emailHash || typeof json.emailHash !== 'string' || !HEX_REGEX.test(json.emailHash)) {
+        return { success: false, error: 'Invalid emailHash. Must be a 0x-prefixed hex string.' };
+    }
+
+    // 4. Amount
     if (!json.amount || typeof json.amount !== 'string' || (!HEX_REGEX.test(json.amount) && isNaN(Number(json.amount)))) {
         return { success: false, error: 'Invalid amount. Must be a hex string or number string.' };
     }
 
-    // 4. Recipient
+    // 5. Recipient
     if (!json.recipient || typeof json.recipient !== 'string' || !/^0x[a-fA-F0-9]{40}$/.test(json.recipient)) {
         return { success: false, error: 'Invalid recipient address. Must be a 42-char ox-string.' };
     }
 
-    // 5. Merkle Root
+    // 6. Merkle Root
     if (!json.merkleRoot || typeof json.merkleRoot !== 'string' || !HEX_REGEX.test(json.merkleRoot)) {
         return { success: false, error: 'Invalid merkleRoot. Must be a 0x-prefixed hex string.' };
     }
 
-    // 6. Merkle Proof Structure
+    // 7. Merkle Proof Structure
     if (!json.merkleProof || typeof json.merkleProof !== 'object') {
         return { success: false, error: 'Missing merkleProof object.' };
     }
