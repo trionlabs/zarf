@@ -3,13 +3,15 @@
     import { page } from "$app/stores";
     import { goto } from "$app/navigation";
     import { authStore } from "$lib/stores/authStore.svelte";
-    import { claimStore } from "$lib/stores/claimStore.svelte";
+    import { claimFlowStore } from "$lib/stores/claimFlowStore.svelte";
 
     // Components
-    import WizardLayout from "$lib/components/claim/wizard/WizardLayout.svelte";
-    import Step1Upload from "$lib/components/claim/wizard/Step1Upload.svelte";
-    import Step2Proof from "$lib/components/claim/wizard/Step2Proof.svelte";
-    import Step3Review from "$lib/components/claim/wizard/Step3Review.svelte";
+    import ClaimSteps from "$lib/components/claim/wizard/ClaimSteps.svelte";
+    import ClaimStep1Identify from "$lib/components/claim/steps/ClaimStep1Identify.svelte";
+    import ClaimStep2Timeline from "$lib/components/claim/steps/ClaimStep2Timeline.svelte";
+    import ClaimStep3Wallet from "$lib/components/claim/steps/ClaimStep3Wallet.svelte";
+    import ClaimStep4Proof from "$lib/components/claim/steps/ClaimStep4Proof.svelte";
+    import ClaimStep5Submit from "$lib/components/claim/steps/ClaimStep5Submit.svelte";
 
     let contractAddress = $state<string | null>(null);
 
@@ -22,24 +24,22 @@
 
         // 3. Security Check: Must be authenticated
         if (!authStore.gmail.isAuthenticated) {
-            console.warn(
-                "Unauthorized access to wizard. Redirecting to claim portal.",
-            );
+            if (import.meta.env.DEV)
+                console.warn("Unauthorized access to wizard.");
             goto("/claim");
             return;
         }
 
         if (!contractAddress) {
-            console.warn(
-                "No contract address specified. Redirecting to claim portal.",
-            );
+            if (import.meta.env.DEV)
+                console.warn("No contract address specified.");
             goto("/claim");
         }
     });
 </script>
 
 <div class="space-y-6">
-    <!-- Page Header (Optional, or integrate into content) -->
+    <!-- Page Header -->
     <div class="flex items-center justify-between">
         <div>
             <h1 class="text-2xl font-bold">Secure Claim</h1>
@@ -52,15 +52,25 @@
     </div>
 
     <!-- Wizard Content -->
-    <WizardLayout>
-        {#if claimStore.step === 1}
-            {#if contractAddress}
-                <Step1Upload {contractAddress} />
+    <div class="flex gap-8">
+        <!-- Sidebar Steps -->
+        <aside class="w-48 shrink-0">
+            <ClaimSteps />
+        </aside>
+
+        <!-- Main Content -->
+        <main class="flex-1">
+            {#if claimFlowStore.currentStep === 1 && contractAddress}
+                <ClaimStep1Identify {contractAddress} />
+            {:else if claimFlowStore.currentStep === 2}
+                <ClaimStep2Timeline />
+            {:else if claimFlowStore.currentStep === 3}
+                <ClaimStep3Wallet />
+            {:else if claimFlowStore.currentStep === 4 && contractAddress}
+                <ClaimStep4Proof {contractAddress} />
+            {:else if claimFlowStore.currentStep === 5 && contractAddress}
+                <ClaimStep5Submit {contractAddress} />
             {/if}
-        {:else if claimStore.step === 2}
-            <Step2Proof />
-        {:else if claimStore.step === 3}
-            <Step3Review />
-        {/if}
-    </WizardLayout>
+        </main>
+    </div>
 </div>
