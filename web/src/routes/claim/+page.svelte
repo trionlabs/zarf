@@ -97,12 +97,12 @@
     <div class="flex-1 space-y-8 animate-in fade-in zoom-in duration-300">
         {#if !importedAddress}
             <!-- 1. Import Step (Gate) -->
-            <section class="max-w-2xl mx-auto mt-10">
+            <section class="w-full">
                 <ImportContractInput onImport={handleImport} />
             </section>
         {:else}
             <!-- 2. Main Claim Flow -->
-            <div class="max-w-xl mx-auto mt-4">
+            <div class="w-full">
                 {#if currentStep === 1}
                     <ClaimStep1Identify contractAddress={importedAddress} />
                 {:else if currentStep === 2}

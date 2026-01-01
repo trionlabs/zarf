@@ -10,7 +10,16 @@
     let isLoading = $state(false);
 
     async function handleSubmit() {
-        if (!/^0x[a-fA-F0-9]{40}$/.test(address)) {
+        const addr = address.trim();
+
+        // Check for common mistake: Transaction Hash
+        if (/^0x[a-fA-F0-9]{64}$/.test(addr)) {
+            error =
+                "This is a Transaction Hash, not a Contract Address. Please check the 'Logs' tab on Etherscan to find the Deployed Contract Address.";
+            return;
+        }
+
+        if (!/^0x[a-fA-F0-9]{40}$/.test(addr)) {
             error = "Invalid Ethereum Address";
             return;
         }
@@ -70,21 +79,16 @@
         </div>
 
         {#if error}
-            <div class="label pb-0 pl-1 animate-in slide-in-from-top-1">
-                <span
-                    class="label-text-alt text-error flex items-center gap-1.5 font-medium"
-                >
-                    <AlertCircle class="w-3.5 h-3.5" />
-                    {error}
-                </span>
+            <div
+                class="flex items-center gap-1.5 text-xs text-error font-medium mt-1.5 animate-in slide-in-from-top-1"
+            >
+                <AlertCircle class="w-3.5 h-3.5" />
+                {error}
             </div>
         {:else}
-            <div class="label pb-0 pl-1">
-                <span class="label-text-alt text-base-content/40 font-light">
-                    Paste the distribution contract address to verify
-                    eligibility.
-                </span>
-            </div>
+            <p class="text-xs text-base-content/40 font-light mt-1.5">
+                Paste the distribution contract address to verify eligibility.
+            </p>
         {/if}
     </div>
 </div>

@@ -23,7 +23,8 @@
         authStore.restoreGmailSession();
 
         // 3. Security Check: Must be authenticated
-        if (!authStore.gmail.isAuthenticated) {
+        // 3. Security Check: Must be authenticated (uses hydration-safe getter)
+        if (!authStore.isAuthenticated) {
             if (import.meta.env.DEV)
                 console.warn("Unauthorized access to wizard.");
             goto("/claim");

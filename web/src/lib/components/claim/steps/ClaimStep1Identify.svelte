@@ -1,29 +1,49 @@
 <script lang="ts">
     import { claimStore } from "$lib/stores/claimStore.svelte";
     import { authStore } from "$lib/stores/authStore.svelte";
-    import { getClaimStatus } from "$lib/contracts/contracts";
+    import {
+        getClaimStatus,
+        getVestingSchedule,
+        getUnlockProgress,
+    } from "$lib/contracts/contracts";
     // We import from merkleTree which handles the Barretenberg WASM loading
     import { computeIdentityCommitment } from "$lib/crypto/merkleTree";
     import { Lock, Mail, KeyRound, Loader2, ArrowRight } from "lucide-svelte";
     import { redirectToGoogle } from "$lib/auth/googleAuth";
     import type { Address } from "viem";
+    import { PIN_LENGTH } from "$lib/constants";
+    import { browser } from "$app/environment";
+    import { onMount } from "svelte";
 
     let { contractAddress } = $props<{ contractAddress: string }>();
 
+    // Hydration Guard: Ensures SSR and initial client render match
+    let mounted = $state(false);
+    onMount(() => {
+        mounted = true;
+    });
+
     let email = $derived(authStore.gmail.email);
     let jwt = $derived(authStore.gmail.jwt);
-    let isAuthenticated = $derived(authStore.gmail.isAuthenticated);
+
+    // Double-safe: Only show authenticated after mount AND store says authenticated
+    let isAuthenticated = $derived(mounted && authStore.isAuthenticated);
 
     let pin = $state("");
     let isUnlocking = $state(false);
     let error = $state<string | null>(null);
+
+    // Derived state form submission eligibility
+    let canSubmit = $derived(
+        isAuthenticated && pin.length >= PIN_LENGTH && !isUnlocking,
+    );
 
     function handleGoogleLogin() {
         redirectToGoogle(contractAddress);
     }
 
     async function handleUnlock() {
-        if (!email || !pin || pin.length < 8 || !jwt) return;
+        if (!email || !pin || pin.length < PIN_LENGTH || !jwt) return;
 
         isUnlocking = true;
         error = null;
@@ -35,15 +55,15 @@
                 email,
                 pin,
             );
-            const commitment = "0x" + commitmentBigInt.toString(16);
+            const commitment =
+                "0x" + commitmentBigInt.toString(16).padStart(64, "0");
 
-            console.log("Searching for commitment:", commitment);
-
-            // 2. Query Contract
-            const status = await getClaimStatus(
-                commitment,
-                contractAddress as Address,
-            );
+            // 2. Query Contract (Parallel)
+            const [status, schedule, progress] = await Promise.all([
+                getClaimStatus(commitment, contractAddress as Address),
+                getVestingSchedule(contractAddress as Address),
+                getUnlockProgress(contractAddress as Address),
+            ]);
 
             if (!status || BigInt(status.allocation) === 0n) {
                 error = "No allocation found for this account & PIN combo.";
@@ -57,8 +77,28 @@
             claimStore.setAllocation(
                 BigInt(status.allocation),
                 BigInt(status.claimed),
+                BigInt(status.vested),
                 commitment,
             );
+
+            // Set vesting info if available
+            if (schedule && progress) {
+                claimStore.setVestingInfo(schedule, progress);
+            } else if (schedule) {
+                // Fallback if progress not available (e.g. older contract)
+                // Calculate progress roughly based on time
+                const now = Date.now() / 1000;
+                const elapsed =
+                    now - schedule.vestingStart - schedule.cliffDuration;
+                const completed = Math.max(
+                    0,
+                    Math.floor(elapsed / schedule.vestingPeriod),
+                );
+                const total = Math.floor(
+                    schedule.vestingDuration / schedule.vestingPeriod,
+                );
+                claimStore.setVestingInfo(schedule, { completed, total });
+            }
 
             // 4. Proceed
             claimStore.nextStep();
@@ -71,24 +111,24 @@
     }
 </script>
 
-<div
-    class="card bg-base-100 border border-base-content/5 shadow-xl max-w-lg mx-auto overflow-visible animate-in fade-in zoom-in duration-300"
->
-    <div class="card-body gap-6">
+<div class="max-w-2xl animate-in fade-in zoom-in duration-300">
+    <div class="space-y-8">
         <!-- Header -->
-        <div class="text-center space-y-2 mb-2">
-            <div
-                class="w-12 h-12 rounded-full bg-primary/10 text-primary flex items-center justify-center mx-auto mb-4"
-            >
-                <Lock class="w-6 h-6" />
+        <!-- Header -->
+        <div class="space-y-4 mb-2">
+            <div class="flex items-center gap-4">
+                <div
+                    class="w-12 h-12 rounded-full bg-primary/10 text-primary flex items-center justify-center shrink-0"
+                >
+                    <Lock class="w-6 h-6" />
+                </div>
+                <div>
+                    <h2 class="card-title text-xl">Identity Verification</h2>
+                    <p class="text-sm text-base-content/60 font-light mt-1">
+                        To preserve privacy, your allocation is hidden.
+                    </p>
+                </div>
             </div>
-            <h2 class="card-title justify-center text-xl">
-                Identity Verification
-            </h2>
-            <p class="text-sm text-base-content/60 font-light">
-                To preserve privacy, your allocation is hidden. <br />
-                Verify your identity to discover your vesting schedule.
-            </p>
         </div>
 
         <!-- 1. Google Auth -->
@@ -173,9 +213,9 @@
             <div class="relative">
                 <input
                     type="password"
-                    class="input input-lg input-bordered w-full pl-11 tracking-widest font-mono text-center placeholder:font-sans placeholder:tracking-normal placeholder:text-base-content/20 focus:border-primary/50 transition-all"
-                    placeholder="Enter 8-char PIN"
-                    maxlength="8"
+                    class="input input-lg input-bordered w-full pl-11 tracking-widest font-mono placeholder:font-sans placeholder:tracking-normal placeholder:text-base-content/20 focus:border-primary/50 transition-all"
+                    placeholder={`Enter ${PIN_LENGTH}-char PIN`}
+                    maxlength={PIN_LENGTH}
                     bind:value={pin}
                     onkeydown={(e) => e.key === "Enter" && handleUnlock()}
                 />
@@ -185,7 +225,7 @@
                     <KeyRound class="w-5 h-5" />
                 </div>
             </div>
-            <p class="text-xs text-center text-base-content/40">
+            <p class="text-xs text-base-content/40 pl-1">
                 This code was sent to you privately (DM or Email).
             </p>
         </div>
@@ -202,7 +242,7 @@
         <div class="card-actions mt-4">
             <button
                 class="btn btn-primary w-full btn-lg shadow-lg shadow-primary/20"
-                disabled={!isAuthenticated || pin.length < 1 || isUnlocking}
+                disabled={!canSubmit}
                 onclick={handleUnlock}
             >
                 {#if isUnlocking}
