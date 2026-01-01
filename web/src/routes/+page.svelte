@@ -1,33 +1,22 @@
 <script lang="ts">
     import { onMount } from "svelte";
     import { goto } from "$app/navigation";
+    import { extractStateFromUrl } from "$lib/auth/googleAuth";
     import ThemeToggle from "$lib/components/layout/ThemeToggle.svelte";
     import WalletConnectButton from "$lib/components/layout/WalletConnectButton.svelte";
+    import Hero from "$lib/components/landing/Hero.svelte";
 
     onMount(() => {
         // If we land here with a Google ID Token (OAuth callback), forward to /claim
         if (window.location.hash.includes("id_token=")) {
-            // Parse state provided during login to restore context (e.g. contract address)
-            const params = new URLSearchParams(
-                window.location.hash.substring(1),
-            );
-            const stateRaw = params.get("state");
-            let redirectQuery = "";
+            // Parse state to restore context (e.g. contract address)
+            const oauthState = extractStateFromUrl();
+            const addressQuery = oauthState?.address
+                ? `?address=${oauthState.address}`
+                : "";
 
-            if (stateRaw) {
-                try {
-                    // Try to decode URL-encoded JSON state
-                    const state = JSON.parse(decodeURIComponent(stateRaw));
-                    if (state.address) {
-                        redirectQuery = `?address=${state.address}`;
-                    }
-                } catch (e) {
-                    console.warn("Failed to parse auth state", e);
-                }
-            }
-
-            // Use goto with replaceState to avoid history pollution
-            goto("/claim" + redirectQuery + window.location.hash, {
+            // Forward to /claim with token hash and restored address
+            goto(`/claim${addressQuery}${window.location.hash}`, {
                 replaceState: true,
             });
         }
@@ -62,27 +51,34 @@
 <div class="min-h-screen flex flex-col relative">
     <!-- Landing Navbar -->
     <header
-        class="absolute top-0 w-full z-50 px-6 py-4 flex items-center justify-between"
+        class="fixed top-0 w-full z-50 px-6 py-4 flex items-center justify-between backdrop-blur-md bg-base-100/30 border-b border-base-content/5 transition-all duration-300"
     >
-        <div class="flex items-center gap-2 font-bold text-xl">
+        <div
+            class="flex items-center gap-3 font-medium text-lg tracking-wide select-none group cursor-default"
+        >
+            <!-- Zen Logo: Minimal Envelope -->
             <div
-                class="w-8 h-8 rounded bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center text-primary-content"
+                class="relative w-8 h-8 flex items-center justify-center transition-transform group-hover:scale-105"
             >
                 <svg
                     xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
                     viewBox="0 0 24 24"
-                    class="w-5 h-5 stroke-current"
-                    stroke-width="2.5"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.5"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    class="w-6 h-6 text-base-content"
                 >
-                    <path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        d="M13 10V3L4 14h7v7l9-11h-7z"
-                    />
+                    <rect width="20" height="16" x="2" y="4" rx="2" />
+                    <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
                 </svg>
+                <!-- Subtle Glow behind logo -->
+                <div
+                    class="absolute inset-0 bg-base-content/5 blur-lg rounded-full scale-0 group-hover:scale-150 transition-transform duration-500"
+                ></div>
             </div>
-            Zarf
+            <span class="text-base-content/90">Zarf</span>
         </div>
 
         <div class="flex items-center gap-4">
@@ -98,37 +94,7 @@
         </div>
     </header>
     <!-- Hero Section -->
-    <section class="hero min-h-screen bg-base-200">
-        <div class="hero-content text-center">
-            <div class="max-w-2xl">
-                <h1 class="text-5xl font-bold">
-                    Privacy-Preserving Token Distribution
-                </h1>
-                <p class="py-6 text-xl">
-                    Create vesting schedules and enable private token claims
-                    using Zero-Knowledge proofs. No KYC. No compromises.
-                </p>
-
-                <div class="flex gap-4 justify-center flex-wrap">
-                    <a href="/wizard" class="btn btn-primary btn-lg">
-                        Create Distribution
-                    </a>
-                    <a href="/claim" class="btn btn-secondary btn-lg">
-                        Claim Tokens
-                    </a>
-                </div>
-
-                <div class="mt-8">
-                    <div class="badge badge-outline">
-                        Powered by Noir & Aztec
-                    </div>
-                    <div class="badge badge-outline ml-2">
-                        Deployed on Ethereum
-                    </div>
-                </div>
-            </div>
-        </div>
-    </section>
+    <Hero />
 
     <!-- Features Section -->
     <section class="py-20">

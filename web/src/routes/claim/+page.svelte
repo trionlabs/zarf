@@ -3,6 +3,7 @@
     import { authStore } from "$lib/stores/authStore.svelte";
     import {
         extractTokenFromUrl,
+        extractStateFromUrl,
         clearUrlFragment,
         decodeJwt,
     } from "$lib/auth/googleAuth";
@@ -16,7 +17,7 @@
     let isAuthenticating = $state(false);
 
     onMount(() => {
-        // 1. Handle Redirect Callback
+        // 1. Handle OAuth Redirect Callback
         const idToken = extractTokenFromUrl();
         if (idToken) {
             isAuthenticating = true;
@@ -31,19 +32,40 @@
                     expiresAt: payload.exp,
                 });
 
-                // Clear URL for aesthetics & security
-                clearUrlFragment();
+                // 2. Restore contractAddress from OAuth state
+                const oauthState = extractStateFromUrl();
+                if (oauthState?.address) {
+                    // Preserve address in URL for the claim flow
+                    const url = new URL(window.location.href);
+                    url.searchParams.set("address", oauthState.address);
+                    url.hash = ""; // Clear hash (token)
+                    goto(url.pathname + url.search, { replaceState: true });
+                } else {
+                    // Just clear URL fragment for aesthetics & security
+                    clearUrlFragment();
+                }
             } catch (err) {
-                console.error("Auth Failed:", err);
+                console.error("[Claim] Auth failed:", err);
+                clearUrlFragment();
             } finally {
                 isAuthenticating = false;
             }
         }
     });
 
+    import { claimStore } from "$lib/stores/claimStore.svelte";
+    import ClaimStep1Identify from "$lib/components/claim/steps/ClaimStep1Identify.svelte";
+    import ClaimStep2Timeline from "$lib/components/claim/steps/ClaimStep2Timeline.svelte";
+    import ClaimStep3Wallet from "$lib/components/claim/steps/ClaimStep3Wallet.svelte";
+    import ClaimStep4Proof from "$lib/components/claim/steps/ClaimStep4Proof.svelte";
+    import ClaimStep5Submit from "$lib/components/claim/steps/ClaimStep5Submit.svelte";
+
+    // ... imports ...
+
     // 2. State for import flow
     // derived from URL to survive redirects/reloads
     let importedAddress = $derived(page.url.searchParams.get("address"));
+    let currentStep = $derived(claimStore.currentStep);
 
     function handleImport(address: string) {
         const url = new URL(window.location.href);
@@ -58,20 +80,54 @@
     <PageHeader
         title="Claim Portal"
         description="Connect your wallet and import a distribution contract to check your eligibility."
-    />
+    >
+        {#snippet extra()}
+            {#if importedAddress}
+                <div
+                    class="badge badge-accent badge-outline font-mono opacity-80 gap-1 pl-1 pr-2"
+                >
+                    <span class="w-2 h-2 rounded-full bg-accent animate-pulse"
+                    ></span>
+                    {importedAddress.slice(0, 6)}...{importedAddress.slice(-4)}
+                </div>
+            {/if}
+        {/snippet}
+    </PageHeader>
 
     <div class="flex-1 space-y-8 animate-in fade-in zoom-in duration-300">
         {#if !importedAddress}
-            <!-- 1. Import Step -->
-            <section class="max-w-2xl">
+            <!-- 1. Import Step (Gate) -->
+            <section class="max-w-2xl mx-auto mt-10">
                 <ImportContractInput onImport={handleImport} />
             </section>
         {:else}
-            <!-- 2. Gate Step (Blurred until Auth) -->
-            <DistributionCard
-                contractAddress={importedAddress}
-                isAuthenticated={authStore.gmail.isAuthenticated}
-            />
+            <!-- 2. Main Claim Flow -->
+            <div class="max-w-xl mx-auto mt-4">
+                {#if currentStep === 1}
+                    <ClaimStep1Identify contractAddress={importedAddress} />
+                {:else if currentStep === 2}
+                    <ClaimStep2Timeline />
+                {:else if currentStep === 3}
+                    <ClaimStep3Wallet />
+                {:else if currentStep === 4}
+                    <ClaimStep4Proof contractAddress={importedAddress} />
+                {:else if currentStep === 5}
+                    <ClaimStep5Submit contractAddress={importedAddress} />
+                {/if}
+            </div>
+
+            <div class="text-center mt-8">
+                <button
+                    class="btn btn-xs btn-ghost opacity-30 hover:opacity-100"
+                    onclick={() => {
+                        // Debug Reset
+                        claimStore.reset();
+                        goto("/claim");
+                    }}
+                >
+                    Reset Flow
+                </button>
+            </div>
         {/if}
     </div>
 </div>

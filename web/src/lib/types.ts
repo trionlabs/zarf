@@ -16,7 +16,7 @@ import type { Address } from 'viem';
  */
 export interface WhitelistEntry {
     email: string;
-    amount: number;
+    amount: bigint;
 }
 
 /**
@@ -38,7 +38,7 @@ export interface MerkleTreeData {
  */
 export interface MerkleClaim {
     email: string;
-    amount: number;
+    amount: bigint;
     salt: string;        // Hex string (Holds the 8-char secret code)
     identityCommitment: string; // Pedersen(email, secret) - Public Identifier
     leaf: bigint;
@@ -101,6 +101,15 @@ export interface DecodedJWT {
     payload: JWTPayload;
 }
 
+/**
+ * OAuth state parameter for preserving context through redirect
+ * Used to pass contractAddress through Google OAuth flow
+ */
+export interface OAuthState {
+    /** Contract address to claim from (optional) */
+    address?: `0x${string}`;
+}
+
 // ============================================================================
 // ZK Proof Types
 // ============================================================================
@@ -112,7 +121,7 @@ export interface ZKPublicInputs {
     identityCommitment: string;      // Pedersen(email, secret) - Public Identifier
     merkleRoot: string;     // Merkle root (hex)
     recipient: Address;     // Recipient wallet address
-    amount: number;         // Claimed amount
+    amount: bigint;         // Claimed amount
 }
 
 /**
@@ -120,12 +129,13 @@ export interface ZKPublicInputs {
  */
 export interface ZKProof {
     proof: string;                    // Hex-encoded proof bytes
-    publicInputs: ZKPublicInputs;     // Public inputs object
+    publicInputs: ZKPublicInputs;     // Public inputs object (Convenience)
+    publicValues: string[];           // Raw public inputs array (REQUIRED for Contract)
     // Convenience duplicates (same as publicInputs)
     identityCommitment: string;       // REPLACED emailHash
     merkleRoot: string;
     recipient: Address;
-    amount: number;
+    amount: bigint;
 }
 
 /**
@@ -134,7 +144,7 @@ export interface ZKProof {
 export interface ZKClaimData {
     email: string;              // User's email
     salt: string;               // Random salt (hex)
-    amount: number;             // Claimed amount
+    amount: bigint;             // Claimed amount
     merkleProof: MerkleProof;   // Merkle proof siblings & indices
     merkleRoot: bigint;         // Merkle root
     recipient: Address;         // Recipient wallet address
