@@ -15,10 +15,11 @@
                 ? `?address=${oauthState.address}`
                 : "";
 
-            // Forward to /claim with token hash and restored address
-            goto(`/claim${addressQuery}${window.location.hash}`, {
-                replaceState: true,
-            });
+            // Use window.location.assign for reliable redirect with hash fragment
+            // SvelteKit goto can sometimes strip hash or cause router issues with external redirects
+            window.location.assign(
+                `/claim${addressQuery}${window.location.hash}`,
+            );
         }
     });
     const features = [
