@@ -3,7 +3,7 @@
  * Pure functions for calculating vesting schedules, end dates, and unlock events.
  */
 
-export type DurationUnit = "weeks" | "months" | "quarters" | "years";
+export type DurationUnit = "minutes" | "hours" | "weeks" | "months" | "quarters" | "years";
 
 export interface UnlockMarker {
     x: number;
@@ -40,6 +40,12 @@ export function calculateEndDate(
 
     const d = new Date(cliffDate);
     switch (durationUnit) {
+        case "minutes":
+            d.setMinutes(d.getMinutes() + duration);
+            break;
+        case "hours":
+            d.setHours(d.getHours() + duration);
+            break;
         case "weeks":
             d.setDate(d.getDate() + duration * 7);
             break;
@@ -115,6 +121,12 @@ export function generateUnlockMarkers(
         let unlockDate = new Date(cliffDate.getTime());
 
         switch (durationUnit) {
+            case "minutes":
+                unlockDate.setMinutes(unlockDate.getMinutes() + actualEvent);
+                break;
+            case "hours":
+                unlockDate.setHours(unlockDate.getHours() + actualEvent);
+                break;
             case "weeks":
                 unlockDate.setDate(unlockDate.getDate() + actualEvent * 7);
                 break;
@@ -149,6 +161,10 @@ export function generateUnlockMarkers(
 export function durationToSeconds(duration: number, unit: DurationUnit): bigint {
     const DAY = 24n * 60n * 60n;
     switch (unit) {
+        case "minutes":
+            return BigInt(duration) * 60n;
+        case "hours":
+            return BigInt(duration) * 60n * 60n;
         case "weeks":
             return BigInt(duration) * 7n * DAY;
         case "months":
@@ -185,6 +201,10 @@ export function cliffDateToSeconds(cliffEndDate: string): bigint {
 export function unitToPeriodSeconds(unit: DurationUnit): bigint {
     const DAY = 24n * 60n * 60n;
     switch (unit) {
+        case "minutes":
+            return 60n;                // 60 seconds
+        case "hours":
+            return 60n * 60n;          // 3,600 seconds
         case "weeks":
             return 7n * DAY;           // 604,800 seconds
         case "months":

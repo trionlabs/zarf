@@ -32,7 +32,7 @@ export interface TokenDetails {
 export interface Schedule {
     cliffEndDate: string; // ISO date string (YYYY-MM-DD)
     distributionDuration: number;
-    durationUnit: "weeks" | "months" | "quarters" | "years";
+    durationUnit: "minutes" | "hours" | "weeks" | "months" | "quarters" | "years";
 }
 
 /**
@@ -186,4 +186,4 @@ export interface WalletState {
 /**
  * Available theme options (DaisyUI themes)
  */
-export type Theme = 'nord' | 'wireframe';
+export type Theme = 'nord' | 'wireframe' | 'dim';

@@ -9,6 +9,8 @@ export const MONTH_NAMES = [
 ] as const;
 
 export const DURATION_UNITS = [
+    { value: "minutes", label: "Minutes" },
+    { value: "hours", label: "Hours" },
     { value: "weeks", label: "Weekly" },
     { value: "months", label: "Monthly" },
     { value: "quarters", label: "Quarterly" },
