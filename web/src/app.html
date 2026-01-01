@@ -8,6 +8,19 @@
 	<link rel="preconnect" href="https://fonts.googleapis.com">
 	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 	<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&display=swap" rel="stylesheet">
+
+	<!-- Blocking script to prevent theme flash during hydration -->
+	<script>
+		(function () {
+			try {
+				var theme = localStorage.getItem('zarf_theme');
+				if (theme === 'nord' || theme === 'wireframe' || theme === 'dim') {
+					document.documentElement.setAttribute('data-theme', theme);
+				}
+			} catch (e) { }
+		})();
+	</script>
+
 	%sveltekit.head%
 </head>
 

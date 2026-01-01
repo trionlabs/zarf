@@ -205,7 +205,7 @@
                     />
 
                     <button
-                        class="btn btn-primary gap-2"
+                        class="btn btn-primary gap-2 shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all active:scale-95"
                         onclick={() => goto("/wizard/step-0")}
                     >
                         <Plus class="w-4 h-4" />
@@ -213,32 +213,35 @@
                     </button>
                 </div>
 
-                <!-- Quick Stats -->
                 <div class="grid grid-cols-3 gap-4 mb-10">
                     <div
-                        class="stat bg-base-100 rounded-xl border border-base-content/5 p-4"
+                        class="stat bg-base-200/30 rounded-xl border border-base-content/5 p-4"
                     >
                         <div class="stat-title text-xs flex items-center gap-1">
                             <Cloud class="w-3 h-3" />
                             On-Chain (Vault)
                         </div>
-                        <div class="stat-value text-2xl text-success">
+                        <div
+                            class="stat-value text-2xl text-success font-light"
+                        >
                             {vaultCount}
                         </div>
                     </div>
                     <div
-                        class="stat bg-base-100 rounded-xl border border-base-content/5 p-4"
+                        class="stat bg-base-200/30 rounded-xl border border-base-content/5 p-4"
                     >
                         <div class="stat-title text-xs">Drafts</div>
-                        <div class="stat-value text-2xl text-warning">
+                        <div
+                            class="stat-value text-2xl text-warning font-light"
+                        >
                             {draftsCount}
                         </div>
                     </div>
                     <div
-                        class="stat bg-base-100 rounded-xl border border-base-content/5 p-4"
+                        class="stat bg-base-200/30 rounded-xl border border-base-content/5 p-4"
                     >
                         <div class="stat-title text-xs">Total</div>
-                        <div class="stat-value text-2xl">
+                        <div class="stat-value text-2xl font-light">
                             {totalCount}
                         </div>
                     </div>
