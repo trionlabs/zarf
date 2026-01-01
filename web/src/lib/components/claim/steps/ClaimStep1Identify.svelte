@@ -99,7 +99,7 @@
 
             {#if isAuthenticated}
                 <div
-                    class="flex items-center gap-3 p-3 bg-success/10 border border-success/20 rounded-lg text-success"
+                    class="flex items-center gap-3 p-3 bg-success/10 border border-success/20 rounded-lg text-success group relative"
                 >
                     <div class="p-1.5 bg-success/20 rounded-full">
                         <Mail class="w-4 h-4" />
@@ -110,6 +110,27 @@
                         </p>
                         <p class="text-sm font-semibold truncate">{email}</p>
                     </div>
+
+                    <!-- Disconnect Button -->
+                    <button
+                        class="btn btn-ghost btn-xs btn-square text-success hover:bg-success/20"
+                        onclick={() => authStore.clearGmailSession()}
+                        aria-label="Disconnect account"
+                    >
+                        <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            width="16"
+                            height="16"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            class="lucide lucide-x"
+                            ><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg
+                        >
+                    </button>
                 </div>
             {:else}
                 <button
