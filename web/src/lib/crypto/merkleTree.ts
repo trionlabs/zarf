@@ -8,7 +8,7 @@
  */
 
 import { Barretenberg, Fr } from '@aztec/bb.js';
-import type { WhitelistEntry, MerkleTreeData, MerkleProof, MerkleClaim } from '../types';
+import type { WhitelistEntry, MerkleTreeData, MerkleProof, MerkleClaim, Schedule } from '../types';
 
 // ============================================================================
 // Constants
@@ -146,38 +146,28 @@ export async function pedersenHashPair(left: bigint, right: bigint): Promise<big
 /**
  * Compute leaf hash from email, amount, and salt.
  * 
- * Formula: leaf = pedersen(email_hash, amount, salt)
+ * Formula: leaf = pedersen(email_hash, amount, unlock_time)
  * 
  * @param email - User's email (will be normalized)
  * @param amount - Claim amount
- * @param salt - Random salt (hex string or bigint)
+ * @param code - 8-char secure code (Epoch Secret)
+ * @param unlockTime - Unix timestamp for this epoch
  * @returns Leaf hash as bigint
- * 
- * @throws {Error} If hashing fails
- * 
- * @example
- * ```typescript
- * const code = generateSecureCode();
- * const leaf = await computeLeaf('alice@example.com', 1000, code);
- * ```
  */
 export async function computeLeaf(
     email: string,
     amount: bigint,
-    code: string
+    code: string,
+    unlockTime: number
 ): Promise<bigint> {
     const bb = await initBarretenberg();
 
     // 1. Compute Identity Commitment
     const identityCommitment = await computeIdentityCommitment(email, code);
 
-    // 2. Leaf = Pedersen(IdentityCommitment, Amount)
-    // Note: We use 0 as the 3rd element because Pedersen hash usually takes ~2 inputs for efficiency in trees,
-    // but here we are hashing 2 elements. Barretenberg's pedersenHash takes an array.
-    // In our circuit, the leaf construction might vary.
-    // Based on ADR-012: Leaf = Pedersen(IdentityCommitment, amount)
-
-    const fields = [new Fr(identityCommitment), new Fr(amount)];
+    // 2. Leaf = Pedersen(IdentityCommitment, Amount, UnlockTime)
+    // UnlockTime is cast to Field
+    const fields = [new Fr(identityCommitment), new Fr(amount), new Fr(BigInt(unlockTime))];
     const leafHash = await bb.pedersenHash(fields, 0);
 
     return BigInt(leafHash.toString());
@@ -532,8 +522,18 @@ export async function verifyMerkleProof(
  * }));
  * ```
  */
+/**
+ * Process whitelist entries into Merkle tree with claims (Discrete Vesting).
+ * 
+ * Generates N leaves per user based on the vesting schedule.
+ * 
+ * @param entries - Whitelist entries (email, totalAmount)
+ * @param schedule - Vesting schedule configuration
+ * @returns Complete Merkle tree data with claims
+ */
 export async function processWhitelist(
-    entries: { email: string; amount: bigint }[]
+    entries: { email: string; amount: bigint }[],
+    schedule: Schedule
 ): Promise<MerkleTreeData> {
     if (entries.length === 0) {
         throw new Error('Cannot process empty whitelist');
@@ -542,29 +542,65 @@ export async function processWhitelist(
     const claims: MerkleClaim[] = [];
     const leaves: bigint[] = [];
 
-    // Compute leaf for each entry
+    // Parse Schedule
+    const cliffEnd = new Date(schedule.cliffEndDate).getTime() / 1000;
+    // For simplicity, we assume 'distributionDuration' is count of periods (e.g. 12 months -> 12 epochs)
+    // If durationUnit is months, period is roughly 30 days.
+    const epochs = schedule.distributionDuration;
+
+    // Calculate Period Length in Seconds
+    let periodSeconds = 0;
+    switch (schedule.durationUnit) {
+        case 'minutes': periodSeconds = 60; break;
+        case 'hours': periodSeconds = 3600; break;
+        case 'weeks': periodSeconds = 7 * 24 * 3600; break;
+        case 'months': periodSeconds = 30 * 24 * 3600; break;
+        case 'quarters': periodSeconds = 90 * 24 * 3600; break;
+        case 'years': periodSeconds = 365 * 24 * 3600; break;
+    }
+
+    // Process each user
     for (let i = 0; i < entries.length; i++) {
         const { email, amount } = entries[i];
-        const salt = generateSecureCode(); // Renamed to salt in Interface for compatibility, but holds CODE
 
-        // Compute Identity Commitment for public identification (Unlinkable)
-        const identityCommitmentBigInt = await computeIdentityCommitment(email, salt);
-        const identityCommitment = '0x' + identityCommitmentBigInt.toString(16);
+        // Master Salt for the user
+        const masterSalt = generateSecureCode();
 
-        // Compute Leaf: H(IdentityCommitment, Amount)
-        // We reuse computeLeaf which does this internally.
-        const leaf = await computeLeaf(email, amount, salt);
+        // Split amount into epochs
+        const amountPerEpoch = amount / BigInt(epochs);
+        const remainder = amount % BigInt(epochs);
 
-        claims.push({
-            email: email.toLowerCase().trim(),
-            amount,
-            salt, // Holds the CODE: e.g. "Xk9mP2qL"
-            identityCommitment, // Add the computed commitment
-            leafIndex: i,
-            leaf,
-        });
+        // Generate N leaves
+        for (let epoch = 0; epoch < epochs; epoch++) {
+            // Distribute remainder to first epochs
+            const currentAmount = epoch < Number(remainder) ? amountPerEpoch + 1n : amountPerEpoch;
 
-        leaves.push(leaf);
+            // Unlock time: CliffEnd + (EpochIndex * Period)
+            // Epoch 0 unlocks AT cliff end.
+            const unlockTime = Math.floor(cliffEnd + (epoch * periodSeconds));
+
+            // Derive Epoch Secret: MasterSalt + "_" + Index
+            const epochSecret = `${masterSalt}_${epoch}`;
+
+            // Compute Identity Commitment for this Epoch (Unlinkable)
+            const identityCommitmentBigInt = await computeIdentityCommitment(email, epochSecret);
+            const identityCommitment = '0x' + identityCommitmentBigInt.toString(16);
+
+            // Compute Leaf: H(EpochCommitment, Amount, UnlockTime)
+            const leaf = await computeLeaf(email, currentAmount, epochSecret, unlockTime);
+
+            claims.push({
+                email: email.toLowerCase().trim(),
+                amount: currentAmount,
+                salt: epochSecret, // Derived secret
+                identityCommitment,
+                leafIndex: leaves.length, // Global index
+                leaf,
+                unlockTime
+            });
+
+            leaves.push(leaf);
+        }
     }
 
     // Build tree
@@ -578,6 +614,6 @@ export async function processWhitelist(
             layers: tree.layers,
             emptyHashes: tree.emptyHashes,
         },
-        claims,
+        claims: claims, // Note: claims list is now N times larger than entries
     };
 }

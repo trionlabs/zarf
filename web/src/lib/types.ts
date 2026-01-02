@@ -33,6 +33,16 @@ export interface MerkleTreeData {
     claims: MerkleClaim[];
 }
 
+
+/**
+ * Vesting schedule configuration (Defined in Wizard, used in Generator)
+ */
+export interface Schedule {
+    cliffEndDate: string; // ISO date string (YYYY-MM-DD)
+    distributionDuration: number;
+    durationUnit: "minutes" | "hours" | "weeks" | "months" | "quarters" | "years";
+}
+
 /**
  * Individual claim with Merkle proof data
  */
@@ -43,6 +53,7 @@ export interface MerkleClaim {
     identityCommitment: string; // Pedersen(email, secret) - Public Identifier
     leaf: bigint;
     leafIndex: number;
+    unlockTime: number; // ADR-023: Discrete Vesting unlock timestamp
 }
 
 /**

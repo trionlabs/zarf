@@ -18,9 +18,9 @@ fn hash_email(email: BoundedVec<u8, MAX_EMAIL_LENGTH>) -> Field {
     pedersen_hash(fields)
 }
 
-/// Compute leaf hash: pedersen(identity_commitment, amount)
-fn compute_leaf(identity_commitment: Field, amount: Field) -> Field {
-    pedersen_hash([identity_commitment, amount])
+/// Compute leaf hash: pedersen(identity_commitment, amount, unlock_time)
+fn compute_leaf(identity_commitment: Field, amount: Field, unlock_time: Field) -> Field {
+    pedersen_hash([identity_commitment, amount, unlock_time])
 }
 
 /// Verify Merkle proof and return computed root
@@ -74,7 +74,9 @@ fn main(
     // Public inputs
     pubkey_modulus_limbs: pub [u128; 18],
     merkle_root: pub Field,
-) -> pub (Field, Field) {
+    // New Public Input for Discrete Vesting (ADR-023)
+    unlock_time: pub Field,
+) -> pub (Field, Field, Field) {
     // 1. Initialize and verify the JWT
     let jwt: JWT<MAX_DATA_LENGTH> = JWT::init(
         data,
@@ -99,19 +101,20 @@ fn main(
     // Same email + different secret = different identity (unlinkability)
     let identity_commitment = compute_identity_commitment(email_hash, secret_hash);
 
-    // 6. Compute leaf from identity_commitment, amount
+    // 6. Compute leaf from identity_commitment, amount AND unlock_time (ADR-023)
     // Note: Leaf now uses identity_commitment instead of email_hash
-    // REFACTOR: Removed 'salt' input
-    let leaf = compute_leaf(identity_commitment, amount);
+    // REFACTOR: Added unlock_time to bind vesting schedule to the leaf
+    let leaf = compute_leaf(identity_commitment, amount, unlock_time);
 
     // 7. Verify Merkle proof - computed root must match public merkle_root
     let computed_root = verify_merkle_proof(leaf, merkle_siblings, merkle_path_indices);
     assert(computed_root == merkle_root, "Merkle proof verification failed");
 
-    // 8. Return identity_commitment and recipient as public outputs
+    // 8. Return identity_commitment, recipient AND amount as public outputs
     // identity_commitment replaces email_hash (ADR-012 privacy upgrade)
     // Contract verifies msg.sender == recipient to prevent front-running
-    (identity_commitment, recipient)
+    // Contract needs amount to transfer tokens
+    (identity_commitment, recipient, amount)
 }
 
 #[test]

@@ -22,28 +22,29 @@
     // Get input data
     let { contractAddress } = $props<{ contractAddress: string }>();
 
-    const { email, salt, totalAllocation, identityCommitment, targetWallet } =
-        claimStore;
+    const { email, selectedEpoch, targetWallet } = claimStore;
 
     onMount(async () => {
         try {
-            // Guard Pattern: If critical data is missing (e.g., after page refresh),
-            // gracefully reset flow instead of crashing with an error.
-            if (!email || !salt || !identityCommitment || !targetWallet) {
+            // Guard Pattern
+            if (!email || !selectedEpoch || !targetWallet) {
                 console.warn(
                     "[ClaimStep4] Missing claim data. Resetting flow...",
                 );
                 claimStore.reset();
-                return; // Exit early, component will unmount as step changes to 1
+                return;
             }
 
             statusMessage = "Fetching Merkle Data...";
             progress = 10;
 
-            // 1. Calculate Leaf
-            const amount = BigInt(totalAllocation);
-            // Leaf = Pedersen(Identity, Amount)
-            const leaf = await computeLeaf(email, totalAllocation, salt);
+            // 1. Calculate Leaf using Selected Epoch Data (ADR-023: Discrete Vesting)
+            const amount = BigInt(selectedEpoch.amount);
+            const salt = selectedEpoch.salt; // This is the Epoch Secret
+            const unlockTime = selectedEpoch.unlockTime;
+
+            // Leaf = Pedersen(Identity, Amount, UnlockTime)
+            const leaf = await computeLeaf(email, amount, salt, unlockTime);
 
             // 2. Fetch Tree Data (Mocked for now)
             const leaves = await fetchPublicLeaves(contractAddress);
@@ -69,21 +70,14 @@
 
                 if (type === "PROGRESS") {
                     statusMessage = message;
-                    // Mock progress increments
                     if (progress < 90) progress += 10;
                 } else if (type === "RESULT") {
-                    // Success
                     const result = data as ZKProof;
                     console.log("Proof Generated!", result);
-
-                    // Update Store
                     claimStore.setProof(result);
-
                     progress = 100;
                     statusMessage = "Proof Ready!";
                     isGenerating = false;
-
-                    // Short delay before next step
                     setTimeout(() => {
                         claimStore.nextStep();
                     }, 1000);
@@ -94,32 +88,29 @@
                 }
             };
 
-            // Handle worker crash / silent errors
             worker.onerror = (e) => {
                 console.error("[ClaimStep4] Worker crashed:", e.message, e);
-                error = `Worker crashed: ${e.message || "Unknown error (check console)"}`;
+                error = `Worker crashed: ${e.message || "Unknown error"}`;
                 isGenerating = false;
             };
 
-            // 5. Fetch Google Public Key for JWT verification
+            // 5. Fetch Google Public Key
             statusMessage = "Fetching Google Public Key...";
             progress = 30;
 
             const jwt = claimStore.jwt;
-            if (!jwt) {
+            if (!jwt)
                 throw new Error("JWT is missing. Please restart the flow.");
-            }
 
             const publicKey = await getPublicKeyForJwt(jwt);
-            console.log("[ClaimStep4] Google public key fetched successfully");
 
-            // 6. Build Request Payload
+            // 6. Build Request Payload with UnlockTime (ADR-023)
             const payload: ProofRequest["payload"] = {
                 jwt,
                 publicKey,
                 claimData: {
                     email,
-                    salt, // Code
+                    salt,
                     amount: "0x" + amount.toString(16),
                     merkleProof: {
                         siblings: merkleProof.siblings,
@@ -127,6 +118,7 @@
                     },
                     merkleRoot: "0x" + merkleRoot.toString(16),
                     recipient: targetWallet,
+                    unlockTime: "0x" + unlockTime.toString(16), // Pass as Hex String
                 },
             };
 

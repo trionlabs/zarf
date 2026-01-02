@@ -6,26 +6,22 @@ import {IERC20} from "./interfaces/IERC20.sol";
 import {JWKRegistry} from "./JWKRegistry.sol";
 
 /// @title ZarfVesting
-/// @notice Vesting contract with ZK proof-based claims
-/// @dev Users prove email ownership via ZK proof to claim vested tokens
+/// @notice Vesting contract with ZK proof-based claims and Discrete Vesting (ADR-023)
+/// @dev Implements private, unlinkable, per-epoch claiming logic
 contract ZarfVesting {
     // ============ Errors ============
     error InvalidProof();
     error InvalidMerkleRoot();
     error InvalidRecipient();
     error InvalidPubkey();
-    error NothingToClaim();
-    error AllocationAlreadySet();
-    error VestingNotStarted();
+    error AlreadyClaimed();
+    error EpochLocked();
     error Unauthorized();
-    error InvalidAllocation();
     error TransferFailed();
     error AlreadyInitialized();
 
     // ============ Events ============
-    event AllocationSet(bytes32 indexed commitment, uint256 amount);
-    event Claimed(bytes32 indexed commitment, address indexed recipient, uint256 amount);
-    event VestingStarted(uint256 startTime, uint256 cliffDuration, uint256 vestingDuration, uint256 vestingPeriod);
+    event Claimed(bytes32 indexed epochCommitment, address indexed recipient, uint256 amount);
     event MerkleRootSet(bytes32 merkleRoot);
     event Deposited(uint256 amount);
     event Initialized(address token, address owner);
@@ -45,15 +41,10 @@ contract ZarfVesting {
     bool public initialized;
 
     bytes32 public merkleRoot;
-    uint256 public vestingStart;
-    uint256 public cliffDuration;
-    uint256 public vestingDuration;
-    uint256 public vestingPeriod;
 
-    // ADR-012: Changed from emailHash to commitment for privacy
-    // commitment = Pedersen(emailHash, secretHash) - unlinkable identity
-    mapping(bytes32 => uint256) public allocations;  // commitment -> amount
-    mapping(bytes32 => uint256) public claimed;       // commitment -> claimedAmount
+    // ADR-023: Nullifiers track claimed epochs to prevent double-spending
+    // Key is the 'epochCommitment' (derived from MasterSalt + EpochIndex)
+    mapping(bytes32 => bool) public nullifiers;
 
     // ============ Modifiers ============
     modifier onlyOwner() {
@@ -96,33 +87,6 @@ contract ZarfVesting {
         emit MerkleRootSet(_merkleRoot);
     }
 
-    function startVesting(uint256 _cliffDuration, uint256 _vestingDuration, uint256 _vestingPeriod) external onlyOwner {
-        require(_vestingPeriod > 0, "Period must be > 0");
-        require(_vestingDuration >= _vestingPeriod, "Duration must be >= period");
-        
-        vestingStart = block.timestamp;
-        
-        cliffDuration = _cliffDuration;
-        vestingDuration = _vestingDuration;
-        vestingPeriod = _vestingPeriod;
-        emit VestingStarted(block.timestamp, _cliffDuration, _vestingDuration, _vestingPeriod);
-    }
-
-    function setAllocation(bytes32 commitment, uint256 amount) external onlyOwner {
-        if (amount == 0) revert InvalidAllocation();
-        allocations[commitment] = amount;
-        emit AllocationSet(commitment, amount);
-    }
-
-    function setAllocations(bytes32[] calldata commitments, uint256[] calldata amounts) external onlyOwner {
-        require(commitments.length == amounts.length, "Length mismatch");
-        for (uint256 i = 0; i < commitments.length; i++) {
-            if (amounts[i] == 0) revert InvalidAllocation();
-            allocations[commitments[i]] = amounts[i];
-            emit AllocationSet(commitments[i], amounts[i]);
-        }
-    }
-
     function deposit(uint256 amount) external onlyOwner {
         safeTransferFrom(token, msg.sender, address(this), amount);
         emit Deposited(amount);
@@ -135,9 +99,10 @@ contract ZarfVesting {
     // ============ User Functions ============
 
     function claim(bytes calldata proof, bytes32[] calldata publicInputs) external {
-        if (vestingStart == 0) revert VestingNotStarted();
+        // 1. Verify ZK Proof
         if (!verifier.verify(proof, publicInputs)) revert InvalidProof();
 
+        // 2. Validate Google JWK Public Key
         bytes32 keyHash;
         assembly {
             let ptr := mload(0x40)
@@ -149,64 +114,40 @@ contract ZarfVesting {
         }
         if (!jwkRegistry.isValidKeyHash(keyHash)) revert InvalidPubkey();
 
+        // 3. Extract and Validate Public Inputs
+        // Layout: [PubKey(18), Root(1), UnlockTime(1), Commitment(1), Recipient(1), Amount(1)]
+        
         bytes32 proofMerkleRoot = publicInputs[PUBKEY_LIMBS];
-        // ADR-012: Now receives commitment instead of emailHash
-        bytes32 commitment = publicInputs[PUBKEY_LIMBS + 1];
-        bytes32 proofRecipient = publicInputs[PUBKEY_LIMBS + 2];
+        uint256 unlockTime = uint256(publicInputs[PUBKEY_LIMBS + 1]); 
+        bytes32 epochCommitment = publicInputs[PUBKEY_LIMBS + 2];
+        bytes32 proofRecipient = publicInputs[PUBKEY_LIMBS + 3];
+        uint256 amount = uint256(publicInputs[PUBKEY_LIMBS + 4]);
 
+        // 4. Integrity Checks
         if (proofMerkleRoot != merkleRoot) revert InvalidMerkleRoot();
         if (proofRecipient != bytes32(uint256(uint160(msg.sender)))) revert InvalidRecipient();
-
-        uint256 vested = calculateVested(commitment);
-        uint256 claimable = vested - claimed[commitment];
-        if (claimable == 0) revert NothingToClaim();
-
-        claimed[commitment] += claimable;
         
-        safeTransfer(token, msg.sender, claimable);
+        // 5. Time-Lock Check (ADR-023: Discrete Vesting)
+        // UnlockTime is bound to the leaf hash, so user cannot fake it without breaking the proof
+        if (block.timestamp < unlockTime) revert EpochLocked();
 
-        emit Claimed(commitment, msg.sender, claimable);
+        // 6. Double-Spend Check
+        if (nullifiers[epochCommitment]) revert AlreadyClaimed();
+
+        // 7. Mark as Claimed
+        nullifiers[epochCommitment] = true;
+        
+        // 8. Transfer Tokens
+        safeTransfer(token, msg.sender, amount);
+
+        emit Claimed(epochCommitment, msg.sender, amount);
     }
 
     // ============ View Functions ============
 
-    function calculateVested(bytes32 commitment) public view returns (uint256) {
-        uint256 allocation = allocations[commitment];
-        if (allocation == 0) return 0;
-        if (vestingStart == 0) return 0;
-
-        uint256 elapsed = block.timestamp - vestingStart;
-        if (elapsed < cliffDuration) return 0;
-        if (elapsed >= cliffDuration + vestingDuration) return allocation;
-
-        uint256 vestedTime = elapsed - cliffDuration;
-        uint256 completedPeriods = vestedTime / vestingPeriod;
-        uint256 totalPeriods = vestingDuration / vestingPeriod;
-        
-        if (totalPeriods == 0) return allocation;
-        return (allocation * completedPeriods) / totalPeriods;
-    }
-
-    function getClaimable(bytes32 commitment) external view returns (uint256) {
-        return calculateVested(commitment) - claimed[commitment];
-    }
-
-    function getVestingInfo() external view returns (uint256 start, uint256 cliff, uint256 duration, uint256 period) {
-        return (vestingStart, cliffDuration, vestingDuration, vestingPeriod);
-    }
-
-    function getUnlockProgress() external view returns (uint256 completed, uint256 total) {
-        if (vestingStart == 0 || vestingPeriod == 0) return (0, 0);
-        
-        uint256 elapsed = block.timestamp - vestingStart;
-        if (elapsed < cliffDuration) return (0, vestingDuration / vestingPeriod);
-        
-        uint256 vestedTime = elapsed - cliffDuration;
-        uint256 completedPeriods = vestedTime / vestingPeriod;
-        uint256 totalPeriods = vestingDuration / vestingPeriod;
-        
-        if (completedPeriods > totalPeriods) completedPeriods = totalPeriods;
-        return (completedPeriods, totalPeriods);
+    /// @notice Check if a specific epoch commitment has been claimed
+    function isClaimed(bytes32 epochCommitment) external view returns (bool) {
+        return nullifiers[epochCommitment];
     }
 
     // ============ Internal Utils (SafeTransfer) ============

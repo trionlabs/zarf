@@ -1,13 +1,7 @@
 <script lang="ts">
     import { claimStore } from "$lib/stores/claimStore.svelte";
     import { authStore } from "$lib/stores/authStore.svelte";
-    import {
-        getClaimStatus,
-        getVestingSchedule,
-        getUnlockProgress,
-    } from "$lib/contracts/contracts";
     // We import from merkleTree which handles the Barretenberg WASM loading
-    import { computeIdentityCommitment } from "$lib/crypto/merkleTree";
     import { Lock, Mail, KeyRound, Loader2, ArrowRight } from "lucide-svelte";
     import { redirectToGoogle } from "$lib/auth/googleAuth";
     import type { Address } from "viem";
@@ -49,59 +43,13 @@
         error = null;
 
         try {
-            // 1. Compute Identity Commitment locally (Pedersen Hash)
-            // This does NOT reveal Email or PIN to the server/node yet
-            const commitmentBigInt = await computeIdentityCommitment(
-                email,
-                pin,
-            );
-            const commitment =
-                "0x" + commitmentBigInt.toString(16).padStart(64, "0");
+            // New Pattern: Delegate discovery loop to the Store
+            // This handles Fetch JSON -> Derive Keys -> Check Local -> Check Chain
+            await claimStore.discoverEpochs(email, pin, contractAddress);
 
-            // 2. Query Contract (Parallel)
-            const [status, schedule, progress] = await Promise.all([
-                getClaimStatus(commitment, contractAddress as Address),
-                getVestingSchedule(contractAddress as Address),
-                getUnlockProgress(contractAddress as Address),
-            ]);
-
-            if (!status || BigInt(status.allocation) === 0n) {
-                error = "No allocation found for this account & PIN combo.";
-                isUnlocking = false;
-                return;
+            if (claimStore.isEligible) {
+                claimStore.nextStep();
             }
-
-            // 3. Update Store with Discovered Data
-            // We store the PIN in memory (claimStore) for ZK proof generation later
-            claimStore.setCredentials(email, jwt, pin);
-            claimStore.setAllocation(
-                BigInt(status.allocation),
-                BigInt(status.claimed),
-                BigInt(status.vested),
-                commitment,
-            );
-
-            // Set vesting info if available
-            if (schedule && progress) {
-                claimStore.setVestingInfo(schedule, progress);
-            } else if (schedule) {
-                // Fallback if progress not available (e.g. older contract)
-                // Calculate progress roughly based on time
-                const now = Date.now() / 1000;
-                const elapsed =
-                    now - schedule.vestingStart - schedule.cliffDuration;
-                const completed = Math.max(
-                    0,
-                    Math.floor(elapsed / schedule.vestingPeriod),
-                );
-                const total = Math.floor(
-                    schedule.vestingDuration / schedule.vestingPeriod,
-                );
-                claimStore.setVestingInfo(schedule, { completed, total });
-            }
-
-            // 4. Proceed
-            claimStore.nextStep();
         } catch (e: any) {
             console.error("Unlock failed:", e);
             error = e.message || "Failed to verify identity.";
@@ -273,6 +221,9 @@
                 {#if isUnlocking}
                     <Loader2 class="w-5 h-5 animate-spin" />
                     Searching Blockchain...
+                    <span class="text-xs opacity-70 block font-normal"
+                        >{claimStore.statusMessage}</span
+                    >
                 {:else}
                     <div class="flex items-center gap-2">
                         Unlock Allocation
