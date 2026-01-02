@@ -1,7 +1,7 @@
 <script lang="ts">
     import { page } from "$app/stores";
     import WizardSteps from "$lib/components/wizard/WizardSteps.svelte";
-    import ClaimSteps from "$lib/components/claim/wizard/ClaimSteps.svelte";
+
     import { authStore } from "$lib/stores/authStore.svelte";
     import {
         LayoutGrid,
@@ -40,8 +40,8 @@
             href: "/claim",
             icon: Gift,
             isActive: currentPath.startsWith("/claim"),
-            subComponent: ClaimSteps,
-            showSub: currentPath.includes("/wizard"), // Only show if in wizard flow
+            subComponent: null,
+            showSub: false,
         },
         {
             label: "Distributions",

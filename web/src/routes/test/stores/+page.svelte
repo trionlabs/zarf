@@ -1,14 +1,14 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { wizardStore } from "$lib/stores/wizardStore.svelte";
-  import { claimFlowStore } from "$lib/stores/claimFlowStore.svelte";
+
   import { walletStore } from "$lib/stores/walletStore.svelte";
   import { themeStore } from "$lib/stores/themeStore.svelte";
 
   // Restore all stores on mount
   onMount(() => {
     wizardStore.restore();
-    claimFlowStore.restore();
+
     themeStore.restore();
   });
 
@@ -45,18 +45,6 @@
       regulatoryRules: [],
       state: "created",
       createdAt: new Date().toISOString(),
-    });
-  }
-
-  function testClaimFlow() {
-    claimFlowStore.enterClaimFlow({
-      id: "0xtest",
-      name: "Test Distribution",
-      projectIcon: "/test.png",
-      status: "claimable",
-      totalAmount: 10000,
-      claimedAmount: 0,
-      nextUnlockDate: "2025-01-01",
     });
   }
 
@@ -152,57 +140,6 @@
       <div class="alert" class:alert-success={hasValidToken}>
         <span>Token Valid: {hasValidToken ? "✅ Yes" : "❌ No"}</span>
       </div>
-    </div>
-  </section>
-
-  <!-- Claim Flow Store -->
-  <section class="card shadow-xl">
-    <div class="card-body">
-      <h2 class="card-title">💰 Claim Flow Store</h2>
-
-      <div class="stats stats-vertical lg:stats-horizontal shadow">
-        <div class="stat">
-          <div class="stat-title">Mode</div>
-          <div class="stat-value text-2xl">{claimFlowStore.mode}</div>
-        </div>
-
-        <div class="stat">
-          <div class="stat-title">Current Step</div>
-          <div class="stat-value">{claimFlowStore.currentStep} / 5</div>
-          <div class="stat-desc">{claimFlowStore.currentStepName}</div>
-        </div>
-
-        <div class="stat">
-          <div class="stat-title">In Claim Flow</div>
-          <div class="stat-value text-2xl">
-            {claimFlowStore.isInClaimFlow ? "✅" : "❌"}
-          </div>
-        </div>
-      </div>
-
-      <div class="flex flex-wrap gap-2 mt-4">
-        <button class="btn btn-sm btn-primary" onclick={testClaimFlow}>
-          Enter Claim Flow
-        </button>
-        <button class="btn btn-sm" onclick={claimFlowStore.nextStep}>
-          Next Step
-        </button>
-        <button class="btn btn-sm" onclick={claimFlowStore.previousStep}>
-          Previous Step
-        </button>
-        <button
-          class="btn btn-sm btn-error"
-          onclick={claimFlowStore.exitClaimFlow}
-        >
-          Exit & Reset
-        </button>
-      </div>
-
-      {#if claimFlowStore.selectedDistribution}
-        <div class="alert alert-info">
-          <span>Selected: {claimFlowStore.selectedDistribution.name}</span>
-        </div>
-      {/if}
     </div>
   </section>
 

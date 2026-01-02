@@ -232,7 +232,7 @@
                     </p>
 
                     <a
-                        href={`/claim/wizard?address=${contractAddress}`}
+                        href={`/claim?address=${contractAddress}`}
                         class="btn btn-primary px-8 shadow-lg shadow-primary/20 hover:shadow-primary/30"
                     >
                         Continue to Claim
