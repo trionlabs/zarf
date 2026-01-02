@@ -139,42 +139,62 @@
 
             {#if isAuthenticated}
                 <div
-                    class="flex items-center gap-3 p-3 bg-success/10 border border-success/20 rounded-lg text-success group relative"
+                    class="flex flex-col sm:flex-row sm:items-center gap-3 p-4 bg-success/5 border border-success/20 rounded-xl text-success group relative overflow-hidden transition-all hover:bg-success/10"
                 >
-                    <div class="p-1.5 bg-success/20 rounded-full">
-                        <Mail class="w-4 h-4" />
+                    <div
+                        class="p-2 bg-success/10 rounded-full flex-shrink-0 text-success"
+                    >
+                        <Mail class="w-5 h-5" />
                     </div>
                     <div class="flex-1 min-w-0">
-                        <p class="text-xs font-medium opacity-70">
+                        <p
+                            class="text-xs font-semibold uppercase tracking-wider opacity-60 mb-0.5"
+                        >
                             Verified Account
                         </p>
-                        <p class="text-sm font-semibold truncate">{email}</p>
+                        <p
+                            class="text-base font-semibold truncate text-base-content"
+                        >
+                            {email}
+                        </p>
                     </div>
 
-                    <!-- Disconnect Button -->
+                    <!-- Switch Account Button -->
                     <button
-                        class="btn btn-ghost btn-xs btn-square text-success hover:bg-success/20"
+                        class="btn btn-sm btn-ghost border border-base-content/10 hover:bg-base-content/5 hover:border-base-content/20 gap-2 font-normal text-base-content/70"
                         onclick={() => authStore.clearGmailSession()}
-                        aria-label="Disconnect account"
                     >
+                        Switch Account
                         <svg
                             xmlns="http://www.w3.org/2000/svg"
-                            width="16"
-                            height="16"
+                            width="14"
+                            height="14"
                             viewBox="0 0 24 24"
                             fill="none"
                             stroke="currentColor"
                             stroke-width="2"
                             stroke-linecap="round"
                             stroke-linejoin="round"
-                            class="lucide lucide-x"
-                            ><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg
+                            class="lucide lucide-log-out"
+                            ><path
+                                d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"
+                            /><polyline points="16 17 21 12 16 7" /><line
+                                x1="21"
+                                x2="9"
+                                y1="12"
+                                y2="12"
+                            /></svg
                         >
                     </button>
+
+                    <!-- ID Badge used for transition reference mostly -->
+                    <div
+                        class="absolute -right-4 -top-4 w-20 h-20 bg-success/5 rounded-full blur-2xl pointer-events-none"
+                    ></div>
                 </div>
-            {:else}
+            {:else if mounted}
                 <button
-                    class="btn btn-outline w-full gap-3 border-base-content/10 hover:bg-base-content/5 hover:border-base-content/20 transform transition-all active:scale-95"
+                    class="btn btn-outline w-full gap-3 py-4 h-auto min-h-[3.5rem] border-base-content/10 hover:bg-base-content/5 hover:border-base-content/20 transform transition-all active:scale-[0.99] text-base font-medium"
                     onclick={handleGoogleLogin}
                 >
                     <svg class="w-5 h-5" viewBox="0 0 24 24">
@@ -197,6 +217,11 @@
                     </svg>
                     Sign in with Google
                 </button>
+            {:else}
+                <!-- Hydration Skeleton -->
+                <div
+                    class="w-full h-14 bg-base-content/5 animate-pulse rounded-lg border border-base-content/5"
+                ></div>
             {/if}
         </div>
 
