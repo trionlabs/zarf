@@ -13,6 +13,7 @@
         durationToSeconds,
         cliffDateToSeconds,
         unitToPeriodSeconds,
+        calculateEndDate,
     } from "$lib/utils/vesting";
     import {
         addOptimisticContract,
@@ -218,22 +219,51 @@
             tokenDecimals,
         );
 
+        // Calculate standard parameters first
+        const periodSecondsStandard = unitToPeriodSeconds(
+            distribution.schedule.durationUnit,
+        );
+        let cliffSeconds = cliffDateToSeconds(
+            distribution.schedule.cliffEndDate,
+        );
+        let vestingSeconds = durationToSeconds(
+            distribution.schedule.distributionDuration,
+            distribution.schedule.durationUnit,
+        );
+        let periodSeconds = periodSecondsStandard;
+
+        // Check for Past Dates / Full Unlock Scenario
+        // If the intended schedule (Cliff + Duration) has already finished, we must
+        // configured the contract to unlock immediately, because existing contracts
+        // use block.timestamp as start time.
+        if (distribution.schedule.cliffEndDate) {
+            const cliffDate = new Date(distribution.schedule.cliffEndDate);
+            const endDate = calculateEndDate(
+                cliffDate,
+                distribution.schedule.distributionDuration,
+                distribution.schedule.durationUnit,
+            );
+
+            if (endDate && endDate.getTime() <= Date.now()) {
+                // Force immediate unlock
+                cliffSeconds = 0n;
+                vestingSeconds = 1n;
+                periodSeconds = 1n;
+                console.log(
+                    "Past date detected: configured for immediate unlock",
+                );
+            }
+        }
+
         const config: FactoryDeployConfig = {
             factoryAddress: currentFactoryAddress,
             tokenAddress: wizardStore.tokenDetails.tokenAddress as Address,
             merkleRoot,
             commitments,
             amounts,
-            cliffSeconds: cliffDateToSeconds(
-                distribution.schedule.cliffEndDate,
-            ),
-            vestingSeconds: durationToSeconds(
-                distribution.schedule.distributionDuration,
-                distribution.schedule.durationUnit,
-            ),
-            periodSeconds: unitToPeriodSeconds(
-                distribution.schedule.durationUnit,
-            ),
+            cliffSeconds,
+            vestingSeconds,
+            periodSeconds,
             totalAmount: totalAmountWei,
             owner: walletAddress!, // Checked at function start
             name: distribution.name,

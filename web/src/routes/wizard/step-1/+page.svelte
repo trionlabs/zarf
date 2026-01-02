@@ -61,11 +61,10 @@
 
     // --- Validation ---
     const today = new Date().toISOString().split("T")[0];
-    const isPastDate = $derived(cliffDate !== "" && cliffDate < today);
 
     const isStep0Valid = $derived(name.length >= 3);
     const isStep1Valid = $derived(
-        cliffDate !== "" && !isPastDate && duration >= 0 && poolAmount > 0,
+        cliffDate !== "" && duration >= 0 && poolAmount > 0,
     );
 
     const isBudgetMatch = $derived(

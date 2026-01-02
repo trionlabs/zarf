@@ -59,8 +59,6 @@
 
     // --- Derived for clean markup ---
     const today = getTodayIso();
-    const isPastDate = $derived(cliffDate !== "" && cliffDate < today);
-    const dateInputClass = $derived(isPastDate ? "text-error" : "");
 </script>
 
 <div class="pt-8 border-t border-base-content/5 space-y-6">
@@ -82,7 +80,7 @@
             bind:value={selectedMonth}
             onchange={updateCliffDate}
             aria-label="Month"
-            class="appearance-none bg-transparent outline-none cursor-pointer hover:text-primary transition-colors font-medium {dateInputClass}"
+            class="appearance-none bg-transparent outline-none cursor-pointer hover:text-primary transition-colors font-medium"
         >
             {#each MONTH_NAMES as m, i}
                 <option value={i}>{m}</option>
@@ -96,25 +94,19 @@
             min="1"
             max="31"
             aria-label="Day"
-            class="w-12 bg-transparent outline-none text-center appearance-none [&::-webkit-inner-spin-button]:appearance-none {dateInputClass}"
+            class="w-12 bg-transparent outline-none text-center appearance-none [&::-webkit-inner-spin-button]:appearance-none"
         />
         <span class="text-base-content/20">,</span>
         <input
             type="number"
             bind:value={selectedYear}
             oninput={handleYearInput}
-            min="2024"
+            min="2020"
             max="2100"
             aria-label="Year"
-            class="w-20 bg-transparent outline-none appearance-none [&::-webkit-inner-spin-button]:appearance-none {dateInputClass}"
+            class="w-20 bg-transparent outline-none appearance-none [&::-webkit-inner-spin-button]:appearance-none"
         />
     </div>
-
-    {#if isPastDate}
-        <p class="text-xs text-error font-medium">
-            Past dates cannot be selected.
-        </p>
-    {/if}
 
     <!-- Quick Date Presets + Time Selector -->
     <div class="flex items-center gap-3 text-xs text-base-content/40">
