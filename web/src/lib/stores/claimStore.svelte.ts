@@ -1,123 +1,203 @@
 import { browser } from '$app/environment';
-import type { ZKProof } from '$lib/types';
+import type { ZKProof, MerkleClaim, MerkleTreeData } from '$lib/types';
+import { computeIdentityCommitment } from '$lib/crypto/merkleTree';
+import { fetchDistributionData, type DistributionData } from '$lib/services/distribution';
+import { isEpochClaimed } from '$lib/contracts/contracts';
+import { type Address } from 'viem';
 
 /**
- * Claim Store - InMemory State for the Claim Flow
+ * Claim Store - InMemory State for the Claim Flow (Discrete Vesting Edition)
  * 
  * SECURITY CRITICAL:
- * This store handles the User's SALT and Claim Data.
+ * This store handles the User's MASTER SALT and Epoch Secrets.
  * It is effectively an "InMemory" store. 
- * We explicitly DO NOT persist `salt` or `claimData` to localStorage/sessionStorage
- * to prevent Cross-Site Scripting (XSS) attacks from easily harvesting unencrypted salts.
- * 
- * If the user refreshes the page, this state is lost, and they must re-upload their JSON.
- * This is a security feature, not a bug.
+ * We explicitly DO NOT persist derived secrets to storage.
  */
 
 export type ClaimStep = 1 | 2 | 3 | 4 | 5;
+
+export interface EpochClaim extends MerkleClaim {
+    isClaimed: boolean;
+    isLocked: boolean;
+    canClaim: boolean;
+}
 
 export class ClaimFlowState {
     // UI State
     currentStep = $state<ClaimStep>(1);
     isLoading = $state(false);
     error = $state<string | null>(null);
+    statusMessage = $state<string | null>(null); // Progress updates
 
     // Session Data (Identification)
-    // CRITICAL: salt (PIN) is NEVER persisted to localStorage
     email = $state<string | null>(null);
-    jwt = $state<string | null>(null); // Google ID Token
-    salt = $state<string | null>(null); // The 8-char PIN
+    jwt = $state<string | null>(null);
+    masterSalt = $state<string | null>(null);
 
-    // Derived Identity
-    // identityCommitment = Pedersen(email, Hash(salt))
-    identityCommitment = $state<string | null>(null);
+    // Discovered Epochs
+    epochs = $state<EpochClaim[]>([]);
+    vestingSchedule = $state<DistributionData['schedule'] | null>(null); // Store schedule metadata
 
-    // Discovered Chain Data
-    totalAllocation = $state<bigint>(0n);
-    claimedAmount = $state<bigint>(0n);
-    vestedAmount = $state<bigint>(0n);
-    claimableAmount = $derived(this.vestedAmount - this.claimedAmount);
-    isEligible = $derived(this.totalAllocation > 0n);
+    // Aggregates
+    totalAllocation = $derived(this.epochs.reduce((sum, e) => sum + e.amount, 0n));
+    // Only count claimed epochs
+    claimedAmount = $derived(this.epochs.filter(e => e.isClaimed).reduce((sum, e) => sum + e.amount, 0n));
+    // Unlockable amount (passed time lock) - This is "Vested"
+    unlockedAmount = $derived(this.epochs.filter(e => !e.isLocked).reduce((sum, e) => sum + e.amount, 0n));
+
+    // Alias for UI compatibility
+    vestedAmount = $derived(this.unlockedAmount);
+
+    // Claimable = Unlocked AND Not Claimed
+    claimableAmount = $derived(this.epochs.filter(e => !e.isLocked && !e.isClaimed).reduce((sum, e) => sum + e.amount, 0n));
+
+    isEligible = $derived(this.epochs.length > 0);
+
+    isCliffPassed = $derived(
+        this.vestingSchedule
+            ? (Date.now() / 1000) >= (Number(this.vestingSchedule.vestingStart) + Number(this.vestingSchedule.cliffDuration))
+            : true // Fallback to true if unknown, or maybe false?
+    );
 
     // Claim Execution
-    targetWallet = $state<string | null>(null); // Address
-    proof = $state<ZKProof | null>(null); // Hex proof
+    selectedEpochIndex = $state<number | null>(null); // Index in this.epochs array
+    selectedEpoch = $derived(this.selectedEpochIndex !== null ? this.epochs[this.selectedEpochIndex] : null);
+
+    targetWallet = $state<string | null>(null);
+    proof = $state<ZKProof | null>(null);
     txHash = $state<string | null>(null);
 
-    // Vesting Schedule
-    vestingInfo = $state<{
-        vestingStart: number;
-        cliffDuration: number;
-        vestingDuration: number;
-        vestingPeriod: number;
-        completedPeriods: number;
-        totalPeriods: number;
-    } | null>(null);
-
-    // Computed Vesting Props
-    cliffEndDate = $derived(this.vestingInfo ? new Date((this.vestingInfo.vestingStart + this.vestingInfo.cliffDuration) * 1000) : null);
-
-    isCliffPassed = $derived.by(() => {
-        if (!this.cliffEndDate) return false;
-        return Date.now() > this.cliffEndDate.getTime();
-    });
-
-    nextUnlockDate = $derived.by(() => {
-        if (!this.vestingInfo) return null;
-        // If fully vested
-        if (this.vestingInfo.completedPeriods >= this.vestingInfo.totalPeriods) return null;
-
-        // Calculate next period time
-        const start = this.vestingInfo.vestingStart;
-        const cliff = this.vestingInfo.cliffDuration;
-        const period = this.vestingInfo.vestingPeriod;
-        // The periods start after cliff.
-        // Period 0 ends at start + cliff + period
-        // Period n ends at start + cliff + (n+1)*period
-
-        // However, "completedPeriods" usually means how many full periods have passed.
-        // So the next unlock (end of next period) is:
-        const nextPeriodIndex = this.vestingInfo.completedPeriods + 1;
-        const nextUnlockTimestamp = start + cliff + (nextPeriodIndex * period);
-
-        return new Date(nextUnlockTimestamp * 1000);
-    });
-
-    percentVested = $derived.by(() => {
-        if (!this.vestingInfo || this.vestingInfo.totalPeriods === 0) return 0;
-        // Use completed periods for discrete steps, or time-based for smooth?
-        // Backlog implies progress bar.
-        // Using strict completed periods per contract logic usually best for "claimable".
-        return (this.vestingInfo.completedPeriods / this.vestingInfo.totalPeriods) * 100;
-    });
-
     constructor() {
-        // Recover session if exists (excluding PIN)
         this.recoverSession();
     }
 
     // --- Actions ---
 
-    setCredentials(email: string, jwt: string, salt: string) {
+    setCredentials(email: string, jwt: string, masterSalt: string) {
         this.email = email;
         this.jwt = jwt;
-        this.salt = salt;
+        this.masterSalt = masterSalt;
 
-        // We will calculate commitment in the service layer, but store it here
-        // For now, reset discovery until validated
-        this.totalAllocation = 0n;
-        this.claimedAmount = 0n;
-        this.vestedAmount = 0n;
+        // Reset epochs on new login
+        this.epochs = [];
     }
 
-    setAllocation(total: bigint, claimed: bigint, vested: bigint, commitment: string) {
-        this.totalAllocation = total;
-        this.claimedAmount = claimed;
-        this.vestedAmount = vested;
-        this.identityCommitment = commitment;
+    /**
+     * DISCOVERY ENGINE (The Core Logic)
+     * 
+     * Loops through potential epoch indices (0..N) and checks if they exist 
+     * in the off-chain distribution data.
+     */
+    async discoverEpochs(email: string, pin: string, contractAddress: string) {
+        this.isLoading = true;
+        this.error = null;
+        this.statusMessage = "Loading distribution data...";
+        this.epochs = [];
 
-        if (total > 0n) {
-            this.saveSession(); // Save minimal non-secret state
+        try {
+            // 1. Fetch Static Data (Leaves & Schedule & Commitment Map)
+            // We assume the JSON has a 'commitments' map for O(1) lookup
+            const data = await fetchDistributionData(contractAddress);
+
+            // Use typed map for O(1) lookup
+            const commitmentMap = data.commitments;
+            this.vestingSchedule = data.schedule;
+
+            this.statusMessage = "Deriving secure keys...";
+
+            let index = 0;
+            const foundEpochs: EpochClaim[] = [];
+            const MAX_EPOCHS = 100; // Safety break
+
+            // 2. The Discovery Loop
+            while (index < MAX_EPOCHS) {
+                // a. Derive Secret: "PIN_Index"
+                const epochSecret = `${pin}_${index}`;
+
+                // b. Compute Commitment (Pedersen Hash)
+                const commitmentBigInt = await computeIdentityCommitment(email, epochSecret);
+                // Pad to 32 bytes hex
+                const commitment = '0x' + commitmentBigInt.toString(16).padStart(64, '0');
+
+                // c. Check Existence (Offline)
+                const meta = commitmentMap[commitment];
+
+                if (meta) {
+                    // FOUND ONE!
+                    // d. Check Status (On-Chain)
+                    // We can optimize this by batching, but for now 1-by-1 is safer/easier
+                    const isClaimed = await isEpochClaimed(commitment, contractAddress as Address);
+
+                    // e. Calculate Unlock Time (if not in meta)
+                    // meta should ideally have { amount, leafIndex }
+                    // If meta is just "true", we are stuck on Amount. Assuming meta has Amount.
+
+                    foundEpochs.push({
+                        email,
+                        amount: BigInt(meta.amount),
+                        salt: epochSecret,
+                        identityCommitment: commitment,
+                        leafIndex: meta.index, // Needed for Proof Gen
+                        leaf: 0n, // We'll compute this later or need it from meta
+                        unlockTime: meta.unlockTime,
+
+                        isClaimed,
+                        isLocked: (Date.now() / 1000) < meta.unlockTime,
+                        canClaim: !isClaimed && (Date.now() / 1000) >= meta.unlockTime
+                    });
+
+                    index++;
+                } else {
+                    // If we miss Index 0, maybe wrong PIN?
+                    // If we hit a gap after finding some, assuming end of schedule.
+                    // Strict rule: Epochs are sequential 0..N.
+                    if (index === 0) {
+                        // Wrong credentials or not in list
+                        break;
+                    } else {
+                        // End of stream
+                        break;
+                    }
+                }
+            }
+
+            if (foundEpochs.length === 0) {
+                throw new Error("No allocation found. Please check your Email and PIN.");
+            }
+
+            this.setEpochs(foundEpochs);
+            this.setCredentials(email, "", pin); // Store session (JWT optional here?)
+
+        } catch (e: any) {
+            console.error("Discovery failed:", e);
+            this.error = e.message || "Failed to discover epochs.";
+            // Clear epochs on error
+            this.epochs = [];
+        } finally {
+            this.isLoading = false;
+            this.statusMessage = null;
+        }
+    }
+
+    /**
+     * Set discovered epochs and their statuses
+     */
+    setEpochs(epochs: EpochClaim[]) {
+        this.epochs = epochs;
+        if (epochs.length > 0) {
+            this.saveSession();
+        }
+    }
+
+    /**
+     * Update status of a single epoch (e.g. after successful claim)
+     */
+    markAsClaimed(commitment: string) {
+        const index = this.epochs.findIndex(e => e.identityCommitment === commitment);
+        if (index !== -1) {
+            // Create new object to trigger reactivity if needed (though Runes handles mutation fine)
+            this.epochs[index].isClaimed = true;
+            this.epochs[index].canClaim = false;
         }
     }
 
@@ -133,17 +213,6 @@ export class ClaimFlowState {
 
     setTxHash(hash: string) {
         this.txHash = hash;
-    }
-
-    setVestingInfo(
-        schedule: { vestingStart: number; cliffDuration: number; vestingDuration: number; vestingPeriod: number },
-        progress: { completed: number; total: number }
-    ) {
-        this.vestingInfo = {
-            ...schedule,
-            completedPeriods: progress.completed,
-            totalPeriods: progress.total
-        };
     }
 
     // --- Navigation ---
@@ -170,24 +239,22 @@ export class ClaimFlowState {
     reset() {
         this.currentStep = 1;
         this.error = null;
+        this.statusMessage = null;
         this.email = null;
         this.jwt = null;
-        this.salt = null;
-        this.identityCommitment = null;
-        this.totalAllocation = 0n;
-        this.claimedAmount = 0n;
-        this.vestedAmount = 0n;
+        this.masterSalt = null;
+        this.epochs = [];
+        this.selectedEpochIndex = null;
         this.targetWallet = null;
         this.proof = null;
         this.txHash = null;
-        this.vestingInfo = null;
 
         if (browser) {
             sessionStorage.removeItem('claim_flow_state');
         }
     }
 
-    // --- Persistence (SessionStorage Only) ---
+    // --- Persistence ---
 
     private saveSession() {
         if (!browser) return;
@@ -195,13 +262,13 @@ export class ClaimFlowState {
         const data = {
             step: this.currentStep,
             email: this.email,
-            // jwt: this.jwt, // Optional to persist, maybe expire?
-            // NEVERY PERSIST SALT
-            identityCommitment: this.identityCommitment,
-            totalAllocation: this.totalAllocation.toString(), // BigInt -> String
-            claimedAmount: this.claimedAmount.toString(),
-            vestedAmount: this.vestedAmount.toString(),
-            targetWallet: this.targetWallet
+            // jwt: this.jwt, 
+            // masterSalt: NEVER PERSIST
+            targetWallet: this.targetWallet,
+            // We can persist public epoch data (commitments/statuses) but NOT secrets
+            // Actually, to endure refresh, we might need to rely on User re-entering PIN?
+            // Or we assume session ends on refresh.
+            // Let's persist email and basic state.
         };
 
         sessionStorage.setItem('claim_flow_state', JSON.stringify(data));
@@ -217,10 +284,6 @@ export class ClaimFlowState {
             const data = JSON.parse(raw);
             this.currentStep = data.step as ClaimStep;
             this.email = data.email;
-            this.identityCommitment = data.identityCommitment;
-            this.totalAllocation = BigInt(data.totalAllocation || '0');
-            this.claimedAmount = BigInt(data.claimedAmount || '0');
-            this.vestedAmount = BigInt(data.vestedAmount || '0');
             this.targetWallet = data.targetWallet;
         } catch (e) {
             console.warn('Failed to recover claim session', e);
