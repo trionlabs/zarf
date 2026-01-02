@@ -43,11 +43,20 @@ export async function fetchPublicLeaves(contractAddress: string | null): Promise
 }
 
 function processDistributionData(data: any): bigint[] {
+    // Secure Format: Direct array of leaves
+    if (data.leaves && Array.isArray(data.leaves)) {
+        console.log(`[Distribution] Found ${data.leaves.length} public leaves (Secure Format).`);
+        return data.leaves.map((l: string) => BigInt(l));
+    }
+
+    // Legacy Format (Dev/Unsafe): Array of objects with sensitive data
     const list = data.claims || data.recipients;
 
     if (!list || !Array.isArray(list)) {
-        throw new Error("Invalid distribution format: 'recipients' or 'claims' array missing.");
+        throw new Error("Invalid distribution format: 'leaves', 'recipients' or 'claims' array missing.");
     }
+
+    console.warn("[Distribution] Using Legacy/Unsafe JSON format. This should not be used in production.");
 
     const leaves = list.map((c: any) => {
         if (!c.leaf) return 0n;
