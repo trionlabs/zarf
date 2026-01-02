@@ -2,24 +2,46 @@
     import { onMount } from "svelte";
     import { goto } from "$app/navigation";
     import { extractStateFromUrl } from "$lib/auth/googleAuth";
+    import { walletStore } from "$lib/stores/walletStore.svelte";
     import ThemeToggle from "$lib/components/layout/ThemeToggle.svelte";
     import WalletConnectButton from "$lib/components/layout/WalletConnectButton.svelte";
     import Hero from "$lib/components/landing/Hero.svelte";
 
     onMount(() => {
-        // If we land here with a Google ID Token (OAuth callback), forward to /claim
-        if (window.location.hash.includes("id_token=")) {
+        const hash = window.location.hash;
+
+        // 1. Handle Successful OAuth Callback
+        if (hash.includes("id_token=")) {
+            console.log("[Landing] Detected ID Token, processing redirect...");
+
             // Parse state to restore context (e.g. contract address)
             const oauthState = extractStateFromUrl();
             const addressQuery = oauthState?.address
                 ? `?address=${oauthState.address}`
                 : "";
 
-            // Use window.location.assign for reliable redirect with hash fragment
-            // SvelteKit goto can sometimes strip hash or cause router issues with external redirects
-            window.location.assign(
-                `/claim${addressQuery}${window.location.hash}`,
-            );
+            // Forward to /claim with state and hash
+            // We use replace to avoid adding the intermediate redirect to history
+            const target = `/claim${addressQuery}${hash}`;
+            console.log("[Landing] Redirecting to:", target);
+            window.location.replace(target);
+            return;
+        }
+
+        // 2. Handle OAuth Errors (e.g. access_denied, interaction_required)
+        if (hash.includes("error=")) {
+            console.warn("[Landing] OAuth Error detected:", hash);
+            // Parse error description if possible or just generic
+            walletStore.setError("Authentication failed. Please try again.");
+
+            const oauthState = extractStateFromUrl();
+            const addressQuery = oauthState?.address
+                ? `?address=${oauthState.address}`
+                : "";
+
+            // Redirect back to claim page to show error state there, clearing the hash
+            window.location.replace(`/claim${addressQuery}`);
+            return;
         }
     });
     const features = [

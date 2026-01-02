@@ -1,6 +1,7 @@
 <script lang="ts">
     import ThemeToggle from "$lib/components/layout/ThemeToggle.svelte";
     import WalletConnectButton from "$lib/components/layout/WalletConnectButton.svelte";
+    import { authStore } from "$lib/stores/authStore.svelte";
 
     let { hideActions = false } = $props<{ hideActions?: boolean }>();
 </script>
@@ -42,6 +43,26 @@
             >
                 Docs
             </a>
+
+            <!-- Gmail Session -->
+            {#if authStore.isAuthenticated}
+                <div class="w-px h-4 bg-base-content/10"></div>
+                <div class="flex items-center gap-2">
+                    <span
+                        class="text-xs text-base-content/60 font-mono hidden sm:inline-block"
+                    >
+                        {authStore.gmail.email}
+                    </span>
+                    <button
+                        class="btn btn-ghost btn-xs text-error/70 hover:text-error hover:bg-error/10"
+                        onclick={() => authStore.clearGmailSession()}
+                        aria-label="Sign out"
+                    >
+                        Log out
+                    </button>
+                </div>
+            {/if}
+
             <div class="w-px h-4 bg-base-content/10"></div>
             <WalletConnectButton />
             <div class="w-px h-4 bg-base-content/10"></div>

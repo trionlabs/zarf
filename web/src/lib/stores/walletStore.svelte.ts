@@ -232,6 +232,8 @@ function destroy() {
     isInitialized = false;
 }
 
+function setError(message: string) { state.error = message; }
+
 export const walletStore = {
     // State getters
     get address() { return state.address; },
@@ -260,6 +262,7 @@ export const walletStore = {
     switchChain,
     refreshBalance,
     clearError,
+    setError, // Added
     closeModal, // Exposed
     destroy
 };
