@@ -30,7 +30,11 @@
                 amount: parseUnits(String(r.amount), tokenDecimals),
             }));
 
-            const result = await processWhitelist(entries);
+            // ADR-023: Discrete Vesting - Generator needs Schedule
+            const result = await processWhitelist(
+                entries,
+                distribution.schedule,
+            );
             deployStore.setMerkleResult(result);
         } catch (e: any) {
             console.error("Merkle generation error:", e);
