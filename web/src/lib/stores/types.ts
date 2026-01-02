@@ -119,19 +119,6 @@ export interface WizardState {
  */
 export type ClaimStep = 1 | 2 | 3 | 4 | 5;
 
-/**
- * Claimable distribution metadata (from contract or The Graph)
- */
-export interface ClaimableDistribution {
-    id: string; // Contract address or unique ID
-    name: string;
-    projectIcon: string; // URL to project logo
-    status: 'vesting' | 'claimable' | 'claimed';
-    totalAmount: number;
-    claimedAmount: number;
-    nextUnlockDate: string; // ISO date string
-    merkleRoot?: string; // For validation
-}
 
 /**
  * Selected tranche for claiming
@@ -142,27 +129,35 @@ export interface SelectedTranche {
     index: number; // Tranche index in schedule
 }
 
-/**
- * Complete claim flow state
- */
-export interface ClaimFlowState {
-    mode: 'dashboard' | 'claiming'; // UI mode toggle
 
-    currentStep: ClaimStep;
+// ============================================================================
+// Merkle Tree Types (ADR-023 Updated)
+// ============================================================================
 
-    // Step 1: Select Distribution
-    selectedDistribution: ClaimableDistribution | null;
+export interface MerkleProof {
+    siblings: string[]; // Hex strings
+    indices: number[];  // 0 or 1
+}
 
-    // Step 2: Select Tranche
-    selectedTranche: SelectedTranche | null;
+export interface MerkleClaim {
+    email: string;
+    amount: bigint;
+    salt: string; // The secret (Master or Epoch secret)
+    identityCommitment: string;
+    leafIndex: number;
+    leaf: bigint;
+    unlockTime: number; // ADR-023: Discrete Vesting unlock timestamp
+}
 
-    // Step 3: Connect Wallet & Generate Proof
-    targetWallet: Address | null;
-    zkProof: string | null; // Hex-encoded proof (not persisted)
-    publicInputs: any | null; // Public inputs for verification (not persisted)
-
-    // Step 4-5: Submit & Success
-    claimTxHash: string | null; // Transaction hash (not persisted)
+export interface MerkleTreeData {
+    root: bigint;
+    tree: {
+        minDepth: number;
+        depth: number;
+        layers: bigint[][];
+        emptyHashes: bigint[];
+    };
+    claims: MerkleClaim[];
 }
 
 // ============================================================================

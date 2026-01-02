@@ -27,6 +27,7 @@ export type ProofRequest = {
             };
             merkleRoot: string; // Hex string '0x...'
             recipient: string; // Hex string '0x...'
+            unlockTime: string; // Hex string '0x...' (ADR-023)
         };
     };
 };
@@ -183,7 +184,7 @@ async function generateProof(payload: ProofRequest['payload']) {
     if (!cachedNoir || !cachedBackend) throw new Error('Not initialized');
 
     const { jwt, publicKey, claimData } = payload;
-    const { email, salt, amount, merkleProof, merkleRoot, recipient } = claimData;
+    const { email, salt, amount, merkleProof, merkleRoot, recipient, unlockTime } = claimData;
 
     postMessage({ type: 'PROGRESS', message: 'Generating Inputs from JWT...' });
 
@@ -227,6 +228,7 @@ async function generateProof(payload: ProofRequest['payload']) {
         // Public inputs (must match solidity layout)
         pubkey_modulus_limbs: jwtInputs.pubkey_modulus_limbs,
         merkle_root: toHex(merkleRoot),
+        unlock_time: toHex(unlockTime), // ADR-023
         recipient: recipient || '0x0',
     };
 
@@ -243,10 +245,15 @@ async function generateProof(payload: ProofRequest['payload']) {
         .join('');
 
     // Extract critical public inputs to return for verification/logging
-    // [19] = identity_commitment (formerly email_hash)
-    // [20] = recipient
-    const identityCommitment = proof.publicInputs[19];
-    const proofRecipient = proof.publicInputs[20];
+    // [19] = unlock_time (Input)
+    // [20] = identity_commitment (Output)
+    // [21] = recipient (Output)
+    // [22] = amount (Output)
+    const identityCommitment = proof.publicInputs[20];
+    const proofRecipient = proof.publicInputs[21];
+
+    // Note: Amount is also an output now (index 22), but we have it in inputs too.
+    // Using input amount for consistency is safer unless we want to verify circuit output.
 
     return {
         proof: proofHex,

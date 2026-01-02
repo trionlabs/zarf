@@ -52,34 +52,25 @@ const VESTING_ABI = parseAbi([
     // Write functions
     'function claim(bytes calldata proof, bytes32[] calldata publicInputs) external',
 
-    // Read functions - Claim status
-    'function calculateVested(bytes32 emailHash) external view returns (uint256)',
-    'function getClaimable(bytes32 emailHash) external view returns (uint256)',
-    'function claimed(bytes32 emailHash) external view returns (uint256)',
-    'function allocations(bytes32 emailHash) external view returns (uint256)',
+    // Read functions
+    'function isClaimed(bytes32 epochCommitment) external view returns (bool)',
+    'function merkleRoot() external view returns (bytes32)',
 
-    // Read functions - Metadata
+    // Metadata
     'function name() external view returns (string)',
     'function owner() external view returns (address)',
     'function token() external view returns (address)',
-
-    // Read functions - Vesting parameters
-    'function vestingStart() external view returns (uint256)',
-    'function cliffDuration() external view returns (uint256)',
-    'function vestingDuration() external view returns (uint256)',
-    'function merkleRoot() external view returns (bytes32)',
-
-    'function vestingPeriod() external view returns (uint256)',
-    'function getVestingInfo() external view returns (uint256 start, uint256 cliff, uint256 duration, uint256 period)',
-    'function getUnlockProgress() external view returns (uint256 completed, uint256 total)',
 
     // Errors
     'error InvalidProof()',
     'error InvalidMerkleRoot()',
     'error InvalidRecipient()',
     'error InvalidPubkey()',
-    'error NothingToClaim()',
-    'error VestingNotStarted()',
+    'error AlreadyClaimed()',
+    'error EpochLocked()',
+    'error Unauthorized()',
+    'error TransferFailed()',
+    'error AlreadyInitialized()',
 ]);
 
 /**
@@ -323,11 +314,11 @@ export async function submitClaim(
         if (errorMessage.includes('InvalidRecipient')) {
             throw new Error('Proof was generated for a different wallet address');
         }
-        if (errorMessage.includes('NothingToClaim')) {
-            throw new Error('No tokens available to claim (already claimed or not vested)');
+        if (errorMessage.includes('AlreadyClaimed')) {
+            throw new Error('This epoch has already been claimed');
         }
-        if (errorMessage.includes('VestingNotStarted')) {
-            throw new Error('Vesting has not started yet');
+        if (errorMessage.includes('EpochLocked')) {
+            throw new Error('This epoch is not yet unlocked');
         }
 
         // Generic error
@@ -369,50 +360,7 @@ export async function submitClaim(
  * }
  * ```
  */
-export async function getVestingInfo(): Promise<VestingInfo | null> {
-    if (!VESTING_ADDRESS) {
-        return null;
-    }
 
-    const publicClient = getPublicClient();
-
-    try {
-        const [vestingStart, cliffDuration, vestingDuration, merkleRoot] = await Promise.all([
-            publicClient.readContract({
-                address: VESTING_ADDRESS,
-                abi: VESTING_ABI,
-                functionName: 'vestingStart',
-            }),
-            publicClient.readContract({
-                address: VESTING_ADDRESS,
-                abi: VESTING_ABI,
-                functionName: 'cliffDuration',
-            }),
-            publicClient.readContract({
-                address: VESTING_ADDRESS,
-                abi: VESTING_ABI,
-                functionName: 'vestingDuration',
-            }),
-            publicClient.readContract({
-                address: VESTING_ADDRESS,
-                abi: VESTING_ABI,
-                functionName: 'merkleRoot',
-            }),
-        ]);
-
-        return {
-            vestingAddress: VESTING_ADDRESS,
-            totalAmount: 0n, // Not tracked in this minimal version
-            claimedAmount: 0n, // Not tracked in this minimal version
-            merkleRoot: merkleRoot as string,
-            cliffEndDate: Number(vestingStart) + Number(cliffDuration),
-            distributionDuration: Number(vestingDuration) / (30 * 24 * 60 * 60), // Convert seconds to months
-        };
-    } catch (error) {
-        console.warn('[Contracts] Failed to fetch vesting info:', error);
-        return null;
-    }
-}
 
 /**
  * Get claim status for a specific email hash.
@@ -430,59 +378,30 @@ export async function getVestingInfo(): Promise<VestingInfo | null> {
  * }
  * ```
  */
-export async function getClaimStatus(
-    emailHash: string,
+/**
+ * Check if a specific epoch commitment has been claimed.
+ * 
+ * @param epochCommitment - The unique identifier for the epoch (bytes32)
+ */
+export async function isEpochClaimed(
+    epochCommitment: string,
     contractAddress?: Address
-): Promise<{
-    allocation: string;
-    claimed: string;
-    vested: string;
-    claimable: string;
-} | null> {
+): Promise<boolean> {
     const targetAddress = contractAddress || VESTING_ADDRESS;
-    if (!targetAddress) {
-        return null;
-    }
+    if (!targetAddress) return false;
 
     const publicClient = getPublicClient();
 
     try {
-        const [allocation, claimed, vested, claimable] = await Promise.all([
-            publicClient.readContract({
-                address: targetAddress,
-                abi: VESTING_ABI,
-                functionName: 'allocations',
-                args: [emailHash as `0x${string}`],
-            }),
-            publicClient.readContract({
-                address: targetAddress,
-                abi: VESTING_ABI,
-                functionName: 'claimed',
-                args: [emailHash as `0x${string}`],
-            }),
-            publicClient.readContract({
-                address: targetAddress,
-                abi: VESTING_ABI,
-                functionName: 'calculateVested',
-                args: [emailHash as `0x${string}`],
-            }),
-            publicClient.readContract({
-                address: targetAddress,
-                abi: VESTING_ABI,
-                functionName: 'getClaimable',
-                args: [emailHash as `0x${string}`],
-            }),
-        ]);
-
-        return {
-            allocation: allocation.toString(),
-            claimed: claimed.toString(),
-            vested: vested.toString(),
-            claimable: claimable.toString(),
-        };
+        return await publicClient.readContract({
+            address: targetAddress,
+            abi: VESTING_ABI,
+            functionName: 'isClaimed',
+            args: [epochCommitment as `0x${string}`],
+        });
     } catch (error) {
-        console.warn('[Contracts] Failed to fetch claim status:', error);
-        return null;
+        console.warn('[Contracts] Failed to check epoch status:', error);
+        return false;
     }
 }
 
@@ -492,54 +411,7 @@ export async function getClaimStatus(
  * @param contractAddress - Optional override
  * @returns Vesting schedule or null
  */
-export async function getVestingSchedule(
-    contractAddress?: Address
-): Promise<VestingSchedule | null> {
-    const targetAddress = contractAddress || VESTING_ADDRESS;
-    if (!targetAddress) return null;
 
-    const publicClient = getPublicClient();
-
-    try {
-        // Try to get structured info first
-        try {
-            const [start, cliff, duration, period] = await publicClient.readContract({
-                address: targetAddress,
-                abi: VESTING_ABI,
-                functionName: 'getVestingInfo',
-            });
-
-            return {
-                vestingStart: Number(start),
-                cliffDuration: Number(cliff),
-                vestingDuration: Number(duration),
-                vestingPeriod: Number(period)
-            };
-        } catch {
-            // Fallback to individual calls
-            const [start, cliff, duration, period] = await Promise.all([
-                publicClient.readContract({ address: targetAddress, abi: VESTING_ABI, functionName: 'vestingStart' }),
-                publicClient.readContract({ address: targetAddress, abi: VESTING_ABI, functionName: 'cliffDuration' }),
-                publicClient.readContract({ address: targetAddress, abi: VESTING_ABI, functionName: 'vestingDuration' }),
-                publicClient.readContract({ address: targetAddress, abi: VESTING_ABI, functionName: 'vestingPeriod' })
-            ]);
-
-            return {
-                vestingStart: Number(start),
-                cliffDuration: Number(cliff),
-                vestingDuration: Number(duration),
-                vestingPeriod: Number(period)
-            };
-        }
-    } catch (error) {
-        console.warn('[Contracts] Failed to fetch vesting schedule:', error);
-        // Fallback for contracts without period (backward compatibility)
-        if (error instanceof Error) {
-            return null;
-        }
-        return null;
-    }
-}
 
 /**
  * Get vesting unlock progress.
@@ -547,30 +419,7 @@ export async function getVestingSchedule(
  * @param contractAddress - Optional override
  * @returns Progress stats or null
  */
-export async function getUnlockProgress(
-    contractAddress?: Address
-): Promise<{ completed: number; total: number } | null> {
-    const targetAddress = contractAddress || VESTING_ADDRESS;
-    if (!targetAddress) return null;
 
-    const publicClient = getPublicClient();
-
-    try {
-        const [completed, total] = await publicClient.readContract({
-            address: targetAddress,
-            abi: VESTING_ABI,
-            functionName: 'getUnlockProgress',
-        });
-
-        return {
-            completed: Number(completed),
-            total: Number(total)
-        };
-    } catch (error) {
-        console.warn('[Contracts] Failed to fetch unlock progress:', error);
-        return null;
-    }
-}
 
 // ============================================================================
 // Utility Functions
