@@ -28,20 +28,24 @@
     };
 
     let periods = $derived.by(() => {
-        if (!claimStore.vestingInfo || claimStore.totalAllocation === 0n) {
+        if (!claimStore.vestingSchedule || claimStore.totalAllocation === 0n) {
             return [];
         }
 
-        const info = claimStore.vestingInfo;
+        const info = claimStore.vestingSchedule;
         const total = claimStore.totalAllocation;
         const claimed = claimStore.claimedAmount;
         const now = Date.now() / 1000;
 
         const result: VestingPeriod[] = [];
-        const amountPerPeriod = total / BigInt(info.totalPeriods);
+        // Calculate total periods from duration / period length
+        const totalPeriods = Math.floor(
+            info.vestingDuration / info.vestingPeriod,
+        );
+        const amountPerPeriod = total / BigInt(totalPeriods);
         let runningClaimed = 0n;
 
-        for (let i = 0; i < info.totalPeriods; i++) {
+        for (let i = 0; i < totalPeriods; i++) {
             // Period unlocks at: start + cliff + (i+1) * period
             // Because period 0 unlocks after 1 full period post-cliff
             const unlockTimestamp =
@@ -146,6 +150,7 @@
                         <th class="font-medium">Unlock Date</th>
                         <th class="font-medium text-right">Amount</th>
                         <th class="font-medium text-center">Status</th>
+                        <th class="font-medium text-right">Action</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -187,6 +192,24 @@
                                         <Lock class="w-3 h-3" />
                                         Locked
                                     </span>
+                                {/if}
+                            </td>
+                            <td class="text-right">
+                                {#if period.status === "claimable"}
+                                    <button
+                                        class="btn btn-xs btn-primary btn-outline"
+                                        onclick={() => {
+                                            // period.index is 1-based, array is 0-based
+                                            // Assume epochs are sorted same as schedule: 0..N
+                                            // But wait, epochs might not match schedule periods 1:1 if implementation differs
+                                            // Assuming periods[i] maps to epochs[i]
+                                            claimStore.state.selectedEpochIndex =
+                                                period.index - 1;
+                                            claimStore.nextStep();
+                                        }}
+                                    >
+                                        Claim
+                                    </button>
                                 {/if}
                             </td>
                         </tr>

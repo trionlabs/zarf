@@ -49,7 +49,8 @@ export interface Schedule {
 export interface MerkleClaim {
     email: string;
     amount: bigint;
-    salt: string;        // Hex string (Holds the 8-char secret code)
+    salt: string;        // Hex string (Holds the Hash Chain Secret for the circuit)
+    pin?: string;        // The original plain text PIN (Master Salt) - Used for export
     identityCommitment: string; // Pedersen(email, secret) - Public Identifier
     leaf: bigint;
     leafIndex: number;

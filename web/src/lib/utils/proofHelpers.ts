@@ -15,7 +15,7 @@ export async function fetchPublicLeaves(contractAddress: string | null): Promise
 
     // Future-proof: Ready for multi-tenant logic
     // Future-proof: Ready for multi-tenant logic
-    const targetUrl = contractAddress ? `/distributions/${contractAddress}.json` : defaultUrl;
+    const targetUrl = contractAddress ? `/distributions/${contractAddress.toLowerCase()}.json` : defaultUrl;
 
     // Current: Multi-tenant enabled
     console.log(`[Distribution] Fetching from: ${targetUrl} (Context: ${contractAddress || 'None'})`);
@@ -42,18 +42,54 @@ export async function fetchPublicLeaves(contractAddress: string | null): Promise
     }
 }
 
-function processDistributionData(data: any): bigint[] {
-    // Secure Format: Direct array of leaves
+async function processDistributionData(data: any): Promise<bigint[]> {
+    // 1. Secure Format: Direct array of leaves
+    // TEMP: Force disabled to debug leaf mismatch. We want to reconstruct from commitments to ensure consistency.
+    /*
     if (data.leaves && Array.isArray(data.leaves)) {
         console.log(`[Distribution] Found ${data.leaves.length} public leaves (Secure Format).`);
         return data.leaves.map((l: string) => BigInt(l));
     }
+    */
 
-    // Legacy Format (Dev/Unsafe): Array of objects with sensitive data
+    // 2. Hybrid Format: Reconstruct from Commitments Map (ADR-023 Standard)
+    if (data.commitments && typeof data.commitments === 'object') {
+        console.log('[Distribution] Leaves array missing. Reconstructing from commitments map...');
+        const leavesMap = new Map<number, bigint>();
+        let maxIndex = -1;
+
+        // We need crypto tools to re-compute leaf
+        const { computeLeafFromCommitment } = await import('../crypto/merkleTree');
+
+        for (const [commitment, metadata] of Object.entries(data.commitments)) {
+            const meta = metadata as any;
+            const idx = meta.index;
+            const amount = BigInt(meta.amount);
+            const unlockTime = meta.unlockTime;
+
+            // Recompute Leaf: Hash(IdentityCommitment, Amount, UnlockTime)
+            const leaf = await computeLeafFromCommitment(commitment, amount, unlockTime);
+
+            leavesMap.set(idx, leaf);
+            if (idx > maxIndex) maxIndex = idx;
+        }
+
+        // Convert map to dense array (sparse entries are 0)
+        // Tree usually has Size = 2^k, but here we just need up to maxIndex + 1
+        const leaves: bigint[] = [];
+        for (let i = 0; i <= maxIndex; i++) {
+            leaves.push(leavesMap.get(i) || 0n);
+        }
+
+        console.log(`[Distribution] Reconstructed ${leaves.length} leaves from commitments.`);
+        return leaves;
+    }
+
+    // 3. Legacy Format (Dev/Unsafe)
     const list = data.claims || data.recipients;
 
     if (!list || !Array.isArray(list)) {
-        throw new Error("Invalid distribution format: 'leaves', 'recipients' or 'claims' array missing.");
+        throw new Error("Invalid distribution format: 'leaves', 'commitments' or 'claims' missing.");
     }
 
     console.warn("[Distribution] Using Legacy/Unsafe JSON format. This should not be used in production.");
