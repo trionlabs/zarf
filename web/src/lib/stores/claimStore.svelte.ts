@@ -91,6 +91,13 @@ class ClaimFlowState {
         return (Date.now() / 1000) >= (start + cliff);
     }
 
+    get cliffEndDate() {
+        if (!this.state.vestingSchedule) return null;
+        const start = Number(this.state.vestingSchedule.vestingStart);
+        const cliff = Number(this.state.vestingSchedule.cliffDuration);
+        return new Date((start + cliff) * 1000);
+    }
+
     // UI Helpers (Direct Accessors)
     get currentStep() { return this.state.currentStep; }
     get isLoading() { return this.state.loading; }
