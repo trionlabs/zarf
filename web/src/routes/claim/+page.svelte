@@ -68,9 +68,6 @@
     let currentStep = $derived(claimStore.currentStep);
 
     function handleImport(address: string) {
-        // Enforce fresh start: User explicitly importing implies a new session
-        claimStore.reset();
-
         const url = new URL(window.location.href);
         url.searchParams.set("address", address);
         goto(url.toString(), { replaceState: true });

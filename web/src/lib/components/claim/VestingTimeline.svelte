@@ -39,13 +39,6 @@
             : "End",
     );
 
-    let nextUnlock = $derived.by(() => {
-        if (!claimStore.epochs) return null;
-        const now = Date.now() / 1000;
-        const next = claimStore.epochs.find((e) => e.unlockTime > now);
-        return next ? new Date(next.unlockTime * 1000) : null;
-    });
-
     // Calculation for marker positions
     let totalDuration = $derived(
         claimStore.vestingSchedule
