@@ -8,23 +8,14 @@
         type OnChainVestingContract,
     } from "$lib/services/distributionDiscovery";
 
-    let { onImport } = $props<{ onImport: (addr: string) => void }>();
+    let { onImport, vaultAddresses = [] } = $props<{
+        onImport: (addr: string) => void;
+        vaultAddresses: Address[];
+    }>();
 
     let address = $state("");
     let error = $state<string | null>(null);
     let isLoading = $state(false);
-
-    const VAULT_ADDRESSES: Address[] = [
-        "0xb5a792828e495037f541a909c1ccf3e091e2ab14",
-        "0x4ea075209bc0bcccd763c2609bccb789f3b55b16",
-        "0x2ec7ec35cdfe97d28de9840c1af8878df3b5fce0",
-        "0xc26174dfd5f7ac42158ba5d290778d17ab9e9104",
-        "0x13322578dc94c6a325505a68797b4004b89d13dc",
-        "0x4866180adc085678e636cbc5f5f2c7bc87962fce",
-        "0x540459974c9ab523aB3663625a8179E93E6c323F",
-        "0x290eCa71a9D41B29501750b200bc04552AD7E782",
-        "0x2cA950a38DE071B6012C4445f17824ea8fbe2B13",
-    ];
 
     let vaultContracts = $state<
         (OnChainVestingContract & { launchDate?: string })[]
@@ -41,10 +32,12 @@
     }
 
     onMount(async () => {
+        if (!vaultAddresses.length) return;
+
         isFetchingVault = true;
         try {
             const results = await Promise.all(
-                VAULT_ADDRESSES.map(async (addr) => {
+                vaultAddresses.map(async (addr: Address) => {
                     const meta = await fetchContractMetadata(addr);
                     if (meta) {
                         return {
@@ -102,12 +95,12 @@
     <!-- Active Vaults -->
     <div class="space-y-4">
         <div class="flex items-center justify-between px-1">
-            <label class="label p-0">
+            <div class="label p-0">
                 <span
                     class="label-text font-medium text-base-content/60 text-[10px] uppercase tracking-widest"
                     >Active Distributions</span
                 >
-            </label>
+            </div>
             {#if isFetchingVault}
                 <span class="loading loading-dots loading-xs opacity-20"></span>
             {/if}
@@ -120,6 +113,14 @@
                         class="h-24 w-full animate-pulse bg-base-200/20 rounded-2xl border border-base-content/5"
                     ></div>
                 {/each}
+            {:else if vaultContracts.length === 0}
+                <div
+                    class="col-span-full py-12 text-center bg-base-200/20 rounded-2xl border border-dashed border-base-content/10"
+                >
+                    <p class="text-xs text-base-content/30 italic">
+                        No distribution contracts found in vault
+                    </p>
+                </div>
             {:else}
                 {#each vaultContracts as contract}
                     <button
@@ -175,6 +176,9 @@
 
     <!-- Manual Import -->
     <div class="max-w-xl mx-auto w-full space-y-4 pt-2">
+        <label class="sr-only" for="contract-input"
+            >Manual Contract Address</label
+        >
         <div class="form-control w-full">
             <div class="join w-full shadow-sm">
                 <div

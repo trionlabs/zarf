@@ -1,5 +1,6 @@
 <script lang="ts">
     import { onMount } from "svelte";
+    import type { Address } from "viem";
     import { authStore } from "$lib/stores/authStore.svelte";
     import {
         extractTokenFromUrl,
@@ -13,6 +14,8 @@
 
     import { page } from "$app/state";
     import { goto } from "$app/navigation";
+
+    let { data } = $props();
 
     let isAuthenticating = $state(false);
 
@@ -96,7 +99,10 @@
         {#if !importedAddress}
             <!-- 1. Import Step (Gate) -->
             <section class="w-full">
-                <ImportContractInput onImport={handleImport} />
+                <ImportContractInput
+                    onImport={handleImport}
+                    vaultAddresses={data.vaultAddresses as Address[]}
+                />
             </section>
         {:else}
             <!-- 2. Main Claim Flow -->
