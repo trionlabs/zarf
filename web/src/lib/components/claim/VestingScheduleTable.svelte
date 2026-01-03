@@ -68,8 +68,9 @@
             const isPast = now >= unlockTimestamp;
 
             if (isPast) {
-                runningClaimed += amountPerPeriod;
-                if (runningClaimed <= claimed) {
+                // Check if the specific epoch for this period is claimed
+                const epoch = claimStore.state.epochs[i];
+                if (epoch?.isClaimed) {
                     status = "claimed";
                 } else {
                     status = "claimable";

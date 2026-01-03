@@ -195,10 +195,17 @@ class ClaimFlowState {
     }
 
     markAsClaimed(commitment: string) {
-        const index = this.state.epochs.findIndex(e => e.identityCommitment === commitment);
+        const commitmentLower = commitment.toLowerCase();
+        const index = this.state.epochs.findIndex(e => e.identityCommitment.toLowerCase() === commitmentLower);
+
+        console.log('[Store] Mark as Claimed:', commitmentLower, 'Found Index:', index);
+
         if (index !== -1) {
             this.state.epochs[index].isClaimed = true;
             this.state.epochs[index].canClaim = false;
+            this.saveSession(); // Persist update if applicable
+        } else {
+            console.warn('[Store] Could not find epoch for commitment:', commitmentLower);
         }
     }
 
