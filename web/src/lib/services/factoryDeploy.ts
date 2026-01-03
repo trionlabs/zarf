@@ -191,7 +191,7 @@ export class FactoryDeployService {
                 args: [{
                     token: this.config.tokenAddress,
                     merkleRoot: this.config.merkleRoot,
-                    emailHashes: this.config.commitments, // Map new commitments to old ABI field
+                    commitments: this.config.commitments, // ADR-023: identity commitments
                     amounts: this.config.amounts,
                     cliffDuration: this.config.cliffSeconds,
                     vestingDuration: this.config.vestingSeconds,

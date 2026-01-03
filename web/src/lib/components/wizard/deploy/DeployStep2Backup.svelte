@@ -2,11 +2,35 @@
     import { deployStore } from "$lib/stores/deployStore.svelte";
     import { fly } from "svelte/transition";
 
+    import { walletStore } from "$lib/stores/walletStore.svelte";
+    import { wizardStore } from "$lib/stores/wizardStore.svelte";
+    import {
+        getFactoryAddress,
+        isFactoryAvailable,
+    } from "$lib/services/factoryDeploy";
+    import { getPublicClient } from "@wagmi/core";
+    import { wagmiConfig } from "$lib/contracts/wallet";
+    import { ZarfVestingFactoryABI } from "$lib/contracts/abis/ZarfVestingFactory";
+    import {
+        parseUnits,
+        keccak256,
+        encodeAbiParameters,
+        type Address,
+    } from "viem";
+    import {
+        durationToSeconds,
+        cliffDateToSeconds,
+        unitToPeriodSeconds,
+        calculateEndDate,
+    } from "$lib/utils/vesting";
+
     // Direct derived state
     let distribution = $derived(deployStore.distribution);
     let merkleResult = $derived(deployStore.merkleResult);
     let isBackupDownloaded = $derived(deployStore.isBackupDownloaded);
     let isBackupConfirmed = $derived(deployStore.isBackupConfirmed);
+
+    let isPredicting = $state(false);
 
     // Helpers to convert duration unit to seconds
     function getPeriodSeconds(unit: string): number {
@@ -29,8 +53,97 @@
     }
 
     // 1. Generate Public Distribution JSON (Safe to upload)
-    function downloadPublicData() {
+    async function downloadPublicData() {
         if (!distribution || !merkleResult) return;
+
+        let filename = "distribution-data.json";
+
+        // Try to predict address if wallet is connected
+        if (walletStore.address && walletStore.chainId) {
+            isPredicting = true;
+            try {
+                const factoryAddress = getFactoryAddress(walletStore.chainId);
+                if (factoryAddress) {
+                    // PREPARE PARAMS (Must match DeployStep4 exactly)
+                    const tokenDecimals =
+                        wizardStore.tokenDetails.tokenDecimals ?? 18;
+                    const commitments = merkleResult.claims.map(
+                        (c) =>
+                            "0x" +
+                            c.identityCommitment.slice(2).padStart(64, "0"),
+                    );
+                    const amounts = merkleResult.claims.map((c) =>
+                        BigInt(c.amount),
+                    );
+                    const merkleRoot =
+                        "0x" + merkleResult.root.toString(16).padStart(64, "0");
+                    const totalAmount = parseUnits(
+                        String(distribution.amount),
+                        tokenDecimals,
+                    );
+
+                    // Times
+                    let periodSeconds = BigInt(
+                        getPeriodSeconds(distribution.schedule.durationUnit),
+                    );
+                    let cliffSeconds = BigInt(
+                        cliffDateToSeconds(distribution.schedule.cliffEndDate),
+                    );
+                    let vestingSeconds = BigInt(
+                        durationToSeconds(
+                            distribution.schedule.distributionDuration,
+                            distribution.schedule.durationUnit,
+                        ),
+                    );
+
+                    // Past date check
+                    if (distribution.schedule.cliffEndDate) {
+                        const endDate = calculateEndDate(
+                            new Date(distribution.schedule.cliffEndDate),
+                            distribution.schedule.distributionDuration,
+                            distribution.schedule.durationUnit,
+                        );
+                        if (endDate && endDate.getTime() <= Date.now()) {
+                            cliffSeconds = 0n;
+                            vestingSeconds = 1n;
+                            periodSeconds = 1n;
+                        }
+                    }
+
+                    // For prediction, we need to replicate the EXACT struct and logic
+                    const params = {
+                        name: distribution.name,
+                        description: distribution.description || "",
+                        token: wizardStore.tokenDetails.tokenAddress as Address,
+                        merkleRoot: merkleRoot as `0x${string}`,
+                        commitments: commitments as `0x${string}`[],
+                        amounts: amounts,
+                        cliffDuration: cliffSeconds,
+                        vestingDuration: vestingSeconds,
+                        vestingPeriod: periodSeconds,
+                    };
+
+                    const publicClient = getPublicClient(wagmiConfig);
+                    if (publicClient) {
+                        const predicted = await publicClient.readContract({
+                            address: factoryAddress,
+                            abi: ZarfVestingFactoryABI,
+                            functionName: "predictVestingAddress",
+                            args: [params, walletStore.address],
+                        });
+
+                        if (predicted) {
+                            filename = `${(predicted as string).toLowerCase()}.json`;
+                        }
+                    }
+                }
+            } catch (e) {
+                console.warn("Failed to predict address:", e);
+                // Fallback to default name
+            } finally {
+                isPredicting = false;
+            }
+        }
 
         // Calculate schedule params
         const cliffEndUnix = Math.floor(
@@ -68,7 +181,7 @@
         };
 
         const jsonString = JSON.stringify(publicData, null, 2);
-        downloadFile(jsonString, "distribution-data.json", "application/json");
+        downloadFile(jsonString, filename, "application/json");
     }
 
     // 2. Generate Private Secrets CSV (Admin ONLY)
@@ -81,8 +194,10 @@
 
         merkleResult.claims.forEach((c) => {
             if (!userMap.has(c.email)) {
-                // c.salt is "MasterSalt_Index" (e.g. X9s2K1m_0)
-                const masterSalt = c.salt.split("_")[0];
+                // NEW: Use the explicitly stored 'pin' (Master Salt)
+                // Legacy: c.salt was "PIN_Index".
+                // Current: c.salt is Hex Field Element.
+                const masterSalt = c.pin || "";
                 userMap.set(c.email, masterSalt);
             }
         });
@@ -143,14 +258,24 @@
                 </div>
                 <h3 class="font-bold">1. Public Data</h3>
                 <p class="text-xs opacity-60 mb-4">
-                    Upload this <b>distribution-data.json</b> to your website or
-                    IPFS. It contains NO secrets, only mathematical proofs.
+                    Before deploying, download this file. If your wallet is
+                    connected, it will be named with the <b
+                        >future contract address</b
+                    >
+                    (e.g. 0x123...json).
+                    <br /><br />
+                    <b>Action Required:</b> Place this file in your project's
+                    <code>/static/distributions/</code> folder before proceeding
+                    to the Deploy step.
                 </p>
                 <button
-                    class="btn btn-outline btn-sm"
+                    class="btn btn-outline btn-sm {isPredicting
+                        ? 'loading'
+                        : ''}"
                     onclick={downloadPublicData}
+                    disabled={isPredicting}
                 >
-                    Download JSON
+                    {isPredicting ? "Calculating Address..." : "Download JSON"}
                 </button>
             </div>
         </div>
