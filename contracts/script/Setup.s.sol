@@ -62,25 +62,16 @@ contract SetupScript is Script {
         vesting.setMerkleRoot(MERKLE_ROOT);
         console.log("Set merkle root");
 
-        // 3. Set allocation for test email hash
-        vesting.setAllocation(EMAIL_HASH, ALLOCATION);
-        console.log("Set allocation:", ALLOCATION);
-
-        // 4. Approve and deposit tokens
+        // 3. Approve and deposit tokens (ADR-023: No setAllocation needed)
         token.approve(address(vesting), ALLOCATION);
         vesting.deposit(ALLOCATION);
-        console.log("Deposited tokens");
+        console.log("Deposited tokens:", ALLOCATION);
 
-        // 5. Start vesting (0 cliff, 1 second duration, 1 second period for instant testing)
-        vesting.startVesting(0, 1, 1);
-        console.log("Started vesting with discrete unlocks");
+        // ADR-023: No startVesting needed - schedule is in Merkle leaves
 
         vm.stopBroadcast();
 
         console.log("\n=== Setup Complete ===");
-        console.log("Merkle root:", vm.toString(MERKLE_ROOT));
-        console.log("Email hash:", vm.toString(EMAIL_HASH));
-        console.log("Allocation:", ALLOCATION);
-        console.log("Ready for claims!");
+        console.log("Vesting configured with discrete epochs (ADR-023)");
     }
 }

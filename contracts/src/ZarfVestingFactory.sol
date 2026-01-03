@@ -105,7 +105,7 @@ contract ZarfVestingFactory {
     // ============ Internal Deployment Logic ============
 
     function _deployAndInitialize(CreateVestingParams calldata params, address owner) internal returns (address) {
-        // 1. Calculate Salt
+        // 1. Calculate Salt (for CREATE2 deterministic address)
         bytes32 salt = keccak256(abi.encode(params));
         
         // 2. Deploy (Constructor args: verifier, jwkRegistry)
@@ -114,20 +114,13 @@ contract ZarfVestingFactory {
             jwkRegistry
         );
         
-        // 3. Initialize Base (Factory becomes owner)
-        // Using address(this) as owner temporarily so we can call setters
+        // 3. Initialize Base (Factory becomes owner temporarily for setup)
         vest.initialize(address(this), params.token, params.name, params.description);
         
-        // 4. Set Allocations
-        vest.setAllocations(params.commitments, params.amounts);
-        
-        // 5. Set Merkle Root
+        // 4. Set Merkle Root (ADR-023: Allocations are now in Merkle Tree, not on-chain)
         vest.setMerkleRoot(params.merkleRoot);
         
-        // 6. Start Vesting
-        vest.startVesting(params.cliffDuration, params.vestingDuration, params.vestingPeriod);
-        
-        // 7. Transfer Ownership to real owner
+        // 5. Transfer Ownership to real owner
         vest.transferOwnership(owner);
         
         return address(vest);
