@@ -64,6 +64,32 @@
         const p = (passed / total) * 100;
         return Math.min(100, Math.max(0, p));
     });
+
+    // Calculate next unlock date
+    let nextUnlock = $derived.by(() => {
+        if (!claimStore.epochs || claimStore.epochs.length === 0) {
+            // Fallback: If no epochs loaded but schedule exists, and we are before cliff
+            if (claimStore.vestingSchedule) {
+                const start = Number(claimStore.vestingSchedule.vestingStart);
+                const cliff = Number(claimStore.vestingSchedule.cliffDuration);
+                const cliffEndTs = start + cliff;
+                if (Date.now() / 1000 < cliffEndTs) {
+                    return new Date(cliffEndTs * 1000);
+                }
+            }
+            return null;
+        }
+
+        // Find the earliest locked epoch
+        const locked = claimStore.epochs
+            .filter((e) => e.isLocked)
+            .sort((a, b) => a.unlockTime - b.unlockTime);
+
+        if (locked.length > 0) {
+            return new Date(locked[0].unlockTime * 1000);
+        }
+        return null;
+    });
 </script>
 
 <!-- Zen Pro Timeline: Clean, minimal, refined -->

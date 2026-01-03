@@ -110,7 +110,7 @@
     );
 </script>
 
-{#if periods.length > 0}
+s{#if periods.length > 0}
     <div class="space-y-4">
         <!-- Section Header -->
         <div class="flex items-center justify-between">
