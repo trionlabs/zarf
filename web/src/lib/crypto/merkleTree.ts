@@ -144,6 +144,19 @@ export async function pedersenHashPair(left: bigint, right: bigint): Promise<big
 }
 
 /**
+ * Compute Pedersen hash of a single field element.
+ * Used for Recursive Hash Chain secrets.
+ * 
+ * @param field - Field element to hash
+ * @returns Hash as bigint
+ */
+export async function pedersenHashField(field: bigint): Promise<bigint> {
+    const bb = await initBarretenberg();
+    const hash = await bb.pedersenHash([new Fr(field)], 0);
+    return BigInt(hash.toString());
+}
+
+/**
  * Compute leaf hash from email, amount, and salt.
  * 
  * Formula: leaf = pedersen(email_hash, amount, unlock_time)
@@ -157,7 +170,7 @@ export async function pedersenHashPair(left: bigint, right: bigint): Promise<big
 export async function computeLeaf(
     email: string,
     amount: bigint,
-    code: string,
+    code: string | bigint, // Updated to support Hash Chain (BigInt)
     unlockTime: number
 ): Promise<bigint> {
     const bb = await initBarretenberg();
@@ -174,33 +187,70 @@ export async function computeLeaf(
 }
 
 /**
+ * Compute leaf hash directly from Identity Commitment.
+ * Used for reconstructing leaves from distribution file (where code/salt is not known directly).
+ * 
+ * Formula: leaf = pedersen(identity_commitment, amount, unlock_time)
+ * 
+ * @param identityCommitmentHex - Identity Commitment as hex string or bigint string
+ * @param amount - Claim amount
+ * @param unlockTime - Unix timestamp
+ */
+export async function computeLeafFromCommitment(
+    identityCommitmentHex: string,
+    amount: bigint,
+    unlockTime: number
+): Promise<bigint> {
+    const bb = await initBarretenberg();
+
+    const identityCommitment = BigInt(identityCommitmentHex);
+
+    // Leaf = Pedersen(IdentityCommitment, Amount, UnlockTime)
+    const fields = [new Fr(identityCommitment), new Fr(amount), new Fr(BigInt(unlockTime))];
+    const leafHash = await bb.pedersenHash(fields, 0);
+
+    return BigInt(leafHash.toString());
+}
+
+/**
  * Compute Identity Commitment for a user.
  * 
  * Formula: Identity = Pedersen(email, Pedersen(code))
  * 
  * @param email - User's email
- * @param code - 8-char secure code
+ * @param code - 8-char secure code (String) OR Hash Chain Secret (BigInt)
  * @returns Identity Commitment as bigint
  */
-export async function computeIdentityCommitment(email: string, code: string): Promise<bigint> {
+export async function computeIdentityCommitment(email: string, code: string | bigint): Promise<bigint> {
     const bb = await initBarretenberg();
 
     // 1. Hash the email (as bytes)
     const emailBytes = stringToBytes(email.toLowerCase().trim(), MAX_EMAIL_LENGTH);
     const emailHash = await pedersenHashBytes(emailBytes);
 
-    // 2. Hash the code (Packed as single Field)
-    // Circuit expects: hash_secret(secret: Field) -> pedersen([secret])
-    // So we must pack the 8 ASCII bytes into one BigInt.
+    let codeHash: bigint;
 
-    // "ABC" -> 0x414243
-    const encoder = new TextEncoder();
-    const codeBytes = encoder.encode(code);
-    const codeHex = '0x' + Array.from(codeBytes).map(b => b.toString(16).padStart(2, '0')).join('');
-    const codeField = BigInt(codeHex);
+    if (typeof code === 'bigint') {
+        // NEW: Input is already a Field Element (Hash Chain result)
+        // Just hash it once more to mix (standard Identity formula)
+        // Identity = Hash(Email, Hash(Secret))
+        const codeField = new Fr(code);
+        const result = await bb.pedersenHash([codeField], 0);
+        codeHash = BigInt(result.toString());
+    } else {
+        // OLD: String processing (Legacy fallback)
+        // Circuit expects: hash_secret(secret: Field) -> pedersen([secret])
+        // So we must pack the 8 ASCII bytes into one BigInt.
 
-    const codeHashResult = await bb.pedersenHash([new Fr(codeField)], 0);
-    const codeHash = BigInt(codeHashResult.toString());
+        // "ABC" -> 0x414243
+        const encoder = new TextEncoder();
+        const codeBytes = encoder.encode(code);
+        const codeHex = '0x' + Array.from(codeBytes).map(b => b.toString(16).padStart(2, '0')).join('');
+        const codeField = BigInt(codeHex);
+
+        const codeHashResult = await bb.pedersenHash([new Fr(codeField)], 0);
+        codeHash = BigInt(codeHashResult.toString());
+    }
 
     // 3. Identity = Pedersen(emailHash, codeHash)
     const identity = await bb.pedersenHash([new Fr(emailHash), new Fr(codeHash)], 0);
@@ -532,7 +582,7 @@ export async function verifyMerkleProof(
  * @returns Complete Merkle tree data with claims
  */
 export async function processWhitelist(
-    entries: { email: string; amount: bigint }[],
+    entries: { email: string; amount: bigint; pin?: string }[],
     schedule: Schedule
 ): Promise<MerkleTreeData> {
     if (entries.length === 0) {
@@ -559,16 +609,23 @@ export async function processWhitelist(
         case 'years': periodSeconds = 365 * 24 * 3600; break;
     }
 
+    const bb = await initBarretenberg(); // Need BB for manual hashing in loop
+
     // Process each user
     for (let i = 0; i < entries.length; i++) {
-        const { email, amount } = entries[i];
+        const { email, amount, pin } = entries[i];
 
-        // Master Salt for the user
-        const masterSalt = generateSecureCode();
+        // Master Salt (PIN) for the user
+        // Use provided PIN or generate random one
+        const masterSalt = pin || generateSecureCode();
 
         // Split amount into epochs
         const amountPerEpoch = amount / BigInt(epochs);
         const remainder = amount % BigInt(epochs);
+
+        // State for Hash Chain
+        const masterSaltBytes = stringToBytes(masterSalt);
+        let currentSecret = await pedersenHashBytes(masterSaltBytes); // Epoch 0 Secret
 
         // Generate N leaves
         for (let epoch = 0; epoch < epochs; epoch++) {
@@ -579,20 +636,29 @@ export async function processWhitelist(
             // Epoch 0 unlocks AT cliff end.
             const unlockTime = Math.floor(cliffEnd + (epoch * periodSeconds));
 
-            // Derive Epoch Secret: MasterSalt + "_" + Index
-            const epochSecret = `${masterSalt}_${epoch}`;
+            // Hash Chain Logic:
+            // Epoch 0: Secret = Hash(PIN) (Calculated before loop or currentSecret initial value)
+            // Epoch i > 0: Secret = Hash(Secret_{i-1})
+            if (epoch > 0) {
+                // Recursive Hash: Secret_i = Hash(Secret_{i-1})
+                const result = await bb.pedersenHash([new Fr(currentSecret)], 0);
+                currentSecret = BigInt(result.toString());
+            }
 
             // Compute Identity Commitment for this Epoch (Unlinkable)
-            const identityCommitmentBigInt = await computeIdentityCommitment(email, epochSecret);
+            // Pass BigInt secret directly
+            const identityCommitmentBigInt = await computeIdentityCommitment(email, currentSecret);
             const identityCommitment = '0x' + identityCommitmentBigInt.toString(16);
 
             // Compute Leaf: H(EpochCommitment, Amount, UnlockTime)
-            const leaf = await computeLeaf(email, currentAmount, epochSecret, unlockTime);
+            // Pass BigInt secret directly
+            const leaf = await computeLeaf(email, currentAmount, currentSecret, unlockTime);
 
             claims.push({
                 email: email.toLowerCase().trim(),
                 amount: currentAmount,
-                salt: epochSecret, // Derived secret
+                salt: '0x' + currentSecret.toString(16), // Store secret as Hex String of the Field Element
+                pin: masterSalt, // Store original PIN for CSV export
                 identityCommitment,
                 leafIndex: leaves.length, // Global index
                 leaf,
