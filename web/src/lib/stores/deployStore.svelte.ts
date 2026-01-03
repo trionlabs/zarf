@@ -102,14 +102,11 @@ export class DeployState {
     initDistribution(dist: Distribution) {
         // If switching distributions or initializing fresh
         if (this.distribution?.id !== dist.id) {
+            // CRITICAL: Reset state first to prevent leakage from previous distribution!
+            this.reset();
+
             this.distribution = dist; // Set it first so we can load
             this.load(dist.id); // Attempt recovery
-
-            // If load didn't fetch merkle result, it means this is a fresh start
-            if (!this.merkleResult) {
-                this.reset(true); // Soft reset
-                this.distribution = dist;
-            }
         } else {
             // Re-sync object reference
             this.distribution = dist;
