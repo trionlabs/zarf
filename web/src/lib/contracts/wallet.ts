@@ -50,10 +50,10 @@ function getWagmiConfig(): Config {
             // Priority 1: Alchemy (if available)
             ...(import.meta.env.VITE_SEPOLIA_RPC_URL ? [http(import.meta.env.VITE_SEPOLIA_RPC_URL)] : []),
             // Priority 2: Public nodes (free, no rate limits)
-            http('https://ethereum-sepolia-rpc.publicnode.com'),
             http('https://rpc.sepolia.org'),
-            http('https://sepolia.drpc.org'),
             http('https://1rpc.io/sepolia'),
+            http('https://ethereum-sepolia-rpc.publicnode.com'),
+            http('https://sepolia.drpc.org'),
         ];
 
         const mainnetRpcs = [

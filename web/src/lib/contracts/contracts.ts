@@ -224,27 +224,14 @@ function getWalletClient(): WalletClient {
 export async function readVestingContract(address: Address) {
     const publicClient = getPublicClient();
 
-    // We fetch checks individually to pinpoint which one fails, 
-    // implying mismatch or wrong address.
-    let name, owner, token, merkleRoot;
-
     try {
-        name = await publicClient.readContract({ address, abi: VESTING_ABI, functionName: 'name' });
-    } catch (e: any) { throw new Error(`Contract 'name' read failed. Is this a ZarfVesting contract? (${e.message})`); }
+        const [name, owner, token, merkleRoot] = await Promise.all([
+            publicClient.readContract({ address, abi: VESTING_ABI, functionName: 'name' }),
+            publicClient.readContract({ address, abi: VESTING_ABI, functionName: 'owner' }),
+            publicClient.readContract({ address, abi: VESTING_ABI, functionName: 'token' }),
+            publicClient.readContract({ address, abi: VESTING_ABI, functionName: 'merkleRoot' }),
+        ]);
 
-    try {
-        owner = await publicClient.readContract({ address, abi: VESTING_ABI, functionName: 'owner' });
-    } catch (e: any) { throw new Error(`Contract 'owner' read failed. (${e.message})`); }
-
-    try {
-        token = await publicClient.readContract({ address, abi: VESTING_ABI, functionName: 'token' });
-    } catch (e: any) { throw new Error(`Contract 'token' read failed. (${e.message})`); }
-
-    try {
-        merkleRoot = await publicClient.readContract({ address, abi: VESTING_ABI, functionName: 'merkleRoot' });
-    } catch (e: any) { throw new Error(`Contract 'merkleRoot' read failed. (${e.message})`); }
-
-    try {
         // Fetch token metadata
         const [symbol, decimals] = await Promise.all([
             publicClient.readContract({ address: token, abi: ERC20_ABI, functionName: 'symbol' }),
@@ -260,8 +247,8 @@ export async function readVestingContract(address: Address) {
             tokenDecimals: decimals
         };
     } catch (error) {
-        console.error('Failed to read token metadata:', error);
-        throw new Error('Invalid Token Address within Vesting Contract');
+        console.error('Failed to read vesting contract:', error);
+        throw new Error('Invalid Vesting Address or Network Error');
     }
 }
 

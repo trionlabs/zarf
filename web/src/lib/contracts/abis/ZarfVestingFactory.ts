@@ -4,20 +4,22 @@
  * Auto-generated from Solidity contract.
  * Provides typed interface for factory deployment operations.
  * 
- * Updated: 2025-12-29 - Added struct-based createVesting pattern with name/description metadata
+ * Updated: 2026-01-03 - ADR-023: Removed on-chain allocations, using Merkle Root only
  * 
  * @module contracts/abis/ZarfVestingFactory
  */
 
 /**
- * CreateVestingParams struct - matches Solidity struct
+ * CreateVestingParams struct - matches Solidity struct (ADR-023)
+ * Note: commitments and amounts are still passed for salt calculation (CREATE2),
+ * but they are NOT stored on-chain anymore.
  */
 export interface CreateVestingParams {
     name: string;
     description: string;
     token: `0x${string}`;
     merkleRoot: `0x${string}`;
-    emailHashes: readonly `0x${string}`[];
+    commitments: readonly `0x${string}`[];  // ADR-012: identity commitments
     amounts: readonly bigint[];
     cliffDuration: bigint;
     vestingDuration: bigint;
@@ -42,6 +44,7 @@ export const ZarfVestingFactoryABI = [
     { type: 'error', name: 'ArrayLengthMismatch', inputs: [] },
     { type: 'error', name: 'ZeroAllocations', inputs: [] },
     { type: 'error', name: 'TransferFailed', inputs: [] },
+    { type: 'error', name: 'DeploymentFailed', inputs: [] },
 
     // Constructor
     {
@@ -105,6 +108,31 @@ export const ZarfVestingFactoryABI = [
         outputs: [{ type: 'address' }],
         stateMutability: 'view'
     },
+    // NEW: predictVestingAddress for deterministic filename
+    {
+        type: 'function',
+        name: 'predictVestingAddress',
+        inputs: [
+            {
+                name: 'params',
+                type: 'tuple',
+                components: [
+                    { name: 'name', type: 'string' },
+                    { name: 'description', type: 'string' },
+                    { name: 'token', type: 'address' },
+                    { name: 'merkleRoot', type: 'bytes32' },
+                    { name: 'commitments', type: 'bytes32[]' },
+                    { name: 'amounts', type: 'uint256[]' },
+                    { name: 'cliffDuration', type: 'uint256' },
+                    { name: 'vestingDuration', type: 'uint256' },
+                    { name: 'vestingPeriod', type: 'uint256' }
+                ]
+            },
+            { name: 'owner', type: 'address' }
+        ],
+        outputs: [{ type: 'address' }],
+        stateMutability: 'view'
+    },
 
     // Write functions - Using struct pattern (CreateVestingParams)
     {
@@ -119,7 +147,7 @@ export const ZarfVestingFactoryABI = [
                     { name: 'description', type: 'string' },
                     { name: 'token', type: 'address' },
                     { name: 'merkleRoot', type: 'bytes32' },
-                    { name: 'emailHashes', type: 'bytes32[]' },
+                    { name: 'commitments', type: 'bytes32[]' },
                     { name: 'amounts', type: 'uint256[]' },
                     { name: 'cliffDuration', type: 'uint256' },
                     { name: 'vestingDuration', type: 'uint256' },
@@ -142,7 +170,7 @@ export const ZarfVestingFactoryABI = [
                     { name: 'description', type: 'string' },
                     { name: 'token', type: 'address' },
                     { name: 'merkleRoot', type: 'bytes32' },
-                    { name: 'emailHashes', type: 'bytes32[]' },
+                    { name: 'commitments', type: 'bytes32[]' },
                     { name: 'amounts', type: 'uint256[]' },
                     { name: 'cliffDuration', type: 'uint256' },
                     { name: 'vestingDuration', type: 'uint256' },
