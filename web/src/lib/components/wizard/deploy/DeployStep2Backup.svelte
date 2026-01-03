@@ -51,6 +51,20 @@
                 totalPeriods: totalPeriods,
             },
             leaves: merkleResult.claims.map((c) => "0x" + c.leaf.toString(16)), // ONLY hashes
+            commitments: merkleResult.claims.reduce(
+                (acc, c) => {
+                    acc[c.identityCommitment] = {
+                        amount: c.amount.toString(),
+                        unlockTime: c.unlockTime,
+                        index: c.leafIndex,
+                    };
+                    return acc;
+                },
+                {} as Record<
+                    string,
+                    { amount: string; unlockTime: number; index: number }
+                >,
+            ),
         };
 
         const jsonString = JSON.stringify(publicData, null, 2);
