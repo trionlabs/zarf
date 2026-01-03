@@ -20,7 +20,7 @@
 
     // Derived Logic form Store
     let proof = $derived(claimStore.proof);
-    let allocation = $derived(claimStore.totalAllocation);
+    let selectedEpoch = $derived(claimStore.selectedEpoch);
     // TODO: We should probably format allocation
 
     async function handleSubmit() {
@@ -160,7 +160,9 @@
             <div class="stat place-items-center">
                 <div class="stat-title">Claiming</div>
                 <div class="stat-value text-primary text-2xl">
-                    {(Number(allocation) / 1e18).toLocaleString()}
+                    {selectedEpoch
+                        ? (Number(selectedEpoch.amount) / 1e18).toLocaleString()
+                        : "0"}
                 </div>
                 <div class="stat-desc">AZTC</div>
             </div>
@@ -194,7 +196,7 @@
             <div class="card-actions mt-4">
                 <button
                     class="btn btn-primary w-full btn-lg shadow-lg shadow-primary/20"
-                    disabled={isSubmitting}
+                    disabled={isSubmitting || !proof}
                     onclick={handleSubmit}
                 >
                     {#if isSubmitting}

@@ -22,15 +22,28 @@
     // Get input data
     let { contractAddress } = $props<{ contractAddress: string }>();
 
-    const { email, selectedEpoch, targetWallet } = claimStore;
+    let email = $derived(claimStore.email);
+    let selectedEpoch = $derived(claimStore.selectedEpoch);
+    let targetWallet = $derived(claimStore.targetWallet);
 
     onMount(async () => {
         try {
+            // Auto-select fallback if missing but data exists (e.g. session recovery)
+            if (!selectedEpoch && claimStore.epochs.length > 0) {
+                console.log(
+                    "[ClaimStep4] Auto-selecting first claimable epoch...",
+                );
+                claimStore.selectNextClaimableEpoch();
+            }
+
             // Guard Pattern
             if (!email || !selectedEpoch || !targetWallet) {
-                console.warn(
-                    "[ClaimStep4] Missing claim data. Resetting flow...",
-                );
+                console.warn("[ClaimStep4] Missing claim data:", {
+                    hasEmail: !!email,
+                    hasSelectedEpoch: !!selectedEpoch,
+                    hasTargetWallet: !!targetWallet,
+                });
+                console.warn("[ClaimStep4] Resetting flow...");
                 claimStore.reset();
                 return;
             }
@@ -44,7 +57,14 @@
             const unlockTime = selectedEpoch.unlockTime;
 
             // Leaf = Pedersen(Identity, Amount, UnlockTime)
-            const leaf = await computeLeaf(email, amount, salt, unlockTime);
+            // CAST SALT TO BIGINT: To ensure computeLeaf uses the Hash Chain logic (numeric)
+            // instead of legacy string encoding.
+            const leaf = await computeLeaf(
+                email,
+                amount,
+                BigInt(salt),
+                unlockTime,
+            );
 
             // 2. Fetch Tree Data (Mocked for now)
             const leaves = await fetchPublicLeaves(contractAddress);
@@ -109,7 +129,7 @@
                 jwt,
                 publicKey,
                 claimData: {
-                    email,
+                    email: email.toLowerCase().trim(),
                     salt,
                     amount: "0x" + amount.toString(16),
                     merkleProof: {
@@ -127,6 +147,14 @@
             // But the Worker WILL fail if keys are missing for real generation.
 
             // Debug: Log payload being sent (without sensitive data)
+            console.log("[ClaimStep4] Debug Inputs:", {
+                email: email.toLowerCase().trim(),
+                salt, // Log salt to see its format
+                amountStr: amount.toString(),
+                amountHex: "0x" + amount.toString(16),
+                unlockTime,
+            });
+
             console.log("[ClaimStep4] Sending to worker:", {
                 hasJwt: !!claimStore.jwt,
                 jwtLength: claimStore.jwt?.length || 0,

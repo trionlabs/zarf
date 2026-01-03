@@ -17,6 +17,18 @@
     let vested = $derived(claimStore.vestedAmount);
     let claimable = $derived(claimStore.claimableAmount);
 
+    // Debug: Log when values update
+    $effect(() => {
+        console.log(
+            "[VestingStatusCard] Total:",
+            total.toString(),
+            "Claimed:",
+            claimed.toString(),
+            "Claimable:",
+            claimable.toString(),
+        );
+    });
+
     // Status Logic
     let isCliffActive = $derived(!claimStore.isCliffPassed);
     let isFullyClaimed = $derived(claimed >= total && total > 0n);
@@ -28,7 +40,9 @@
     );
 
     function handleContinue() {
-        claimStore.nextStep();
+        if (claimStore.selectNextClaimableEpoch()) {
+            claimStore.nextStep();
+        }
     }
 </script>
 
