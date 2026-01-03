@@ -3,7 +3,11 @@
     import { Clock } from "lucide-svelte";
 
     // Derived values for display
-    let percent = $derived(claimStore.percentVested);
+    let percent = $derived.by(() => {
+        const total = Number(claimStore.totalAllocation);
+        const vested = Number(claimStore.vestedAmount);
+        return total > 0 ? (vested / total) * 100 : 0;
+    });
 
     // Formatting dates
     const formatDate = (ts: number) =>
@@ -13,51 +17,56 @@
         });
 
     let start = $derived(
-        claimStore.vestingInfo
-            ? formatDate(claimStore.vestingInfo.vestingStart)
+        claimStore.vestingSchedule
+            ? formatDate(claimStore.vestingSchedule.vestingStart)
             : "Start",
     );
     let cliffEnd = $derived(
-        claimStore.vestingInfo
+        claimStore.vestingSchedule
             ? formatDate(
-                  claimStore.vestingInfo.vestingStart +
-                      claimStore.vestingInfo.cliffDuration,
+                  claimStore.vestingSchedule.vestingStart +
+                      claimStore.vestingSchedule.cliffDuration,
               )
             : "Cliff",
     );
     let end = $derived(
-        claimStore.vestingInfo
+        claimStore.vestingSchedule
             ? formatDate(
-                  claimStore.vestingInfo.vestingStart +
-                      claimStore.vestingInfo.cliffDuration +
-                      claimStore.vestingInfo.vestingDuration,
+                  claimStore.vestingSchedule.vestingStart +
+                      claimStore.vestingSchedule.cliffDuration +
+                      claimStore.vestingSchedule.vestingDuration,
               )
             : "End",
     );
 
-    let nextUnlock = $derived(claimStore.nextUnlockDate);
+    let nextUnlock = $derived.by(() => {
+        if (!claimStore.epochs) return null;
+        const now = Date.now() / 1000;
+        const next = claimStore.epochs.find((e) => e.unlockTime > now);
+        return next ? new Date(next.unlockTime * 1000) : null;
+    });
 
     // Calculation for marker positions
     let totalDuration = $derived(
-        claimStore.vestingInfo
-            ? claimStore.vestingInfo.cliffDuration +
-                  claimStore.vestingInfo.vestingDuration
+        claimStore.vestingSchedule
+            ? claimStore.vestingSchedule.cliffDuration +
+                  claimStore.vestingSchedule.vestingDuration
             : 100,
     );
     let cliffPercent = $derived(
-        claimStore.vestingInfo
-            ? (claimStore.vestingInfo.cliffDuration / totalDuration) * 100
+        claimStore.vestingSchedule
+            ? (claimStore.vestingSchedule.cliffDuration / totalDuration) * 100
             : 0,
     );
 
     // Timeline progress based on time
     let timelineProgress = $derived.by(() => {
-        if (!claimStore.vestingInfo) return 0;
+        if (!claimStore.vestingSchedule) return 0;
         const now = Date.now() / 1000;
-        const startTs = claimStore.vestingInfo.vestingStart;
+        const startTs = claimStore.vestingSchedule.vestingStart;
         const total =
-            claimStore.vestingInfo.cliffDuration +
-            claimStore.vestingInfo.vestingDuration;
+            claimStore.vestingSchedule.cliffDuration +
+            claimStore.vestingSchedule.vestingDuration;
         const passed = now - startTs;
         const p = (passed / total) * 100;
         return Math.min(100, Math.max(0, p));
