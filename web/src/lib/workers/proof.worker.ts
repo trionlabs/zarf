@@ -221,7 +221,8 @@ async function generateProof(payload: ProofRequest['payload']) {
         // Merkle proof data
         // NEW (ADR-012): Pass the 8-char code as 'secret' (converted to hex bytes)
         // Circuit expects field, so we pack the ASCII bytes into a field.
-        secret: toHexFromBytes(salt),
+        // UPDATE: Hash Chain secret is ALREADY a field element hex string.
+        secret: salt,
         amount: toHex(amount),
         merkle_siblings: siblings,
         merkle_path_indices: indices,
