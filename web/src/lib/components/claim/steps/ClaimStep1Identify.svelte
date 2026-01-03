@@ -27,6 +27,14 @@
     let isUnlocking = $state(false);
     let error = $state<string | null>(null);
 
+    // Reset PIN when auth state changes (e.g. user re-logins) or on mount
+    $effect(() => {
+        if (isAuthenticated) {
+            pin = "";
+            error = null;
+        }
+    });
+
     // Derived state form submission eligibility
     let canSubmit = $derived(
         isAuthenticated && pin.length >= PIN_LENGTH && !isUnlocking,

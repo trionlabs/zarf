@@ -187,6 +187,15 @@ async function connect(connector?: Connector) {
     if (!browser) return;
     if (state.isReconnecting) { state.error = 'Please wait, restoring previous session...'; return; }
 
+    // Optimization: If already connected to THIS connector, just return
+    if (state.isConnected && connector && state.address) {
+        const account = getWalletAccount();
+        if (account.connector?.id === connector.id) {
+            state.isModalOpen = false;
+            return;
+        }
+    }
+
     // Close modal if open
     state.isModalOpen = false;
 
@@ -194,10 +203,13 @@ async function connect(connector?: Connector) {
     state.error = null;
     try {
         const result = await wagmiConnect(connector);
-        // State update will be handled by watcher, but we can optimistically set it or wait.
-        // Wagmi watcher usually fires immediately.
         return result;
     } catch (err: any) {
+        // If it's already connected error, we can ignore it and just sync state
+        if (err.name === 'ConnectorAlreadyConnectedError') {
+            syncFromWagmi();
+            return;
+        }
         state.error = sanitizeError(err);
         throw err;
     } finally {

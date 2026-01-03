@@ -164,14 +164,24 @@ export function getWalletConnectors(): readonly Connector[] {
 export function getWalletAccount(): WalletAccount {
     if (!browser) return { address: undefined, isConnected: false, chainId: undefined };
     const account = getAccount(getWagmiConfig());
-    return { address: account.address, isConnected: account.isConnected, chainId: account.chainId };
+    return {
+        address: account.address,
+        isConnected: account.isConnected,
+        chainId: account.chainId,
+        connector: account.connector
+    };
 }
 
 export function watchWalletAccount(callback: (account: WalletAccount) => void): () => void {
     if (!browser) return () => { };
     return watchAccount(getWagmiConfig(), {
         onChange: (account) => {
-            callback({ address: account.address, isConnected: account.isConnected, chainId: account.chainId });
+            callback({
+                address: account.address,
+                isConnected: account.isConnected,
+                chainId: account.chainId,
+                connector: account.connector
+            });
         },
     });
 }

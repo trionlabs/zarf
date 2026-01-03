@@ -6,6 +6,8 @@
     import CliffCountdown from "./CliffCountdown.svelte";
     import { ArrowRight, Coins, Lock, CheckCircle } from "lucide-svelte";
 
+    let { contractAddress } = $props<{ contractAddress: string }>();
+
     // Computed formatters
     const format = (val: bigint) =>
         Number(formatUnits(val, 18)).toLocaleString(undefined, {
@@ -158,7 +160,7 @@
         </div>
 
         <!-- Detailed Unlock Schedule -->
-        <VestingScheduleTable />
+        <VestingScheduleTable {contractAddress} />
 
         <!-- Actions: Zen Pro Button Style -->
         <footer class="pt-4 border-t border-base-content/5">

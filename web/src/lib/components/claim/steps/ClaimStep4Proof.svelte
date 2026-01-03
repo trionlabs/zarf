@@ -7,7 +7,12 @@
         getProofForLeaf,
     } from "$lib/utils/proofHelpers";
     import { getPublicKeyForJwt } from "$lib/utils/googleJwk";
-    import { Loader2, CheckCircle, ShieldCheck } from "lucide-svelte";
+    import {
+        Loader2,
+        CheckCircle,
+        ShieldCheck,
+        AlertTriangle,
+    } from "lucide-svelte";
     import ProofWorker from "$lib/workers/proof.worker.ts?worker";
     import type { ProofRequest } from "$lib/workers/proof.worker";
     import type { ZKProof } from "$lib/types";
@@ -116,61 +121,119 @@
     });
 </script>
 
-<div class="space-y-8 text-center py-4">
-    {#if error}
-        <div class="text-error">
-            <p class="font-bold">Generation Failed</p>
-            <p class="text-sm opacity-80">{error}</p>
-            <button
-                class="btn btn-sm btn-outline mt-4"
-                onclick={() => window.location.reload()}>Retry</button
-            >
-        </div>
-    {:else if isGenerating}
-        <div class="relative w-24 h-24 mx-auto">
-            <div
-                class="absolute inset-0 border-4 border-base-200 rounded-full"
-            ></div>
-            <div
-                class="absolute inset-0 border-4 border-primary rounded-full border-t-transparent animate-spin"
-                style="border-right-color: transparent;"
-            ></div>
-            <div
-                class="absolute inset-0 flex items-center justify-center text-primary"
-            >
-                <ShieldCheck class="w-8 h-8 animate-pulse" />
-            </div>
-        </div>
-
-        <div class="space-y-2">
-            <h2 class="text-xl font-bold">Generating Zero-Knowledge Proof</h2>
-            <p class="text-sm text-base-content/60 max-w-xs mx-auto">
-                {statusMessage}
-            </p>
-            <div
-                class="w-full max-w-xs mx-auto bg-base-200 rounded-full h-1.5 mt-4"
-            >
+<div
+    class="space-y-12 py-10 animate-in fade-in slide-in-from-top-4 duration-500"
+>
+    <div class="max-w-xl mx-auto text-center space-y-10">
+        {#if error}
+            <div class="space-y-6">
                 <div
-                    class="bg-primary h-1.5 rounded-full transition-all duration-500"
-                    style="width: {progress}%"
+                    class="w-16 h-16 rounded-full bg-error/5 text-error flex items-center justify-center mx-auto border border-error/10"
+                >
+                    <AlertTriangle class="w-8 h-8" />
+                </div>
+                <div class="space-y-2">
+                    <h2
+                        class="text-xl font-medium text-base-content tracking-tight"
+                    >
+                        Generation Failed
+                    </h2>
+                    <p
+                        class="text-sm text-base-content/40 font-light max-w-xs mx-auto italic"
+                    >
+                        {error}
+                    </p>
+                </div>
+                <button
+                    class="btn btn-ghost border-base-content/5 bg-base-100 px-8 h-12 rounded-2xl text-[10px] uppercase tracking-widest font-bold"
+                    onclick={() => window.location.reload()}
+                >
+                    Retry Generation
+                </button>
+            </div>
+        {:else if isGenerating}
+            <!-- Sophisticated Loading State -->
+            <div class="relative w-32 h-32 mx-auto">
+                <!-- Abstract Rings -->
+                <div
+                    class="absolute inset-0 border-[1px] border-base-content/5 rounded-full"
                 ></div>
+                <div
+                    class="absolute inset-2 border-[1px] border-base-content/5 rounded-full border-dashed"
+                ></div>
+
+                <!-- Main Spinner -->
+                <div
+                    class="absolute inset-0 border-t-2 border-primary rounded-full animate-[spin_3s_linear_infinite]"
+                ></div>
+
+                <!-- Center Icon -->
+                <div class="absolute inset-0 flex items-center justify-center">
+                    <ShieldCheck
+                        class="w-8 h-8 text-primary/40 animate-pulse"
+                    />
+                </div>
             </div>
-            <p class="text-xs text-base-content/40 mt-4">
-                This preserves your privacy by proving eligibility without
-                revealing your identity.<br />(Takes ~30-60 seconds)
-            </p>
-        </div>
-    {:else}
-        <div class="flex flex-col items-center gap-4 animate-in zoom-in">
-            <div
-                class="w-16 h-16 rounded-full bg-success/10 text-success flex items-center justify-center"
-            >
-                <CheckCircle class="w-8 h-8" />
+
+            <div class="space-y-6">
+                <div class="space-y-2">
+                    <h2
+                        class="text-xl font-medium text-base-content tracking-tight"
+                    >
+                        Securing Identity
+                    </h2>
+                    <p class="text-xs text-base-content/40 font-light italic">
+                        {statusMessage}
+                    </p>
+                </div>
+
+                <!-- Custom Minimal Progress -->
+                <div class="max-w-[240px] mx-auto space-y-3">
+                    <div
+                        class="h-1 w-full bg-base-content/5 rounded-full overflow-hidden"
+                    >
+                        <div
+                            class="bg-primary h-full rounded-full transition-all duration-700 ease-out"
+                            style="width: {progress}%"
+                        ></div>
+                    </div>
+                    <div class="flex justify-between items-center px-1">
+                        <span
+                            class="text-[9px] uppercase tracking-[0.2em] text-base-content/20 font-bold"
+                            >Privacy Layer</span
+                        >
+                        <span class="text-[9px] font-mono text-primary/60"
+                            >{progress}%</span
+                        >
+                    </div>
+                </div>
+
+                <p
+                    class="text-[10px] text-base-content/30 max-w-[280px] mx-auto leading-relaxed"
+                >
+                    Zero-knowledge proofs prove you own the allocation <span
+                        class="text-base-content/60 font-medium"
+                        >without linking</span
+                    > your email to your wallet address.
+                </p>
             </div>
-            <div>
-                <h2 class="text-xl font-bold">Proof Generated</h2>
-                <p class="text-base-content/60">Redirecting to submission...</p>
+        {:else}
+            <!-- Success Transition -->
+            <div class="space-y-6 animate-in zoom-in duration-500">
+                <div
+                    class="w-16 h-16 rounded-full bg-success/10 text-success flex items-center justify-center mx-auto border border-success/10"
+                >
+                    <CheckCircle class="w-8 h-8" />
+                </div>
+                <div class="space-y-1">
+                    <h2 class="text-xl font-medium tracking-tight">
+                        Proof Successful
+                    </h2>
+                    <p class="text-xs text-base-content/40 italic">
+                        Finalizing claim parameters...
+                    </p>
+                </div>
             </div>
-        </div>
-    {/if}
+        {/if}
+    </div>
 </div>

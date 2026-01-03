@@ -175,8 +175,14 @@ class ClaimFlowState {
         this.state.currentStep = 1;
         this.state.epochs = [];
         this.state.masterSalt = null;
+        this.state.pin = "";
+        this.state.email = "";
         this.state.error = null;
         this.state.loading = false;
+        this.state.selectedEpochIndex = null;
+        this.state.proof = null;
+        this.state.txHash = null;
+
         // Optionally clear session
         if (browser) {
             sessionStorage.removeItem('claim_flow_state');
@@ -214,8 +220,8 @@ class ClaimFlowState {
         const data = {
             step: this.state.currentStep,
             email: this.state.email,
-            targetWallet: this.state.targetWallet,
-            pin: this.state.pin // Should strictly handle secret persistence policy here
+            targetWallet: this.state.targetWallet
+            // PIN is never persisted for security (ADR-025)
         };
 
         sessionStorage.setItem('claim_flow_state', JSON.stringify(data));
@@ -229,11 +235,11 @@ class ClaimFlowState {
 
         try {
             const data = JSON.parse(raw);
-            // Do not restore step. In-memory epochs are lost on reload, so we must force re-discovery.
+            // Always force Step 1 on fresh load to ensure Barretenberg & Secrets are initialized correctly
             this.state.currentStep = 1;
             this.state.email = data.email || null;
             this.state.targetWallet = data.targetWallet || null;
-            this.state.pin = data.pin || null;
+            this.state.pin = null; // Ensure PIN is never recovered
         } catch (e) {
             console.warn('Failed to recover claim session', e);
             sessionStorage.removeItem('claim_flow_state');

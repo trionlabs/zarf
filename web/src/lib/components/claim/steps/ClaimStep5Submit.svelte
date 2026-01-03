@@ -43,6 +43,12 @@
             );
 
             claimStore.setTxHash(result.hash);
+
+            // Critical: Update the store so the schedule and stats update immediately
+            if (proof?.identityCommitment) {
+                claimStore.markAsClaimed(proof.identityCommitment);
+            }
+
             txHash = result.hash;
             success = true;
         } catch (e: any) {
@@ -60,80 +66,124 @@
     }
 </script>
 
-<div class="space-y-6 text-center">
-    <!-- Header -->
-    <div
-        class="w-16 h-16 rounded-full bg-primary/10 text-primary flex items-center justify-center mx-auto mb-2"
-    >
-        <FileText class="w-8 h-8" />
-    </div>
-    <h2 class="card-title justify-center text-xl">Submit Claim</h2>
-    <p class="text-sm text-base-content/60 font-light">
-        Your proof is ready. Submit it to the blockchain to receive your tokens.
-    </p>
-
-    <!-- Summary -->
-    <div class="stats shadow bg-base-200/50 mt-4 mx-auto">
-        <div class="stat place-items-center">
-            <div class="stat-title">Claiming</div>
-            <div class="stat-value text-primary text-2xl">
-                {(Number(allocation) / 1e18).toLocaleString()}
+<div
+    class="space-y-10 py-8 animate-in fade-in slide-in-from-top-4 duration-500"
+>
+    <div class="max-w-xl mx-auto space-y-10 text-center">
+        <!-- Header Section -->
+        <div class="space-y-3">
+            <div
+                class="w-14 h-14 rounded-full bg-primary/5 text-primary flex items-center justify-center mx-auto mb-4 border border-primary/10"
+            >
+                <FileText class="w-6 h-6" />
             </div>
-            <div class="stat-desc">AZTC</div>
-        </div>
-    </div>
-
-    <!-- Action -->
-    {#if error}
-        <div class="alert alert-error text-xs py-2 rounded-lg text-left">
-            <AlertTriangle class="w-4 h-4" />
-            <span>{error}</span>
-        </div>
-    {/if}
-
-    {#if success}
-        <div class="alert alert-success text-xs py-2 rounded-lg">
-            <CheckCircle2 class="w-4 h-4" />
-            <span>Transaction Submitted!</span>
+            <h2 class="text-2xl font-medium tracking-tight">Finalize Claim</h2>
+            <p
+                class="text-sm text-base-content/40 font-light max-w-sm mx-auto leading-relaxed"
+            >
+                Your zero-knowledge proof is verified and ready. One final
+                signature to receive your tokens.
+            </p>
         </div>
 
-        <div class="flex flex-col gap-2 mt-4">
-            {#if txHash}
-                <a
-                    href={getExplorerUrl(txHash as `0x${string}`)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    class="btn btn-outline btn-sm gap-2"
+        <!-- Amount Highlight -->
+        <div
+            class="relative py-8 px-6 rounded-[2rem] bg-base-200/30 border border-base-content/5 overflow-hidden"
+        >
+            <div
+                class="absolute -top-10 -right-10 w-32 h-32 bg-primary/5 rounded-full blur-3xl"
+            ></div>
+            <div
+                class="absolute -bottom-10 -left-10 w-32 h-32 bg-primary/5 rounded-full blur-3xl"
+            ></div>
+
+            <div class="relative space-y-1">
+                <span
+                    class="text-[10px] uppercase tracking-[0.3em] text-base-content/30 font-bold"
+                    >Claim Amount</span
                 >
-                    View on Etherscan
-                    <ExternalLink class="w-3 h-3" />
-                </a>
-            {/if}
+                <div class="flex items-baseline justify-center gap-2">
+                    <span
+                        class="text-5xl font-light tracking-tighter text-base-content"
+                    >
+                        {(Number(allocation) / 1e18).toLocaleString()}
+                    </span>
+                    <span
+                        class="text-sm font-medium text-primary uppercase tracking-widest"
+                        >AZTC</span
+                    >
+                </div>
+            </div>
+        </div>
 
-            <button
-                class="btn btn-primary btn-md w-full mt-4"
-                onclick={handleFinish}
+        <!-- Status / Errors -->
+        {#if error}
+            <div
+                class="flex items-center gap-3 p-4 rounded-xl bg-error/5 border border-error/10 text-error text-xs text-left"
             >
-                Done & Return to Dashboard
-            </button>
-        </div>
-    {:else}
-        <div class="pt-4">
-            <button
-                class="btn btn-primary w-full btn-lg shadow-lg shadow-primary/20"
-                disabled={isSubmitting}
-                onclick={handleSubmit}
-            >
-                {#if isSubmitting}
-                    <span class="loading loading-spinner"></span>
-                    Submitting...
-                {:else}
-                    <div class="flex items-center gap-2">
-                        Submit Transaction
-                        <Send class="w-4 h-4" />
-                    </div>
-                {/if}
-            </button>
-        </div>
-    {/if}
+                <AlertTriangle class="w-4 h-4 shrink-0" />
+                <p>{error}</p>
+            </div>
+        {/if}
+
+        {#if success}
+            <div class="space-y-6 animate-in zoom-in duration-500">
+                <div
+                    class="flex items-center justify-center gap-2 text-success"
+                >
+                    <CheckCircle2 class="w-5 h-5" />
+                    <span class="text-sm font-medium uppercase tracking-widest"
+                        >Transaction Success</span
+                    >
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {#if txHash}
+                        <a
+                            href={getExplorerUrl(txHash as `0x${string}`)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            class="btn btn-ghost border-base-content/5 bg-base-100 hover:bg-base-200/50 h-14 rounded-2xl text-[10px] uppercase tracking-widest font-bold"
+                        >
+                            <ExternalLink class="w-3.5 h-3.5 mr-2 opacity-40" />
+                            View Explorer
+                        </a>
+                    {/if}
+
+                    <button
+                        class="btn btn-primary h-14 rounded-2xl text-[10px] uppercase tracking-widest font-bold shadow-lg shadow-primary/20"
+                        onclick={handleFinish}
+                    >
+                        Return to Vault
+                    </button>
+                </div>
+            </div>
+        {:else}
+            <!-- Action Button -->
+            <div class="pt-4">
+                <button
+                    class="btn btn-primary w-full h-16 rounded-2xl text-[11px] uppercase tracking-[0.3em] font-bold shadow-xl shadow-primary/20 group"
+                    disabled={isSubmitting}
+                    onclick={handleSubmit}
+                >
+                    {#if isSubmitting}
+                        <span class="loading loading-spinner loading-sm"></span>
+                        <span class="ml-2">Transmitting...</span>
+                    {:else}
+                        <div class="flex items-center justify-center gap-3">
+                            Submit to Blockchain
+                            <Send
+                                class="w-3.5 h-3.5 group-hover:-translate-y-1 group-hover:translate-x-1 transition-transform"
+                            />
+                        </div>
+                    {/if}
+                </button>
+                <p
+                    class="text-[10px] text-base-content/20 mt-4 italic font-light"
+                >
+                    Tokens will be sent immediately after network confirmation.
+                </p>
+            </div>
+        {/if}
+    </div>
 </div>

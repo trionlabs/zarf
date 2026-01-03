@@ -59,7 +59,10 @@
     import { claimStore } from "$lib/stores/claimStore.svelte";
     import ClaimStep1Identify from "$lib/components/claim/steps/ClaimStep1Identify.svelte";
     import ClaimStep2Timeline from "$lib/components/claim/steps/ClaimStep2Timeline.svelte";
-    import ClaimModal from "$lib/components/claim/ClaimModal.svelte";
+    import ClaimStep3Wallet from "$lib/components/claim/steps/ClaimStep3Wallet.svelte";
+    import ClaimStep4Proof from "$lib/components/claim/steps/ClaimStep4Proof.svelte";
+    import ClaimStep5Submit from "$lib/components/claim/steps/ClaimStep5Submit.svelte";
+    import { slide } from "svelte/transition";
 
     // ... imports ...
 
@@ -73,6 +76,19 @@
         url.searchParams.set("address", address);
         goto(url.toString(), { replaceState: true });
     }
+
+    // Security & State Reset: If we change contracts or go back to list, reset the store
+    let lastAddress = $state<string | null>(null);
+    $effect(() => {
+        if (importedAddress !== lastAddress) {
+            console.log(
+                "[Claim] Context Changed, Reseting Store:",
+                importedAddress,
+            );
+            claimStore.reset();
+            lastAddress = importedAddress;
+        }
+    });
 </script>
 
 <div
@@ -110,11 +126,8 @@
                 {#if currentStep === 1}
                     <ClaimStep1Identify contractAddress={importedAddress} />
                 {:else}
-                    <!-- Keep Dashboard Always Visible once unlocked -->
-                    <ClaimStep2Timeline />
-
-                    <!-- Claim process happens in a Modal -->
-                    <ClaimModal contractAddress={importedAddress} />
+                    <!-- Dashboard & Inline Claim Flow -->
+                    <ClaimStep2Timeline contractAddress={importedAddress} />
                 {/if}
             </div>
 

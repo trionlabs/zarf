@@ -1,7 +1,20 @@
 <script lang="ts">
     import { claimStore } from "$lib/stores/claimStore.svelte";
     import { formatUnits } from "viem";
-    import { Check, Clock, Lock, ChevronDown, ChevronUp } from "lucide-svelte";
+    import {
+        Check,
+        Clock,
+        Lock,
+        ChevronDown,
+        ChevronUp,
+        X,
+    } from "lucide-svelte";
+    import { slide, fade } from "svelte/transition";
+    import ClaimStep3Wallet from "./steps/ClaimStep3Wallet.svelte";
+    import ClaimStep4Proof from "./steps/ClaimStep4Proof.svelte";
+    import ClaimStep5Submit from "./steps/ClaimStep5Submit.svelte";
+
+    let { contractAddress } = $props<{ contractAddress: string }>();
 
     // Format token amounts
     const format = (val: bigint) =>
@@ -38,7 +51,6 @@
         const now = Date.now() / 1000;
 
         const result: VestingPeriod[] = [];
-        // Calculate total periods from duration / period length
         const totalPeriods = Math.floor(
             info.vestingDuration / info.vestingPeriod,
         );
@@ -46,20 +58,16 @@
         let runningClaimed = 0n;
 
         for (let i = 0; i < totalPeriods; i++) {
-            // Period unlocks at: start + cliff + (i+1) * period
-            // Because period 0 unlocks after 1 full period post-cliff
             const unlockTimestamp =
                 info.vestingStart +
                 info.cliffDuration +
                 (i + 1) * info.vestingPeriod;
             const unlockDate = new Date(unlockTimestamp * 1000);
 
-            // Determine status
             let status: PeriodStatus;
             const isPast = now >= unlockTimestamp;
 
             if (isPast) {
-                // This period has unlocked
                 runningClaimed += amountPerPeriod;
                 if (runningClaimed <= claimed) {
                     status = "claimed";
@@ -82,10 +90,7 @@
         return result;
     });
 
-    // Collapsible state - show first 3 by default if many periods
     let isExpanded = $state(false);
-
-    // Final UI-ready data transformation
     let displayPeriods = $derived.by(() => {
         const source =
             isExpanded || periods.length <= 11 ? periods : periods.slice(0, 10);
@@ -97,8 +102,6 @@
     });
 
     let hasMore = $derived(periods.length > 4);
-
-    // Stats
     let claimedCount = $derived(
         periods.filter((p) => p.status === "claimed").length,
     );
@@ -108,6 +111,27 @@
     let lockedCount = $derived(
         periods.filter((p) => p.status === "locked").length,
     );
+
+    // Active Claim Row
+    let activeEpochIndex = $derived(claimStore.state.selectedEpochIndex);
+    let currentStep = $derived(claimStore.currentStep);
+
+    function handleStartClaim(index: number) {
+        // If already active, toggle off?
+        if (activeEpochIndex === index - 1 && currentStep >= 3) {
+            claimStore.state.currentStep = 2;
+            claimStore.state.selectedEpochIndex = null;
+            return;
+        }
+
+        claimStore.state.selectedEpochIndex = index - 1;
+        claimStore.state.currentStep = 3; // Move to Wallet Step
+    }
+
+    function handleCancel() {
+        claimStore.state.currentStep = 2;
+        claimStore.state.selectedEpochIndex = null;
+    }
 </script>
 
 {#if periods.length > 0}
@@ -140,37 +164,54 @@
         </div>
 
         <!-- Table -->
-        <div class="overflow-hidden rounded-xl border border-base-content/5">
-            <table class="table table-sm w-full">
+        <div
+            class="overflow-hidden rounded-xl border border-base-content/5 bg-base-100 shadow-sm"
+        >
+            <table
+                class="table table-sm w-full border-separate border-spacing-0"
+            >
                 <thead>
                     <tr
                         class="bg-base-200/20 text-[10px] uppercase tracking-wider text-base-content/40"
                     >
-                        <th class="font-medium">Period</th>
-                        <th class="font-medium">Unlock Date</th>
-                        <th class="font-medium text-right">Amount</th>
-                        <th class="font-medium text-center">Status</th>
-                        <th class="font-medium text-right">Action</th>
+                        <th class="font-medium p-4">Period</th>
+                        <th class="font-medium p-4">Unlock Date</th>
+                        <th class="font-medium p-4 text-right">Amount</th>
+                        <th class="font-medium p-4 text-center">Status</th>
+                        <th class="font-medium p-4 text-right">Action</th>
                     </tr>
                 </thead>
                 <tbody>
                     {#each displayPeriods as period (period.index)}
+                        {@const isActive =
+                            activeEpochIndex === period.index - 1}
+
                         <tr
-                            class="border-t border-base-content/5 hover:bg-base-200/10 transition-colors"
+                            class="group transition-colors {isActive
+                                ? 'bg-primary/[0.02]'
+                                : 'hover:bg-base-200/10'}"
                         >
-                            <td class="font-mono text-xs text-base-content/60">
+                            <td
+                                class="p-4 font-mono text-xs text-base-content/60 border-t border-base-content/5"
+                            >
                                 #{period.index}
                             </td>
-                            <td class="text-xs text-base-content/70">
+                            <td
+                                class="p-4 text-xs text-base-content/70 border-t border-base-content/5"
+                            >
                                 {period.formattedDate}
                             </td>
-                            <td class="text-right font-mono text-xs">
+                            <td
+                                class="p-4 text-right font-mono text-xs border-t border-base-content/5"
+                            >
                                 {period.formattedAmount}
                                 <span class="text-base-content/30 ml-1"
                                     >ZARF</span
                                 >
                             </td>
-                            <td class="text-center">
+                            <td
+                                class="p-4 text-center border-t border-base-content/5"
+                            >
                                 {#if period.status === "claimed"}
                                     <span
                                         class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-success/10 text-success"
@@ -180,7 +221,7 @@
                                     </span>
                                 {:else if period.status === "claimable"}
                                     <span
-                                        class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-primary/10 text-primary animate-pulse"
+                                        class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-primary/10 text-primary"
                                     >
                                         <Clock class="w-3 h-3" />
                                         Ready
@@ -194,25 +235,89 @@
                                     </span>
                                 {/if}
                             </td>
-                            <td class="text-right">
+                            <td
+                                class="p-4 text-right border-t border-base-content/5"
+                            >
                                 {#if period.status === "claimable"}
                                     <button
-                                        class="btn btn-xs btn-primary btn-outline"
-                                        onclick={() => {
-                                            // period.index is 1-based, array is 0-based
-                                            // Assume epochs are sorted same as schedule: 0..N
-                                            // But wait, epochs might not match schedule periods 1:1 if implementation differs
-                                            // Assuming periods[i] maps to epochs[i]
-                                            claimStore.state.selectedEpochIndex =
-                                                period.index - 1;
-                                            claimStore.nextStep();
-                                        }}
+                                        class="btn btn-xs {isActive
+                                            ? 'btn-ghost text-primary'
+                                            : 'btn-primary btn-outline'} uppercase tracking-widest text-[9px] font-bold px-4"
+                                        onclick={() =>
+                                            handleStartClaim(period.index)}
                                     >
-                                        Claim
+                                        {isActive ? "Active" : "Claim"}
                                     </button>
                                 {/if}
                             </td>
                         </tr>
+
+                        <!-- Drawer Row -->
+                        {#if isActive && currentStep >= 3}
+                            <tr class="bg-base-100 relative overflow-hidden">
+                                <td
+                                    colspan="5"
+                                    class="p-0 border-t border-primary/10"
+                                >
+                                    <div
+                                        in:slide={{ duration: 400 }}
+                                        class="relative bg-gradient-to-b from-primary/[0.02] to-transparent"
+                                    >
+                                        <!-- Header / Step Indicator -->
+                                        <div
+                                            class="flex items-center justify-between px-6 py-3 border-b border-base-content/5"
+                                        >
+                                            <div class="flex gap-1.5">
+                                                {#each [3, 4, 5] as step}
+                                                    <div
+                                                        class="h-1 w-6 rounded-full transition-all duration-500 {currentStep >=
+                                                        step
+                                                            ? 'bg-primary'
+                                                            : 'bg-base-content/10'}"
+                                                    ></div>
+                                                {/each}
+                                            </div>
+                                            <button
+                                                class="text-base-content/20 hover:text-base-content/60 transition-colors"
+                                                onclick={handleCancel}
+                                            >
+                                                <X class="w-4 h-4" />
+                                            </button>
+                                        </div>
+
+                                        <!-- Content Wrapper -->
+                                        <div class="p-0">
+                                            {#if currentStep === 3}
+                                                <div
+                                                    in:fade={{
+                                                        duration: 300,
+                                                        delay: 100,
+                                                    }}
+                                                >
+                                                    <ClaimStep3Wallet />
+                                                </div>
+                                            {:else if currentStep === 4}
+                                                <div
+                                                    in:fade={{ duration: 300 }}
+                                                >
+                                                    <ClaimStep4Proof
+                                                        {contractAddress}
+                                                    />
+                                                </div>
+                                            {:else if currentStep === 5}
+                                                <div
+                                                    in:fade={{ duration: 300 }}
+                                                >
+                                                    <ClaimStep5Submit
+                                                        {contractAddress}
+                                                    />
+                                                </div>
+                                            {/if}
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                        {/if}
                     {/each}
                 </tbody>
             </table>
@@ -220,7 +325,7 @@
             <!-- Expand/Collapse Button -->
             {#if hasMore}
                 <button
-                    class="w-full py-2 text-xs text-base-content/40 hover:text-base-content/60 hover:bg-base-200/10 transition-colors flex items-center justify-center gap-1 border-t border-base-content/5"
+                    class="w-full py-4 text-[10px] uppercase tracking-widest font-bold text-base-content/30 hover:text-base-content/60 hover:bg-base-200/10 transition-colors flex items-center justify-center gap-2 border-t border-base-content/5"
                     onclick={() => (isExpanded = !isExpanded)}
                 >
                     {#if isExpanded}

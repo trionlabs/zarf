@@ -6,6 +6,7 @@
  */
 
 import type { Address } from 'viem';
+import type { Connector } from '@wagmi/core';
 
 // ============================================================================
 // Whitelist & CSV Types
@@ -181,6 +182,7 @@ export interface WalletAccount {
     isConnected: boolean;
     address?: Address;
     chainId?: number;
+    connector?: Connector; // Added connector property
 }
 
 // ============================================================================
