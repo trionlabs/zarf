@@ -88,7 +88,7 @@
     // Final UI-ready data transformation
     let displayPeriods = $derived.by(() => {
         const source =
-            isExpanded || periods.length <= 4 ? periods : periods.slice(0, 3);
+            isExpanded || periods.length <= 11 ? periods : periods.slice(0, 10);
         return source.map((p) => ({
             ...p,
             formattedDate: formatDate(p.unlockDate.getTime() / 1000),
@@ -110,7 +110,7 @@
     );
 </script>
 
-s{#if periods.length > 0}
+{#if periods.length > 0}
     <div class="space-y-4">
         <!-- Section Header -->
         <div class="flex items-center justify-between">

@@ -1,7 +1,12 @@
 <script lang="ts">
+    import { onMount } from "svelte";
     import { readVestingContract } from "$lib/contracts/contracts";
-    import { Search, ArrowRight, AlertCircle } from "lucide-svelte";
+    import { Search, AlertCircle } from "lucide-svelte";
     import type { Address } from "viem";
+    import {
+        fetchContractMetadata,
+        type OnChainVestingContract,
+    } from "$lib/services/distributionDiscovery";
 
     let { onImport } = $props<{ onImport: (addr: string) => void }>();
 
@@ -9,13 +14,68 @@
     let error = $state<string | null>(null);
     let isLoading = $state(false);
 
+    const VAULT_ADDRESSES: Address[] = [
+        "0xb5a792828e495037f541a909c1ccf3e091e2ab14",
+        "0x4ea075209bc0bcccd763c2609bccb789f3b55b16",
+        "0x2ec7ec35cdfe97d28de9840c1af8878df3b5fce0",
+        "0xc26174dfd5f7ac42158ba5d290778d17ab9e9104",
+        "0x13322578dc94c6a325505a68797b4004b89d13dc",
+        "0x4866180adc085678e636cbc5f5f2c7bc87962fce",
+        "0x540459974c9ab523aB3663625a8179E93E6c323F",
+        "0x290eCa71a9D41B29501750b200bc04552AD7E782",
+        "0x2cA950a38DE071B6012C4445f17824ea8fbe2B13",
+    ];
+
+    let vaultContracts = $state<
+        (OnChainVestingContract & { launchDate?: string })[]
+    >([]);
+    let isFetchingVault = $state(false);
+
+    function formatDate(timestamp: bigint) {
+        if (timestamp === 0n) return "Not Started";
+        return new Date(Number(timestamp) * 1000).toLocaleDateString("en-US", {
+            year: "numeric",
+            month: "short",
+            day: "numeric",
+        });
+    }
+
+    onMount(async () => {
+        isFetchingVault = true;
+        try {
+            const results = await Promise.all(
+                VAULT_ADDRESSES.map(async (addr) => {
+                    const meta = await fetchContractMetadata(addr);
+                    if (meta) {
+                        return {
+                            ...meta,
+                            launchDate: formatDate(meta.vestingStart),
+                        };
+                    }
+                    return null;
+                }),
+            );
+            vaultContracts = results.filter(
+                (c): c is OnChainVestingContract & { launchDate: string } =>
+                    c !== null,
+            );
+        } catch (e) {
+            console.error("Failed to fetch vault metadata", e);
+        } finally {
+            isFetchingVault = false;
+        }
+    });
+
+    async function handleSelect(addr: string) {
+        address = addr;
+        await handleSubmit();
+    }
+
     async function handleSubmit() {
         const addr = address.trim();
 
-        // Check for common mistake: Transaction Hash
         if (/^0x[a-fA-F0-9]{64}$/.test(addr)) {
-            error =
-                "This is a Transaction Hash, not a Contract Address. Please check the 'Logs' tab on Etherscan to find the Deployed Contract Address.";
+            error = "This is a Transaction Hash, not a Contract Address.";
             return;
         }
 
@@ -38,57 +98,121 @@
     }
 </script>
 
-<div class="space-y-2">
-    <label class="label pl-1" for="contract-input">
-        <span class="label-text font-medium text-base-content/80"
-            >Contract Information</span
-        >
-    </label>
-
-    <!-- Inlined DaisyUI markup (no custom wrapper) -->
-    <div class="form-control w-full space-y-2">
-        <div
-            class="join w-full shadow-sm hover:shadow-md transition-shadow duration-300"
-        >
-            <div
-                class="join-item bg-base-200/30 flex items-center px-4 border border-base-content/10 border-r-0"
-            >
-                <Search class="w-4 h-4 text-base-content/40" />
-            </div>
-            <input
-                type="text"
-                id="contract-input"
-                placeholder="0x..."
-                class="input input-lg input-bordered join-item w-full font-mono text-base bg-base-100 focus:bg-base-100 border-base-content/10 focus:border-primary/50 text-base-content/80 placeholder:text-base-content/20 transition-all duration-300"
-                class:input-error={error !== null}
-                bind:value={address}
-                onkeydown={(e) => e.key === "Enter" && handleSubmit()}
-            />
-            <button
-                type="button"
-                class="btn btn-lg join-item border-base-content/10 hover:border-primary/30 hover:bg-primary/5 text-base-content/40 hover:text-primary transition-all duration-300"
-                onclick={handleSubmit}
-                disabled={isLoading}
-            >
-                {#if isLoading}
-                    <span class="loading loading-spinner loading-sm"></span>
-                {:else}
-                    <ArrowRight class="w-4 h-4" />
-                {/if}
-            </button>
+<div class="space-y-10">
+    <!-- Active Vaults -->
+    <div class="space-y-4">
+        <div class="flex items-center justify-between px-1">
+            <label class="label p-0">
+                <span
+                    class="label-text font-medium text-base-content/60 text-[10px] uppercase tracking-widest"
+                    >Active Distributions</span
+                >
+            </label>
+            {#if isFetchingVault}
+                <span class="loading loading-dots loading-xs opacity-20"></span>
+            {/if}
         </div>
 
-        {#if error}
-            <div
-                class="flex items-center gap-1.5 text-xs text-error font-medium mt-1.5 animate-in slide-in-from-top-1"
-            >
-                <AlertCircle class="w-3.5 h-3.5" />
-                {error}
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {#if isFetchingVault && vaultContracts.length === 0}
+                {#each Array(4) as _}
+                    <div
+                        class="h-24 w-full animate-pulse bg-base-200/20 rounded-2xl border border-base-content/5"
+                    ></div>
+                {/each}
+            {:else}
+                {#each vaultContracts as contract}
+                    <button
+                        class="flex flex-col p-5 rounded-2xl border border-base-content/5 bg-base-200/30 hover:bg-base-200/50 hover:border-primary/20 transition-all text-left group relative overflow-hidden"
+                        onclick={() => handleSelect(contract.address)}
+                    >
+                        <div class="flex justify-between items-start mb-2">
+                            <h3
+                                class="font-semibold text-base text-base-content group-hover:text-primary transition-colors"
+                            >
+                                {contract.name}
+                            </h3>
+                            <span
+                                class="px-2 py-0.5 rounded-full bg-base-content/5 text-[9px] text-base-content/40 font-bold uppercase tracking-tighter"
+                            >
+                                {contract.launchDate}
+                            </span>
+                        </div>
+
+                        <p
+                            class="text-xs text-base-content/50 font-light line-clamp-2 mb-4 leading-relaxed flex-1"
+                        >
+                            {contract.description}
+                        </p>
+
+                        <div
+                            class="flex items-center justify-between mt-auto pt-3 border-t border-base-content/5"
+                        >
+                            <code
+                                class="text-[9px] text-base-content/20 font-mono group-hover:text-primary/40 transition-colors"
+                            >
+                                {contract.address.slice(
+                                    0,
+                                    10,
+                                )}...{contract.address.slice(-8)}
+                            </code>
+                            <span
+                                class="text-[10px] text-primary opacity-0 group-hover:opacity-100 transition-all transform translate-x-2 group-hover:translate-x-0 font-semibold uppercase tracking-widest"
+                            >
+                                Enter →
+                            </span>
+                        </div>
+                    </button>
+                {/each}
+            {/if}
+        </div>
+    </div>
+
+    <!-- Divider -->
+    <div class="divider opacity-5 text-[9px] uppercase tracking-[0.2em]">
+        or import manually
+    </div>
+
+    <!-- Manual Import -->
+    <div class="max-w-xl mx-auto w-full space-y-4 pt-2">
+        <div class="form-control w-full">
+            <div class="join w-full shadow-sm">
+                <div
+                    class="join-item bg-base-200/30 flex items-center px-4 border border-base-content/10 border-r-0"
+                >
+                    <Search class="w-4 h-4 text-base-content/40" />
+                </div>
+                <input
+                    type="text"
+                    id="contract-input"
+                    placeholder="Enter manual contract address 0x..."
+                    class="input input-bordered join-item w-full font-mono text-sm bg-base-100 border-base-content/10 focus:border-primary/50 text-base-content/80 transition-all h-14"
+                    class:input-error={error !== null}
+                    bind:value={address}
+                    onkeydown={(e) => e.key === "Enter" && handleSubmit()}
+                />
+                <button
+                    type="button"
+                    class="btn h-14 join-item border-base-content/10 px-6 font-medium text-xs uppercase tracking-widest"
+                    onclick={handleSubmit}
+                    disabled={isLoading}
+                >
+                    {#if isLoading}
+                        <span class="loading loading-spinner loading-sm"></span>
+                    {:else}
+                        Verify
+                    {/if}
+                </button>
             </div>
-        {:else}
-            <p class="text-xs text-base-content/40 font-light mt-1.5">
-                Paste the distribution contract address to verify eligibility.
-            </p>
-        {/if}
+
+            {#if error}
+                <div
+                    class="flex items-center gap-1.5 text-[10px] text-error font-medium mt-2 px-2"
+                >
+                    <AlertCircle class="w-3 h-3" />
+                    {error}
+                </div>
+            {/if}
+        </div>
     </div>
 </div>

@@ -56,9 +56,7 @@
     import { claimStore } from "$lib/stores/claimStore.svelte";
     import ClaimStep1Identify from "$lib/components/claim/steps/ClaimStep1Identify.svelte";
     import ClaimStep2Timeline from "$lib/components/claim/steps/ClaimStep2Timeline.svelte";
-    import ClaimStep3Wallet from "$lib/components/claim/steps/ClaimStep3Wallet.svelte";
-    import ClaimStep4Proof from "$lib/components/claim/steps/ClaimStep4Proof.svelte";
-    import ClaimStep5Submit from "$lib/components/claim/steps/ClaimStep5Submit.svelte";
+    import ClaimModal from "$lib/components/claim/ClaimModal.svelte";
 
     // ... imports ...
 
@@ -79,7 +77,7 @@
 >
     <PageHeader
         title="Claim Portal"
-        description="Connect your wallet and import a distribution contract to check your eligibility."
+        description="Select a distribution from the vault to verify your eligibility and claim tokens."
     >
         {#snippet extra()}
             {#if importedAddress}
@@ -105,14 +103,12 @@
             <div class="w-full">
                 {#if currentStep === 1}
                     <ClaimStep1Identify contractAddress={importedAddress} />
-                {:else if currentStep === 2}
+                {:else}
+                    <!-- Keep Dashboard Always Visible once unlocked -->
                     <ClaimStep2Timeline />
-                {:else if currentStep === 3}
-                    <ClaimStep3Wallet />
-                {:else if currentStep === 4}
-                    <ClaimStep4Proof contractAddress={importedAddress} />
-                {:else if currentStep === 5}
-                    <ClaimStep5Submit contractAddress={importedAddress} />
+
+                    <!-- Claim process happens in a Modal -->
+                    <ClaimModal contractAddress={importedAddress} />
                 {/if}
             </div>
 

@@ -38,12 +38,6 @@
             ? ((Number(vested) / Number(total)) * 100).toFixed(0)
             : "0",
     );
-
-    function handleContinue() {
-        if (claimStore.selectNextClaimableEpoch()) {
-            claimStore.nextStep();
-        }
-    }
 </script>
 
 <!-- Zen Pro Layout: Open, minimal, no card wrapper -->
@@ -177,15 +171,12 @@
                     All Tokens Claimed
                 </button>
             {:else if hasClaimable}
-                <button
-                    class="btn btn-primary w-full rounded-lg shadow-md shadow-primary/10 hover:shadow-primary/20 transition-all transform active:scale-[0.98] group"
-                    onclick={handleContinue}
-                >
-                    Continue to Claim
-                    <ArrowRight
-                        class="w-4 h-4 ml-2 group-hover:translate-x-0.5 transition-transform"
-                    />
-                </button>
+                <div class="text-center space-y-2">
+                    <p class="text-xs text-base-content/50">
+                        Select an unlocked period from the schedule above to
+                        start your claim.
+                    </p>
+                </div>
             {:else}
                 <button
                     class="btn btn-ghost w-full border border-dashed border-base-content/10 text-base-content/40 hover:bg-base-200/30 hover:border-base-content/20"

@@ -115,6 +115,8 @@ class ClaimFlowState {
         return this.state.selectedEpochIndex !== null ? this.state.epochs[this.state.selectedEpochIndex] : null;
     }
 
+    get proof() { return this.state.proof; }
+
     // ==========================================
     // Actions
     // ==========================================
@@ -227,7 +229,8 @@ class ClaimFlowState {
 
         try {
             const data = JSON.parse(raw);
-            this.state.currentStep = data.step as ClaimStep;
+            // Do not restore step. In-memory epochs are lost on reload, so we must force re-discovery.
+            this.state.currentStep = 1;
             this.state.email = data.email || null;
             this.state.targetWallet = data.targetWallet || null;
             this.state.pin = data.pin || null;
@@ -368,6 +371,7 @@ class ClaimFlowState {
             else if (msg.includes("No allocation found")) { /* keep */ }
 
             this.setError(msg);
+            throw new Error(msg);
         } finally {
             this.state.loading = false;
             this.state.statusMessage = null;

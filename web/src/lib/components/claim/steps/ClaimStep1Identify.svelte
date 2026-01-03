@@ -187,9 +187,11 @@
                 <input
                     type="password"
                     class="input input-lg input-bordered w-full pl-11 tracking-widest font-mono placeholder:font-sans placeholder:tracking-normal placeholder:text-base-content/20 focus:border-primary/50 transition-all"
+                    class:input-error={error !== null}
                     placeholder={`Enter ${PIN_LENGTH}-char PIN`}
                     maxlength={PIN_LENGTH}
                     bind:value={pin}
+                    oninput={() => (error = null)}
                     onkeydown={(e) => e.key === "Enter" && handleUnlock()}
                 />
                 <div
@@ -198,19 +200,18 @@
                     <KeyRound class="w-5 h-5" />
                 </div>
             </div>
-            <p class="text-xs text-base-content/40 pl-1">
-                This code was sent to you privately (DM or Email).
-            </p>
+            {#if error}
+                <p
+                    class="text-xs text-error font-medium pl-1 animate-in slide-in-from-top-1"
+                >
+                    {error}
+                </p>
+            {:else}
+                <p class="text-xs text-base-content/40 pl-1">
+                    This code was sent to you privately (DM or Email).
+                </p>
+            {/if}
         </div>
-
-        <!-- Action -->
-        {#if error}
-            <div
-                class="alert alert-error text-xs py-2 rounded-lg bg-error/10 border-error/20 text-error"
-            >
-                <span>{error}</span>
-            </div>
-        {/if}
 
         <div class="card-actions mt-4">
             <button
