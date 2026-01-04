@@ -1,5 +1,28 @@
 @import "tailwindcss";
 
 @plugin "daisyui" {
-    themes: nord --default, wireframe, dim;
+    themes: nord --default,
+        wireframe,
+        dim;
+}
+
+/* Zen Pro Dim Theme Overrides */
+[data-theme="dim"] {
+    --color-base-100: oklch(25% 0.02 260);
+    --color-base-200: oklch(20% 0.02 260);
+    --color-base-300: oklch(15% 0.02 260);
+    --color-base-content: oklch(90% 0.05 260);
+
+    --color-primary: oklch(50% 0.15 260);
+    --color-primary-content: oklch(98% 0.02 260);
+
+    --color-secondary: oklch(60% 0.12 280);
+    --color-secondary-content: oklch(98% 0.01 280);
+
+    --color-accent: oklch(70% 0.10 320);
+    --color-accent-content: oklch(20% 0.05 260);
+
+    --radius-selector: 1rem;
+    --radius-field: 1rem;
+    --radius-box: 1rem;
 }
