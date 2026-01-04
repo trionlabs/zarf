@@ -1,6 +1,7 @@
 <script lang="ts">
     import { deployStore } from "$lib/stores/deployStore.svelte";
     import { fly } from "svelte/transition";
+    import { AlertTriangle, Globe, Key } from "lucide-svelte";
 
     import { walletStore } from "$lib/stores/walletStore.svelte";
     import { wizardStore } from "$lib/stores/wizardStore.svelte";
@@ -235,7 +236,7 @@
     <div class="mb-6">
         <h2 class="text-2xl font-bold mb-2">Backup Distribution Data</h2>
         <div class="alert alert-warning shadow-sm">
-            <span class="text-2xl">⚠️</span>
+            <AlertTriangle class="w-6 h-6" />
             <div>
                 <h3 class="font-bold">CRITICAL STEP: Prevent Data Loss</h3>
                 <div class="text-xs">
@@ -254,7 +255,7 @@
                 <div
                     class="w-12 h-12 bg-info/10 text-info rounded-full flex items-center justify-center mb-2"
                 >
-                    <span class="text-2xl">🌍</span>
+                    <Globe class="w-6 h-6" />
                 </div>
                 <h3 class="font-bold">1. Public Data</h3>
                 <p class="text-xs opacity-60 mb-4">
@@ -286,7 +287,7 @@
                 <div
                     class="w-12 h-12 bg-error/10 text-error rounded-full flex items-center justify-center mb-2"
                 >
-                    <span class="text-2xl">🗝️</span>
+                    <Key class="w-6 h-6" />
                 </div>
                 <h3 class="font-bold">2. Private Secrets</h3>
                 <p class="text-xs opacity-60 mb-4">

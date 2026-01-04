@@ -116,7 +116,7 @@
     }
 </script>
 
-<div class="max-w-2xl mx-auto py-4">
+<div class="max-w-2xl py-4">
     <div class="mb-8 flex items-start gap-4">
         <div
             class="w-12 h-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center shrink-0"
@@ -208,7 +208,7 @@
                 >
                     {#if !walletStore.isConnected}
                         <button
-                            class="btn btn-primary btn-lg shadow-primary/20 shadow-lg min-w-[160px]"
+                            class="btn btn-primary btn-lg shadow-md shadow-primary/10 min-w-[160px] disabled:shadow-none"
                             onclick={handleConnect}
                             disabled={walletStore.isConnecting}
                         >
@@ -237,13 +237,11 @@
                                 </div>
                             {/if}
                             <button
-                                class="btn btn-ghost btn-square btn-sm tooltip tooltip-bottom"
-                                data-tip="Disconnect"
+                                class="btn btn-sm btn-ghost border border-base-content/10 hover:bg-base-content/5 hover:border-base-content/20 gap-2 font-normal text-base-content/70"
                                 onclick={handleDisconnect}
                             >
-                                <LogOut
-                                    class="w-4 h-4 opacity-60 hover:opacity-100"
-                                />
+                                <LogOut class="w-4 h-4" />
+                                Switch Wallet
                             </button>
                         </div>
                     {/if}

@@ -1,12 +1,13 @@
 <script lang="ts">
     import { onMount } from "svelte";
     import { readVestingContract } from "$lib/contracts/contracts";
-    import { Search, AlertCircle } from "lucide-svelte";
+    import { Search, AlertCircle, ArrowRight } from "lucide-svelte";
     import type { Address } from "viem";
     import {
         fetchContractMetadata,
         type OnChainVestingContract,
     } from "$lib/services/distributionDiscovery";
+    import ZenCard from "$lib/components/ui/ZenCard.svelte";
 
     let { onImport, vaultAddresses = [] } = $props<{
         onImport: (addr: string) => void;
@@ -106,11 +107,11 @@
             {/if}
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             {#if isFetchingVault && vaultContracts.length === 0}
                 {#each Array(4) as _}
                     <div
-                        class="h-24 w-full animate-pulse bg-base-200/20 rounded-2xl border border-base-content/5"
+                        class="h-32 w-full animate-pulse bg-base-100/50 rounded-3xl border border-base-content/5"
                     ></div>
                 {/each}
             {:else if vaultContracts.length === 0}
@@ -123,47 +124,65 @@
                 </div>
             {:else}
                 {#each vaultContracts as contract}
-                    <button
-                        class="flex flex-col p-5 rounded-2xl border border-base-content/5 bg-base-200/30 hover:bg-base-200/50 hover:border-primary/20 transition-all text-left group relative overflow-hidden"
+                    <ZenCard
+                        class="relative group overflow-hidden border-base-content/5 hover:border-primary/20 bg-base-200/30"
                         onclick={() => handleSelect(contract.address)}
+                        role="button"
                     >
-                        <div class="flex justify-between items-start mb-2">
-                            <h3
-                                class="font-semibold text-base text-base-content group-hover:text-primary transition-colors"
-                            >
-                                {contract.name}
-                            </h3>
-                            <span
-                                class="px-2 py-0.5 rounded-full bg-base-content/5 text-[9px] text-base-content/40 font-bold uppercase tracking-tighter"
-                            >
-                                {contract.launchDate}
-                            </span>
-                        </div>
-
-                        <p
-                            class="text-xs text-base-content/50 font-light line-clamp-2 mb-4 leading-relaxed flex-1"
-                        >
-                            {contract.description}
-                        </p>
-
+                        <!-- Dynamic Background Blob -->
                         <div
-                            class="flex items-center justify-between mt-auto pt-3 border-t border-base-content/5"
-                        >
-                            <code
-                                class="text-[9px] text-base-content/20 font-mono group-hover:text-primary/40 transition-colors"
+                            class="absolute -top-10 -right-10 w-24 h-24 rounded-full blur-2xl opacity-0 group-hover:opacity-10 transition-colors duration-500 bg-primary"
+                        ></div>
+
+                        <div class="card-body p-6 relative z-10">
+                            <div class="flex justify-between items-start mb-1">
+                                <h3
+                                    class="font-bold text-lg text-base-content group-hover:text-primary transition-colors"
+                                >
+                                    {contract.name}
+                                </h3>
+                                <div class="flex items-center gap-2">
+                                    <span
+                                        class="text-[10px] font-mono opacity-40"
+                                        >{contract.tokenSymbol}</span
+                                    >
+                                    <span
+                                        class="px-2 py-0.5 rounded-full bg-base-content/5 text-[9px] text-base-content/40 font-bold uppercase tracking-tighter"
+                                    >
+                                        {contract.launchDate}
+                                    </span>
+                                </div>
+                            </div>
+
+                            <p
+                                class="text-xs text-base-content/50 font-light line-clamp-2 mb-4 leading-relaxed"
                             >
-                                {contract.address.slice(
-                                    0,
-                                    10,
-                                )}...{contract.address.slice(-8)}
-                            </code>
-                            <span
-                                class="text-[10px] text-primary opacity-0 group-hover:opacity-100 transition-all transform translate-x-2 group-hover:translate-x-0 font-semibold uppercase tracking-widest"
+                                {contract.description ||
+                                    "No description provided."}
+                            </p>
+
+                            <div
+                                class="flex items-center justify-between mt-auto pt-4 border-t border-base-content/5"
                             >
-                                Enter →
-                            </span>
+                                <code
+                                    class="text-[10px] text-base-content/20 font-mono group-hover:text-primary/40 transition-colors"
+                                >
+                                    {contract.address.slice(
+                                        0,
+                                        10,
+                                    )}...{contract.address.slice(-8)}
+                                </code>
+                                <div
+                                    class="flex items-center gap-1 text-[10px] text-primary opacity-50 group-hover:opacity-100 transition-all font-bold uppercase tracking-widest"
+                                >
+                                    Enter
+                                    <ArrowRight
+                                        class="w-3 h-3 group-hover:translate-x-1 transition-transform"
+                                    />
+                                </div>
+                            </div>
                         </div>
-                    </button>
+                    </ZenCard>
                 {/each}
             {/if}
         </div>

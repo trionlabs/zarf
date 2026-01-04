@@ -211,91 +211,164 @@
                     </ZenButton>
                 </div>
 
-                <div class="grid grid-cols-3 gap-8 mb-12">
-                    <div class="flex flex-col gap-1 p-2">
-                        <div
-                            class="text-sm font-medium text-base-content/40 flex items-center gap-2"
-                        >
-                            <div
-                                class="w-1.5 h-1.5 rounded-full bg-success"
-                            ></div>
-                            On-Chain (Vault)
-                        </div>
-                        <div
-                            class="text-4xl font-light tracking-tighter text-base-content"
-                        >
-                            {vaultCount}
-                        </div>
-                    </div>
+                <!-- Stats Overview -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+                    <!-- Vault Stat -->
                     <div
-                        class="flex flex-col gap-1 p-2 border-l border-base-content/5 pl-8"
+                        class="group relative overflow-hidden rounded-3xl bg-base-100/40 backdrop-blur-md border border-base-content/5 p-6 hover:border-success/20 transition-all duration-300"
                     >
                         <div
-                            class="text-sm font-medium text-base-content/40 flex items-center gap-2"
+                            class="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity"
                         >
-                            <div
-                                class="w-1.5 h-1.5 rounded-full bg-warning"
-                            ></div>
-                            Drafts
+                            <Cloud class="w-24 h-24 -mr-8 -mt-8 rotate-12" />
                         </div>
                         <div
-                            class="text-4xl font-light tracking-tighter text-base-content"
+                            class="relative z-10 flex flex-col h-full justify-between gap-4"
                         >
-                            {draftsCount}
+                            <div class="flex items-center gap-2">
+                                <div
+                                    class="w-8 h-8 rounded-lg bg-success/10 flex items-center justify-center text-success"
+                                >
+                                    <Cloud class="w-4 h-4" />
+                                </div>
+                                <span
+                                    class="text-sm font-medium text-base-content/60"
+                                    >Active Vaults</span
+                                >
+                            </div>
+                            <div class="flex items-end gap-3">
+                                <span
+                                    class="text-4xl font-light tracking-tighter text-base-content"
+                                >
+                                    {vaultCount}
+                                </span>
+                                {#if isVaultTab}
+                                    <button
+                                        class="mb-2 transition-all duration-500 {onChainLoading
+                                            ? 'animate-spin opacity-50'
+                                            : 'opacity-0 group-hover:opacity-100 hover:text-success'}"
+                                        onclick={(e) => {
+                                            e.stopPropagation();
+                                            fetchOnChainContracts(true);
+                                        }}
+                                        title={refreshLabel}
+                                    >
+                                        <RefreshCw class="w-4 h-4" />
+                                    </button>
+                                {/if}
+                            </div>
                         </div>
                     </div>
+
+                    <!-- Drafts Stat -->
                     <div
-                        class="flex flex-col gap-1 p-2 border-l border-base-content/5 pl-8"
+                        class="group relative overflow-hidden rounded-3xl bg-base-100/40 backdrop-blur-md border border-base-content/5 p-6 hover:border-warning/20 transition-all duration-300"
                     >
-                        <div class="text-sm font-medium text-base-content/40">
-                            Total
+                        <div
+                            class="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity"
+                        >
+                            <FileText class="w-24 h-24 -mr-8 -mt-8 rotate-12" />
                         </div>
                         <div
-                            class="text-4xl font-light tracking-tighter text-base-content"
+                            class="relative z-10 flex flex-col h-full justify-between gap-4"
                         >
-                            {totalCount}
+                            <div class="flex items-center gap-2">
+                                <div
+                                    class="w-8 h-8 rounded-lg bg-warning/10 flex items-center justify-center text-warning"
+                                >
+                                    <FileText class="w-4 h-4" />
+                                </div>
+                                <span
+                                    class="text-sm font-medium text-base-content/60"
+                                    >Drafts</span
+                                >
+                            </div>
+                            <span
+                                class="text-4xl font-light tracking-tighter text-base-content"
+                            >
+                                {draftsCount}
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Total Stat -->
+                    <div
+                        class="group relative overflow-hidden rounded-3xl bg-base-100/40 backdrop-blur-md border border-base-content/5 p-6 transition-all duration-300"
+                    >
+                        <div
+                            class="absolute top-0 right-0 p-4 opacity-5 transition-opacity"
+                        >
+                            <Rocket class="w-24 h-24 -mr-8 -mt-8 rotate-12" />
+                        </div>
+                        <div
+                            class="relative z-10 flex flex-col h-full justify-between gap-4"
+                        >
+                            <div class="flex items-center gap-2">
+                                <div
+                                    class="w-8 h-8 rounded-lg bg-base-content/5 flex items-center justify-center text-base-content/70"
+                                >
+                                    <Rocket class="w-4 h-4" />
+                                </div>
+                                <span
+                                    class="text-sm font-medium text-base-content/60"
+                                    >Total Distributions</span
+                                >
+                            </div>
+                            <span
+                                class="text-4xl font-light tracking-tighter text-base-content"
+                            >
+                                {totalCount}
+                            </span>
                         </div>
                     </div>
                 </div>
 
-                <!-- Tabs -->
-                <div class="flex gap-2 mb-8">
-                    {#each tabs as tab}
-                        {@const isActive = activeTab === tab.id}
-                        {@const count = getTabCount(tab.id)}
-                        {@const Icon = tab.icon}
+                <!-- Tabs & Controls -->
+                <div
+                    class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8"
+                >
+                    <!-- Segmented Control Tabs -->
+                    <div
+                        class="inline-flex p-1 bg-base-200/50 rounded-full border border-base-content/5 backdrop-blur-sm"
+                    >
+                        {#each tabs as tab}
+                            {@const isActive = activeTab === tab.id}
+                            {@const count = getTabCount(tab.id)}
+                            {@const Icon = tab.icon}
 
-                        <!-- Dynamic class logic via conditional rendering or derived is preferred over complex template literals, 
-                             but here keeping it simple as it's readable and local to the loop -->
-                        <button
-                            class="relative flex items-center gap-2 px-4 py-2 text-sm font-medium transition-all rounded-full
-                            {isActive
-                                ? 'bg-base-content text-base-100 shadow-sm'
-                                : 'text-base-content/50 hover:bg-base-content/5 hover:text-base-content'}"
-                            onclick={() => (activeTab = tab.id)}
-                        >
-                            <Icon class="w-4 h-4" />
-                            {tab.label}
-                            {#if count > 0}
-                                <span
-                                    class="ml-1 text-[10px] font-bold opacity-80"
-                                >
-                                    {count}
-                                </span>
-                            {/if}
-                        </button>
-                    {/each}
+                            <button
+                                class="relative flex items-center gap-2 px-6 py-2.5 text-sm font-medium transition-all duration-300 rounded-full
+                                {isActive
+                                    ? 'bg-base-100 shadow-sm text-base-content scale-[1.02]'
+                                    : 'text-base-content/50 hover:text-base-content hover:bg-base-content/5'}"
+                                onclick={() => (activeTab = tab.id)}
+                            >
+                                <Icon
+                                    class="w-4 h-4 {isActive
+                                        ? ''
+                                        : 'opacity-70'}"
+                                />
+                                {tab.label}
+                                {#if count > 0}
+                                    <span
+                                        class="ml-1 px-1.5 py-0.5 text-[10px] font-bold rounded-md {isActive
+                                            ? 'bg-base-content/5'
+                                            : 'bg-transparent opacity-50'}"
+                                    >
+                                        {count}
+                                    </span>
+                                {/if}
+                            </button>
+                        {/each}
+                    </div>
 
-                    <!-- Refresh button for Vault tab -->
+                    <!-- Global Actions -->
                     {#if isVaultTab}
-                        <button
-                            class="ml-auto flex items-center gap-2 px-3 py-2 text-xs text-base-content/50 hover:text-base-content transition-colors"
-                            onclick={() => fetchOnChainContracts(true)}
-                            disabled={onChainLoading}
+                        <span
+                            class="text-xs text-base-content/30 font-mono hidden sm:block"
                         >
-                            <RefreshCw class="w-3 h-3 {refreshIconClass}" />
-                            {refreshLabel}
-                        </button>
+                            Last synced: {refreshLabel}
+                        </span>
                     {/if}
                 </div>
 

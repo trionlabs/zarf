@@ -12,7 +12,7 @@
 
     function getUnitButtonClass(unitValue: string): string {
         return durationUnit === unitValue
-            ? "bg-primary text-primary-content shadow-lg shadow-primary/20"
+            ? "bg-primary text-primary-content shadow-sm shadow-primary/10"
             : "bg-base-content/5 text-base-content/60 hover:bg-base-content/10";
     }
 </script>

@@ -172,7 +172,7 @@
 
         {#if showContinue}
             <button
-                class="btn btn-primary px-8 rounded-lg shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all transform active:scale-95"
+                class="btn btn-primary px-8 rounded-lg shadow-md shadow-primary/10 hover:shadow-lg hover:shadow-primary/20 transition-all transform active:scale-95 disabled:shadow-none"
                 onclick={goNext}
                 disabled={continueDisabled}
             >

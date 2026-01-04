@@ -174,7 +174,7 @@
                     </div>
 
                     <button
-                        class="btn btn-primary w-full shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all transform active:scale-95"
+                        class="btn btn-primary w-full shadow-md shadow-primary/10 hover:shadow-lg hover:shadow-primary/20 transition-all transform active:scale-95"
                         onclick={handleLogin}
                     >
                         <!-- Google G Icon - Simplified -->
@@ -233,7 +233,7 @@
 
                     <a
                         href={`/claim?address=${contractAddress}`}
-                        class="btn btn-primary px-8 shadow-lg shadow-primary/20 hover:shadow-primary/30"
+                        class="btn btn-primary px-8 shadow-md shadow-primary/10 hover:shadow-lg hover:shadow-primary/20 transition-all"
                     >
                         Continue to Claim
                         <svg

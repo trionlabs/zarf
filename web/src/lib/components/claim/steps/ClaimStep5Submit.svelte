@@ -69,17 +69,17 @@
 <div
     class="space-y-10 py-8 animate-in fade-in slide-in-from-top-4 duration-500"
 >
-    <div class="max-w-xl mx-auto space-y-10 text-center">
+    <div class="max-w-xl space-y-10 text-left">
         <!-- Header Section -->
         <div class="space-y-3">
             <div
-                class="w-14 h-14 rounded-full bg-primary/5 text-primary flex items-center justify-center mx-auto mb-4 border border-primary/10"
+                class="w-14 h-14 rounded-full bg-primary/5 text-primary flex items-center justify-center mb-4 border border-primary/10"
             >
                 <FileText class="w-6 h-6" />
             </div>
             <h2 class="text-2xl font-medium tracking-tight">Finalize Claim</h2>
             <p
-                class="text-sm text-base-content/40 font-light max-w-sm mx-auto leading-relaxed"
+                class="text-sm text-base-content/40 font-light max-w-sm leading-relaxed"
             >
                 Your zero-knowledge proof is verified and ready. One final
                 signature to receive your tokens.
@@ -102,7 +102,7 @@
                     class="text-[10px] uppercase tracking-[0.3em] text-base-content/30 font-bold"
                     >Claim Amount</span
                 >
-                <div class="flex items-baseline justify-center gap-2">
+                <div class="flex items-baseline justify-start gap-2">
                     <span
                         class="text-5xl font-light tracking-tighter text-base-content"
                     >
@@ -128,9 +128,7 @@
 
         {#if success}
             <div class="space-y-6 animate-in zoom-in duration-500">
-                <div
-                    class="flex items-center justify-center gap-2 text-success"
-                >
+                <div class="flex items-center justify-start gap-2 text-success">
                     <CheckCircle2 class="w-5 h-5" />
                     <span class="text-sm font-medium uppercase tracking-widest"
                         >Transaction Success</span
@@ -151,7 +149,7 @@
                     {/if}
 
                     <button
-                        class="btn btn-primary h-14 rounded-2xl text-[10px] uppercase tracking-widest font-bold shadow-lg shadow-primary/20"
+                        class="btn btn-primary h-14 rounded-2xl text-[10px] uppercase tracking-widest font-bold shadow-sm shadow-primary/10 hover:shadow-primary/20 transition-all"
                         onclick={handleFinish}
                     >
                         Return to Vault
@@ -162,7 +160,7 @@
             <!-- Action Button -->
             <div class="pt-4">
                 <button
-                    class="btn btn-primary w-full h-16 rounded-2xl text-[11px] uppercase tracking-[0.3em] font-bold shadow-xl shadow-primary/20 group"
+                    class="btn btn-primary w-full h-16 rounded-2xl text-[11px] uppercase tracking-[0.3em] font-bold shadow-md shadow-primary/10 hover:shadow-lg hover:shadow-primary/20 transition-all group disabled:shadow-none disabled:bg-base-content/5 disabled:text-base-content/20"
                     disabled={isSubmitting}
                     onclick={handleSubmit}
                 >

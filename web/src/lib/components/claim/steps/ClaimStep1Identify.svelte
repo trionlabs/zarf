@@ -223,7 +223,7 @@
 
         <div class="card-actions mt-4">
             <button
-                class="btn btn-primary w-full btn-lg shadow-lg shadow-primary/20"
+                class="btn btn-primary w-full btn-lg shadow-sm shadow-primary/10 disabled:shadow-none disabled:bg-base-content/5 disabled:text-base-content/20"
                 disabled={!canSubmit}
                 onclick={handleUnlock}
             >

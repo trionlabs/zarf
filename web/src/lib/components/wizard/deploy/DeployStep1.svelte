@@ -2,6 +2,7 @@
     import { deployStore } from "$lib/stores/deployStore.svelte";
     import { processWhitelist } from "$lib/crypto/merkleTree";
     import { fly } from "svelte/transition";
+    import { AlertTriangle, CheckCircle2 } from "lucide-svelte";
 
     import { wizardStore } from "$lib/stores/wizardStore.svelte";
     import { parseUnits } from "viem";
@@ -133,7 +134,7 @@
                 <div
                     class="w-12 h-12 rounded-full bg-error/10 flex items-center justify-center mb-2"
                 >
-                    <span class="text-2xl">⚠️</span>
+                    <AlertTriangle class="w-6 h-6 text-error" />
                 </div>
                 <h3 class="font-bold">Generation Failed</h3>
                 <p class="text-sm opacity-80 max-w-md">{merkleError}</p>
@@ -152,7 +153,7 @@
                 <div
                     class="w-12 h-12 rounded-full bg-success/10 flex items-center justify-center mb-2"
                 >
-                    <span class="text-2xl">✅</span>
+                    <CheckCircle2 class="w-6 h-6 text-success" />
                 </div>
                 <h3 class="font-bold">Ready for Deployment</h3>
                 <p class="text-sm opacity-60 font-mono text-center">

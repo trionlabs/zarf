@@ -256,7 +256,7 @@
         >
             <a
                 href="/wizard"
-                class="btn btn-primary btn-lg rounded-full px-8 font-normal shadow-lg shadow-primary/20 hover:scale-105 transition-all"
+                class="btn btn-primary btn-lg rounded-full px-8 font-normal shadow-md shadow-primary/10 hover:shadow-lg hover:shadow-primary/20 hover:scale-105 transition-all"
             >
                 Start Distribution
                 <ArrowRight class="w-4 h-4 ml-2" />
