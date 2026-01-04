@@ -60,6 +60,15 @@
         }
     }
 
+    async function handleChangeWallet() {
+        closeDropdown();
+        await walletStore.disconnect();
+        // Give a brief tick for state to clear, though not strictly necessary if handled correctly
+        setTimeout(() => {
+            walletStore.requestConnection();
+        }, 100);
+    }
+
     async function copyAddress() {
         if (!walletStore.address) return;
         try {
@@ -246,6 +255,27 @@
             {/if}
 
             <div class="divider my-0"></div>
+
+            <li>
+                <button
+                    onclick={handleChangeWallet}
+                    class="hover:bg-base-content/5"
+                >
+                    <svg
+                        class="w-4 h-4 opacity-70"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                        ><path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            stroke-width="2"
+                            d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"
+                        /></svg
+                    >
+                    Change Wallet
+                </button>
+            </li>
 
             <li>
                 <button

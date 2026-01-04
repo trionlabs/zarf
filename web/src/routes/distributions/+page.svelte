@@ -23,6 +23,7 @@
     import OnChainDetailPanel from "$lib/components/distributions/OnChainDetailPanel.svelte";
     import DistributionEmptyState from "$lib/components/distributions/DistributionEmptyState.svelte";
     import PageHeader from "$lib/components/ui/PageHeader.svelte";
+    import ZenButton from "$lib/components/ui/ZenButton.svelte";
     import { getWalletAccount } from "$lib/contracts/wallet";
     import {
         discoverOwnerVestings,
@@ -204,53 +205,61 @@
                         description="Manage all your token distributions in one place"
                     />
 
-                    <button
-                        class="btn btn-primary gap-2 shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all active:scale-95"
-                        onclick={() => goto("/wizard/step-0")}
-                    >
+                    <ZenButton onclick={() => goto("/wizard/step-0")}>
                         <Plus class="w-4 h-4" />
                         New Distribution
-                    </button>
+                    </ZenButton>
                 </div>
 
-                <div class="grid grid-cols-3 gap-4 mb-10">
-                    <div
-                        class="stat bg-base-200/30 rounded-xl border border-base-content/5 p-4"
-                    >
-                        <div class="stat-title text-xs flex items-center gap-1">
-                            <Cloud class="w-3 h-3" />
+                <div class="grid grid-cols-3 gap-8 mb-12">
+                    <div class="flex flex-col gap-1 p-2">
+                        <div
+                            class="text-sm font-medium text-base-content/40 flex items-center gap-2"
+                        >
+                            <div
+                                class="w-1.5 h-1.5 rounded-full bg-success"
+                            ></div>
                             On-Chain (Vault)
                         </div>
                         <div
-                            class="stat-value text-2xl text-success font-light"
+                            class="text-4xl font-light tracking-tighter text-base-content"
                         >
                             {vaultCount}
                         </div>
                     </div>
                     <div
-                        class="stat bg-base-200/30 rounded-xl border border-base-content/5 p-4"
+                        class="flex flex-col gap-1 p-2 border-l border-base-content/5 pl-8"
                     >
-                        <div class="stat-title text-xs">Drafts</div>
                         <div
-                            class="stat-value text-2xl text-warning font-light"
+                            class="text-sm font-medium text-base-content/40 flex items-center gap-2"
+                        >
+                            <div
+                                class="w-1.5 h-1.5 rounded-full bg-warning"
+                            ></div>
+                            Drafts
+                        </div>
+                        <div
+                            class="text-4xl font-light tracking-tighter text-base-content"
                         >
                             {draftsCount}
                         </div>
                     </div>
                     <div
-                        class="stat bg-base-200/30 rounded-xl border border-base-content/5 p-4"
+                        class="flex flex-col gap-1 p-2 border-l border-base-content/5 pl-8"
                     >
-                        <div class="stat-title text-xs">Total</div>
-                        <div class="stat-value text-2xl font-light">
+                        <div class="text-sm font-medium text-base-content/40">
+                            Total
+                        </div>
+                        <div
+                            class="text-4xl font-light tracking-tighter text-base-content"
+                        >
                             {totalCount}
                         </div>
                     </div>
                 </div>
 
                 <!-- Tabs -->
-                <div
-                    class="flex gap-2 border-b border-base-content/10 pb-px mb-6"
-                >
+                <div class="flex gap-2 mb-8">
                     {#each tabs as tab}
                         {@const isActive = activeTab === tab.id}
                         {@const count = getTabCount(tab.id)}
@@ -259,21 +268,21 @@
                         <!-- Dynamic class logic via conditional rendering or derived is preferred over complex template literals, 
                              but here keeping it simple as it's readable and local to the loop -->
                         <button
-                            class="flex items-center gap-2 px-4 py-3 text-sm font-medium transition-all border-b-2 -mb-px
+                            class="relative flex items-center gap-2 px-4 py-2 text-sm font-medium transition-all rounded-full
                             {isActive
-                                ? `${tab.color} border-current`
-                                : 'text-base-content/50 border-transparent hover:text-base-content'}"
+                                ? 'bg-base-content text-base-100 shadow-sm'
+                                : 'text-base-content/50 hover:bg-base-content/5 hover:text-base-content'}"
                             onclick={() => (activeTab = tab.id)}
                         >
                             <Icon class="w-4 h-4" />
                             {tab.label}
-                            <span
-                                class="badge badge-sm {isActive
-                                    ? tab.bgColor + ' ' + tab.color
-                                    : 'bg-base-content/10'}"
-                            >
-                                {count}
-                            </span>
+                            {#if count > 0}
+                                <span
+                                    class="ml-1 text-[10px] font-bold opacity-80"
+                                >
+                                    {count}
+                                </span>
+                            {/if}
                         </button>
                     {/each}
 
@@ -305,7 +314,7 @@
                             >
                                 {#snippet action()}
                                     <button
-                                        class="btn btn-primary gap-2"
+                                        class="btn btn-primary gap-2 transition-all active:scale-95"
                                         onclick={() =>
                                             walletStore.requestConnection()}
                                     >
@@ -348,7 +357,7 @@
                             >
                                 {#snippet action()}
                                     <button
-                                        class="btn btn-primary gap-2"
+                                        class="btn btn-primary gap-2 transition-all active:scale-95"
                                         onclick={() =>
                                             fetchOnChainContracts(true)}
                                     >
@@ -369,7 +378,7 @@
                                 {#snippet action()}
                                     {#if hasDrafts}
                                         <button
-                                            class="btn btn-primary gap-2"
+                                            class="btn btn-primary gap-2 transition-all active:scale-95"
                                             onclick={() =>
                                                 (activeTab = "drafts")}
                                         >
@@ -378,7 +387,7 @@
                                         </button>
                                     {:else}
                                         <button
-                                            class="btn btn-primary gap-2"
+                                            class="btn btn-primary gap-2 transition-all active:scale-95"
                                             onclick={() =>
                                                 goto("/wizard/step-0")}
                                         >
@@ -416,7 +425,7 @@
                             >
                                 {#snippet action()}
                                     <button
-                                        class="btn btn-primary gap-2"
+                                        class="btn btn-primary gap-2 transition-all active:scale-95"
                                         onclick={() => goto("/wizard/step-0")}
                                     >
                                         <Plus class="w-4 h-4" />

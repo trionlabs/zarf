@@ -3,7 +3,6 @@
     import {
         Rocket,
         Trash2,
-        Edit2,
         Copy,
         BarChart3,
         Users,
@@ -15,6 +14,8 @@
     } from "lucide-svelte";
     import { wizardStore } from "$lib/stores/wizardStore.svelte";
     import type { Distribution } from "$lib/stores/types";
+    import ZenCard from "$lib/components/ui/ZenCard.svelte";
+    import ZenButton from "$lib/components/ui/ZenButton.svelte";
 
     let {
         distribution,
@@ -79,12 +80,6 @@
         goto(`/wizard/deploy?id=${distribution.id}`);
     }
 
-    function handleEdit(e: Event) {
-        e.stopPropagation();
-        // TODO: Implement edit flow
-        console.log("Edit:", distribution.id);
-    }
-
     function handleDelete(e: Event) {
         e.stopPropagation();
         if (confirm(`Delete "${distribution.name}"? This cannot be undone.`)) {
@@ -126,14 +121,13 @@
     }
 </script>
 
-<div
-    class="w-full text-left card bg-base-100 border border-base-content/10 hover:shadow-lg transition-all duration-200 cursor-pointer {borderClass}"
+<ZenCard
     onclick={() => onSelect?.(distribution)}
     onkeydown={(e) => e.key === "Enter" && onSelect?.(distribution)}
     role="button"
-    tabindex="0"
+    tabindex={0}
 >
-    <div class="card-body p-5 space-y-4">
+    <div class="card-body p-6 space-y-5">
         <!-- Header -->
         <div class="flex items-start justify-between">
             <div class="flex items-center gap-3">
@@ -239,22 +233,10 @@
         >
             {#if variant === "draft"}
                 <!-- Use button type="button" to prevent form submission if inside a form, though not the case here -->
-                <button
-                    type="button"
-                    class="btn btn-sm btn-primary flex-1 gap-1.5"
-                    onclick={handleDeploy}
-                >
+                <ZenButton size="sm" class="flex-1" onclick={handleDeploy}>
                     <Rocket class="w-3.5 h-3.5" />
                     Deploy
-                </button>
-                <button
-                    type="button"
-                    class="btn btn-sm btn-ghost btn-square"
-                    onclick={handleEdit}
-                    title="Edit"
-                >
-                    <Edit2 class="w-4 h-4" />
-                </button>
+                </ZenButton>
                 <button
                     type="button"
                     class="btn btn-sm btn-ghost btn-square text-error/60 hover:text-error"
@@ -315,5 +297,5 @@
                 </button>
             {/if}
         </div>
-    </div>
-</div>
+    </div></ZenCard
+>

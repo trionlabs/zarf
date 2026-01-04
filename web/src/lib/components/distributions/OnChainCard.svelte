@@ -10,6 +10,7 @@
         Hourglass,
     } from "lucide-svelte";
     import type { OnChainVestingContract } from "$lib/services/distributionDiscovery";
+    import ZenCard from "$lib/components/ui/ZenCard.svelte";
 
     let {
         contract,
@@ -59,14 +60,13 @@
     }
 </script>
 
-<div
-    class="w-full text-left card bg-base-100 border border-base-content/10 hover:shadow-lg transition-all duration-200 cursor-pointer border-l-4 border-l-success"
+<ZenCard
     onclick={() => onSelect?.(contract)}
     onkeydown={(e) => e.key === "Enter" && onSelect?.(contract)}
     role="button"
-    tabindex="0"
+    tabindex={0}
 >
-    <div class="card-body p-5 space-y-4">
+    <div class="card-body p-6 space-y-5">
         <!-- Header -->
         <div class="flex items-start justify-between">
             <div class="flex items-center gap-3">
@@ -185,4 +185,4 @@
             </a>
         </div>
     </div>
-</div>
+</ZenCard>

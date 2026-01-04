@@ -208,7 +208,10 @@
     <!-- Footer Actions -->
     {#if currentState === "created"}
         <footer class="p-4 border-t border-base-content/5 space-y-2">
-            <button class="btn btn-primary w-full gap-2" onclick={handleDeploy}>
+            <button
+                class="btn btn-primary w-full gap-2 transition-all active:scale-95"
+                onclick={handleDeploy}
+            >
                 <Rocket class="w-4 h-4" />
                 Deploy Distribution
             </button>
