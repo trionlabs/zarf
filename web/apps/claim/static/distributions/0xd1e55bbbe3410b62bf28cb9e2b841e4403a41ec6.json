@@ -1,0 +1,302 @@
+{
+  "merkleRoot": "0x61528b883c565d16f194d9f51a8f68dfe2640f788ea16571631cf531861d8cb",
+  "schedule": {
+    "vestingStart": 1769644800,
+    "cliffDuration": 0,
+    "vestingDuration": 31104000,
+    "vestingPeriod": 2592000,
+    "totalPeriods": 12
+  },
+  "leaves": [
+    "0x2707db9016063bd8a304fc2faafc899dd247d5e92f848e1bf947a7c299eb3a2d",
+    "0x1dd0a84daff540b1d2d0881b9f09d40369fb44a8e1661491c5aa4c3fb11a90e3",
+    "0x1ce563e68d8a988891a7bec332faefcbd8710ea52159aef26a92ff628eed29f2",
+    "0x2abbc95fef01656a2160d021fedc531c16a8e2c2e85eeabcc4a87e1a09a3be9b",
+    "0x256d724293d25cbb33b6111b09989e4006eebbac12f0af4a13f7361c59ed0635",
+    "0x141b248957fd81e8943b5abdf094013b61eb18788cf0b0380bebeb02e4191ab3",
+    "0x28f73687ada09fd9868845e1b975d13b95c2e24a1e78afe9c5a1a99368d42130",
+    "0x2fae59546ef052baeea1d3485162e981bebaa529e723ba6f66f0b2900ca97cf6",
+    "0x11b5b93aedf280cf8bab13aff27a19d46161ee56344a3609bb4bd865df17bfc7",
+    "0x1aa12df365f3321db79a47e170e1bf97afe7484c67ffe85ae089084727eed0e7",
+    "0x2d1693d3815dd04a17146eb0db940bf10405cf45c28c3cdafe4cb8f6fc80264e",
+    "0x11939227139f93d8ba76312f858ec3ad4692563703b638d1cfae17300dda1b5d",
+    "0x2bd760bbc029d2121e7cd418f410cefa97a54464900a6cfedb332d7ed4905551",
+    "0x51f24e2953a95a806475cb2c1d318f75a86575c706d7ab178a6a8a629cbc09b",
+    "0x2a58e7ede8b042dae9bea6d0650b35ad11e371a1ac12276e329b86ecb5e7adc9",
+    "0x2c3ec36a65241addb6f8cdc1565573e08390c46b63a2deda5da4a5dbec9ab9dd",
+    "0x2c5a885865d403e73391fab8e72c18f079cffa672c9ca669f45c93bb1edcdd1b",
+    "0x2c20df30c8814757d103ecd802c02515bcab65ac4b3b7fe69a18c093c8bba7b9",
+    "0x2363c3d96bc09da28d0cf14ea66a1a321fbcfe83a4a421506946261ea8a5c9ef",
+    "0x1c3b302ae89d247a58a7c1f7add1c83edc6f98eb2cf8e460aa2a7b897944ae34",
+    "0xeb9d2621978615a996eb7e829ef6d4695f182ec3f29baf4a068f70fd7abf62c",
+    "0x30247e43ee9e8ef25b0ccec2f0c38b1ee07ef981f062b7ce1a258f980dcb1f9f",
+    "0x229a50949f9d92d78c872f79064fad9c0ceed660480fe126c712bc74336256a3",
+    "0x296e4e14a8c5f9bb997b528fcd3b1d3ba44aeae6e8056f50c844877acef16a3f",
+    "0x2ac3ac4bde81af9b36aa834fdd398ec3b530cb9345054d485cab4df556cb965f",
+    "0x1bf1aa8039b689f0867e764488224a213bce87e6666066237fef24b06376280e",
+    "0x12ee851efcc23851979c9fe733a4c23b83e6ad32c68e5ba252130c3814615b71",
+    "0x2343080eb81d58195fc723423972b347c9a3606232961d63c592367c49cbb337",
+    "0x2f7bce58a4f14afdcb5bfbed48f63bb18da05f23986e824a74c20af446c22741",
+    "0x2416dff65c9ced5dbbc2781feadb0a6372fff85b068bb20cef1c70338eac0a78",
+    "0x54cf857db40f0419c73df02562c32ed643cd5cf46629b208ac8a6788dc1e333",
+    "0x2d299ab38198283be72c01e3fc66500e010d9ca389e46616fbfe6d4b480b4546",
+    "0x26b12e90d499edcf812f2ca2743b2f414161e8c39158a5731d9c98d2484d37e6",
+    "0x6db9a45a7dd52b76c09b26200ff880efabf65a8c8d186ca6965df739e2b1cbd",
+    "0x10efb7c517d6a4fd09b0764e1d65c564d6d3f020f4f8e713610b0f7349ab66df",
+    "0x24b1b23934fdafd0d65a5383bb49ad237055bb8564d615b4e2fe4b3f81381352",
+    "0x1ec4c63b7f2c1f5bbff1d852f6181b362292ed2652bcfc1148f57459c9b5b9f7",
+    "0x2fe6e483710c9dac26facdecc74414ca7c967a4ece19e29b63246b1a30e7217d",
+    "0x901a6b34b017114374d6adc18893b88fa970c98dfcbc2cda8ddaef950650da",
+    "0x1606629818278d0602dfba9d67b3281efd1e7afb3da06f06769c913448434473",
+    "0xc3fdba651d1cc7aedc9b9808a266c1d5cba0e84777ac501aa569cea93cfae73",
+    "0x3983f9eefb6326f98bda29a00583cc4d96496a75fd2f4b7fcf6cb2fcee51eef",
+    "0x6a38dc40c9a31f3cabc7bb1a4ab0faa39d4841ee81aca6edd68d0f28e5d68d",
+    "0x2546d75cef4febd980d8d02bc2a140ad436613f5c16be26ff1fa5744cd56725e",
+    "0x1be89fb57568a20072b6baeb6aef491244bb5746c13c7e40fb5430facbea8e60",
+    "0x4b530dba13a4a181f70042889e5a9c41411e96cff88fd8c79f72bf0368f815b",
+    "0x22494567adea2ac9edbc8dba6cf862259c6d854772ea211ec8523af84a3614b1",
+    "0x213c69fdf4c9eb177fa83d3a3e67ebc17eb7d4e3de75459a0e60a42723d727fb"
+  ],
+  "commitments": {
+    "0xefb1bdfaf6b38994f1606f4e7860f63e57be4a5d54d0401ef6d40883b17f053": {
+      "amount": "8333333333333333334",
+      "unlockTime": 1769644800,
+      "index": 0
+    },
+    "0x20560fb83e773ad1b8f082f8271af885b2667bcdeda99f5b7228f70f5b025b10": {
+      "amount": "8333333333333333334",
+      "unlockTime": 1772236800,
+      "index": 1
+    },
+    "0x2b0ddec4f4180fc86a9220e5ddf376abaf6770b692861554247e6f4aaf49125e": {
+      "amount": "8333333333333333334",
+      "unlockTime": 1774828800,
+      "index": 2
+    },
+    "0x11ee7d4aca1c76d82fe990b82c19abf4f2d1e35e87a6edd7dc11c0974500af32": {
+      "amount": "8333333333333333334",
+      "unlockTime": 1777420800,
+      "index": 3
+    },
+    "0x21ae9c13b670f67c553c92cd28b6c730669a4931b2520e807ae5ee92e2fe9163": {
+      "amount": "8333333333333333333",
+      "unlockTime": 1780012800,
+      "index": 4
+    },
+    "0x17fa44e2c438dc650658403aca66bae33683804173da5a299bdb5a4b8a32d214": {
+      "amount": "8333333333333333333",
+      "unlockTime": 1782604800,
+      "index": 5
+    },
+    "0x3045f7bc35dc8823bea7275b5b0253c687cee261b8749b9671b456b8c919b090": {
+      "amount": "8333333333333333333",
+      "unlockTime": 1785196800,
+      "index": 6
+    },
+    "0x2876f791ab747c24bf929f3e0efbc746afa74422b987d2768007f2f49e646212": {
+      "amount": "8333333333333333333",
+      "unlockTime": 1787788800,
+      "index": 7
+    },
+    "0xb7c2523ccc24effad1623c2ddeb8fe074d2fa67ebc8482a4d95033e6f434a8c": {
+      "amount": "8333333333333333333",
+      "unlockTime": 1790380800,
+      "index": 8
+    },
+    "0x1b1bb0bffd46e6232b0de6d88292f7b0dd4a4d4c8e8b3d23f1a651fe1fee7689": {
+      "amount": "8333333333333333333",
+      "unlockTime": 1792972800,
+      "index": 9
+    },
+    "0x17d2582d181388c7ba1b088417157183b76234b88697f9192131f77540d5a7e0": {
+      "amount": "8333333333333333333",
+      "unlockTime": 1795564800,
+      "index": 10
+    },
+    "0x265d4be82fef1f89b6a9bd689b96676e0c00ed7924481716163c2908c7fa04a1": {
+      "amount": "8333333333333333333",
+      "unlockTime": 1798156800,
+      "index": 11
+    },
+    "0x99f1288e150bb15856bf6c451d3ddc8b8b971622a27c4502544fc10bd390ead": {
+      "amount": "8333333333333333334",
+      "unlockTime": 1769644800,
+      "index": 12
+    },
+    "0x14ace813cff2f5763f012e1c06cb58924284690da3b036a8dca2b5f466353158": {
+      "amount": "8333333333333333334",
+      "unlockTime": 1772236800,
+      "index": 13
+    },
+    "0x2084e8776c47e48fca782bc3b95960892dc0a140e45233643868a902c8151613": {
+      "amount": "8333333333333333334",
+      "unlockTime": 1774828800,
+      "index": 14
+    },
+    "0x2477d90c69f42881cd2fe5b68be6202424913e9333917e5c0526c84821327af": {
+      "amount": "8333333333333333334",
+      "unlockTime": 1777420800,
+      "index": 15
+    },
+    "0x2898b841e382d095ea3b8ad458dbdf82b102ca155a162d2562264bb49630bf71": {
+      "amount": "8333333333333333333",
+      "unlockTime": 1780012800,
+      "index": 16
+    },
+    "0x248d7d83ccbd11e09c2d06910e1f8b7825ee8071f419e0e2df5e7eed61b49161": {
+      "amount": "8333333333333333333",
+      "unlockTime": 1782604800,
+      "index": 17
+    },
+    "0x366f28f39c4ca15edd98cd8b718d2dd1fd82c9153fdf259808392ea807e04dd": {
+      "amount": "8333333333333333333",
+      "unlockTime": 1785196800,
+      "index": 18
+    },
+    "0x17f7eef1f8271c5aa53248ed45777c65051a065d9c6f1081dd7520443a334fc1": {
+      "amount": "8333333333333333333",
+      "unlockTime": 1787788800,
+      "index": 19
+    },
+    "0x896e1a55893e255bd272a05777798915399fc5707101e46e5d82361ea655658": {
+      "amount": "8333333333333333333",
+      "unlockTime": 1790380800,
+      "index": 20
+    },
+    "0x1157c013f8b48253ecad7d478cda5db159ddaad4ba8d8d1dc8b7fb4921f221e1": {
+      "amount": "8333333333333333333",
+      "unlockTime": 1792972800,
+      "index": 21
+    },
+    "0xcdb65c4100838d7548b1a6264949d69d6dd105adcf891f695dac1a563454467": {
+      "amount": "8333333333333333333",
+      "unlockTime": 1795564800,
+      "index": 22
+    },
+    "0x2f550e2f654f30fc68545db02a5a4845a8ba0b57de6fbddf26fd8a2cad57a61f": {
+      "amount": "8333333333333333333",
+      "unlockTime": 1798156800,
+      "index": 23
+    },
+    "0xc6ea2ff7832a4845ae0e5a199e34bd5e6a6296d6ce756bf8b05a6d52fee57e3": {
+      "amount": "8333333333333333334",
+      "unlockTime": 1769644800,
+      "index": 24
+    },
+    "0x1006028354872d5a6da4352aeba9d1d36b19a1c2d758e2460f3071a4894f365c": {
+      "amount": "8333333333333333334",
+      "unlockTime": 1772236800,
+      "index": 25
+    },
+    "0x2877cfbf1675df332d4db475d812b9cdd053cc0243ca9f2a8c95fdbf7f009346": {
+      "amount": "8333333333333333334",
+      "unlockTime": 1774828800,
+      "index": 26
+    },
+    "0x253cd0b87b5b258111ec4fec03c386fdf0d8a2d4cd0f41d9de8c32fda2822e33": {
+      "amount": "8333333333333333334",
+      "unlockTime": 1777420800,
+      "index": 27
+    },
+    "0x200b088c9d4647a46647ba4b2037d9f0c2c8622952569db87309df668845cdad": {
+      "amount": "8333333333333333333",
+      "unlockTime": 1780012800,
+      "index": 28
+    },
+    "0x7dccf87e4a6739bd9293c7ddbf63478da0f3981a5355af96f0511d61c94e9ce": {
+      "amount": "8333333333333333333",
+      "unlockTime": 1782604800,
+      "index": 29
+    },
+    "0xb8d0a160383ac54940d0e7bc759373cbefaaf53310970c3f15b450d8e91f468": {
+      "amount": "8333333333333333333",
+      "unlockTime": 1785196800,
+      "index": 30
+    },
+    "0x199eafbf6e03485f5daa3b6b619ef2b957bc13537523a6383f054d88fda639e3": {
+      "amount": "8333333333333333333",
+      "unlockTime": 1787788800,
+      "index": 31
+    },
+    "0xb46e49030b687ee3fef8278c88dbecf39cf59891b5fb768a8e97094fe4dbbe8": {
+      "amount": "8333333333333333333",
+      "unlockTime": 1790380800,
+      "index": 32
+    },
+    "0x257d7d7e551d6d1d0d9e74e8515bf08d66c3904da0675404705728a0f8087b3a": {
+      "amount": "8333333333333333333",
+      "unlockTime": 1792972800,
+      "index": 33
+    },
+    "0x22de2fac7751a2550e69abe0ed6b2b55c2e1a9dd9a3ed527f83bce6745c08b56": {
+      "amount": "8333333333333333333",
+      "unlockTime": 1795564800,
+      "index": 34
+    },
+    "0x1fac825fa61892f3553d22ab85ac7a6f93a848ae08b5aba13ac99dd748f5b660": {
+      "amount": "8333333333333333333",
+      "unlockTime": 1798156800,
+      "index": 35
+    },
+    "0x2203627b354897464064d4a3b9dc0e44842ec35a0f5f3ad94ebafaf4dcfca379": {
+      "amount": "8333333333333333334",
+      "unlockTime": 1769644800,
+      "index": 36
+    },
+    "0x16cf423212749319a577c5515f2690f0203fdb42ea2324af18293d39ff8f6573": {
+      "amount": "8333333333333333334",
+      "unlockTime": 1772236800,
+      "index": 37
+    },
+    "0x662a2350ae9cee55abe32b73f1accc53102f6d2a96d8ef5fac38d18ebf03f5": {
+      "amount": "8333333333333333334",
+      "unlockTime": 1774828800,
+      "index": 38
+    },
+    "0x2148d629c5bc8f9efebac521f9ed258f7d89b4e272ba87a14dda4269f9f02c08": {
+      "amount": "8333333333333333334",
+      "unlockTime": 1777420800,
+      "index": 39
+    },
+    "0x20e65a2c1d9f1e07950b5b9ea0e70d7522d23e4be3ad38e6ad755eab438546ca": {
+      "amount": "8333333333333333333",
+      "unlockTime": 1780012800,
+      "index": 40
+    },
+    "0x53009ab618c4a2499f7aa760d9d52b8416ce6387ca2cdca9ac9ae2e9bcaf85d": {
+      "amount": "8333333333333333333",
+      "unlockTime": 1782604800,
+      "index": 41
+    },
+    "0x2913d6fff2106d20d4240f87244ce1a77ce03f0ceb1cb734f4f74b8b11c9de7f": {
+      "amount": "8333333333333333333",
+      "unlockTime": 1785196800,
+      "index": 42
+    },
+    "0x1fa7d7760ed5447e9afb759bc7b0549bafffc830e00c0e4ba94754120a5bacc4": {
+      "amount": "8333333333333333333",
+      "unlockTime": 1787788800,
+      "index": 43
+    },
+    "0xf734856c83ab8132de6b2cc1f5d5dae780226383e8f9f61123296c9ddaf718b": {
+      "amount": "8333333333333333333",
+      "unlockTime": 1790380800,
+      "index": 44
+    },
+    "0x11089188bfb34ec7a85c1d865936a5d4c2025950c7eb08c8ea62bd3c4abfcb00": {
+      "amount": "8333333333333333333",
+      "unlockTime": 1792972800,
+      "index": 45
+    },
+    "0x9b85a1c0d1314e618e342b0864f8c01a81cbddcad43e5681f12202addfeca1b": {
+      "amount": "8333333333333333333",
+      "unlockTime": 1795564800,
+      "index": 46
+    },
+    "0x1e2742ea97d175c4f39c3c5a6c5415c267ca91af6c3f187d015715a33fc93059": {
+      "amount": "8333333333333333333",
+      "unlockTime": 1798156800,
+      "index": 47
+    }
+  }
+}

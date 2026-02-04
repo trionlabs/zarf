@@ -1,0 +1,29 @@
+{
+	"name": "@zarf/workspace",
+	"version": "0.0.1",
+	"packageManager": "pnpm@10.23.0",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"dev:landing": "pnpm --filter @zarf/landing dev",
+		"dev:create": "pnpm --filter @zarf/create dev",
+		"dev:claim": "pnpm --filter @zarf/claim dev",
+		"build": "pnpm build:all",
+		"build:landing": "pnpm --filter @zarf/landing build",
+		"build:create": "pnpm --filter @zarf/create build",
+		"build:claim": "pnpm --filter @zarf/claim build",
+		"build:all": "pnpm -r build",
+		"deploy:landing": "pnpm --filter @zarf/landing run deploy",
+		"deploy:create": "pnpm --filter @zarf/create run deploy",
+		"deploy:claim": "pnpm --filter @zarf/claim run deploy"
+	},
+	"pnpm": {
+		"overrides": {
+			"rollup": "npm:@rollup/wasm-node",
+			"buffer": "^6.0.3"
+		},
+		"onlyBuiltDependencies": [
+			"esbuild"
+		]
+	}
+}

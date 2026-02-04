@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+  <!-- Background: Dark rounded square -->
+  <rect width="32" height="32" rx="8" fill="#0a0a0a"/>
+  
+  <!-- Lightning bolt icon (Zap) centered -->
+  <path 
+    d="M17.5 6L10 17h5.5l-1 9 7.5-11h-5.5l1-9z" 
+    fill="white"
+    stroke="white"
+    stroke-width="0.5"
+    stroke-linejoin="round"
+  />
+  
+  <!-- Subtle inner glow -->
+  <rect width="32" height="32" rx="8" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="1"/>
+</svg>

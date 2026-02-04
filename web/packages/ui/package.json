@@ -1,0 +1,26 @@
+{
+    "name": "@zarf/ui",
+    "version": "0.0.1",
+    "private": true,
+    "type": "module",
+    "exports": {
+        "./components/*": "./lib/components/*",
+        "./stores/*": "./lib/stores/*",
+        "./utils/*": "./lib/utils/*",
+        "./actions/*": "./lib/actions/*",
+        "./styles/*": "./lib/styles/*",
+        "./types": "./lib/types.ts"
+    },
+    "peerDependencies": {
+        "svelte": "^5.0.0"
+    },
+    "dependencies": {
+        "@wagmi/core": "^3.3.1",
+        "@zarf/core": "workspace:*",
+        "buffer": "^6.0.3",
+        "clsx": "^2.1.1",
+        "lucide-svelte": "^0.563.0",
+        "tailwind-merge": "^3.4.0",
+        "viem": "^2.45.0"
+    }
+}

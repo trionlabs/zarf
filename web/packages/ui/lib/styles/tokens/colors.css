@@ -1,0 +1,255 @@
+/*
+  ZEN DESIGN SYSTEM - COLOR TOKENS
+  Semantic color tokens using oklch() for perceptual consistency.
+
+  IMPORTANT: Fallback values are provided for SSR/initial render before
+  data-theme is applied by JavaScript. Default fallbacks use dark theme values.
+*/
+
+:root {
+  /* === BASE THEME VALUES (Fallbacks for SSR) === */
+  /* Dark theme fallbacks - smoky fume palette */
+  --color-base-100: #121212;
+  --color-base-200: oklch(18% 0.005 280);
+  --color-base-300: oklch(22% 0.005 280);
+  --color-base-content: oklch(90% 0.01 260);
+  --color-primary: oklch(88% 0.01 260);
+  --color-primary-content: oklch(15% 0.02 260);
+  --color-secondary: oklch(35% 0 0);
+  --color-secondary-content: oklch(90% 0 0);
+  --color-accent: oklch(85% 0 0);
+  --color-accent-content: oklch(10% 0 0);
+  --color-neutral: oklch(25% 0 0);
+  --color-neutral-content: oklch(85% 0 0);
+  --color-info: oklch(85% 0.03 240);
+  --color-success: oklch(90% 0.03 150);
+  --color-warning: oklch(88% 0.03 95);
+  --color-error: oklch(85% 0.04 20);
+
+  /* === SEMANTIC TOKENS === */
+  /* Base colors - derived from theme */
+  --zen-bg: var(--color-base-100);
+  --zen-bg-elevated: var(--color-base-200);  /* Cards/surfaces - white in light, lighter in dark */
+  --zen-bg-sunken: var(--color-base-300);
+
+  /* Foreground colors with opacity variants */
+  --zen-fg: var(--color-base-content);
+  --zen-fg-muted: oklch(from var(--zen-fg) l c h / 0.72);
+  --zen-fg-subtle: oklch(from var(--zen-fg) l c h / 0.55);
+  --zen-fg-faint: oklch(from var(--zen-fg) l c h / 0.35);
+
+  /* Border colors - refined for 0.5px borders */
+  --zen-border: oklch(from var(--zen-fg) l c h / 0.12);
+  --zen-border-subtle: oklch(from var(--zen-fg) l c h / 0.06);
+  --zen-border-strong: oklch(from var(--zen-fg) l c h / 0.18);
+
+  /* Primary action color */
+  --zen-primary: var(--color-primary);
+  --zen-primary-content: var(--color-primary-content);
+  --zen-primary-hover: oklch(from var(--zen-primary) calc(l * 0.9) c h);
+  --zen-primary-muted: oklch(from var(--zen-primary) l c h / 0.1);
+
+  /* Secondary color */
+  --zen-secondary: var(--color-secondary);
+  --zen-secondary-content: var(--color-secondary-content);
+
+  /* Accent color */
+  --zen-accent: var(--color-accent);
+  --zen-accent-content: var(--color-accent-content);
+
+  /* Status colors - Base values from theme
+     -muted and -content are theme-aware (defined in dark.css/light.css)
+     Fallbacks here are for SSR (dark mode default) */
+  --zen-success: var(--color-success);
+  --zen-success-muted: oklch(25% 0.04 155);               /* SSR fallback (dark) */
+  --zen-success-content: oklch(80% 0.12 155);             /* SSR fallback (dark) */
+
+  --zen-warning: var(--color-warning);
+  --zen-warning-muted: oklch(25% 0.04 85);                /* SSR fallback (dark) */
+  --zen-warning-content: oklch(85% 0.12 85);              /* SSR fallback (dark) */
+
+  --zen-error: var(--color-error);
+  --zen-error-muted: oklch(25% 0.04 25);                  /* SSR fallback (dark) */
+  --zen-error-content: oklch(85% 0.10 25);                /* SSR fallback (dark) */
+
+  --zen-info: var(--color-info);
+  --zen-info-muted: oklch(25% 0.04 250);                  /* SSR fallback (dark) */
+  --zen-info-content: oklch(80% 0.10 250);                /* SSR fallback (dark) */
+
+  /* Highlight colors for avatar/accent states */
+  --zen-highlight-bg: oklch(95% 0.02 80);
+  --zen-highlight-fg: oklch(60% 0.08 80);
+
+  /* Glass effect colors */
+  --zen-glass-bg: oklch(from var(--zen-bg) l c h / 0.7);
+  --zen-glass-border: oklch(from var(--zen-fg) l c h / 0.06);
+
+  /* ===========================================
+     BUTTON COLOR TOKENS - "Porcelain & Precision"
+
+     SSR Fallbacks using dark theme values.
+     Actual theme values defined in:
+     - themes/dark.css (Porcelain on Charcoal)
+     - themes/light.css (Charcoal on Silver)
+
+     State Matrix Philosophy:
+     - Idle: Dimmed/muted for elegant rest state
+     - Hover: Full expression (+10% L shift, glowing border)
+     - Active: Pressed depth (inset shadow, maintained color)
+
+     No scale/translate transforms. Color shifts only.
+     =========================================== */
+
+  /* Primary Button - Porcelain surface, charcoal text
+     Idle 82% L → Hover 92% L (+10%) → Active 78% L
+     Border: LIGHTER than surface in dark mode (inner glow)
+     Solid colors only, NO opacity */
+  --zen-btn-primary-bg: oklch(82% 0.008 260);
+  --zen-btn-primary-bg-hover: oklch(92% 0.012 260);
+  --zen-btn-primary-bg-active: oklch(78% 0.01 260);
+  --zen-btn-primary-border: oklch(92% 0.006 260);
+  --zen-btn-primary-border-hover: oklch(100% 0.015 260);
+  --zen-btn-primary-border-active: oklch(85% 0.008 260);
+  --zen-btn-primary-text: oklch(25% 0.008 260);
+  --zen-btn-primary-text-hover: oklch(15% 0.01 260);
+
+  /* Secondary Button - Transparent, bordered
+     Solid border colors using lightness */
+  --zen-btn-secondary-bg: transparent;
+  --zen-btn-secondary-bg-hover: oklch(25% 0.005 260);
+  --zen-btn-secondary-bg-active: oklch(28% 0.006 260);
+  --zen-btn-secondary-border: oklch(35% 0.006 260);
+  --zen-btn-secondary-border-hover: oklch(55% 0.008 260);
+  --zen-btn-secondary-border-active: oklch(45% 0.007 260);
+  --zen-btn-secondary-text: oklch(72% 0.008 260);
+  --zen-btn-secondary-text-hover: oklch(90% 0.01 260);
+
+  /* Ghost Button - Minimal, borderless
+     Solid bg colors on hover */
+  --zen-btn-ghost-bg: transparent;
+  --zen-btn-ghost-bg-hover: oklch(22% 0.004 260);
+  --zen-btn-ghost-bg-active: oklch(25% 0.005 260);
+  --zen-btn-ghost-text: oklch(55% 0.006 260);
+  --zen-btn-ghost-text-hover: oklch(72% 0.008 260);
+
+  /* Danger Button - Error-colored, destructive
+     Solid colors throughout */
+  --zen-btn-danger-bg: transparent;
+  --zen-btn-danger-bg-hover: oklch(25% 0.02 20);
+  --zen-btn-danger-bg-active: oklch(28% 0.025 20);
+  --zen-btn-danger-border: oklch(45% 0.08 20);
+  --zen-btn-danger-border-hover: oklch(60% 0.12 20);
+  --zen-btn-danger-border-active: oklch(50% 0.10 20);
+  --zen-btn-danger-text: oklch(70% 0.08 20);
+  --zen-btn-danger-text-hover: oklch(80% 0.12 20);
+}
+
+@theme {
+  /* DaisyUI compatibility tokens */
+  --color-base-100: var(--color-base-100);
+  --color-base-200: var(--color-base-200);
+  --color-base-300: var(--color-base-300);
+  --color-base-content: var(--color-base-content);
+
+  --color-primary: var(--color-primary);
+  --color-primary-content: var(--color-primary-content);
+
+  --color-secondary: var(--color-secondary);
+  --color-secondary-content: var(--color-secondary-content);
+
+  --color-accent: var(--color-accent);
+  --color-accent-content: var(--color-accent-content);
+
+  --color-neutral: var(--color-neutral);
+  --color-neutral-content: var(--color-neutral-content);
+
+  --color-info: var(--color-info);
+  --color-success: var(--color-success);
+  --color-warning: var(--color-warning);
+  --color-error: var(--color-error);
+
+  /* Register tokens as Tailwind colors */
+  --color-zen-bg: var(--zen-bg);
+  --color-zen-bg-elevated: var(--zen-bg-elevated);
+  --color-zen-bg-sunken: var(--zen-bg-sunken);
+
+  --color-zen-fg: var(--zen-fg);
+  --color-zen-fg-muted: var(--zen-fg-muted);
+  --color-zen-fg-subtle: var(--zen-fg-subtle);
+  --color-zen-fg-faint: var(--zen-fg-faint);
+
+  --color-zen-border: var(--zen-border);
+  --color-zen-border-subtle: var(--zen-border-subtle);
+  --color-zen-border-strong: var(--zen-border-strong);
+
+  --color-zen-primary: var(--zen-primary);
+  --color-zen-primary-content: var(--zen-primary-content);
+  --color-zen-primary-hover: var(--zen-primary-hover);
+  --color-zen-primary-muted: var(--zen-primary-muted);
+
+  --color-zen-secondary: var(--zen-secondary);
+  --color-zen-secondary-content: var(--zen-secondary-content);
+
+  --color-zen-accent: var(--zen-accent);
+  --color-zen-accent-content: var(--zen-accent-content);
+
+  --color-zen-success: var(--zen-success);
+  --color-zen-success-muted: var(--zen-success-muted);
+  --color-zen-success-content: var(--zen-success-content);
+
+  --color-zen-warning: var(--zen-warning);
+  --color-zen-warning-muted: var(--zen-warning-muted);
+  --color-zen-warning-content: var(--zen-warning-content);
+
+  --color-zen-error: var(--zen-error);
+  --color-zen-error-muted: var(--zen-error-muted);
+  --color-zen-error-content: var(--zen-error-content);
+
+  --color-zen-info: var(--zen-info);
+  --color-zen-info-muted: var(--zen-info-muted);
+  --color-zen-info-content: var(--zen-info-content);
+
+  --color-zen-highlight-bg: var(--zen-highlight-bg);
+  --color-zen-highlight-fg: var(--zen-highlight-fg);
+
+  --color-zen-glass-bg: var(--zen-glass-bg);
+  --color-zen-glass-border: var(--zen-glass-border);
+
+  /* Button color tokens for Tailwind */
+  /* Primary */
+  --color-zen-btn-primary-bg: var(--zen-btn-primary-bg);
+  --color-zen-btn-primary-bg-hover: var(--zen-btn-primary-bg-hover);
+  --color-zen-btn-primary-bg-active: var(--zen-btn-primary-bg-active);
+  --color-zen-btn-primary-border: var(--zen-btn-primary-border);
+  --color-zen-btn-primary-border-hover: var(--zen-btn-primary-border-hover);
+  --color-zen-btn-primary-border-active: var(--zen-btn-primary-border-active);
+  --color-zen-btn-primary-text: var(--zen-btn-primary-text);
+  --color-zen-btn-primary-text-hover: var(--zen-btn-primary-text-hover);
+
+  /* Secondary */
+  --color-zen-btn-secondary-bg: var(--zen-btn-secondary-bg);
+  --color-zen-btn-secondary-bg-hover: var(--zen-btn-secondary-bg-hover);
+  --color-zen-btn-secondary-bg-active: var(--zen-btn-secondary-bg-active);
+  --color-zen-btn-secondary-border: var(--zen-btn-secondary-border);
+  --color-zen-btn-secondary-border-hover: var(--zen-btn-secondary-border-hover);
+  --color-zen-btn-secondary-border-active: var(--zen-btn-secondary-border-active);
+  --color-zen-btn-secondary-text: var(--zen-btn-secondary-text);
+  --color-zen-btn-secondary-text-hover: var(--zen-btn-secondary-text-hover);
+
+  /* Ghost */
+  --color-zen-btn-ghost-bg: var(--zen-btn-ghost-bg);
+  --color-zen-btn-ghost-bg-hover: var(--zen-btn-ghost-bg-hover);
+  --color-zen-btn-ghost-bg-active: var(--zen-btn-ghost-bg-active);
+  --color-zen-btn-ghost-text: var(--zen-btn-ghost-text);
+  --color-zen-btn-ghost-text-hover: var(--zen-btn-ghost-text-hover);
+
+  /* Danger */
+  --color-zen-btn-danger-bg: var(--zen-btn-danger-bg);
+  --color-zen-btn-danger-bg-hover: var(--zen-btn-danger-bg-hover);
+  --color-zen-btn-danger-bg-active: var(--zen-btn-danger-bg-active);
+  --color-zen-btn-danger-border: var(--zen-btn-danger-border);
+  --color-zen-btn-danger-border-hover: var(--zen-btn-danger-border-hover);
+  --color-zen-btn-danger-border-active: var(--zen-btn-danger-border-active);
+  --color-zen-btn-danger-text: var(--zen-btn-danger-text);
+  --color-zen-btn-danger-text-hover: var(--zen-btn-danger-text-hover);
+}

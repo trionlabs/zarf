@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en" data-theme="glass-porcelain">
+
+<head>
+	<meta charset="utf-8" />
+	<link rel="icon" href="%sveltekit.assets%/favicon.svg" />
+	<meta name="viewport" content="width=device-width, initial-scale=1" />
+	<meta name="theme-color" content="#000000" />
+	<link rel="preconnect" href="https://fonts.googleapis.com">
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+	<link
+		href="https://fonts.googleapis.com/css2?family=Saira:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap"
+		rel="stylesheet">
+
+	<!-- Blocking script to prevent theme flash during hydration -->
+	<script>
+		(function () {
+			try {
+				var stored = localStorage.getItem('zarf_theme');
+				var theme = 'dark'; // Updated match for ThemeStore
+
+				if (stored === 'light' || stored === 'dark') {
+					theme = stored;
+				} else {
+					localStorage.setItem('zarf_theme', 'dark');
+				}
+
+				// Map to specific DaisyUI themes
+				var daisyTheme = theme === 'light' ? 'paper-porcelain' : 'glass-porcelain';
+				document.documentElement.setAttribute('data-theme', daisyTheme);
+			} catch (e) { }
+		})();
+	</script>
+
+	%sveltekit.head%
+</head>
+
+<body data-sveltekit-preload-data="hover">
+	<div style="display: contents">%sveltekit.body%</div>
+</body>
+
+</html>

@@ -1,0 +1,23 @@
+/*
+  ZEN DESIGN SYSTEM - RADIUS TOKENS
+  Standardized border radius scale.
+*/
+
+:root {
+  --zen-radius-none: 0;
+  --zen-radius-sm: 0.375rem;   /* 6px - badges, small elements */
+  --zen-radius-md: 0.5rem;     /* 8px - inputs */
+  --zen-radius-lg: 0.75rem;    /* 12px - buttons */
+  --zen-radius-xl: 1rem;       /* 16px - small cards */
+  --zen-radius-2xl: 1.5rem;    /* 24px - cards */
+  --zen-radius-3xl: 2rem;      /* 32px - feature cards */
+  --zen-radius-full: 9999px;   /* pills, avatars */
+
+  /* Semantic radius */
+  --zen-radius-button: var(--zen-radius-full);
+  --zen-radius-input: var(--zen-radius-lg);
+  --zen-radius-card: var(--zen-radius-2xl);
+  --zen-radius-modal: var(--zen-radius-2xl);
+  --zen-radius-badge: var(--zen-radius-sm);
+  --zen-radius-avatar: var(--zen-radius-full);
+}

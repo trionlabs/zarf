@@ -1,0 +1,21 @@
+{
+  "markdownlint.config": {
+    "MD025": false,
+    "MD033": false,
+    "MD040": false,
+    "MD007": false,
+    "MD022": false,
+    "MD032": false,
+    "MD012": false,
+    "MD024": false,
+    "MD035": false,
+    "MD034": false,
+    "MD031": false,
+    "MD047": false
+  },
+  "markdownlint.enabled": false,
+  "fileFiltering": {
+    "respectGitIgnore": false,
+    "enableRecursiveFileSearch": false
+  }
+}

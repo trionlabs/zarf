@@ -1,0 +1,212 @@
+/*
+  ZEN DESIGN SYSTEM - LIGHT THEME (Paper Porcelain)
+  Cool silver background with pure white cards.
+  Minimal, clean, with refined depth.
+*/
+
+[data-theme="paper-porcelain"],
+[data-theme="light"] {
+  /* Base colors - Silver bg, white cards */
+  --color-base-100: #F8F8FA;
+  /* rgb(248,248,250) - main bg */
+  --color-base-200: #FFFFFF;
+  /* Pure white - card surfaces */
+  --color-base-300: #F2F2F5;
+  /* Slightly darker for depth */
+  --color-base-content: #211E23;
+  /* rgb(33,30,35) - text */
+
+  /* Primary: Deep Cool Charcoal (Hue 290) */
+  --color-primary: oklch(15% 0.02 290);
+  --color-primary-content: #FFFFFF;
+
+  /* Secondary: Silver mist */
+  --color-secondary: oklch(88% 0.004 290);
+  --color-secondary-content: #211E23;
+
+  /* Accent: Subtle cool grey */
+  --color-accent: oklch(45% 0.015 290);
+  --color-accent-content: #FFFFFF;
+
+  /* Neutral: Cool grey */
+  --color-neutral: oklch(92% 0.004 290);
+  --color-neutral-content: #211E23;
+
+  /* Semantic Colors - Refined & Cool */
+  --color-info: oklch(55% 0.12 250);
+  --color-success: oklch(60% 0.14 155);
+  --color-warning: oklch(65% 0.14 85);
+  --color-error: oklch(55% 0.16 25);
+
+  /* Background - Cool silver */
+  background: #F8F8FA;
+  background-color: #F8F8FA;
+  min-height: 100vh;
+
+  /* Glass effect variables - white glass on silver bg */
+  --zen-glass-blur: 20px;
+  --zen-glass-bg-opacity: 0.92;
+  --zen-glass-border-opacity: 0.08;
+
+  /* ===========================================
+     BUTTON TOKENS - "Porcelain & Precision" Light Mode
+
+     Philosophy: Deep, solid, high-contrast with self-colored rims.
+     Charcoal buttons on silver background.
+
+     Base: --zen-fg = oklch(22% 0.01 290) = Deep Cool Charcoal
+           --zen-bg = oklch(98% 0.003 290) = Cool Silver
+
+     State shifts use lightness modulation (no scale/translate).
+     =========================================== */
+
+  /* Primary Button - Dramatic hover shift
+     Surface: Idle 28% → Hover 18% (-10% L) → Active 12% (pressed deep)
+     Border: Self-colored rim - DARKER than surface in light mode */
+  --zen-btn-primary-bg: oklch(28% 0.008 290);             /* Slightly lifted idle */
+  --zen-btn-primary-bg-hover: oklch(18% 0.012 290);       /* Deep hover (-10% L) */
+  --zen-btn-primary-bg-active: oklch(12% 0.01 290);       /* Pressed deep */
+  --zen-btn-primary-border: oklch(18% 0.006 290);         /* Darker rim (darker than surface) */
+  --zen-btn-primary-border-hover: oklch(5% 0.015 290);    /* Very dark strong rim */
+  --zen-btn-primary-border-active: oklch(8% 0.008 290);   /* Dark pressed rim */
+  --zen-btn-primary-text: oklch(95% 0.003 290);           /* Slightly muted white */
+  --zen-btn-primary-text-hover: oklch(100% 0.002 290);    /* Pure white on hover */
+
+  /* Secondary Button - Transparent with visible border
+     Border: Solid colors using lightness for visibility */
+  --zen-btn-secondary-bg: transparent;
+  --zen-btn-secondary-bg-hover: oklch(92% 0.005 290);     /* Subtle fill */
+  --zen-btn-secondary-bg-active: oklch(88% 0.006 290);    /* Slightly more fill */
+  --zen-btn-secondary-border: oklch(75% 0.006 290);       /* Visible against light bg */
+  --zen-btn-secondary-border-hover: oklch(45% 0.008 290); /* Darker on hover */
+  --zen-btn-secondary-border-active: oklch(60% 0.007 290);/* Mid darkness */
+  --zen-btn-secondary-text: oklch(45% 0.008 290);         /* Muted charcoal */
+  --zen-btn-secondary-text-hover: oklch(22% 0.01 290);    /* Full charcoal */
+
+  /* Ghost Button - Minimal, high-frequency actions
+     No border, subtle bg on hover */
+  --zen-btn-ghost-bg: transparent;
+  --zen-btn-ghost-bg-hover: oklch(92% 0.004 290);         /* Very subtle fill */
+  --zen-btn-ghost-bg-active: oklch(88% 0.005 290);        /* Slightly more fill */
+  --zen-btn-ghost-text: oklch(60% 0.006 290);             /* Faint (low contrast) */
+  --zen-btn-ghost-text-hover: oklch(45% 0.008 290);       /* Muted (visible) */
+
+  /* Danger Button - Destructive actions
+     Error color border, solid colors */
+  --zen-btn-danger-bg: transparent;
+  --zen-btn-danger-bg-hover: oklch(92% 0.04 25);          /* Subtle error fill */
+  --zen-btn-danger-bg-active: oklch(88% 0.05 25);         /* Slightly more fill */
+  --zen-btn-danger-border: oklch(65% 0.12 25);            /* Visible error border */
+  --zen-btn-danger-border-hover: oklch(50% 0.16 25);      /* Darker error */
+  --zen-btn-danger-border-active: oklch(55% 0.14 25);     /* Mid error */
+  --zen-btn-danger-text: oklch(50% 0.14 25);              /* Error muted */
+  --zen-btn-danger-text-hover: oklch(45% 0.16 25);        /* Error full (darker) */
+
+  /* ===========================================
+     SEMANTIC STATUS COLORS - Light Mode
+
+     Light mode uses standard logic:
+     - muted bg: light, subtle tint
+     - content text: dark, saturated (readable on light bg)
+     =========================================== */
+
+  /* Success - Green tones (Hue ~155) */
+  --zen-success-muted: oklch(95% 0.03 155);               /* Light green bg */
+  --zen-success-content: oklch(35% 0.12 155);             /* Dark green text */
+
+  /* Warning - Amber tones (Hue ~85) */
+  --zen-warning-muted: oklch(95% 0.04 85);                /* Light amber bg */
+  --zen-warning-content: oklch(35% 0.14 85);              /* Dark amber text */
+
+  /* Error - Red tones (Hue ~25) */
+  --zen-error-muted: oklch(95% 0.03 25);                  /* Light red bg */
+  --zen-error-content: oklch(40% 0.14 25);                /* Dark red text */
+
+  /* Info - Blue tones (Hue ~250) */
+  --zen-info-muted: oklch(95% 0.03 250);                  /* Light blue bg */
+  --zen-info-content: oklch(40% 0.12 250);                /* Dark blue text */
+
+  /* Grain overlay opacity - barely visible */
+  --zen-grain-opacity: 0.03;
+
+  /* Light mode highlight adjustments */
+  --zen-highlight-bg: oklch(96% 0.008 80);
+  --zen-highlight-fg: oklch(45% 0.06 80);
+
+  /* Light mode shadows - layered, cool-tinted, refined */
+  --zen-shadow-xs:
+    0 1px 2px 0 oklch(22% 0.01 290 / 0.04);
+
+  --zen-shadow-sm:
+    0 1px 2px 0 oklch(22% 0.01 290 / 0.03),
+    0 2px 4px 0 oklch(22% 0.01 290 / 0.03);
+
+  --zen-shadow-md:
+    0 1px 2px 0 oklch(22% 0.01 290 / 0.02),
+    0 2px 4px 0 oklch(22% 0.01 290 / 0.02),
+    0 4px 8px -2px oklch(22% 0.01 290 / 0.04);
+
+  --zen-shadow-lg:
+    0 1px 2px 0 oklch(22% 0.01 290 / 0.02),
+    0 4px 8px -2px oklch(22% 0.01 290 / 0.03),
+    0 12px 24px -4px oklch(22% 0.01 290 / 0.06);
+
+  --zen-shadow-xl:
+    0 2px 4px 0 oklch(22% 0.01 290 / 0.02),
+    0 8px 16px -4px oklch(22% 0.01 290 / 0.04),
+    0 20px 40px -8px oklch(22% 0.01 290 / 0.08);
+
+  --zen-shadow-elevated:
+    0 1px 2px 0 oklch(22% 0.01 290 / 0.02),
+    0 4px 8px -2px oklch(22% 0.01 290 / 0.03),
+    0 8px 20px -4px oklch(22% 0.01 290 / 0.06);
+
+  --zen-shadow-glass:
+    0 1px 2px 0 oklch(22% 0.01 290 / 0.02),
+    0 2px 6px -1px oklch(22% 0.01 290 / 0.03);
+
+  /* Scrollbar */
+  scrollbar-color: oklch(50% 0.01 290 / 0.20) transparent;
+}
+
+/* Light theme specific overrides */
+[data-theme="paper-porcelain"] .grain-overlay,
+[data-theme="light"] .grain-overlay {
+  mix-blend-mode: multiply;
+  filter: brightness(1.1) contrast(1.1);
+}
+
+[data-theme="paper-porcelain"] .grid-overlay,
+[data-theme="light"] .grid-overlay {
+  --grid-line-color: oklch(22% 0.01 290 / 0.03);
+  opacity: 0.5;
+}
+
+/* Scrollbar styling */
+[data-theme="paper-porcelain"]::-webkit-scrollbar,
+[data-theme="light"]::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+[data-theme="paper-porcelain"]::-webkit-scrollbar-track,
+[data-theme="light"]::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+[data-theme="paper-porcelain"]::-webkit-scrollbar-thumb,
+[data-theme="light"]::-webkit-scrollbar-thumb {
+  background: oklch(60% 0.01 290 / 0.20);
+  border-radius: 10px;
+  transition: background 0.3s;
+}
+
+[data-theme="paper-porcelain"]::-webkit-scrollbar-thumb:hover,
+[data-theme="light"]::-webkit-scrollbar-thumb:hover {
+  background: oklch(50% 0.01 290 / 0.30);
+}
+
+[data-theme="paper-porcelain"]::-webkit-scrollbar-corner,
+[data-theme="light"]::-webkit-scrollbar-corner {
+  background: transparent;
+}

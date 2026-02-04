@@ -1,0 +1,49 @@
+{
+    "name": "@zarf/claim",
+    "version": "0.0.1",
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "dev": "vite dev --port 5175",
+        "build": "vite build",
+        "preview": "vite preview",
+        "prepare": "svelte-kit sync || echo ''",
+        "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+        "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
+        "deploy": "vite build && wrangler deploy"
+    },
+    "devDependencies": {
+        "@sveltejs/adapter-auto": "^7.0.0",
+        "@sveltejs/adapter-cloudflare": "^7.2.6",
+        "@sveltejs/kit": "^2.50.1",
+        "@sveltejs/vite-plugin-svelte": "^6.2.4",
+        "@tailwindcss/vite": "^4.1.18",
+        "svelte": "^5.48.5",
+        "svelte-check": "^4.3.5",
+        "tailwindcss": "^4.1.18",
+        "typescript": "^5.9.3",
+        "vite": "^7.3.1",
+        "vite-plugin-node-polyfills": "^0.25.0",
+        "vite-plugin-static-copy": "^3.2.0",
+        "vite-plugin-top-level-await": "^1.6.0",
+        "vite-plugin-wasm": "^3.5.0",
+        "wrangler": "^4.61.0"
+    },
+    "dependencies": {
+        "@aztec/bb.js": "^2.1.11",
+        "@noir-lang/acvm_js": "1.0.0-beta.18",
+        "@noir-lang/noir_js": "1.0.0-beta.18",
+        "@noir-lang/noirc_abi": "1.0.0-beta.18",
+        "@wagmi/connectors": "^7.1.5",
+        "@wagmi/core": "^3.3.1",
+        "@zarf/core": "workspace:*",
+        "@zarf/ui": "workspace:*",
+        "buffer": "^6.0.3",
+        "clsx": "^2.1.1",
+        "lucide-svelte": "^0.563.0",
+        "noir-jwt": "^0.4.5",
+        "tailwind-merge": "^3.4.0",
+        "viem": "^2.45.0",
+        "wagmi": "^3.4.1"
+    }
+}

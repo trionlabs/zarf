@@ -1,0 +1,207 @@
+/*
+  ZEN DESIGN SYSTEM - DARK THEME (Glass Porcelain)
+  Dark Fume/Soot + Grain + Glass aesthetic.
+  Smoky, muted, broken colors.
+*/
+
+[data-theme="glass-porcelain"],
+[data-theme="dark"] {
+  /* Base colors - Smoky fume palette */
+  --color-base-100: #121212;
+  /* Deep fume background */
+  --color-base-200: oklch(18% 0.005 280);
+  /* Card surfaces - lighter fume */
+  --color-base-300: oklch(22% 0.005 280);
+  /* Elevated surfaces */
+  --color-base-content: oklch(90% 0.01 260);
+  /* Soft white text */
+
+  /* Primary: Soft light for dark mode (Hue 280 aligned) */
+  --color-primary: oklch(90% 0.01 280);
+  --color-primary-content: oklch(15% 0.02 280);
+
+  /* Secondary - Muted */
+  --color-secondary: oklch(35% 0 0);
+  --color-secondary-content: oklch(90% 0 0);
+
+  /* Accent - Broken white */
+  --color-accent: oklch(85% 0 0);
+  --color-accent-content: oklch(10% 0 0);
+
+  /* Neutral - Pure grey */
+  --color-neutral: oklch(25% 0 0);
+  --color-neutral-content: oklch(85% 0 0);
+
+  /* Semantic Colors - Muted/broken */
+  --color-info: oklch(85% 0.03 240);
+  --color-success: oklch(90% 0.03 150);
+  --color-warning: oklch(88% 0.03 95);
+  --color-error: oklch(85% 0.04 20);
+
+  /* Background - Deep fume */
+  background: #121212;
+  background-color: #121212;
+  min-height: 100vh;
+
+  /* Glass effect variables - smoky glass */
+  --zen-glass-blur: 24px;
+  --zen-glass-bg-opacity: 0.70;
+  --zen-glass-border-opacity: 0.08;
+
+  /* ===========================================
+     BUTTON TOKENS - "Porcelain & Precision" Dark Mode
+
+     Philosophy: Glazed ceramic feel. Dimmed at rest, "glow" solid on interaction.
+     Porcelain buttons on deep charcoal background.
+
+     Base: --zen-fg = oklch(90% 0.01 260) = Smoky Porcelain
+           --zen-bg = #121212 = Deep Fume/Charcoal
+
+     State shifts use lightness modulation (no scale/translate).
+     =========================================== */
+
+  /* Primary Button - Dramatic hover shift
+     Surface: Idle 82% → Hover 92% (+10% L, "glow") → Active 78% (pressed)
+     Border: Self-colored rim - LIGHTER than surface in dark mode */
+  --zen-btn-primary-bg: oklch(82% 0.008 260);             /* Dimmed porcelain idle */
+  --zen-btn-primary-bg-hover: oklch(92% 0.012 260);       /* Bright glow (+10% L) */
+  --zen-btn-primary-bg-active: oklch(78% 0.01 260);       /* Pressed depth */
+  --zen-btn-primary-border: oklch(92% 0.006 260);         /* Lighter rim (brighter than surface) */
+  --zen-btn-primary-border-hover: oklch(100% 0.015 260);  /* Bright glowing rim */
+  --zen-btn-primary-border-active: oklch(85% 0.008 260);  /* Slightly lighter rim */
+  --zen-btn-primary-text: oklch(25% 0.008 260);           /* Charcoal, slightly muted */
+  --zen-btn-primary-text-hover: oklch(15% 0.01 260);      /* Deep charcoal on hover */
+
+  /* Secondary Button - Transparent with visible border
+     Border: Solid colors using lightness for visibility */
+  --zen-btn-secondary-bg: transparent;
+  --zen-btn-secondary-bg-hover: oklch(25% 0.005 260);     /* Subtle fill */
+  --zen-btn-secondary-bg-active: oklch(28% 0.006 260);    /* Slightly more fill */
+  --zen-btn-secondary-border: oklch(35% 0.006 260);       /* Visible against dark bg */
+  --zen-btn-secondary-border-hover: oklch(55% 0.008 260); /* Brighter on hover */
+  --zen-btn-secondary-border-active: oklch(45% 0.007 260);/* Mid brightness */
+  --zen-btn-secondary-text: oklch(72% 0.008 260);         /* Muted porcelain */
+  --zen-btn-secondary-text-hover: oklch(90% 0.01 260);    /* Full porcelain */
+
+  /* Ghost Button - Minimal, high-frequency actions
+     No border, subtle bg on hover */
+  --zen-btn-ghost-bg: transparent;
+  --zen-btn-ghost-bg-hover: oklch(22% 0.004 260);         /* Very subtle fill */
+  --zen-btn-ghost-bg-active: oklch(25% 0.005 260);        /* Slightly more fill */
+  --zen-btn-ghost-text: oklch(55% 0.006 260);             /* Faint (low contrast) */
+  --zen-btn-ghost-text-hover: oklch(72% 0.008 260);       /* Muted (visible) */
+
+  /* Danger Button - Destructive actions
+     Error color border, solid colors */
+  --zen-btn-danger-bg: transparent;
+  --zen-btn-danger-bg-hover: oklch(25% 0.02 20);          /* Subtle error fill */
+  --zen-btn-danger-bg-active: oklch(28% 0.025 20);        /* Slightly more fill */
+  --zen-btn-danger-border: oklch(45% 0.08 20);            /* Visible error border */
+  --zen-btn-danger-border-hover: oklch(60% 0.12 20);      /* Brighter error */
+  --zen-btn-danger-border-active: oklch(50% 0.10 20);     /* Mid error */
+  --zen-btn-danger-text: oklch(70% 0.08 20);              /* Error muted */
+  --zen-btn-danger-text-hover: oklch(80% 0.12 20);        /* Error full */
+
+  /* ===========================================
+     SEMANTIC STATUS COLORS - Dark Mode
+
+     Dark mode needs INVERTED logic:
+     - muted bg: darker, more saturated (visible on dark bg)
+     - content text: LIGHTER (readable on dark bg)
+     =========================================== */
+
+  /* Success - Green tones (Hue ~155) */
+  --zen-success-muted: oklch(25% 0.04 155);               /* Dark green bg */
+  --zen-success-content: oklch(80% 0.12 155);             /* Light green text */
+
+  /* Warning - Amber tones (Hue ~85) */
+  --zen-warning-muted: oklch(25% 0.04 85);                /* Dark amber bg */
+  --zen-warning-content: oklch(85% 0.12 85);              /* Light amber text */
+
+  /* Error - Red tones (Hue ~25) */
+  --zen-error-muted: oklch(25% 0.04 25);                  /* Dark red bg */
+  --zen-error-content: oklch(85% 0.10 25);                /* Light red text */
+
+  /* Info - Blue tones (Hue ~250) */
+  --zen-info-muted: oklch(25% 0.04 250);                  /* Dark blue bg */
+  --zen-info-content: oklch(80% 0.10 250);                /* Light blue text */
+
+  /* Grain overlay opacity - higher = more grainy/dusty texture */
+  --zen-grain-opacity: 0.25;
+
+  /* Dark mode highlight adjustments - neutral chrome */
+  --zen-highlight-bg: oklch(20% 0.005 260);
+  --zen-highlight-fg: oklch(78% 0.008 260);
+
+  /* Dark mode shadows - deeper, with subtle warm tint */
+  --zen-shadow-xs:
+    0 1px 2px 0 oklch(0% 0 0 / 0.30);
+
+  --zen-shadow-sm:
+    0 1px 2px 0 oklch(0% 0 0 / 0.25),
+    0 2px 4px 0 oklch(0% 0 0 / 0.20);
+
+  --zen-shadow-md:
+    0 1px 2px 0 oklch(0% 0 0 / 0.20),
+    0 2px 4px 0 oklch(0% 0 0 / 0.15),
+    0 4px 8px -2px oklch(0% 0 0 / 0.25);
+
+  --zen-shadow-lg:
+    0 1px 2px 0 oklch(0% 0 0 / 0.15),
+    0 4px 8px -2px oklch(0% 0 0 / 0.20),
+    0 12px 24px -4px oklch(0% 0 0 / 0.35);
+
+  --zen-shadow-xl:
+    0 2px 4px 0 oklch(0% 0 0 / 0.15),
+    0 8px 16px -4px oklch(0% 0 0 / 0.25),
+    0 24px 48px -8px oklch(0% 0 0 / 0.40);
+
+  --zen-shadow-elevated:
+    0 1px 2px 0 oklch(0% 0 0 / 0.15),
+    0 4px 8px -2px oklch(0% 0 0 / 0.20),
+    0 12px 28px -4px oklch(0% 0 0 / 0.35);
+
+  --zen-shadow-glass:
+    0 1px 2px 0 oklch(0% 0 0 / 0.15),
+    0 4px 12px -2px oklch(0% 0 0 / 0.25);
+
+  /* Scrollbar */
+  scrollbar-color: oklch(90% 0 0 / 0.1) transparent;
+}
+
+/* Dark theme specific overrides */
+/* grain-overlay now uses --zen-grain-opacity directly from index.css */
+
+[data-theme="glass-porcelain"] .grid-overlay,
+[data-theme="dark"] .grid-overlay {
+  opacity: 1;
+}
+
+/* Scrollbar styling */
+[data-theme="glass-porcelain"]::-webkit-scrollbar,
+[data-theme="dark"]::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+[data-theme="glass-porcelain"]::-webkit-scrollbar-track,
+[data-theme="dark"]::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+[data-theme="glass-porcelain"]::-webkit-scrollbar-thumb,
+[data-theme="dark"]::-webkit-scrollbar-thumb {
+  background: oklch(90% 0 0 / 0.1);
+  border-radius: 10px;
+  transition: background 0.3s;
+}
+
+[data-theme="glass-porcelain"]::-webkit-scrollbar-thumb:hover,
+[data-theme="dark"]::-webkit-scrollbar-thumb:hover {
+  background: oklch(90% 0 0 / 0.2);
+}
+
+[data-theme="glass-porcelain"]::-webkit-scrollbar-corner,
+[data-theme="dark"]::-webkit-scrollbar-corner {
+  background: transparent;
+}
