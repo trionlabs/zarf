@@ -1,0 +1,45 @@
+/*
+  ZEN DESIGN SYSTEM - SPACING TOKENS
+  Consistent spacing scale based on 4px base unit.
+*/
+
+:root {
+  /* Base spacing scale (4px increments) */
+  --zen-space-0: 0;
+  --zen-space-px: 1px;
+  --zen-space-0-5: 0.125rem;  /* 2px */
+  --zen-space-1: 0.25rem;     /* 4px */
+  --zen-space-1-5: 0.375rem;  /* 6px */
+  --zen-space-2: 0.5rem;      /* 8px */
+  --zen-space-2-5: 0.625rem;  /* 10px */
+  --zen-space-3: 0.75rem;     /* 12px */
+  --zen-space-3-5: 0.875rem;  /* 14px */
+  --zen-space-4: 1rem;        /* 16px */
+  --zen-space-5: 1.25rem;     /* 20px */
+  --zen-space-6: 1.5rem;      /* 24px */
+  --zen-space-7: 1.75rem;     /* 28px */
+  --zen-space-8: 2rem;        /* 32px */
+  --zen-space-9: 2.25rem;     /* 36px */
+  --zen-space-10: 2.5rem;     /* 40px */
+  --zen-space-11: 2.75rem;    /* 44px */
+  --zen-space-12: 3rem;       /* 48px */
+  --zen-space-14: 3.5rem;     /* 56px */
+  --zen-space-16: 4rem;       /* 64px */
+  --zen-space-20: 5rem;       /* 80px */
+  --zen-space-24: 6rem;       /* 96px */
+  --zen-space-32: 8rem;       /* 128px */
+
+  /* Semantic spacing */
+  --zen-gap-xs: var(--zen-space-1);
+  --zen-gap-sm: var(--zen-space-2);
+  --zen-gap-md: var(--zen-space-4);
+  --zen-gap-lg: var(--zen-space-6);
+  --zen-gap-xl: var(--zen-space-8);
+
+  /* Component padding */
+  --zen-padding-input: var(--zen-space-3) var(--zen-space-4);
+  --zen-padding-button-sm: var(--zen-space-1-5) var(--zen-space-3);
+  --zen-padding-button-md: var(--zen-space-2-5) var(--zen-space-5);
+  --zen-padding-button-lg: var(--zen-space-3) var(--zen-space-6);
+  --zen-padding-card: var(--zen-space-6);
+}

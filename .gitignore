@@ -1,0 +1,39 @@
+# .env
+.env
+
+# circuits
+circuits/Prover.toml
+circuits/target/
+
+# poc
+poc/node_modules
+poc/dist
+poc/public/wasm/*.wasm
+poc/public/wasm/*.wasm.gz
+poc/public/circuits/zarf.json
+
+# contracts
+contracts/cache/
+contracts/out/
+contracts/broadcast/
+
+# notes, backlogs, docs & ai
+docs/
+*.md
+_backlogs/
+reports/
+.DS_Store
+*.csv
+!whitelist_sample.csv
+*.txt
+test/*.dev
+
+# Agents & Tools
+.geminiignore
+.agent/
+.agents/
+.gemini/
+.claude/
+.github/
+.kiro/
+.cursor/

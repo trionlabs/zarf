@@ -1,0 +1,60 @@
+@import "tailwindcss";
+
+/* Scan @zarf/ui package for Tailwind classes */
+@source "../../../packages/ui/lib/**/*.svelte";
+@source "../../../packages/ui/lib/**/*.ts";
+
+/* Zen Design System (Themes & Tokens) */
+@import "@zarf/ui/styles/index.css";
+
+/* App-specific dark mode - deeper fume aesthetic */
+[data-theme="glass-porcelain"],
+[data-theme="dark"] {
+  /* Override zen-bg for deeper dark background */
+  --zen-bg: #0A0A0B;
+  --zen-bg-elevated: #131315;
+  --zen-bg-sunken: #1A1A1D;
+  /* DaisyUI compatibility */
+  --color-base-100: #0A0A0B;
+  --color-base-200: #131315;
+  --color-base-300: #1A1A1D;
+  background: #0A0A0B;
+  background-color: #0A0A0B;
+
+  /* Increased grain for smoky feel */
+  --zen-grain-opacity: 0.30;
+}
+
+/* ============================================
+   RIPPLE BACKGROUND - Fingerprint-like circles
+   Theme-aware: white ripples on dark, charcoal on light
+   ============================================ */
+.ripple-bg {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.4;
+  background:
+    repeating-radial-gradient(
+      circle at 90% 90%,
+      transparent 0px,
+      transparent 7px,
+      var(--ripple-color) 8px,
+      transparent 9px
+    );
+}
+
+/* Dark mode - white ripples */
+[data-theme="glass-porcelain"] .ripple-bg,
+[data-theme="dark"] .ripple-bg {
+  --ripple-color: oklch(from var(--zen-fg) l c h / 0.03);
+  opacity: 0.5;
+}
+
+/* Light mode - charcoal ripples, subtle */
+[data-theme="paper-porcelain"] .ripple-bg,
+[data-theme="light"] .ripple-bg {
+  --ripple-color: oklch(from var(--zen-fg) l c h / 0.025);
+  opacity: 0.6;
+}

@@ -1,0 +1,65 @@
+/*
+  ZEN DESIGN SYSTEM - SHADOW TOKENS
+  Layered shadow system for depth and elevation.
+  Base fallbacks - themes override with refined values.
+*/
+
+:root {
+  --zen-shadow-none: none;
+
+  /* Base shadows (fallbacks - overridden by theme) */
+  --zen-shadow-xs:
+    0 1px 2px 0 oklch(from var(--zen-fg) l c h / 0.04);
+
+  --zen-shadow-sm:
+    0 1px 2px 0 oklch(from var(--zen-fg) l c h / 0.03),
+    0 2px 4px 0 oklch(from var(--zen-fg) l c h / 0.03);
+
+  --zen-shadow-md:
+    0 1px 2px 0 oklch(from var(--zen-fg) l c h / 0.02),
+    0 2px 4px 0 oklch(from var(--zen-fg) l c h / 0.02),
+    0 4px 8px -2px oklch(from var(--zen-fg) l c h / 0.04);
+
+  --zen-shadow-lg:
+    0 1px 2px 0 oklch(from var(--zen-fg) l c h / 0.02),
+    0 4px 8px -2px oklch(from var(--zen-fg) l c h / 0.03),
+    0 12px 24px -4px oklch(from var(--zen-fg) l c h / 0.06);
+
+  --zen-shadow-xl:
+    0 2px 4px 0 oklch(from var(--zen-fg) l c h / 0.02),
+    0 8px 16px -4px oklch(from var(--zen-fg) l c h / 0.04),
+    0 20px 40px -8px oklch(from var(--zen-fg) l c h / 0.08);
+
+  --zen-shadow-2xl:
+    0 4px 8px 0 oklch(from var(--zen-fg) l c h / 0.02),
+    0 16px 32px -8px oklch(from var(--zen-fg) l c h / 0.06),
+    0 32px 64px -12px oklch(from var(--zen-fg) l c h / 0.12);
+
+  /* Inset shadow */
+  --zen-shadow-inner: inset 0 2px 4px 0 oklch(from var(--zen-fg) l c h / 0.04);
+
+  /* Glass card shadow */
+  --zen-shadow-glass:
+    0 1px 2px 0 oklch(from var(--zen-fg) l c h / 0.02),
+    0 2px 6px -1px oklch(from var(--zen-fg) l c h / 0.03);
+
+  /* Elevated surface shadow */
+  --zen-shadow-elevated:
+    0 1px 2px 0 oklch(from var(--zen-fg) l c h / 0.02),
+    0 4px 8px -2px oklch(from var(--zen-fg) l c h / 0.03),
+    0 8px 20px -4px oklch(from var(--zen-fg) l c h / 0.06);
+
+  /* Button shadows */
+  --zen-shadow-button:
+    0 1px 2px 0 oklch(from var(--zen-fg) l c h / 0.04),
+    0 2px 4px 0 oklch(from var(--zen-fg) l c h / 0.04);
+
+  --zen-shadow-button-hover:
+    0 2px 4px 0 oklch(from var(--zen-fg) l c h / 0.04),
+    0 4px 8px -2px oklch(from var(--zen-fg) l c h / 0.06);
+
+  /* Focus ring */
+  --zen-ring-offset: 2px;
+  --zen-ring-width: 2px;
+  --zen-ring-color: oklch(from var(--zen-primary) l c h / 0.4);
+}

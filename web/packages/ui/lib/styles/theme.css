@@ -1,0 +1,178 @@
+/*
+   ZEN PRO DESIGN SYSTEM - COMPONENT STYLES
+   Button, Input, Card styling for apps without DaisyUI
+*/
+
+/* ============================================
+   DESIGN TOKENS
+   ============================================ */
+:root {
+    --zen-border-width: 0.5px;
+    --radius-selector: 0.75rem;
+    --radius-field: 0.75rem;
+    --radius-box: 1rem;
+}
+
+/* ============================================
+   ZEN BUTTONS
+   ============================================ */
+.btn,
+.zen-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.625rem 1.25rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    line-height: 1.25;
+    border-radius: var(--radius-selector);
+    border: var(--zen-border-width) solid transparent;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-decoration: none;
+}
+
+.btn:disabled,
+.zen-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Button Sizes */
+.btn-sm, .zen-btn-sm {
+    padding: 0.375rem 0.875rem;
+    font-size: 0.75rem;
+}
+
+.btn-lg, .zen-btn-lg {
+    padding: 0.75rem 1.5rem;
+    font-size: 1rem;
+}
+
+/* ============================================
+   LEGACY BUTTON VARIANTS (for non-ZenButton usage)
+   ZenButton uses Tailwind arbitrary values with --zen-btn-* tokens
+   ============================================ */
+[data-theme="glass-porcelain"] .btn-primary,
+[data-theme="dark"] .btn-primary {
+    background-color: var(--color-primary);
+    color: var(--color-primary-content);
+    border-color: var(--color-primary);
+    box-shadow: 0 4px 10px -2px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="glass-porcelain"] .btn-primary:hover:not(:disabled),
+[data-theme="dark"] .btn-primary:hover:not(:disabled) {
+    box-shadow: 0 6px 14px -4px rgba(0, 0, 0, 0.4);
+    filter: brightness(0.95);
+}
+
+[data-theme="glass-porcelain"] .btn-ghost,
+[data-theme="dark"] .btn-ghost {
+    background-color: transparent;
+    color: var(--color-base-content);
+    border-color: oklch(from var(--zen-fg) l c h / 0.1);
+}
+
+[data-theme="glass-porcelain"] .btn-ghost:hover:not(:disabled),
+[data-theme="dark"] .btn-ghost:hover:not(:disabled) {
+    background-color: oklch(from var(--zen-fg) l c h / 0.05);
+}
+
+[data-theme="paper-porcelain"] .btn-primary,
+[data-theme="light"] .btn-primary {
+    background-color: var(--color-primary);
+    color: var(--color-primary-content);
+    border-color: var(--color-primary);
+    box-shadow: 0 4px 14px -4px rgba(0, 0, 0, 0.2);
+}
+
+[data-theme="paper-porcelain"] .btn-primary:hover:not(:disabled),
+[data-theme="light"] .btn-primary:hover:not(:disabled) {
+    filter: brightness(0.85);
+    box-shadow: 0 6px 20px -4px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="paper-porcelain"] .btn-ghost,
+[data-theme="light"] .btn-ghost {
+    background-color: transparent;
+    color: var(--color-base-content);
+    border-color: oklch(from var(--zen-fg) l c h / 0.1);
+}
+
+[data-theme="paper-porcelain"] .btn-ghost:hover:not(:disabled),
+[data-theme="light"] .btn-ghost:hover:not(:disabled) {
+    background-color: oklch(from var(--zen-fg) l c h / 0.04);
+}
+
+/* ============================================
+   INPUT STYLES
+   ============================================ */
+.input, .zen-input,
+.textarea, .zen-textarea,
+.select, .zen-select {
+    display: block;
+    width: 100%;
+    padding: 0.75rem 1rem;
+    font-size: 0.875rem;
+    line-height: 1.5;
+    border-radius: var(--radius-field);
+    border: var(--zen-border-width) solid var(--zen-border);
+    background-color: oklch(from var(--zen-bg) l c h / 0.5);
+    color: var(--zen-fg);
+    transition: all 0.2s ease;
+}
+
+.input:focus, .zen-input:focus,
+.textarea:focus, .zen-textarea:focus,
+.select:focus, .zen-select:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: none;
+}
+
+.input:disabled, .zen-input:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Dark theme input overrides */
+[data-theme="glass-porcelain"] .input,
+[data-theme="glass-porcelain"] .zen-input,
+[data-theme="dark"] .input,
+[data-theme="dark"] .zen-input {
+    background-color: rgba(0, 0, 0, 0.2);
+    border-color: rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(4px);
+    box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.1);
+}
+
+/* ============================================
+   CARD & GLASS EFFECTS
+   ============================================ */
+[data-theme="glass-porcelain"] .card,
+[data-theme="dark"] .card {
+    background-color: rgba(255, 255, 255, 0.02);
+    backdrop-filter: blur(24px) saturate(120%);
+    -webkit-backdrop-filter: blur(24px) saturate(120%);
+    border: 1px solid rgba(220, 240, 255, 0.06);
+    box-shadow:
+        0 4px 12px -2px rgba(0, 0, 0, 0.1),
+        0 8px 32px -4px rgba(0, 5, 15, 0.15),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.03),
+        inset 0 1px 0 0 rgba(255, 255, 255, 0.05);
+}
+
+[data-theme="paper-porcelain"] .card,
+[data-theme="light"] .card {
+    background-color: rgba(255, 255, 255, 0.6);
+    backdrop-filter: blur(20px) saturate(120%);
+    -webkit-backdrop-filter: blur(20px) saturate(120%);
+    border: 1px solid rgba(0, 0, 0, 0.06);
+    box-shadow:
+        0 4px 12px -2px rgba(0, 0, 0, 0.05),
+        0 8px 32px -4px rgba(0, 0, 0, 0.08),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.5),
+        inset 0 1px 0 0 rgba(255, 255, 255, 0.8);
+}

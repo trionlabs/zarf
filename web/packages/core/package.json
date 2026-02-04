@@ -1,0 +1,52 @@
+{
+    "name": "@zarf/core",
+    "version": "0.0.1",
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "postinstall": "node scripts/copy-wasm.js"
+    },
+    "exports": {
+        ".": "./lib/index.ts",
+        "./types": "./lib/types.ts",
+        "./contracts": "./lib/contracts/contracts.ts",
+        "./contracts/wallet": "./lib/contracts/wallet.ts",
+        "./contracts/walletLazy": "./lib/contracts/walletLazy.ts",
+        "./contracts/abis/*": "./lib/contracts/abis/*.ts",
+        "./crypto": "./lib/crypto/index.ts",
+        "./crypto/*": "./lib/crypto/*.ts",
+        "./utils": "./lib/utils/index.ts",
+        "./utils/*": "./lib/utils/*.ts",
+        "./constants": "./lib/constants.ts",
+        "./constants/*": "./lib/constants/*.ts",
+        "./config": "./lib/config/index.ts",
+        "./config/*": "./lib/config/*.ts",
+        "./zk": "./lib/zk/index.ts",
+        "./zk/*": "./lib/zk/*.ts"
+    },
+    "peerDependencies": {
+        "@aztec/bb.js": "^2.1.9",
+        "@noir-lang/acvm_js": "1.0.0-beta.18",
+        "@noir-lang/noir_js": "1.0.0-beta.18",
+        "@noir-lang/noirc_abi": "1.0.0-beta.18",
+        "@wagmi/connectors": "^7.0.5",
+        "@wagmi/core": "^3.0.1",
+        "noir-jwt": "^0.4.5",
+        "viem": "^2.43.3",
+        "wagmi": "^3.1.2"
+    },
+    "dependencies": {
+        "buffer": "^6.0.3"
+    },
+    "devDependencies": {
+        "@aztec/bb.js": "^2.1.11",
+        "@noir-lang/acvm_js": "1.0.0-beta.18",
+        "@noir-lang/noir_js": "1.0.0-beta.18",
+        "@noir-lang/noirc_abi": "1.0.0-beta.18",
+        "@wagmi/connectors": "^7.1.5",
+        "@wagmi/core": "^3.3.1",
+        "noir-jwt": "^0.4.5",
+        "viem": "^2.45.0",
+        "wagmi": "^3.4.1"
+    }
+}

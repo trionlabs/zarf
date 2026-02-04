@@ -1,0 +1,162 @@
+/*
+  ZEN DESIGN SYSTEM - MAIN ENTRY
+  Import this file in your app.css after Tailwind.
+
+  Usage:
+  @import "tailwindcss";
+  @import "@zarf/ui/styles/index.css";
+*/
+
+/* Design Tokens */
+@import "./tokens/colors.css";
+@import "./tokens/spacing.css";
+@import "./tokens/radius.css";
+@import "./tokens/shadows.css";
+
+/* Base Styles */
+@import "./base.css";
+
+/* Theme Definitions */
+@import "./themes/light.css";
+@import "./themes/dark.css";
+
+/* Component Layer - Zen component base styles */
+@layer components {
+  /* Zen Border Width Standard */
+  .zen-border {
+    border-width: 0.5px;
+  }
+
+  /* Glass surface style */
+  .zen-glass {
+    background-color: oklch(from var(--zen-bg) l c h / var(--zen-glass-bg-opacity, 0.7));
+    backdrop-filter: blur(var(--zen-glass-blur, 24px)) saturate(105%);
+    -webkit-backdrop-filter: blur(var(--zen-glass-blur, 24px)) saturate(105%);
+    border: 0.5px solid var(--zen-glass-border);
+    box-shadow: var(--zen-shadow-glass);
+  }
+
+  /* Elevated surface style */
+  .zen-elevated {
+    background-color: var(--zen-bg);
+    border: 0.5px solid var(--zen-border-subtle);
+    box-shadow: var(--zen-shadow-elevated);
+  }
+
+  /* Bordered surface style */
+  .zen-bordered {
+    background-color: transparent;
+    border: 0.5px solid var(--zen-border);
+  }
+
+  /* Input base styles (removing DaisyUI dependency) */
+  .zen-input {
+    display: block;
+    width: 100%;
+    padding: var(--zen-padding-input);
+    background-color: oklch(from var(--zen-bg) l c h / 0.5);
+    border: 0.5px solid var(--zen-border);
+    border-radius: var(--zen-radius-input);
+    color: var(--zen-fg);
+    font-size: 0.875rem;
+    line-height: 1.5;
+    transition: all 0.2s ease;
+  }
+
+  .zen-input:hover {
+    border-color: var(--zen-border-strong);
+    background-color: var(--zen-bg);
+  }
+
+  .zen-input:focus {
+    outline: none;
+    background-color: var(--zen-bg);
+    border-color: oklch(from var(--zen-primary) l c h / 0.5);
+    box-shadow: none;
+  }
+
+  .zen-input::placeholder {
+    color: var(--zen-fg-subtle);
+  }
+
+  .zen-input:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  /* Textarea variant */
+  .zen-textarea {
+    resize: vertical;
+    min-height: 6rem;
+  }
+
+  /* Label styles */
+  .zen-label {
+    display: block;
+    padding-bottom: var(--zen-space-1);
+    padding-left: var(--zen-space-1);
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--zen-fg-subtle);
+  }
+
+  /* Error state */
+  .zen-input-error {
+    border-color: var(--zen-error);
+    color: var(--zen-error);
+  }
+
+  .zen-error-text {
+    padding-top: var(--zen-space-1);
+    padding-left: var(--zen-space-1);
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--zen-error);
+  }
+
+  /* Zen Buttons */
+  .zen-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.625rem 1.25rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    line-height: 1.25;
+    border-radius: var(--zen-radius-button);
+    border: 0.5px solid transparent;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-decoration: none;
+  }
+
+  .zen-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  /* Sizes */
+  .zen-btn-sm {
+    padding: 0.375rem 0.875rem;
+    font-size: 0.75rem;
+  }
+  .zen-btn-lg {
+    padding: 0.75rem 1.5rem;
+    font-size: 1rem;
+  }
+
+}
+
+/* Grain overlay for texture */
+.grain-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  background: url("data:image/png;base64,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");
+  background-repeat: repeat;
+  opacity: var(--zen-grain-opacity, 0.06);
+}
