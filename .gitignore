@@ -20,6 +20,7 @@ contracts/broadcast/
 # notes, backlogs, docs & ai
 docs/
 *.md
+!/README.md
 _backlogs/
 reports/
 .DS_Store
