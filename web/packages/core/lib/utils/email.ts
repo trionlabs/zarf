@@ -1,11 +1,22 @@
 /**
- * Email Normalization & Hashing Utilities
+ * Email Normalization, Validation & Hashing Utilities
  *
- * Provides consistent email normalization and hashing for identity verification.
+ * Provides consistent email handling for identity verification.
  * Used by both create and claim apps to ensure matching identity commitments.
  *
  * @module utils/email
  */
+
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/**
+ * Lexical email validation: requires `local@domain.tld` shape.
+ * Single source of truth — replaces drifted local copies in csvProcessor
+ * (which accepted `a@b`) and inputValidator.
+ */
+export function isValidEmail(email: string): boolean {
+    return typeof email === 'string' && EMAIL_REGEX.test(email);
+}
 
 /**
  * Normalize email for consistent hashing

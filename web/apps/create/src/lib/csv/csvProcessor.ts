@@ -10,29 +10,11 @@
  */
 
 import type { WhitelistEntry } from '../stores/types';
-import { isAddress } from 'viem';
-import { normalizeEmail } from '@zarf/core/utils/email';
+import { normalizeEmail, isValidEmail } from '@zarf/core/utils/email';
+import { isValidAddress } from '@zarf/core/utils/address';
 
 // Re-export for backward compatibility
 export { normalizeEmail };
-
-// ============================================================================
-// Validators & Normalizers
-// ============================================================================
-
-/**
- * Basic address format validation
- */
-function isValidAddress(address: string): boolean {
-    return isAddress(address, { strict: false });
-}
-
-/**
- * Basic email format validation
- */
-function isValidEmail(email: string): boolean {
-    return email.includes('@') && email.length > 3;
-}
 
 /**
  * Normalizes address for consistent hashing and comparison.
