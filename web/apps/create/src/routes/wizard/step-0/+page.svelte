@@ -13,9 +13,9 @@
     } from "lucide-svelte";
     import {
         fetchTokenMetadata,
-        isValidAddress,
         type TokenMetadata,
     } from "$lib/services/tokenMetadata";
+    import { isValidAddress } from "@zarf/core/utils/address";
     import { fade, fly } from "svelte/transition";
     import ZenButton from "@zarf/ui/components/ui/ZenButton.svelte";
     import ZenCard from "@zarf/ui/components/ui/ZenCard.svelte";
