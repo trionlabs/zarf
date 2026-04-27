@@ -6,7 +6,7 @@ import {
     padEmail,
     buildCircuitInputs,
     TREE_DEPTH,
-    EMAIL_BYTE_LEN,
+    MAX_EMAIL_LENGTH,
     type ClaimData,
     type NoirJwtResult,
 } from './proofInputs';
@@ -148,9 +148,9 @@ describe('padMerkleProof', () => {
 // ──────────────────────────────────────────────────────────────────────────
 
 describe('padEmail', () => {
-    it('pads short emails to EMAIL_BYTE_LEN with zero bytes', () => {
+    it('pads short emails to MAX_EMAIL_LENGTH with zero bytes', () => {
         const { storage, len } = padEmail('abc');
-        expect(storage).toHaveLength(EMAIL_BYTE_LEN);
+        expect(storage).toHaveLength(MAX_EMAIL_LENGTH);
         // First 3 bytes are ASCII codes for a, b, c
         expect(storage.slice(0, 3)).toEqual([0x61, 0x62, 0x63]);
         // Rest are zeros
@@ -161,7 +161,7 @@ describe('padEmail', () => {
 
     it('returns all-zero storage for empty input', () => {
         const { storage, len } = padEmail('');
-        expect(storage).toHaveLength(EMAIL_BYTE_LEN);
+        expect(storage).toHaveLength(MAX_EMAIL_LENGTH);
         expect(storage.every(b => b === 0)).toBe(true);
         expect(len).toBe(0);
     });
@@ -253,9 +253,9 @@ describe('buildCircuitInputs', () => {
         expect(inputs.pubkey_modulus_limbs).toEqual(['0xff', '0xee']);
     });
 
-    it('pads expected_email to EMAIL_BYTE_LEN with the original string length', () => {
+    it('pads expected_email to MAX_EMAIL_LENGTH with the original string length', () => {
         const inputs = buildCircuitInputs(fixtureClaim, fixtureJwt);
-        expect(inputs.expected_email.storage).toHaveLength(EMAIL_BYTE_LEN);
+        expect(inputs.expected_email.storage).toHaveLength(MAX_EMAIL_LENGTH);
         expect(inputs.expected_email.len).toBe(fixtureClaim.email.length);
         // First N bytes are the email ASCII bytes
         const expectedBytes = Array.from(new TextEncoder().encode(fixtureClaim.email));

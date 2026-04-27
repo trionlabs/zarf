@@ -6,9 +6,8 @@
  * behavior (including byte layout) is exactly what was inlined before.
  */
 
-export const TREE_DEPTH = 20;
-export const EMAIL_BYTE_LEN = 64;
-export const MAX_SIGNED_DATA_LENGTH = 1024;
+import { TREE_DEPTH, MAX_EMAIL_LENGTH, MAX_SIGNED_DATA_LENGTH } from '../constants';
+export { TREE_DEPTH, MAX_EMAIL_LENGTH, MAX_SIGNED_DATA_LENGTH };
 
 /**
  * Result of `noir-jwt`'s `generateInputs`. Treated as an opaque
@@ -89,11 +88,11 @@ export function padMerkleProof(
 }
 
 /**
- * Pad an email string to a fixed byte array (default 64 bytes), zero-filled.
- * Returns the padded byte array AND the original length, matching what the
- * circuit expects as `expected_email`.
+ * Pad an email string to a fixed byte array (default MAX_EMAIL_LENGTH bytes),
+ * zero-filled. Returns the padded byte array AND the original length, matching
+ * what the circuit expects as `expected_email`.
  */
-export function padEmail(email: string, length: number = EMAIL_BYTE_LEN) {
+export function padEmail(email: string, length: number = MAX_EMAIL_LENGTH) {
     const emailBytes = Array.from(new TextEncoder().encode(email));
     while (emailBytes.length < length) {
         emailBytes.push(0);

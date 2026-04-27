@@ -14,3 +14,4 @@ export const MAX_EMAIL_LENGTH = 64;
 // ===================================
 
 export const TREE_DEPTH = 20;
+export const MAX_SIGNED_DATA_LENGTH = 1024;

@@ -15,20 +15,7 @@ const browser = typeof window !== 'undefined';
 
 import type { Barretenberg } from '@aztec/bb.js';
 import type { WhitelistEntry, MerkleTreeData, MerkleProof, MerkleClaim, Schedule } from '../types';
-
-// ============================================================================
-// Constants
-// ============================================================================
-
-/**
- * Fixed Merkle tree depth (must match Noir circuit)
- */
-const TREE_DEPTH = 20;
-
-/**
- * Maximum email length for padding (must match circuit)
- */
-const MAX_EMAIL_LENGTH = 64;
+import { TREE_DEPTH, MAX_EMAIL_LENGTH } from '../constants';
 
 // ============================================================================
 // Barretenberg Singleton
