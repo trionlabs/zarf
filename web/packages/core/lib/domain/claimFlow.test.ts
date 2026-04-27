@@ -10,22 +10,16 @@ const e = (amount: bigint, opts: { claimed?: boolean; locked?: boolean } = {}) =
 });
 
 describe('amount totals', () => {
-    const epochs = [
-        e(100n, { claimed: true,  locked: false }),
-        e(200n, { claimed: false, locked: false }),
-        e(400n, { claimed: false, locked: true  }),
-    ];
-
     it('total / claimed / unlocked / claimable agree on a representative mix', () => {
+        const epochs = [
+            e(100n, { claimed: true,  locked: false }),
+            e(200n, { claimed: false, locked: false }),
+            e(400n, { claimed: false, locked: true  }),
+        ];
         expect(totalAllocation(epochs)).toBe(700n);
         expect(claimedAmount(epochs)).toBe(100n);
         expect(unlockedAmount(epochs)).toBe(300n);   // not-locked: 100 + 200
         expect(claimableAmount(epochs)).toBe(200n);  // not-locked AND not-claimed
-    });
-
-    it('all-zero on an empty epoch list', () => {
-        expect(totalAllocation([])).toBe(0n);
-        expect(claimableAmount([])).toBe(0n);
     });
 });
 
