@@ -27,6 +27,7 @@ import {
 import type { Address } from 'viem';
 import type { Connector } from '@wagmi/core';
 import type { WalletAccount } from "@zarf/core/types";
+import { sanitizeBlockchainError } from '../utils/errorSanitizer';
 
 // Types unchanged
 interface WalletBalance { value: bigint; formatted: string; symbol: string; }
@@ -115,14 +116,17 @@ function syncFromWagmi() {
     updateInternalState({ ...account, address: account.address ?? undefined });
 }
 
-function sanitizeError(err: any): string {
-    const message = err?.message || '';
-    if (message.includes('rejected') || message.includes('denied')) return 'Request rejected by user';
-    if (message.includes('No wallet') || message.includes('No injected')) return 'No Ethereum wallet detected. Please install MetaMask.';
-    if (message.includes('already pending')) return 'A connection request is already pending. Check your wallet.';
-    if (message.includes('Chain not configured')) return 'Network switch failed. Please switch manually in your wallet.';
-    if ((import.meta as any).env.DEV) console.error('Wallet error:', err);
-    return 'An unexpected error occurred';
+function sanitizeError(err: unknown): string {
+    return sanitizeBlockchainError(err, {
+        customRules: [
+            { match: /No wallet|No injected/i,
+              message: 'No Ethereum wallet detected. Please install MetaMask.' },
+            { match: 'already pending',
+              message: 'A connection request is already pending. Check your wallet.' },
+            { match: 'Chain not configured',
+              message: 'Network switch failed. Please switch manually in your wallet.' },
+        ],
+    });
 }
 
 // Actions
