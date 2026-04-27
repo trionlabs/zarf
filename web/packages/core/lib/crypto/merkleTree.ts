@@ -7,8 +7,7 @@
  * @module crypto/merkleTree
  */
 
-// SSR-safe browser check (framework-agnostic)
-const browser = typeof window !== 'undefined';
+import { browser } from '../utils/ssr';
 
 // Buffer polyfill is handled by hooks.client.ts in each app
 // This ensures Buffer is available before bb.js loads

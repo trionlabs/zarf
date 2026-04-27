@@ -1,8 +1,7 @@
 <script lang="ts">
     import { onMount } from "svelte";
     import { ArrowRight, ChevronDown } from "lucide-svelte";
-    // SSR-safe browser check
-    const browser = typeof window !== "undefined";
+    import { browser } from "@zarf/core/utils/ssr";
     import { themeStore } from "../../stores/themeStore.svelte";
     import Tooltip from "../../components/ui/Tooltip.svelte";
     import ZenButton from "../../components/ui/ZenButton.svelte";

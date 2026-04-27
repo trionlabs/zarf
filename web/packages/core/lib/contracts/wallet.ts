@@ -9,8 +9,7 @@
  * @module contracts/wallet
  */
 
-// SSR-safe browser check (framework-agnostic)
-const browser = typeof window !== 'undefined';
+import { browser } from '../utils/ssr';
 import {
     createConfig,
     http,
