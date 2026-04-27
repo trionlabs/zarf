@@ -9,17 +9,10 @@
         type FactoryDeployConfig,
         type FactoryDeployProgress,
     } from "../../../services/factoryDeploy";
-    import {
-        durationToSeconds,
-        cliffDateToSeconds,
-        unitToPeriodSeconds,
-        calculateEndDate,
-    } from "@zarf/core/utils/vesting";
-    import {
-        addOptimisticContract,
-        type OnChainVestingContract,
-    } from "@zarf/core/services/distributionDiscovery";
+    import { addOptimisticContract } from "@zarf/core/services/distributionDiscovery";
     import { buildFactoryDeployInputs } from "@zarf/core/domain/merkleResultAdapter";
+    import { planDeploy, buildOptimisticContract } from "@zarf/core/domain/deployPlanner";
+    import { recoverPendingDeploy } from "@zarf/core/domain/deployRecovery";
     import { walletStore } from "@zarf/ui/stores/walletStore.svelte";
     import { goto } from "$app/navigation";
     import {
@@ -81,76 +74,75 @@
     const showFactoryWarning = $derived(!factoryAvailable && Boolean(chainId));
     const showNotDeployedIdle = $derived(!isDeployed && currentStep === "idle");
 
-    // Recovery Logic: Resume pending transactions after page refresh
+    // Recovery: resume pending transactions after page refresh.
+    // Pure decision via recoverPendingDeploy(); component just dispatches the result.
     onMount(async () => {
-        if (deployStore.createTxHash) {
-            if (import.meta.env.DEV)
-                console.log("Recovering pending create TX...");
-            currentStep = "create";
-            isDeploying = true;
-            currentMessage = "Checking deployment status...";
+        if (!deployStore.createTxHash && !deployStore.approveTxHash) return;
 
-            try {
-                const receipt = await waitForTransactionReceipt(wagmiConfig, {
-                    hash: deployStore.createTxHash as Hash,
-                });
+        const pendingKind = deployStore.createTxHash ? "create" : "approve";
+        currentStep = pendingKind;
+        isDeploying = true;
+        currentMessage =
+            pendingKind === "create"
+                ? "Checking deployment status..."
+                : "Checking approval status...";
 
-                if (receipt.status === "success") {
-                    let recoveredAddress: Address | null = null;
-                    try {
-                        recoveredAddress =
-                            parseVestingAddressFromReceipt(receipt);
-                    } catch (err) {
-                        if (import.meta.env.DEV)
-                            console.warn("Failed to parse logs", err);
-                    }
+        const result = await recoverPendingDeploy(
+            {
+                approveTxHash: deployStore.approveTxHash as Hash | null,
+                createTxHash: deployStore.createTxHash as Hash | null,
+            },
+            {
+                waitForReceipt: (hash) =>
+                    waitForTransactionReceipt(wagmiConfig, { hash }),
+                parseVestingAddress: parseVestingAddressFromReceipt,
+            },
+        );
 
-                    if (recoveredAddress && distribution) {
-                        deployStore.setDeployed(recoveredAddress);
-                        wizardStore.moveDistributionToLaunched(
-                            distribution.id,
-                            receipt.transactionHash,
-                        );
-                    }
-
-                    currentStep = "complete";
-                    isDeploying = false;
-                    currentMessage = "Deployment confirmed.";
-                } else {
-                    error = "Transaction failed on-chain.";
-                    isDeploying = false;
-                    currentStep = "error";
+        switch (result.kind) {
+            case "none":
+                isDeploying = false;
+                currentStep = "idle";
+                break;
+            case "createConfirmed":
+                if (distribution) {
+                    deployStore.setDeployed(result.vestingAddress);
+                    wizardStore.moveDistributionToLaunched(
+                        distribution.id,
+                        result.transactionHash,
+                    );
                 }
-            } catch (e: unknown) {
+                currentStep = "complete";
+                isDeploying = false;
+                currentMessage = "Deployment confirmed.";
+                break;
+            case "createConfirmedNoAddress":
+                currentStep = "complete";
+                isDeploying = false;
+                currentMessage = "Deployment confirmed.";
+                break;
+            case "createReverted":
+                error = "Transaction failed on-chain.";
+                isDeploying = false;
+                currentStep = "error";
+                break;
+            case "approveConfirmed":
+                currentStep = "idle";
+                isDeploying = false;
+                break;
+            case "approveReverted":
+                error = "Approval transaction failed.";
+                isDeploying = false;
+                currentStep = "error";
+                break;
+            case "rpcError":
                 if (import.meta.env.DEV)
-                    console.error("Failed to check create tx", e);
-                currentMessage = "Waiting for confirmation...";
-            }
-        } else if (deployStore.approveTxHash) {
-            if (import.meta.env.DEV)
-                console.log("Recovering pending approval TX...");
-            currentStep = "approve";
-            isDeploying = true;
-            currentMessage = "Checking approval status...";
-
-            try {
-                const receipt = await waitForTransactionReceipt(wagmiConfig, {
-                    hash: deployStore.approveTxHash as Hash,
-                });
-
-                if (receipt.status === "success") {
-                    currentStep = "idle";
-                    isDeploying = false;
-                } else {
-                    error = "Approval transaction failed.";
-                    isDeploying = false;
-                    currentStep = "error";
-                }
-            } catch (e: unknown) {
-                if (import.meta.env.DEV)
-                    console.error("Failed to check approve tx", e);
-                currentMessage = "Waiting for approval confirmation...";
-            }
+                    console.error(`Failed to check ${result.pending} tx`, result.error);
+                currentMessage =
+                    result.pending === "create"
+                        ? "Waiting for confirmation..."
+                        : "Waiting for approval confirmation...";
+                break;
         }
     });
 
@@ -199,86 +191,34 @@
         // Get token decimals (default to 18 if not set)
         const tokenDecimals = wizardStore.tokenDetails.tokenDecimals ?? 18;
 
-        // Validate every claim and convert to factory inputs.
-        // Throws on missing/malformed data — closes the silent 0x000…0 path.
-        let factoryInputs: ReturnType<typeof buildFactoryDeployInputs>;
+        // Validate every claim, build factory inputs, and plan the deploy
+        // (past-date override + integrity check). Pure-TS — testable.
+        let config: ReturnType<typeof planDeploy>;
         try {
-            factoryInputs = buildFactoryDeployInputs(
+            const factoryInputs = buildFactoryDeployInputs(
                 merkleResult.claims,
                 merkleResult.root,
             );
+            config = planDeploy({
+                factoryAddress: currentFactoryAddress as Address,
+                tokenAddress: wizardStore.tokenDetails.tokenAddress as Address,
+                owner: walletAddress!,
+                name: distribution.name,
+                description: distribution.description || "",
+                schedule: distribution.schedule,
+                totalAmountWei: parseUnits(String(distribution.amount), tokenDecimals),
+                merkleRoot: factoryInputs.merkleRoot,
+                commitments: factoryInputs.commitments,
+                amounts: factoryInputs.amounts,
+                allocationsTotal: factoryInputs.totalAllocation,
+            });
         } catch (e) {
-            error = `Distribution data is invalid: ${(e as Error).message}. Please recreate the distribution.`;
+            error = `Distribution data is invalid: ${(e as Error).message}`;
             isDeploying = false;
             return;
         }
-        const { commitments, amounts, merkleRoot } = factoryInputs;
-
-        // Convert total amount to wei using token decimals
-        const totalAmountWei = parseUnits(
-            String(distribution.amount),
-            tokenDecimals,
-        );
-
-        // Calculate standard parameters first
-        const periodSecondsStandard = unitToPeriodSeconds(
-            distribution.schedule.durationUnit,
-        );
-        let cliffSeconds = cliffDateToSeconds(
-            distribution.schedule.cliffEndDate,
-            distribution.schedule.cliffTime || "00:00",
-        );
-        let vestingSeconds = durationToSeconds(
-            distribution.schedule.distributionDuration,
-            distribution.schedule.durationUnit,
-        );
-        let periodSeconds = periodSecondsStandard;
-
-        // Check for Past Dates / Full Unlock Scenario
-        // If the intended schedule (Cliff + Duration) has already finished, we must
-        // configured the contract to unlock immediately, because existing contracts
-        // use block.timestamp as start time.
-        if (distribution.schedule.cliffEndDate) {
-            const cliffDateTime = `${distribution.schedule.cliffEndDate}T${distribution.schedule.cliffTime || "00:00"}:00Z`;
-            const cliffDate = new Date(cliffDateTime);
-            const endDate = calculateEndDate(
-                cliffDate,
-                distribution.schedule.distributionDuration,
-                distribution.schedule.durationUnit,
-            );
-
-            if (endDate && endDate.getTime() <= Date.now()) {
-                // Force immediate unlock
-                cliffSeconds = 0n;
-                vestingSeconds = 1n;
-                periodSeconds = 1n;
-                console.log(
-                    "Past date detected: configured for immediate unlock",
-                );
-            }
-        }
-
-        const config: FactoryDeployConfig = {
-            factoryAddress: currentFactoryAddress,
-            tokenAddress: wizardStore.tokenDetails.tokenAddress as Address,
-            merkleRoot,
-            commitments,
-            amounts,
-            cliffSeconds,
-            vestingSeconds,
-            periodSeconds,
-            totalAmount: totalAmountWei,
-            owner: walletAddress!, // Checked at function start
-            name: distribution.name,
-            description: distribution.description || "",
-        };
-
-        // Verify integrity
-        const allocationsSum = amounts.reduce((sum, a) => sum + a, 0n);
-        if (allocationsSum !== config.totalAmount) {
-            error = `Integrity Error: Allocations sum does not match distribution total. Please recreate the distribution.`;
-            isDeploying = false;
-            return;
+        if (config.immediateUnlock) {
+            console.log("Past date detected: configured for immediate unlock");
         }
 
         const service = new FactoryDeployService(
@@ -314,35 +254,19 @@
                     createTxHash || "0x",
                 );
 
-                // Optimistic UI Update (Ruthless Review Item #5)
-                // Add to discovery cache immediately so it shows up in dashboard
-                const optimisticContract: OnChainVestingContract = {
-                    address: vestingAddress,
-                    name: distribution.name,
-                    description: distribution.description || "",
-                    token: wizardStore.tokenDetails.tokenAddress as Address,
-                    tokenSymbol:
-                        wizardStore.tokenDetails.tokenSymbol || "TOKEN",
-                    tokenDecimals: wizardStore.tokenDetails.tokenDecimals || 18,
-                    owner: walletAddress,
-                    vestingStart: BigInt(Math.floor(Date.now() / 1000)), // Approx
-                    cliffDuration: BigInt(
-                        cliffDateToSeconds(distribution.schedule.cliffEndDate, distribution.schedule.cliffTime || "00:00"),
-                    ),
-                    vestingDuration: BigInt(
-                        durationToSeconds(
-                            distribution.schedule.distributionDuration,
-                            distribution.schedule.durationUnit,
-                        ),
-                    ),
-                    vestingPeriod: BigInt(
-                        unitToPeriodSeconds(distribution.schedule.durationUnit),
-                    ),
-                    tokenBalance: totalAmountWei,
-                };
-
+                // Optimistic UI Update — show in dashboard before next RPC fetch
                 try {
-                    addOptimisticContract(walletAddress, optimisticContract);
+                    addOptimisticContract(walletAddress, buildOptimisticContract({
+                        address: vestingAddress,
+                        name: distribution.name,
+                        description: distribution.description || "",
+                        tokenAddress: wizardStore.tokenDetails.tokenAddress as Address,
+                        tokenSymbol: wizardStore.tokenDetails.tokenSymbol,
+                        tokenDecimals: wizardStore.tokenDetails.tokenDecimals,
+                        owner: walletAddress,
+                        schedule: distribution.schedule,
+                        totalAmountWei: config.totalAmount,
+                    }));
                 } catch (err) {
                     console.warn("Optimistic cache update failed", err);
                 }
