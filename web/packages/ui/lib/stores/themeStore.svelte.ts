@@ -8,8 +8,7 @@
  * @module stores/themeStore
  */
 
-// SSR-safe browser check
-const browser = typeof window !== 'undefined';
+import { browser } from '@zarf/core/utils/ssr';
 import type { Theme } from './types';
 
 const STORAGE_KEY = 'zarf_theme';

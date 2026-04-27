@@ -25,7 +25,7 @@ let viemCore: typeof import('viem') | null = null;
 let _wagmiConfig: Config | null = null;
 let _initPromise: Promise<Config> | null = null;
 
-const browser = typeof window !== 'undefined';
+import { browser } from '../utils/ssr';
 
 /**
  * Lazily initialize wagmi - only loads the heavy wallet code when first called

@@ -7,8 +7,7 @@
  * @module config/contracts
  */
 
-// SSR-safe browser check (framework-agnostic)
-const browser = typeof window !== 'undefined';
+import { browser } from '../utils/ssr';
 
 // ============ Chain IDs ============
 
