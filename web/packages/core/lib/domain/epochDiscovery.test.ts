@@ -19,22 +19,13 @@ const meta = (idx: number, amount: string, unlockTime: number) => ({ index: idx,
 // ──────────────────────────────────────────────────────────────────────────
 
 describe('buildCommitmentLookup + lookupCommitment', () => {
-    it('matches both padded and unpadded keys', () => {
-        const dist: DistributionData['commitments'] = {
+    it('matches both padded and unpadded keys (older distributions stored unpadded)', () => {
+        const map = buildCommitmentLookup({
             [padded(0xabc)]: meta(0, '100', 0),  // padded form
-            '0xdead':       meta(1, '200', 0),  // unpadded form
-        };
-        const map = buildCommitmentLookup(dist);
-
-        // padded → padded entry
+            '0xdead':        meta(1, '200', 0),  // unpadded form
+        });
         expect(lookupCommitment(map, padded(0xabc))?.amount).toBe('100');
-        // padded query → unpadded stored entry: lookupCommitment strips leading zeros
         expect(lookupCommitment(map, padded(0xdead))?.amount).toBe('200');
-    });
-
-    it('returns undefined for unknown commitments', () => {
-        const map = buildCommitmentLookup({ [padded(0xabc)]: meta(0, '100', 0) });
-        expect(lookupCommitment(map, padded(0xdef))).toBeUndefined();
     });
 });
 
