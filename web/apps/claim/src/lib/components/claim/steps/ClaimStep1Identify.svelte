@@ -5,7 +5,7 @@
     import { Lock, Mail, KeyRound, Loader2, ArrowRight, LogOut } from "lucide-svelte";
     import { redirectToGoogle } from "@zarf/ui/utils/googleAuth";
     import type { Address } from "viem";
-    import { PIN_LENGTH } from "../../../constants";
+    import { PIN_LENGTH } from "@zarf/core/constants";
     import { browser } from "$app/environment";
     import { onMount } from "svelte";
     import ZenInput from "@zarf/ui/components/ui/ZenInput.svelte";

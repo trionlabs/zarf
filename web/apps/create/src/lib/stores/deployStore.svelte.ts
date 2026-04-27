@@ -1,5 +1,4 @@
 import type { Distribution, Recipient, MerkleTreeData } from './types';
-import type { DeployProgress, DeployConfig } from '../services/deploy';
 import type { Address } from 'viem';
 import { safeParse, safeStringify } from '@zarf/core/utils/json';
 
@@ -24,7 +23,6 @@ export class DeployState {
     walletAddress = $state<Address | null>(null);
 
     // Step 4
-    deployProgress = $state<DeployProgress | null>(null);
     contractAddress = $state<Address | null>(null);
     isDeployed = $state(false);
 
@@ -163,11 +161,6 @@ export class DeployState {
         this.walletAddress = address;
     }
 
-    // Deploy Actions
-    updateDeployProgress(progress: DeployProgress) {
-        this.deployProgress = progress;
-    }
-
     // Persist Transaction Hashes (The Write-Ahead Log)
     setApproveTx(hash: string) {
         this.approveTxHash = hash;
@@ -204,7 +197,6 @@ export class DeployState {
         this.isBackupConfirmed = false;
         this.isWalletConnected = false;
         this.walletAddress = null;
-        this.deployProgress = null;
         this.contractAddress = null;
         this.isDeployed = false;
         this.approveTxHash = null;
