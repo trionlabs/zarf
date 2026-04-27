@@ -5,7 +5,7 @@
     import {
         fetchContractMetadata,
         type OnChainVestingContract,
-    } from "../../services/distributionDiscovery";
+    } from "@zarf/core/services/distributionDiscovery";
     import ZenCard from "@zarf/ui/components/ui/ZenCard.svelte";
     import AddressInput from "@zarf/ui/components/ui/AddressInput.svelte";
 

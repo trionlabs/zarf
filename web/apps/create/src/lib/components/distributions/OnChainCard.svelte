@@ -6,7 +6,7 @@
         Hourglass,
         CheckCircle2,
     } from "lucide-svelte";
-    import type { OnChainVestingContract } from "../../services/distributionDiscovery";
+    import type { OnChainVestingContract } from "@zarf/core/services/distributionDiscovery";
     import ZenCard from "@zarf/ui/components/ui/ZenCard.svelte";
     import ZenButton from "@zarf/ui/components/ui/ZenButton.svelte";
     import ZenBadge from "@zarf/ui/components/ui/ZenBadge.svelte";

@@ -3,7 +3,7 @@ import type { ZKProof, MerkleClaim, MerkleTreeData } from "@zarf/ui/types";
 import { calculateVestingPeriods, type VestingPeriod } from "@zarf/core/utils";
 import { toastStore } from "@zarf/ui/stores/toastStore.svelte";
 
-import { fetchDistributionData, type DistributionData } from "../services/distribution";
+import { fetchDistributionData, type DistributionData } from "@zarf/core/services/distribution";
 import { isEpochClaimed } from "@zarf/core/contracts";
 import { type Address } from 'viem';
 

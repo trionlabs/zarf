@@ -16,7 +16,7 @@
     import {
         discoverOwnerVestings,
         type OnChainVestingContract,
-    } from "$lib/services/distributionDiscovery";
+    } from "@zarf/core/services/distributionDiscovery";
 
     // Components
     import PageHeader from "@zarf/ui/components/ui/PageHeader.svelte";
