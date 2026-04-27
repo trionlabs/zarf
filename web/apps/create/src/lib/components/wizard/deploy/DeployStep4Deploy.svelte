@@ -19,6 +19,7 @@
         addOptimisticContract,
         type OnChainVestingContract,
     } from "@zarf/core/services/distributionDiscovery";
+    import { buildFactoryDeployInputs } from "@zarf/core/domain/merkleResultAdapter";
     import { walletStore } from "@zarf/ui/stores/walletStore.svelte";
     import { goto } from "$app/navigation";
     import {
@@ -198,30 +199,20 @@
         // Get token decimals (default to 18 if not set)
         const tokenDecimals = wizardStore.tokenDetails.tokenDecimals ?? 18;
 
-        // Prepare identity commitments and amounts from merkle result
-        // amounts are ALREADY in wei (from DeployStep1), so we just BigInt them
-        const commitments: Hash[] = merkleResult.claims.map((c: any) => {
-            // Use identityCommitment if available, fallback to deprecated emailHash for older cached data
-            const commitment =
-                c.identityCommitment || c.emailHash?.toString(16);
-
-            // Format to 32-byte hex
-            let hex = commitment;
-            if (typeof hex === "string" && hex.startsWith("0x")) {
-                hex = hex.slice(2);
-            }
-            if (!hex) hex = "0";
-
-            return `0x${hex.padStart(64, "0")}` as Hash;
-        });
-
-        const amounts: bigint[] = merkleResult.claims.map((c: any) =>
-            BigInt(c.amount),
-        );
-
-        // Prepare merkle root
-        const merkleRootHex = merkleResult.root.toString(16);
-        const merkleRoot = `0x${merkleRootHex.padStart(64, "0")}` as Hash;
+        // Validate every claim and convert to factory inputs.
+        // Throws on missing/malformed data — closes the silent 0x000…0 path.
+        let factoryInputs: ReturnType<typeof buildFactoryDeployInputs>;
+        try {
+            factoryInputs = buildFactoryDeployInputs(
+                merkleResult.claims,
+                merkleResult.root,
+            );
+        } catch (e) {
+            error = `Distribution data is invalid: ${(e as Error).message}. Please recreate the distribution.`;
+            isDeploying = false;
+            return;
+        }
+        const { commitments, amounts, merkleRoot } = factoryInputs;
 
         // Convert total amount to wei using token decimals
         const totalAmountWei = parseUnits(
