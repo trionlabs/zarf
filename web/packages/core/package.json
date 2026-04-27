@@ -25,7 +25,8 @@
         "./config/*": "./lib/config/*.ts",
         "./zk": "./lib/zk/index.ts",
         "./zk/*": "./lib/zk/*.ts",
-        "./services/*": "./lib/services/*.ts"
+        "./services/*": "./lib/services/*.ts",
+        "./domain/*": "./lib/domain/*.ts"
     },
     "peerDependencies": {
         "@aztec/bb.js": "^2.1.9",
