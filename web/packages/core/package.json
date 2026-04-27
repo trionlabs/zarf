@@ -48,6 +48,7 @@
         "@noir-lang/noirc_abi": "1.0.0-beta.18",
         "@wagmi/connectors": "^7.1.5",
         "@wagmi/core": "^3.3.1",
+        "happy-dom": "^20.9.0",
         "noir-jwt": "^0.4.5",
         "viem": "^2.45.0",
         "vitest": "^4.1.5",
