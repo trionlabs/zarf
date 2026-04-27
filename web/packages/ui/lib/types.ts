@@ -156,11 +156,12 @@ export interface ZKProof {
  */
 export interface ZKClaimData {
     email: string;              // User's email
-    salt: string;               // Random salt (hex)
+    salt: string;               // Random salt (hex field element)
     amount: bigint;             // Claimed amount
     merkleProof: MerkleProof;   // Merkle proof siblings & indices
     merkleRoot: bigint;         // Merkle root
     recipient: Address;         // Recipient wallet address
+    unlockTime: bigint;         // ADR-023: Discrete Vesting unlock timestamp
 }
 
 // ============================================================================

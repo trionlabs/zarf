@@ -4,7 +4,9 @@
     "private": true,
     "type": "module",
     "scripts": {
-        "postinstall": "node scripts/copy-wasm.js"
+        "postinstall": "node scripts/copy-wasm.js",
+        "test": "vitest run",
+        "test:watch": "vitest"
     },
     "exports": {
         ".": "./lib/index.ts",
@@ -47,6 +49,7 @@
         "@wagmi/core": "^3.3.1",
         "noir-jwt": "^0.4.5",
         "viem": "^2.45.0",
+        "vitest": "^4.1.5",
         "wagmi": "^3.4.1"
     }
 }

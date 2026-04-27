@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { onMount, onDestroy } from "svelte";
+    import { onMount } from "svelte";
     import { claimStore } from "../../../stores/claimStore.svelte";
 
     import {
@@ -8,19 +8,16 @@
     } from "../../../utils/proofHelpers";
     import { getPublicKeyForJwt } from "../../../utils/googleJwk";
     import {
-        Loader2,
         CheckCircle,
         ShieldCheck,
         AlertTriangle,
     } from "lucide-svelte";
-    import ProofWorker from "../../../workers/proof.worker.ts?worker";
-    import type { ProofRequest } from "../../../workers/proof.worker";
-    import type { ZKProof } from "@zarf/ui/types";
+    import { generateClaimProof } from "@zarf/core/zk";
+    import type { Address } from "viem";
     import ZenButton from "@zarf/ui/components/ui/ZenButton.svelte";
 
     let progress = $state(0);
     let statusMessage = $state("Initializing...");
-    let worker: Worker | null = null;
     let isGenerating = $state(true);
     let error = $state<string | null>(null);
 
@@ -65,62 +62,43 @@
             const { proof: merkleProof, root: merkleRoot } =
                 await getProofForLeaf(leaf, leaves);
 
-            statusMessage = "Starting Proof Worker...";
-            worker = new ProofWorker();
-
-            worker.onmessage = (e) => {
-                const { type, message, data } = e.data;
-                if (type === "PROGRESS") {
-                    statusMessage = message;
-                    if (progress < 90) progress += 10;
-                } else if (type === "RESULT") {
-                    const result = data as ZKProof;
-                    claimStore.setProof(result);
-                    progress = 100;
-                    statusMessage = "Proof Ready!";
-                    isGenerating = false;
-                    setTimeout(() => {
-                        claimStore.nextStep();
-                    }, 1000);
-                } else if (type === "ERROR") {
-                    error = message;
-                    isGenerating = false;
-                }
-            };
-
             const jwt = claimStore.jwt;
             if (!jwt) throw new Error("JWT is missing.");
 
             const publicKey = await getPublicKeyForJwt(jwt);
 
-            const payload: ProofRequest["payload"] = {
-                jwt,
-                publicKey,
-                claimData: {
-                    email: email.toLowerCase().trim(),
-                    salt,
-                    amount: "0x" + amount.toString(16),
-                    merkleProof: {
-                        siblings: merkleProof.siblings,
-                        indices: merkleProof.indices.map((i) => i.toString()),
-                    },
-                    merkleRoot: "0x" + merkleRoot.toString(16),
-                    recipient: targetWallet,
-                    unlockTime: "0x" + unlockTime.toString(16),
-                },
-            };
-
             statusMessage = "Initializing ZK Worker...";
             progress = 40;
-            worker.postMessage({ type: "GENERATE_PROOF", payload });
+
+            const result = await generateClaimProof(
+                jwt,
+                publicKey,
+                {
+                    email: email.toLowerCase().trim(),
+                    salt,
+                    amount,
+                    merkleProof,
+                    merkleRoot,
+                    recipient: targetWallet as Address,
+                    unlockTime: BigInt(unlockTime),
+                },
+                (message) => {
+                    statusMessage = message;
+                    if (progress < 90) progress += 10;
+                },
+            );
+
+            claimStore.setProof(result);
+            progress = 100;
+            statusMessage = "Proof Ready!";
+            isGenerating = false;
+            setTimeout(() => {
+                claimStore.nextStep();
+            }, 1000);
         } catch (e: any) {
             error = e.message;
             isGenerating = false;
         }
-    });
-
-    onDestroy(() => {
-        if (worker) worker.terminate();
     });
 </script>
 
