@@ -18,7 +18,7 @@
     import {
         addOptimisticContract,
         type OnChainVestingContract,
-    } from "../../../services/distributionDiscovery";
+    } from "@zarf/core/services/distributionDiscovery";
     import { walletStore } from "@zarf/ui/stores/walletStore.svelte";
     import { goto } from "$app/navigation";
     import {
