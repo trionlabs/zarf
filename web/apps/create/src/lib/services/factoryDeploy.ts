@@ -311,34 +311,17 @@ function delay(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+import { sanitizeBlockchainError } from '@zarf/ui/utils/errorSanitizer';
+
 function sanitizeError(error: unknown): string {
-    const message = (error as { message?: string })?.message || '';
-
-    if (message.includes('rejected') || message.includes('denied')) {
-        return 'Transaction rejected by user';
-    }
-    if (message.includes('insufficient allowance')) {
-        return 'Insufficient token approval. Please approve more tokens.';
-    }
-    if (message.includes('insufficient balance')) {
-        return 'Insufficient token balance';
-    }
-    if (message.includes('ArrayLengthMismatch')) {
-        return 'Allocation data mismatch: email hashes and amounts must have same length';
-    }
-    if (message.includes('ZeroAllocations')) {
-        return 'No allocations provided';
-    }
-    if (message.includes('TransferFailed')) {
-        return 'Token transfer failed';
-    }
-    const code = (error as { code?: number })?.code;
-    if (message.includes('rate limit') || message.includes('too many') || message.includes('resource not available') || message.includes('ResourceUnavailable') || code === -32002) {
-        return 'MetaMask RPC rate limited. Fix: Open MetaMask → Settings → Networks → Sepolia → Change RPC URL to: https://ethereum-sepolia-rpc.publicnode.com';
-    }
-
-    // Return original message for development, sanitize in production
-    return import.meta.env.DEV ? message : 'Transaction failed. Please try again.';
+    return sanitizeBlockchainError(error, {
+        customRules: [
+            { match: 'ArrayLengthMismatch', message: 'Allocation data mismatch: email hashes and amounts must have same length.' },
+            { match: 'ZeroAllocations', message: 'No allocations provided.' },
+            { match: 'TransferFailed', message: 'Token transfer failed.' },
+        ],
+        fallback: 'Transaction failed. Please try again.',
+    });
 }
 
 // ============================================================================
