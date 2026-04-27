@@ -1,10 +1,19 @@
 import { browser } from '$app/environment';
 import type { ZKProof, MerkleClaim, MerkleTreeData } from "@zarf/ui/types";
-import { calculateVestingPeriods, type VestingPeriod } from "@zarf/core/utils";
 import { toastStore } from "@zarf/ui/stores/toastStore.svelte";
 
 import { fetchDistributionData, type DistributionData } from "@zarf/core/services/distribution";
 import { isEpochClaimed } from "@zarf/core/contracts";
+import {
+    totalAllocation as totalAllocationOf,
+    claimedAmount as claimedAmountOf,
+    unlockedAmount as unlockedAmountOf,
+    claimableAmount as claimableAmountOf,
+    isCliffPassed as isCliffPassedOf,
+    cliffEndDate as cliffEndDateOf,
+    findNextClaimableIdx,
+    buildVestingPeriods,
+} from "@zarf/core/domain/claimFlow";
 import { type Address } from 'viem';
 
 /**
@@ -62,43 +71,21 @@ class ClaimFlowState {
     // Getters (Derived from State)
     // ==========================================
 
-    get totalAllocation() {
-        return this.state.epochs.reduce((sum, e) => sum + e.amount, 0n);
-    }
+    get totalAllocation()  { return totalAllocationOf(this.state.epochs); }
+    get claimedAmount()    { return claimedAmountOf(this.state.epochs); }
+    get unlockedAmount()   { return unlockedAmountOf(this.state.epochs); }
+    get vestedAmount()     { return this.unlockedAmount; }
+    get claimableAmount()  { return claimableAmountOf(this.state.epochs); }
+    get isEligible()       { return this.state.epochs.length > 0; }
 
-    get claimedAmount() {
-        return this.state.epochs.filter(e => e.isClaimed).reduce((sum, e) => sum + e.amount, 0n);
-    }
-
-    get unlockedAmount() {
-        return this.state.epochs.filter(e => !e.isLocked).reduce((sum, e) => sum + e.amount, 0n);
-    }
-
-    get vestedAmount() {
-        return this.unlockedAmount;
-    }
-
-    get claimableAmount() {
-        return this.state.epochs.filter(e => !e.isLocked && !e.isClaimed).reduce((sum, e) => sum + e.amount, 0n);
-    }
-
-    get isEligible() {
-        return this.state.epochs.length > 0;
-    }
-
-    get isCliffPassed() {
-        if (!this.state.vestingSchedule) return true;
-        const start = Number(this.state.vestingSchedule.vestingStart);
-        const cliff = Number(this.state.vestingSchedule.cliffDuration);
-        return (Date.now() / 1000) >= (start + cliff);
-    }
-
-    get cliffEndDate() {
-        if (!this.state.vestingSchedule) return null;
-        const start = Number(this.state.vestingSchedule.vestingStart);
-        const cliff = Number(this.state.vestingSchedule.cliffDuration);
-        return new Date((start + cliff) * 1000);
-    }
+    /**
+     * Has the cliff passed? Returns `true | false | null` — `null` means
+     * "schedule not loaded yet"; UI should treat as "unknown", not as eligible.
+     * (Previously this returned `true` on null schedule, which momentarily
+     * showed a CTA before data loaded.)
+     */
+    get isCliffPassed() { return isCliffPassedOf(this.state.vestingSchedule); }
+    get cliffEndDate()  { return cliffEndDateOf(this.state.vestingSchedule); }
 
     // UI Helpers (Direct Accessors)
     get currentStep() { return this.state.currentStep; }
@@ -114,30 +101,7 @@ class ClaimFlowState {
     get vestingSchedule() { return this.state.vestingSchedule; }
 
     get periods() {
-        const claimedMap: Record<number, boolean> = {};
-        // Map based on index (assuming index 0 corresponds to period 1?)
-        // In the utility logic: "Check if this specific epoch index is marked as claimed"
-        // In Store: epochs[0] corresponds to period 1?
-        // Let's verify discovery logic.
-        // Discovery: `index` increments. `leafIndex` comes from CSV.
-        // Vesting Logic: `result.push({ index: i + 1 ... })`
-        // Loop `i=0`. `claimedEpochs[i]`.
-        // So yes, `this.state.epochs[i]` corresponds to vesting period `i`.
-        
-        // Note: `this.state.epochs` might be sparse if we only found SOME epochs?
-        // Discovery finds ALL epochs usually.
-        // But let's be safe. If `epochs` array is aligned with time (index 0 = first unlock), then this works.
-        // Yes, the discovery loop pushes in order of discovery (0 to MAX).
-        
-        this.state.epochs.forEach((e, i) => {
-            if (e.isClaimed) claimedMap[i] = true;
-        });
-
-        return calculateVestingPeriods(
-            this.state.vestingSchedule,
-            this.totalAllocation,
-            claimedMap
-        );
+        return buildVestingPeriods(this.state.vestingSchedule, this.state.epochs);
     }
 
     get selectedEpoch() {
@@ -254,13 +218,10 @@ class ClaimFlowState {
     }
 
     selectNextClaimableEpoch() {
-        if (!this.state.epochs) return false;
-        const index = this.state.epochs.findIndex(e => !e.isLocked && !e.isClaimed);
-        if (index !== -1) {
-            this.state.selectedEpochIndex = index;
-            return true;
-        }
-        return false;
+        const idx = findNextClaimableIdx(this.state.epochs);
+        if (idx === null) return false;
+        this.state.selectedEpochIndex = idx;
+        return true;
     }
 
     // --- Persistence ---
