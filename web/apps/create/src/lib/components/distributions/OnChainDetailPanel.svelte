@@ -8,7 +8,7 @@
         Hourglass,
         ShieldCheck,
     } from "lucide-svelte";
-    import type { OnChainVestingContract } from "../../services/distributionDiscovery";
+    import type { OnChainVestingContract } from "@zarf/core/services/distributionDiscovery";
 
     let {
         contract,
