@@ -1,5 +1,5 @@
-
 import type { ZKClaimData, ZKProof } from '../types';
+import type { ClaimData } from './proofInputs';
 
 // Re-export types for worker consumers
 export type { ProofRequest } from './proof.worker';
@@ -13,10 +13,13 @@ export interface ProofRequestPayload {
     claimData: ZKClaimData;
 }
 
+export type ProgressCallback = (message: string) => void;
+
 // Single instance of the worker
 let worker: Worker | null = null;
 let pendingResolver: ((value: ZKProof) => void) | null = null;
 let pendingRejecter: ((reason: any) => void) | null = null;
+let pendingProgress: ProgressCallback | null = null;
 
 /*
  * Initialize the ZK Proof Worker
@@ -40,17 +43,24 @@ function initWorker() {
                     pendingResolver(data);
                     pendingResolver = null;
                     pendingRejecter = null;
+                    pendingProgress = null;
                 }
             } else if (type === 'ERROR') {
                 if (pendingRejecter) {
                     pendingRejecter(new Error(message));
                     pendingResolver = null;
                     pendingRejecter = null;
+                    pendingProgress = null;
                 }
                 console.error('[ZK Prover Error]', message);
                 terminateWorker();
             } else if (type === 'PROGRESS') {
-                console.log('[ZK Prover]', message);
+                if (pendingProgress) {
+                    try { pendingProgress(message); }
+                    catch (e) { console.error('[ZK Prover] onProgress threw:', e); }
+                } else {
+                    console.log('[ZK Prover]', message);
+                }
             }
         };
 
@@ -60,6 +70,7 @@ function initWorker() {
                 pendingRejecter(e);
                 pendingResolver = null;
                 pendingRejecter = null;
+                pendingProgress = null;
             }
             terminateWorker();
         };
@@ -78,6 +89,22 @@ function terminateWorker() {
     }
 }
 
+/** Convert a domain ZKClaimData (bigints) into the wire shape the worker expects (hex strings). */
+function toWireClaimData(c: ZKClaimData): ClaimData {
+    return {
+        email: c.email,
+        salt: c.salt,
+        amount: '0x' + c.amount.toString(16),
+        merkleProof: {
+            siblings: c.merkleProof.siblings,
+            indices: c.merkleProof.indices.map((i) => i.toString()),
+        },
+        merkleRoot: '0x' + c.merkleRoot.toString(16),
+        recipient: c.recipient,
+        unlockTime: '0x' + c.unlockTime.toString(16),
+    };
+}
+
 /**
  * Generate a ZK Proof for claiming tokens.
  * This runs in a dedicated Web Worker to avoid blocking the main thread.
@@ -85,12 +112,14 @@ function terminateWorker() {
  * @param jwt Google OAuth JWT token
  * @param publicKey Google Public Key (JWK)
  * @param claimData Claim data including merkle proof
+ * @param onProgress Optional callback fired for each progress message from the worker
  * @returns Generated ZK Proof
  */
 export async function generateClaimProof(
     jwt: string,
     publicKey: any,
-    claimData: ZKClaimData
+    claimData: ZKClaimData,
+    onProgress?: ProgressCallback,
 ): Promise<ZKProof> {
     const w = initWorker();
     if (!w) throw new Error('ZK Prover not supported in this environment');
@@ -102,13 +131,14 @@ export async function generateClaimProof(
     return new Promise((resolve, reject) => {
         pendingResolver = resolve;
         pendingRejecter = reject;
+        pendingProgress = onProgress ?? null;
 
         w.postMessage({
             type: 'GENERATE_PROOF',
             payload: {
                 jwt,
                 publicKey,
-                claimData,
+                claimData: toWireClaimData(claimData),
             },
         });
     });
