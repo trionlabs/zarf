@@ -11,8 +11,10 @@
     } from "../../../services/factoryDeploy";
     import { addOptimisticContract } from "@zarf/core/services/distributionDiscovery";
     import { buildFactoryDeployInputs } from "@zarf/core/domain/merkleResultAdapter";
-    import { planDeploy, buildOptimisticContract } from "@zarf/core/domain/deployPlanner";
+    import { planDeploy, planScheduleSeconds, buildOptimisticContract } from "@zarf/core/domain/deployPlanner";
     import { recoverPendingDeploy } from "@zarf/core/domain/deployRecovery";
+    import { buildClaimList } from "@zarf/core/domain/claimListBuilder";
+    import { pinClaimList } from "../../../services/pinService";
     import { walletStore } from "@zarf/ui/stores/walletStore.svelte";
     import { goto } from "$app/navigation";
     import {
@@ -54,7 +56,7 @@
     // Local deployment state
     let isDeploying = $state(false);
     let currentStep = $state<
-        "idle" | "approve" | "create" | "complete" | "error"
+        "idle" | "pin" | "approve" | "create" | "complete" | "error"
     >("idle");
     let currentMessage = $state("");
     let error = $state<string | null>(null);
@@ -199,6 +201,27 @@
                 merkleResult.claims,
                 merkleResult.root,
             );
+
+            // Pin the off-chain claim list to IPFS so the claim app can
+            // discover it without a manual repo redeploy. Idempotent: same
+            // content yields the same CID, so a recovered run reuses it.
+            let metadataCid = deployStore.metadataCid;
+            if (!metadataCid) {
+                currentStep = "pin";
+                currentMessage = "Pinning claim list to IPFS...";
+                const seconds = planScheduleSeconds(distribution.schedule);
+                const claimList = await buildClaimList({
+                    claims: merkleResult.claims,
+                    root: merkleResult.root,
+                    cliffSeconds: seconds.cliffSeconds,
+                    vestingSeconds: seconds.vestingSeconds,
+                    periodSeconds: seconds.periodSeconds,
+                });
+                const pinned = await pinClaimList(claimList);
+                metadataCid = pinned.cid;
+                deployStore.setMetadataCid(metadataCid);
+            }
+
             config = planDeploy({
                 factoryAddress: currentFactoryAddress as Address,
                 tokenAddress: wizardStore.tokenDetails.tokenAddress as Address,
@@ -211,10 +234,12 @@
                 commitments: factoryInputs.commitments,
                 amounts: factoryInputs.amounts,
                 allocationsTotal: factoryInputs.totalAllocation,
+                metadataCid,
             });
         } catch (e) {
-            error = `Distribution data is invalid: ${(e as Error).message}`;
+            error = `Pre-deploy step failed: ${(e as Error).message}`;
             isDeploying = false;
+            currentStep = "error";
             return;
         }
         if (config.immediateUnlock) {

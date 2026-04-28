@@ -1,105 +1,57 @@
 import { buildMerkleTree, getMerkleProof } from '@zarf/core/crypto/merkleTree';
 import type { MerkleProof } from '@zarf/ui/types';
+import type { Address } from 'viem';
+import { getCidForVesting } from '@zarf/core/services/vestingDiscovery';
+import { fetchIpfsJson } from '@zarf/core/utils/ipfsFetch';
 
 /**
- * Fetch Merkle leaves from the distribution file.
- * 
- * Strategy:
- * 1. Default to `/distribution.json` (Single-tenant / Local Dev Mode)
- * 2. In Multi-tenant Prod, we would use `/distributions/${contractAddress}.json`
- * 
- * @param contractAddress - Functional context (unused currently, reserved for v2)
+ * Fetch Merkle leaves for a vesting from IPFS.
+ *
+ * The CID is resolved from the factory's VestingCreated event log.
+ *
+ * @param contractAddress - Vesting contract address
  */
 export async function fetchPublicLeaves(contractAddress: string | null): Promise<bigint[]> {
-    const defaultUrl = '/distribution.json';
-
-    // Future-proof: Ready for multi-tenant logic
-    // Future-proof: Ready for multi-tenant logic
-    const targetUrl = contractAddress ? `/distributions/${contractAddress.toLowerCase()}.json` : defaultUrl;
-
-    // Current: Multi-tenant enabled
-    console.log(`[Distribution] Fetching from: ${targetUrl} (Context: ${contractAddress || 'None'})`);
-
-    try {
-        let response = await fetch(targetUrl);
-
-        // Fallback Logic: If specific file missing, try default (useful if we enable multi-tenant later)
-        if (!response.ok && targetUrl !== defaultUrl) {
-            console.warn(`[Distribution] Specific file not found. Falling back to default.`);
-            response = await fetch(defaultUrl);
-        }
-
-        if (!response.ok) {
-            throw new Error(`Failed to load distribution data. Status: ${response.status}`);
-        }
-
-        const data = await response.json();
-        return processDistributionData(data);
-
-    } catch (e) {
-        console.error("[Distribution] Error:", e);
-        throw new Error(`Distribution Data Error: ${e instanceof Error ? e.message : 'Unknown error'}`);
+    if (!contractAddress) {
+        throw new Error('Distribution Data Error: contractAddress is required');
     }
+
+    const cid = await getCidForVesting(contractAddress as Address);
+    if (!cid) {
+        throw new Error(`No metadata CID found for vesting ${contractAddress}`);
+    }
+    const data = await fetchIpfsJson(cid);
+    return processDistributionData(data);
 }
 
-async function processDistributionData(data: any): Promise<bigint[]> {
-    // 1. Secure Format: Direct array of leaves
-    // TEMP: Force disabled to debug leaf mismatch. We want to reconstruct from commitments to ensure consistency.
-    /*
-    if (data.leaves && Array.isArray(data.leaves)) {
-        console.log(`[Distribution] Found ${data.leaves.length} public leaves (Secure Format).`);
-        return data.leaves.map((l: string) => BigInt(l));
-    }
-    */
+interface ClaimListShape {
+    commitments?: Record<string, { amount: string; unlockTime: number; index: number }>;
+}
 
-    // 2. Hybrid Format: Reconstruct from Commitments Map (ADR-023 Standard)
-    if (data.commitments && typeof data.commitments === 'object') {
-        console.log('[Distribution] Leaves array missing. Reconstructing from commitments map...');
-        const leavesMap = new Map<number, bigint>();
-        let maxIndex = -1;
-
-        // We need crypto tools to re-compute leaf
-        const { computeLeafFromCommitment } = await import('@zarf/core/crypto/merkleTree');
-
-        for (const [commitment, metadata] of Object.entries(data.commitments)) {
-            const meta = metadata as any;
-            const idx = meta.index;
-            const amount = BigInt(meta.amount);
-            const unlockTime = meta.unlockTime;
-
-            // Recompute Leaf: Hash(IdentityCommitment, Amount, UnlockTime)
-            const leaf = await computeLeafFromCommitment(commitment, amount, unlockTime);
-
-            leavesMap.set(idx, leaf);
-            if (idx > maxIndex) maxIndex = idx;
-        }
-
-        // Convert map to dense array (sparse entries are 0)
-        // Tree usually has Size = 2^k, but here we just need up to maxIndex + 1
-        const leaves: bigint[] = [];
-        for (let i = 0; i <= maxIndex; i++) {
-            leaves.push(leavesMap.get(i) || 0n);
-        }
-
-        console.log(`[Distribution] Reconstructed ${leaves.length} leaves from commitments.`);
-        return leaves;
+async function processDistributionData(data: unknown): Promise<bigint[]> {
+    const doc = data as ClaimListShape;
+    if (!doc.commitments || typeof doc.commitments !== 'object') {
+        throw new Error("Invalid distribution format: 'commitments' missing");
     }
 
-    // 3. Legacy Format (Dev/Unsafe)
-    const list = data.claims || data.recipients;
+    const { computeLeafFromCommitment } = await import('@zarf/core/crypto/merkleTree');
 
-    if (!list || !Array.isArray(list)) {
-        throw new Error("Invalid distribution format: 'leaves', 'commitments' or 'claims' missing.");
+    const leavesMap = new Map<number, bigint>();
+    let maxIndex = -1;
+    for (const [commitment, meta] of Object.entries(doc.commitments)) {
+        const leaf = await computeLeafFromCommitment(
+            commitment,
+            BigInt(meta.amount),
+            meta.unlockTime,
+        );
+        leavesMap.set(meta.index, leaf);
+        if (meta.index > maxIndex) maxIndex = meta.index;
     }
 
-    console.warn("[Distribution] Using Legacy/Unsafe JSON format. This should not be used in production.");
-
-    const leaves = list.map((c: any) => {
-        if (!c.leaf) return 0n;
-        return BigInt(c.leaf);
-    });
-
-    console.log(`Loaded ${leaves.length} leaves from distribution.`);
+    const leaves: bigint[] = [];
+    for (let i = 0; i <= maxIndex; i++) {
+        leaves.push(leavesMap.get(i) ?? 0n);
+    }
     return leaves;
 }
 

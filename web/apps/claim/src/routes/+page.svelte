@@ -14,16 +14,16 @@
     import ZenBadge from "@zarf/ui/components/ui/ZenBadge.svelte";
     import ZenButton from "@zarf/ui/components/ui/ZenButton.svelte";
     import { filterDistributionsByEmail } from "$lib/services/emailFilter";
+    import { discoverAllVestings } from "@zarf/core/services/vestingDiscovery";
 
     import { page } from "$app/state";
     import { goto } from "$app/navigation";
-
-    let { data } = $props();
 
     let isAuthenticating = $state(false);
     let isFiltering = $state(false);
     let hasFiltered = $state(false);
     let filteredAddresses = $state<Address[]>([]);
+    let discoveredAddresses = $state<Address[]>([]);
 
     // Track if user is authenticated
     let isAuthenticated = $derived(authStore.isAuthenticated);
@@ -39,8 +39,8 @@
         }
 
         // Filter when authenticated with email and have addresses
-        if (data.vaultAddresses.length > 0) {
-            filterDistributions(userEmail, data.vaultAddresses as Address[]);
+        if (discoveredAddresses.length > 0) {
+            filterDistributions(userEmail, discoveredAddresses);
         } else {
             // No addresses to filter
             hasFiltered = true;
@@ -64,6 +64,15 @@
             hasFiltered = true;
         }
     }
+
+    onMount(async () => {
+        try {
+            const vestings = await discoverAllVestings();
+            discoveredAddresses = vestings.map((v) => v.address);
+        } catch (e) {
+            console.warn("[Claim] Chain discovery failed", e);
+        }
+    });
 
     onMount(() => {
         // 1. Handle OAuth Redirect Callback

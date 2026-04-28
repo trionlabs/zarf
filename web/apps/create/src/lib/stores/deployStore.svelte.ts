@@ -29,6 +29,7 @@ export class DeployState {
     // Recovery Fields (The Write-Ahead Log)
     approveTxHash = $state<string | null>(null);
     createTxHash = $state<string | null>(null);
+    metadataCid = $state<string | null>(null);
 
     // External guards (Derived)
     canContinueToStep2 = $derived(!!this.merkleResult);
@@ -53,6 +54,7 @@ export class DeployState {
                 // Recovery fields
                 approveTxHash: this.approveTxHash,
                 createTxHash: this.createTxHash,
+                metadataCid: this.metadataCid,
                 timestamp: Date.now()
             };
             const key = `deploy_state_${this.distribution.id}`;
@@ -89,6 +91,7 @@ export class DeployState {
                 // Restore recovery state
                 this.approveTxHash = state.approveTxHash || null;
                 this.createTxHash = state.createTxHash || null;
+                this.metadataCid = state.metadataCid || null;
             }
         } catch (e) {
             console.warn("Failed to load deploy state", e);
@@ -172,6 +175,11 @@ export class DeployState {
         this.save();
     }
 
+    setMetadataCid(cid: string) {
+        this.metadataCid = cid;
+        this.save();
+    }
+
     setDeployed(address: Address) {
         this.isDeployed = true;
         this.contractAddress = address;
@@ -201,6 +209,7 @@ export class DeployState {
         this.isDeployed = false;
         this.approveTxHash = null;
         this.createTxHash = null;
+        this.metadataCid = null;
 
         if (typeof window !== "undefined" && this.distribution?.id) {
             localStorage.removeItem(`deploy_state_${this.distribution.id}`);

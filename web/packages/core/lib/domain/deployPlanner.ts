@@ -91,6 +91,8 @@ export interface DeployPlanInputs {
     amounts: bigint[];
     /** Sum of amounts; used for the integrity check. */
     allocationsTotal: bigint;
+    /** IPFS CID of the off-chain claim list. */
+    metadataCid: string;
 }
 
 /** Subset of `FactoryDeployConfig` we construct here. Caller can spread or assign as-needed. */
@@ -107,6 +109,7 @@ export interface PlannedDeployConfig {
     owner: Address;
     name: string;
     description: string;
+    metadataCid: string;
     immediateUnlock: boolean;
 }
 
@@ -140,6 +143,7 @@ export function planDeploy(inputs: DeployPlanInputs, now: Date = new Date()): Pl
         owner: inputs.owner,
         name: inputs.name,
         description: inputs.description,
+        metadataCid: inputs.metadataCid,
         immediateUnlock,
     };
 }
