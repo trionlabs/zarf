@@ -23,16 +23,18 @@ contract ZarfVestingFactory {
         uint256 cliffDuration;    // Cliff duration in seconds
         uint256 vestingDuration;  // Total vesting duration in seconds
         uint256 vestingPeriod;    // Duration of each unlock period in seconds
+        string metadataCid;       // IPFS CID of off-chain claim list (leaves, schedule, hashes)
     }
 
     // ============ Events ============
-    
+
     event VestingCreated(
         address indexed vesting,
         address indexed owner,
         address indexed token,
         uint256 totalAmount,
-        uint256 recipientCount
+        uint256 recipientCount,
+        string metadataCid
     );
 
     // ============ Errors ============
@@ -90,16 +92,16 @@ contract ZarfVestingFactory {
         // 6. Track deployment
         _trackDeployment(vesting, msg.sender);
         
-        emit VestingCreated(vesting, msg.sender, params.token, totalAmount, params.commitments.length);
+        emit VestingCreated(vesting, msg.sender, params.token, totalAmount, params.commitments.length, params.metadataCid);
     }
-    
+
     function createVesting(CreateVestingParams calldata params) external returns (address vesting) {
          if (params.commitments.length != params.amounts.length) revert ArrayLengthMismatch();
          if (params.commitments.length == 0) revert ZeroAllocations();
          vesting = _deployAndInitialize(params, msg.sender);
          _trackDeployment(vesting, msg.sender);
          uint256 total = _sumAmounts(params.amounts);
-         emit VestingCreated(vesting, msg.sender, params.token, total, params.commitments.length);
+         emit VestingCreated(vesting, msg.sender, params.token, total, params.commitments.length, params.metadataCid);
     }
 
     // ============ Internal Deployment Logic ============

@@ -9,9 +9,9 @@ import "../src/ZarfVestingFactory.sol";
 /// @dev Run with: forge script script/DeployFactory.s.sol --rpc-url $RPC_URL --broadcast --verify
 contract DeployFactory is Script {
     function run() external {
-        // Load environment variables
-        address verifier = vm.envAddress("VERIFIER_ADDRESS");
-        address jwkRegistry = vm.envAddress("JWK_REGISTRY_ADDRESS");
+        // Load environment variables (VITE_-prefixed because frontend reads them too)
+        address verifier = vm.envAddress("VITE_VERIFIER_ADDRESS");
+        address jwkRegistry = vm.envAddress("VITE_JWK_REGISTRY_ADDRESS");
 
         console.log("Deploying ZarfVestingFactory...");
         console.log("  Verifier:", verifier);
