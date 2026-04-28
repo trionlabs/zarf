@@ -44,6 +44,7 @@ describe('planDeploy', () => {
         totalAmountWei: 1000n,
         merkleRoot: '0xroot' as Hash, commitments: ['0xc1' as Hash], amounts: [1000n],
         allocationsTotal: 1000n,
+        metadataCid: 'bafkreitestcid',
     };
 
     it('throws on integrity error (allocations sum ≠ totalAmount)', () => {

@@ -1,6 +1,6 @@
 <script lang="ts">
     import { onMount } from "svelte";
-    import { fade, slide } from "svelte/transition";
+    import { fade, slide, fly } from "svelte/transition";
     import { goto } from "$app/navigation";
     import {
         Plus,
@@ -25,6 +25,7 @@
     import ZenAlert from "@zarf/ui/components/ui/ZenAlert.svelte";
     import DistributionCard from "$lib/components/wizard/DistributionCard.svelte";
     import OnChainCard from "$lib/components/distributions/OnChainCard.svelte";
+    import OnChainDetailPanel from "$lib/components/distributions/OnChainDetailPanel.svelte";
     import DistributionEmptyState from "$lib/components/distributions/DistributionEmptyState.svelte";
     import WalletConnectButton from "@zarf/ui/components/wallet/WalletConnectButton.svelte";
 
@@ -33,6 +34,19 @@
     let isFetching = $state(false);
     let onChainContracts = $state<OnChainVestingContract[]>([]);
     let fetchError = $state<string | null>(null);
+    let selectedContract = $state<OnChainVestingContract | null>(null);
+
+    function handleSelect(c: OnChainVestingContract) {
+        selectedContract = c;
+    }
+
+    function closePanel() {
+        selectedContract = null;
+    }
+
+    function onKeydown(e: KeyboardEvent) {
+        if (e.key === "Escape") closePanel();
+    }
 
     // Derived Lists
     const drafts = $derived(
@@ -257,8 +271,7 @@
                                 >
                                     <OnChainCard
                                         {contract}
-                                        onSelect={(c) =>
-                                            console.log("Select", c)}
+                                        onSelect={handleSelect}
                                     />
                                 </div>
                             {/each}
@@ -269,3 +282,27 @@
         {/if}
     </div>
 </div>
+
+<svelte:window on:keydown={onKeydown} />
+
+{#if selectedContract}
+    <!-- Backdrop -->
+    <button
+        type="button"
+        aria-label="Close detail panel"
+        class="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"
+        onclick={closePanel}
+        transition:fade={{ duration: 150 }}
+    ></button>
+
+    <!-- Slide-out panel (right side) -->
+    <aside
+        class="fixed top-0 right-0 z-50 h-full w-full sm:w-[28rem] shadow-2xl border-l-[0.5px] border-zen-border-subtle"
+        transition:fly={{ x: 400, duration: 250 }}
+    >
+        <OnChainDetailPanel
+            contract={selectedContract}
+            onClose={closePanel}
+        />
+    </aside>
+{/if}

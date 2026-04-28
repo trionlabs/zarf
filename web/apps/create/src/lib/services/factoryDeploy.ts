@@ -45,11 +45,13 @@ export interface FactoryDeployConfig {
     name: string;
     /** Vesting description (metadata) */
     description: string;
+    /** IPFS CID of the off-chain claim list (leaves, schedule, hashes) */
+    metadataCid: string;
     /** Creation source (e.g. "zarf-web") */
     source?: string;
 }
 
-export type FactoryDeployStep = 'approve' | 'create' | 'complete' | 'error';
+export type FactoryDeployStep = 'pin' | 'approve' | 'create' | 'complete' | 'error';
 
 export interface FactoryDeployProgress {
     step: FactoryDeployStep;
@@ -64,7 +66,7 @@ export type FactoryProgressCallback = (progress: FactoryDeployProgress) => void;
 // ============================================================================
 
 /** VestingCreated event signature for log parsing */
-export const VESTING_CREATED_EVENT = 'VestingCreated(address,address,address,uint256,uint256)' as const;
+export const VESTING_CREATED_EVENT = 'VestingCreated(address,address,address,uint256,uint256,string)' as const;
 
 // ============================================================================
 // Service Class
@@ -206,7 +208,8 @@ export class FactoryDeployService {
                     vestingDuration: this.config.vestingSeconds,
                     vestingPeriod: this.config.periodSeconds,
                     name: this.config.name,
-                    description: this.config.description
+                    description: this.config.description,
+                    metadataCid: this.config.metadataCid
                 }, this.config.totalAmount],
                 account: this.config.owner,
             });
