@@ -1,22 +1,17 @@
 /**
- * Wizard Store - Distribution Creation Flow (6 Steps)
- * 
- * Manages state for the multi-step wizard:
- * 1. Token Details
- * 2. Vesting Schedule
- * 3. Upload Whitelist (CSV)
- * 4. Regulatory Rules
- * 5. Review & Deploy
- * 6. Success
- * 
- * State persists to localStorage and clears on completion.
- * 
+ * Wizard Store - Distribution Creation Flow (4 Steps: 0..3)
+ *
+ * Tracks creation state (token + distributions). The deploy flow's
+ * write-ahead log (merkleResult, contract address, tx hashes) lives in
+ * `deployStore` — keep them out of here.
+ *
+ * State persists to localStorage and clears on full reset.
+ *
  * @module stores/wizardStore
  */
 
 import { browser } from '$app/environment';
-import type { WizardState, TokenDetails, Schedule, Recipient, Distribution } from './types';
-import type { Address } from 'viem';
+import type { WizardState, TokenDetails, Distribution } from './types';
 
 const STORAGE_KEY = 'zarf_wizard_state';
 
@@ -35,9 +30,6 @@ const initialState: WizardState = {
         iconUrl: null,
     },
     distributions: [],
-    merkleRoot: null,
-    deployedContractAddress: null,
-    txHash: null
 };
 
 // ============================================================================
@@ -71,10 +63,6 @@ let editingDurationUnit = $state<string>(""); // 'weeks' | 'months' | 'quarters'
 let editingRecipientCount = $state<number>(0);
 let editingCliffDate = $state<string>("");
 
-const isComplete = $derived(
-    state.currentStep === 3 && state.deployedContractAddress !== null
-);
-
 // ============================================================================
 // Persistence Helpers
 // ============================================================================
@@ -83,10 +71,6 @@ function persist() {
     if (!browser) return;
 
     try {
-        if (state.currentStep === 3 && state.deployedContractAddress) {
-            localStorage.removeItem(STORAGE_KEY);
-            return;
-        }
         localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     } catch (error) {
         console.warn('[WizardStore] Failed to persist:', error);
@@ -175,18 +159,6 @@ function cancelDistribution(id: string) {
     }
 }
 
-function setMerkleRoot(root: string) {
-    state.merkleRoot = root;
-    persist();
-}
-
-function setDeploymentResult(contractAddress: Address, txHash: string) {
-    state.deployedContractAddress = contractAddress;
-    state.txHash = txHash;
-    state.currentStep = 3;
-    persist();
-}
-
 function nextStep() {
     if (state.currentStep < 3) {
         state.currentStep++;
@@ -224,9 +196,6 @@ export const wizardStore = {
     get currentStep() { return state.currentStep; },
     get tokenDetails() { return state.tokenDetails; },
     get distributions() { return state.distributions; },
-    get merkleRoot() { return state.merkleRoot; },
-    get deployedContractAddress() { return state.deployedContractAddress; },
-    get txHash() { return state.txHash; },
     get editingPoolAmount() { return editingPoolAmount; },
     get editingVestingDuration() { return editingVestingDuration; },
     get editingDurationUnit() { return editingDurationUnit; },
@@ -236,7 +205,6 @@ export const wizardStore = {
     // Derived
     get totalRecipientsAmount() { return totalRecipientsAmount; },
     get totalDistributionCount() { return totalDistributionCount; },
-    get isComplete() { return isComplete; },
 
     // Actions
     setTokenDetails,
@@ -245,8 +213,6 @@ export const wizardStore = {
     updateDistribution,
     moveDistributionToLaunched,
     cancelDistribution,
-    setMerkleRoot,
-    setDeploymentResult,
     nextStep,
     previousStep,
     goToStep,

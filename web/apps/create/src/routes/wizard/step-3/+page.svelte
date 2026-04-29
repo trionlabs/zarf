@@ -1,8 +1,9 @@
 <script lang="ts">
     import { wizardStore } from "$lib/stores/wizardStore.svelte";
+    import { deployStore } from "$lib/stores/deployStore.svelte";
     import { goto } from "$app/navigation";
     import { onMount } from "svelte";
-    import { Check, Copy, ExternalLink, ArrowRight } from "lucide-svelte";
+    import { Check, Copy, ArrowRight } from "lucide-svelte";
     import ZenButton from "@zarf/ui/components/ui/ZenButton.svelte";
     import { fly } from "svelte/transition";
 
@@ -14,9 +15,10 @@
 
     onMount(() => {
         wizardStore.goToStep(2);
-        // Update with real address after hydration
-        if (wizardStore.deployedContractAddress) {
-            contractAddress = wizardStore.deployedContractAddress;
+        // Update with real address after hydration. Source of truth is deployStore;
+        // wizardStore no longer mirrors deployment results.
+        if (deployStore.contractAddress) {
+            contractAddress = deployStore.contractAddress;
         }
     });
 
@@ -83,13 +85,6 @@
 
     <!-- Actions -->
     <div class="flex gap-4" in:fly={{ y: 20, duration: 600, delay: 500 }}>
-        <a
-            href="/dashboard"
-            class="flex items-center justify-center h-12 px-8 rounded-full border border-zen-border text-zen-fg-muted hover:bg-zen-fg/5 transition-colors text-sm font-medium"
-        >
-            View Dashboard
-            <ExternalLink class="w-4 h-4 ml-2 opacity-60" />
-        </a>
         <ZenButton
             variant="primary"
             size="lg"

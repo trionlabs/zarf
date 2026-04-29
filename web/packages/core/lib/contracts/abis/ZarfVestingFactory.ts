@@ -110,6 +110,13 @@ export const ZarfVestingFactoryABI = [
         outputs: [{ type: 'address' }],
         stateMutability: 'view'
     },
+    {
+        type: 'function',
+        name: 'vestingMetadataCid',
+        inputs: [{ name: 'vesting', type: 'address' }],
+        outputs: [{ type: 'string' }],
+        stateMutability: 'view'
+    },
     // NEW: predictVestingAddress for deterministic filename
     {
         type: 'function',

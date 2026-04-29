@@ -15,7 +15,8 @@
 		"build:all": "pnpm -r build",
 		"deploy:landing": "pnpm --filter @zarf/landing run deploy",
 		"deploy:create": "pnpm --filter @zarf/create run deploy",
-		"deploy:claim": "pnpm --filter @zarf/claim run deploy"
+		"deploy:claim": "pnpm --filter @zarf/claim run deploy",
+		"check:type-forks": "node scripts/check-type-forks.mjs"
 	},
 	"pnpm": {
 		"overrides": {

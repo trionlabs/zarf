@@ -20,21 +20,24 @@ import {
 } from 'viem';
 import { sepolia } from 'viem/chains';
 import type { VestingInfo, TransactionResult, VestingSchedule } from '../types';
+import { getCoreConfig } from '../config/runtime';
 
 // ============================================================================
 // Configuration
 // ============================================================================
 
 /**
- * Contract addresses from environment variables
+ * Contract addresses are read lazily from `getCoreConfig()` so this module
+ * stays free of `import.meta.env` and works in any runtime that has called
+ * `configureCore(...)` at boot.
  */
-const VESTING_ADDRESS = import.meta.env.VITE_VESTING_ADDRESS as Address | undefined;
-const JWK_REGISTRY_ADDRESS = import.meta.env.VITE_JWK_REGISTRY_ADDRESS as Address | undefined;
+function getVestingAddress(): Address | undefined {
+    return getCoreConfig().vestingAddress;
+}
 
-/**
- * RPC URL override (optional)
- */
-const RPC_URL = import.meta.env.VITE_RPC_URL as string | undefined;
+function getRpcUrl(): string | undefined {
+    return getCoreConfig().rpcUrls[sepolia.id];
+}
 
 /**
  * Active chain
@@ -155,7 +158,7 @@ async function ensureSepoliaChain(): Promise<void> {
  * @returns Public client instance
  */
 function getPublicClient(): PublicClient {
-    const rpcUrl = RPC_URL || chain.rpcUrls.default.http[0];
+    const rpcUrl = getRpcUrl() || chain.rpcUrls.default.http[0];
 
     return createPublicClient({
         chain,
@@ -258,9 +261,9 @@ export async function submitClaim(
     account: Address,
     contractAddress?: Address
 ): Promise<{ hash: Hash; receipt: any }> {
-    const targetAddress = contractAddress || VESTING_ADDRESS;
+    const targetAddress = contractAddress || getVestingAddress();
     if (!targetAddress) {
-        throw new Error('Vesting contract not configured. Set VITE_VESTING_ADDRESS in .env file or pass explicit address.');
+        throw new Error('Vesting contract not configured. Pass an explicit address or configure core with vestingAddress.');
     }
 
     // Ensure wallet is on Sepolia
@@ -387,7 +390,7 @@ export async function isEpochClaimed(
     epochCommitment: string,
     contractAddress?: Address
 ): Promise<boolean> {
-    const targetAddress = contractAddress || VESTING_ADDRESS;
+    const targetAddress = contractAddress || getVestingAddress();
     if (!targetAddress) return false;
 
     const publicClient = getPublicClient();
@@ -426,19 +429,10 @@ export async function isEpochClaimed(
 // ============================================================================
 
 /**
- * Check if contract addresses are configured.
- * 
- * @returns True if VITE_VESTING_ADDRESS is set
- * 
- * @example
- * ```typescript
- * if (!isContractConfigured()) {
- *   console.log('Please configure contract addresses in .env');
- * }
- * ```
+ * Check if a vesting contract address has been configured at boot.
  */
 export function isContractConfigured(): boolean {
-    return !!VESTING_ADDRESS;
+    return !!getVestingAddress();
 }
 
 /**

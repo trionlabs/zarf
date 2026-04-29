@@ -15,6 +15,8 @@ export class DeployState {
     merkleResult = $state<MerkleTreeData | null>(null);
     isGeneratingMerkle = $state(false);
     merkleError = $state<string | null>(null);
+    isPinning = $state(false);
+    pinError = $state<string | null>(null);
 
     // Step 2 & 3
     isBackupDownloaded = $state(false);
@@ -32,7 +34,7 @@ export class DeployState {
     metadataCid = $state<string | null>(null);
 
     // External guards (Derived)
-    canContinueToStep2 = $derived(!!this.merkleResult);
+    canContinueToStep2 = $derived(!!this.merkleResult && !!this.metadataCid);
     canContinueToStep3 = $derived(this.isBackupDownloaded && this.isBackupConfirmed);
     canContinueToStep4 = $derived(this.isWalletConnected);
 
@@ -147,6 +149,16 @@ export class DeployState {
         this.merkleError = error;
     }
 
+    startPinning() {
+        this.isPinning = true;
+        this.pinError = null;
+    }
+
+    setPinError(error: string) {
+        this.isPinning = false;
+        this.pinError = error;
+    }
+
     // Backup Actions
     setBackupDownloaded(downloaded: boolean) {
         this.isBackupDownloaded = downloaded;
@@ -177,6 +189,8 @@ export class DeployState {
 
     setMetadataCid(cid: string) {
         this.metadataCid = cid;
+        this.isPinning = false;
+        this.pinError = null;
         this.save();
     }
 
@@ -201,6 +215,8 @@ export class DeployState {
         this.merkleResult = null;
         this.isGeneratingMerkle = false;
         this.merkleError = null;
+        this.isPinning = false;
+        this.pinError = null;
         this.isBackupDownloaded = false;
         this.isBackupConfirmed = false;
         this.isWalletConnected = false;

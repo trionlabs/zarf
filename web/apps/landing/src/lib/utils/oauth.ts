@@ -4,11 +4,8 @@
  * Minimal utilities for handling OAuth callback redirect.
  * Full OAuth logic lives in the Claim app.
  */
-
-/** OAuth state passed through redirect */
-export interface OAuthState {
-    address?: `0x${string}`;
-}
+import type { OAuthState } from '@zarf/core';
+export type { OAuthState };
 
 const ETH_ADDRESS_REGEX = /^0x[a-fA-F0-9]{40}$/;
 

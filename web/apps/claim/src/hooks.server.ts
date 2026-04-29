@@ -1,3 +1,6 @@
+// Configure @zarf/core with this app's env vars on the server runtime too,
+// so SSR'd code paths that reach into core don't crash on missing config.
+import './lib/coreInit';
 import type { Handle } from '@sveltejs/kit';
 import { dev } from '$app/environment';
 

@@ -10,7 +10,7 @@
         ArrowRight,
     } from "lucide-svelte";
     import { readCSVFile, generateSampleCSV } from "../../../csv/csvProcessor";
-    import type { WhitelistEntry } from "../../../stores/types";
+    import type { Recipient } from "../../../stores/types";
     import ZenButton from "@zarf/ui/components/ui/ZenButton.svelte";
 
     let {
@@ -24,7 +24,7 @@
         unlockEvents = 1, // Number of unlock events in the vesting schedule
         tokenSymbol = "TOKENS",
     } = $props<{
-        recipients: WhitelistEntry[];
+        recipients: Recipient[];
         csvFileName: string | null;
         csvError: string | null;
         isProcessingCSV: boolean;
@@ -40,7 +40,7 @@
     // Derived stats
     let csvTotal = $derived(
         recipients.reduce(
-            (sum: number, r: WhitelistEntry) => sum + r.amount,
+            (sum: number, r: Recipient) => sum + r.amount,
             0,
         ),
     );
@@ -60,7 +60,7 @@
     // Identify duplicates for highlighting
     let duplicateEmails = $derived.by(() => {
         const counts = new Map<string, number>();
-        recipients.forEach((r: WhitelistEntry) => {
+        recipients.forEach((r: Recipient) => {
             if (r.email) counts.set(r.email, (counts.get(r.email) || 0) + 1);
         });
         const dups = new Set<string>();

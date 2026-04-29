@@ -51,7 +51,7 @@ export interface FactoryDeployConfig {
     source?: string;
 }
 
-export type FactoryDeployStep = 'pin' | 'approve' | 'create' | 'complete' | 'error';
+export type FactoryDeployStep = 'approve' | 'create' | 'complete' | 'error';
 
 export interface FactoryDeployProgress {
     step: FactoryDeployStep;
