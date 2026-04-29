@@ -13,7 +13,6 @@
         "./types": "./lib/types.ts",
         "./contracts": "./lib/contracts/contracts.ts",
         "./contracts/wallet": "./lib/contracts/wallet.ts",
-        "./contracts/walletLazy": "./lib/contracts/walletLazy.ts",
         "./contracts/abis/*": "./lib/contracts/abis/*.ts",
         "./crypto": "./lib/crypto/index.ts",
         "./crypto/*": "./lib/crypto/*.ts",
