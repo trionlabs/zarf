@@ -7,6 +7,10 @@
  * @module services/distribution
  */
 
+import type { Address } from 'viem';
+import { getCidForVesting } from './vestingDiscovery';
+import { fetchIpfsJson } from '../utils/ipfsFetch';
+
 export interface EpochMetadata {
     /** BigInt as string (JSON restriction) */
     amount: string;
@@ -104,19 +108,21 @@ export function validateDistributionData(raw: unknown): DistributionData {
 }
 
 /**
- * Fetch distribution data for a specific contract.
- * Expects a JSON file at `/distributions/<address>.json`.
+ * Fetch distribution data for a specific vesting contract.
+ *
+ * Resolves the IPFS CID from the factory's `vestingMetadataCid(addr)` mapping
+ * (set at deploy time), then fetches and validates the pinned JSON.
  *
  * @param address - The vesting contract address
  */
 export async function fetchDistributionData(address: string): Promise<DistributionData> {
-    const filename = `/distributions/${address.toLowerCase()}.json`;
+    const cid = await getCidForVesting(address as Address);
+    if (!cid) {
+        throw new Error(`No metadata CID registered for vesting ${address}`);
+    }
+
     try {
-        const response = await fetch(filename);
-        if (!response.ok) {
-            throw new Error(`Distribution data not found: ${response.statusText}`);
-        }
-        const raw = await response.json();
+        const raw = await fetchIpfsJson(cid);
         return validateDistributionData(raw);
     } catch (error) {
         console.error('[Distribution] Failed to fetch data:', error);
