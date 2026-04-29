@@ -1,14 +1,13 @@
 import { browser } from '$app/environment';
-import type { Address } from 'viem';
 import { decodeJwt } from "../utils/googleAuth";
 import { STORAGE_KEYS } from "@zarf/core/constants/storage";
 
 /**
- * Authentication Store
- * 
- * Manages the "Dual-Identity" state:
- * 1. Gmail Session (Who I am) -> Proven via OIDC
- * 2. Wallet Session (Where I want funds) -> Proven via Connector
+ * Authentication Store — Gmail / OIDC session.
+ *
+ * Wallet state is owned by `walletStore`. There used to be a parallel
+ * `walletState` here, but it was orphaned (`setWalletSession` was never
+ * called) so it was removed to eliminate the cross-store mirror.
  */
 
 interface GmailSession {
@@ -18,12 +17,6 @@ interface GmailSession {
     expiresAt: number | null;
 }
 
-interface WalletSession {
-    isConnected: boolean;
-    address: Address | null;
-    chainId: number | null;
-}
-
 const initialGmailState: GmailSession = {
     isAuthenticated: false,
     email: null,
@@ -31,18 +24,11 @@ const initialGmailState: GmailSession = {
     expiresAt: null
 };
 
-const initialWalletState: WalletSession = {
-    isConnected: false,
-    address: null,
-    chainId: null
-};
-
 // ============================================================================
 // State (Runes)
 // ============================================================================
 
 let gmailState = $state<GmailSession>(initialGmailState);
-let walletState = $state<WalletSession>(initialWalletState);
 let isHydrated = $state(false); // Tracks if client-side restoration has completed
 
 // ============================================================================
@@ -69,10 +55,6 @@ function clearGmailSession() {
     if (browser) {
         sessionStorage.removeItem(STORAGE_KEYS.GMAIL_JWT);
     }
-}
-
-function setWalletSession(data: Partial<WalletSession>) {
-    walletState = { ...walletState, ...data };
 }
 
 // ============================================================================
@@ -118,13 +100,11 @@ function restoreGmailSession() {
 
 export const authStore = {
     get gmail() { return gmailState; },
-    get wallet() { return walletState; },
 
     // Hydration-Safe Getter: Ensures we never show "Authenticated" during SSR/Hydration mismatch
     get isAuthenticated() { return gmailState.isAuthenticated && isHydrated; },
 
     setGmailSession,
     clearGmailSession,
-    setWalletSession,
     restoreGmailSession
 };

@@ -13,7 +13,7 @@
         Calendar,
         Users,
     } from "lucide-svelte";
-    import type { WhitelistEntry, Distribution } from "$lib/stores/types";
+    import type { Recipient, Distribution } from "$lib/stores/types";
     import type { DurationUnit } from "@zarf/core/utils/vesting";
     import { CREATION_STEPS } from "@zarf/core/constants/wizard";
 
@@ -50,7 +50,7 @@
     let duration = $state<number>(12);
     let durationUnit = $state<DurationUnit>("months");
 
-    let recipients = $state<WhitelistEntry[]>([]);
+    let recipients = $state<Recipient[]>([]);
     let csvFileName = $state<string | null>(null);
     let csvError = $state<string | null>(null);
     let isProcessingCSV = $state(false);
@@ -58,7 +58,7 @@
 
     const totalAmount = $derived(
         recipients.reduce(
-            (sum: number, r: WhitelistEntry) => sum + r.amount,
+            (sum: number, r: Recipient) => sum + r.amount,
             0,
         ),
     );

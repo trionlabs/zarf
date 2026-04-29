@@ -2,6 +2,9 @@
  * Client-side hooks - runs before component code
  */
 
+// Configure @zarf/core with this app's env vars before anything else loads.
+import './lib/coreInit';
+
 // Buffer polyfill for Barretenberg WASM
 import { Buffer } from 'buffer';
 

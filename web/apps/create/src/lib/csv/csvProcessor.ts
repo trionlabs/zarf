@@ -9,7 +9,9 @@
  * @module csv/csvProcessor
  */
 
-import type { WhitelistEntry } from '../stores/types';
+// CSV produces UI-draft entries (amount: number from a form field), which is the
+// `Recipient` shape, not the post-merkle on-chain `Recipient` (amount: bigint).
+import type { Recipient } from '../stores/types';
 import { normalizeEmail, isValidEmail } from '@zarf/core/utils/email';
 import { isValidAddress } from '@zarf/core/utils/address';
 
@@ -28,7 +30,7 @@ export function normalizeAddress(address: string): string {
 // ============================================================================
 
 export interface ParseResult {
-    entries: WhitelistEntry[];
+    entries: Recipient[];
     errors: string[];
 }
 
@@ -42,7 +44,7 @@ export interface ParseResult {
  */
 export function parseCSV(content: string): ParseResult {
     const lines = content.trim().split('\n');
-    const entries: WhitelistEntry[] = [];
+    const entries: Recipient[] = [];
     const errors: string[] = [];
 
 

@@ -12,7 +12,8 @@ import { sepolia } from 'viem/chains';
 import { ZarfVestingFactoryABI } from '../contracts/abis/ZarfVestingFactory';
 import { ZarfVestingABI } from '../contracts/abis/ZarfVesting';
 import { ERC20ABI } from '../contracts/abis/ERC20';
-import { FACTORY_ADDRESS } from '../config/contracts';
+import { getFactoryAddress } from '../config/contracts';
+import { getCoreConfig } from '../config/runtime';
 
 // ============ Public Client (Lazy Initialization) ============
 
@@ -20,7 +21,9 @@ let _publicClient: PublicClient | null = null;
 
 function getPublicClient(): PublicClient {
     if (!_publicClient) {
-        const rpcUrl = import.meta.env.VITE_SEPOLIA_RPC_URL || 'https://ethereum-sepolia-rpc.publicnode.com';
+        const rpcUrl =
+            getCoreConfig().rpcUrls[sepolia.id] ||
+            'https://ethereum-sepolia-rpc.publicnode.com';
         _publicClient = createPublicClient({
             chain: sepolia,
             transport: http(rpcUrl)
@@ -142,6 +145,7 @@ export function addOptimisticContract(owner: Address, contract: OnChainVestingCo
 export async function fetchOwnerDeploymentAddresses(owner: Address): Promise<Address[]> {
     const client = getPublicClient();
 
+    const FACTORY_ADDRESS = getFactoryAddress();
     if (!FACTORY_ADDRESS) {
         throw new Error('Factory address not configured');
     }
@@ -381,6 +385,7 @@ export async function discoverOwnerVestings(
 export async function getOwnerDeploymentCount(owner: Address): Promise<number> {
     const client = getPublicClient();
 
+    const FACTORY_ADDRESS = getFactoryAddress();
     if (!FACTORY_ADDRESS) {
         return 0;
     }

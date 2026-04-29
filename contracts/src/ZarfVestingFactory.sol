@@ -53,6 +53,7 @@ contract ZarfVestingFactory {
     
     address[] public deployments;
     mapping(address => address[]) public ownerDeployments;
+    mapping(address => string) public vestingMetadataCid;
 
     // ============ Constructor ============
     
@@ -90,8 +91,8 @@ contract ZarfVestingFactory {
         _safeTransfer(params.token, vesting, totalAmount);
         
         // 6. Track deployment
-        _trackDeployment(vesting, msg.sender);
-        
+        _trackDeployment(vesting, msg.sender, params.metadataCid);
+
         emit VestingCreated(vesting, msg.sender, params.token, totalAmount, params.commitments.length, params.metadataCid);
     }
 
@@ -99,7 +100,7 @@ contract ZarfVestingFactory {
          if (params.commitments.length != params.amounts.length) revert ArrayLengthMismatch();
          if (params.commitments.length == 0) revert ZeroAllocations();
          vesting = _deployAndInitialize(params, msg.sender);
-         _trackDeployment(vesting, msg.sender);
+         _trackDeployment(vesting, msg.sender, params.metadataCid);
          uint256 total = _sumAmounts(params.amounts);
          emit VestingCreated(vesting, msg.sender, params.token, total, params.commitments.length, params.metadataCid);
     }
@@ -177,9 +178,10 @@ contract ZarfVestingFactory {
 
     // ============ Internal Utils ============
     
-    function _trackDeployment(address vesting, address owner) internal {
+    function _trackDeployment(address vesting, address owner, string calldata metadataCid) internal {
         deployments.push(vesting);
         ownerDeployments[owner].push(vesting);
+        vestingMetadataCid[vesting] = metadataCid;
     }
     
     function _sumAmounts(uint256[] calldata amounts) internal pure returns (uint256 total) {

@@ -1,13 +1,29 @@
 /**
- * Global Store Type Definitions
- * 
- * This file contains all TypeScript interfaces for Svelte 5 Runes stores.
- * Covers wizard, claim flow, wallet, and theme state management.
- * 
+ * App-specific store types for the create wizard.
+ *
+ * Domain types (MerkleClaim, MerkleProof, MerkleTreeData, Schedule, WhitelistEntry,
+ * DurationUnit, UnlockMarker, etc.) live in `@zarf/core` and are re-exported below
+ * so existing imports `from './types'` keep working.
+ *
+ * Only put types here that are genuinely UI/wizard-specific (TokenDetails,
+ * Distribution, WizardState, Recipient, ClaimStep, …).
+ *
  * @module stores/types
  */
 
 import type { Address } from 'viem';
+import type { Schedule } from '@zarf/core';
+
+// Re-export domain types for app-local convenience.
+export type {
+    Schedule,
+    MerkleClaim,
+    MerkleProof,
+    MerkleTreeData,
+    WhitelistEntry,
+    DurationUnit,
+    UnlockMarker,
+} from '@zarf/core';
 
 // ============================================================================
 // Wizard Store Types
@@ -27,17 +43,12 @@ export interface TokenDetails {
 }
 
 /**
- * Vesting schedule configuration
- */
-export interface Schedule {
-    cliffEndDate: string; // ISO date string (YYYY-MM-DD)
-    cliffTime: string;    // Time string (HH:MM) in UTC
-    distributionDuration: number;
-    durationUnit: "minutes" | "hours" | "weeks" | "months" | "quarters" | "years";
-}
-
-/**
- * Whitelist recipient entry
+ * Whitelist recipient entry — wizard-form draft shape.
+ *
+ * NOTE: this is the user-facing input (amount: number from a form field).
+ * It is NOT the same as `MerkleClaim` (the post-processing on-chain shape with
+ * amount: bigint). Conversion happens at the boundary when the merkle tree is
+ * generated.
  */
 export interface Recipient {
     address: string; // Keep as primary identifier, but might be empty if email is used initially
@@ -46,9 +57,6 @@ export interface Recipient {
     leafIndex?: number; // assigned after merkle generation
     salt?: string;
 }
-
-// Alias for compatibility if needed
-export type WhitelistEntry = Recipient;
 
 /**
  * Distribution State
@@ -59,9 +67,6 @@ export type DistributionState =
     | 'in_progress'  // Claiming started
     | 'cancelled';   // Cancelled
 
-/**
- * Single Distribution Entry (Step 1)
- */
 /**
  * Detailed deployment progress steps
  */
@@ -92,7 +97,11 @@ export interface Distribution {
 }
 
 /**
- * Complete wizard state across all steps
+ * Complete wizard state across all steps.
+ *
+ * Deploy-result fields (merkleRoot/deployedContractAddress/txHash) live in
+ * `deployStore`, not here — the wizard tracks creation, deployStore tracks
+ * the deploy/recovery write-ahead log.
  */
 export interface WizardState {
     currentStep: number; // 0-3
@@ -102,13 +111,6 @@ export interface WizardState {
 
     // Step 1: Distributions (Basket)
     distributions: Distribution[];
-
-    // Step 2: Review & Deploy
-    merkleRoot: string | null; // Aggregate or per-distribution logic TBD
-
-    // Step 3: Deployment Result
-    deployedContractAddress: Address | null;
-    txHash: string | null;
 }
 
 // ============================================================================
@@ -130,37 +132,6 @@ export interface SelectedTranche {
     index: number; // Tranche index in schedule
 }
 
-
-// ============================================================================
-// Merkle Tree Types (ADR-023 Updated)
-// ============================================================================
-
-export interface MerkleProof {
-    siblings: string[]; // Hex strings
-    indices: number[];  // 0 or 1
-}
-
-export interface MerkleClaim {
-    email: string;
-    amount: bigint;
-    salt: string; // The secret (Master or Epoch secret)
-    pin?: string; // The original plain text PIN (Master Salt) - Used for export
-    identityCommitment: string;
-    leafIndex: number;
-    leaf: bigint;
-    unlockTime: number; // ADR-023: Discrete Vesting unlock timestamp
-}
-
-export interface MerkleTreeData {
-    root: bigint;
-    tree: {
-        minDepth: number;
-        depth: number;
-        layers: bigint[][];
-        emptyHashes: bigint[];
-    };
-    claims: MerkleClaim[];
-}
 
 // ============================================================================
 // Wallet Store Types

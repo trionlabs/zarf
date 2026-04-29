@@ -11,10 +11,8 @@
     } from "../../../services/factoryDeploy";
     import { addOptimisticContract } from "@zarf/core/services/distributionDiscovery";
     import { buildFactoryDeployInputs } from "@zarf/core/domain/merkleResultAdapter";
-    import { planDeploy, planScheduleSeconds, buildOptimisticContract } from "@zarf/core/domain/deployPlanner";
+    import { planDeploy, buildOptimisticContract } from "@zarf/core/domain/deployPlanner";
     import { recoverPendingDeploy } from "@zarf/core/domain/deployRecovery";
-    import { buildClaimList } from "@zarf/core/domain/claimListBuilder";
-    import { pinClaimList } from "../../../services/pinService";
     import { walletStore } from "@zarf/ui/stores/walletStore.svelte";
     import { goto } from "$app/navigation";
     import {
@@ -56,7 +54,7 @@
     // Local deployment state
     let isDeploying = $state(false);
     let currentStep = $state<
-        "idle" | "pin" | "approve" | "create" | "complete" | "error"
+        "idle" | "approve" | "create" | "complete" | "error"
     >("idle");
     let currentMessage = $state("");
     let error = $state<string | null>(null);
@@ -202,24 +200,13 @@
                 merkleResult.root,
             );
 
-            // Pin the off-chain claim list to IPFS so the claim app can
-            // discover it without a manual repo redeploy. Idempotent: same
-            // content yields the same CID, so a recovered run reuses it.
-            let metadataCid = deployStore.metadataCid;
+            // Pinning is done in Step 1 (Prepare). If the CID is missing
+            // here, the user shouldn't have been allowed past that step.
+            const metadataCid = deployStore.metadataCid;
             if (!metadataCid) {
-                currentStep = "pin";
-                currentMessage = "Pinning claim list to IPFS...";
-                const seconds = planScheduleSeconds(distribution.schedule);
-                const claimList = await buildClaimList({
-                    claims: merkleResult.claims,
-                    root: merkleResult.root,
-                    cliffSeconds: seconds.cliffSeconds,
-                    vestingSeconds: seconds.vestingSeconds,
-                    periodSeconds: seconds.periodSeconds,
-                });
-                const pinned = await pinClaimList(claimList);
-                metadataCid = pinned.cid;
-                deployStore.setMetadataCid(metadataCid);
+                throw new Error(
+                    "Claim list CID missing — go back to Step 1 to re-pin",
+                );
             }
 
             config = planDeploy({
