@@ -7,7 +7,7 @@ import "../src/TestToken.sol";
 /**
  * @title DeployTestToken
  * @notice Deploys a test ERC20 token to Sepolia for wizard testing
- * @dev Usage: forge script script/DeployTestToken.s.sol --rpc-url sepolia --broadcast
+ * @dev Usage from contracts/solidity: forge script script/DeployTestToken.s.sol --rpc-url sepolia --broadcast
  */
 contract DeployTestToken is Script {
     function run() external {

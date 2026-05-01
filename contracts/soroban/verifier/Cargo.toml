@@ -1,0 +1,22 @@
+[package]
+name = "rs-soroban-ultrahonk"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+soroban-sdk = { version = "26.0.0-rc.1", default-features = false, features = ["alloc"] }
+ultrahonk_soroban_verifier = { path = "ultrahonk-soroban-verifier", default-features = false }
+
+[dev-dependencies]
+soroban-sdk = { version = "26.0.0-rc.1", features = ["testutils", "alloc"] }
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+overflow-checks = true
