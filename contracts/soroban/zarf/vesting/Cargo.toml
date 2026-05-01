@@ -1,0 +1,23 @@
+[package]
+name = "zarf-vesting-soroban"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+soroban-sdk = { version = "26.0.0-rc.1", default-features = false, features = ["alloc"] }
+
+[dev-dependencies]
+rs-soroban-ultrahonk = { path = "../../verifier" }
+soroban-sdk = { version = "26.0.0-rc.1", default-features = false, features = ["alloc", "testutils"] }
+zarf-jwk-registry = { path = "../jwk-registry" }
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+overflow-checks = true

@@ -6,7 +6,7 @@ import "../src/ZarfVestingFactory.sol";
 
 /// @title DeployFactory
 /// @notice Deploys ZarfVestingFactory to mainnet or testnet
-/// @dev Run with: forge script script/DeployFactory.s.sol --rpc-url $RPC_URL --broadcast --verify
+/// @dev Run from contracts/solidity with: forge script script/DeployFactory.s.sol --rpc-url $RPC_URL --broadcast --verify
 contract DeployFactory is Script {
     function run() external {
         // Load environment variables (VITE_-prefixed because frontend reads them too)
@@ -33,7 +33,7 @@ contract DeployFactory is Script {
 
 /// @title DeployFactoryWithMocks
 /// @notice Deploys Factory with mock dependencies for testing
-/// @dev Use for local development: forge script script/DeployFactory.s.sol:DeployFactoryWithMocks --rpc-url $RPC_URL --broadcast
+/// @dev Use from contracts/solidity for local development: forge script script/DeployFactory.s.sol:DeployFactoryWithMocks --rpc-url $RPC_URL --broadcast
 contract DeployFactoryWithMocks is Script {
     function run() external {
         // For testing, we can use zero addresses or mock addresses
