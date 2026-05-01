@@ -8,9 +8,6 @@ optimizer = true
 optimizer_runs = 200
 via_ir = false  # Minimum runs = smallest bytecode
 
-# Load environment variables from root .env
-dotenv = "../.env"
-
 # Sepolia configuration
 fs_permissions = [{ access = "read", path = "./" }]
 
