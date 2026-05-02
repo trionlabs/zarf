@@ -25,7 +25,7 @@ export async function fetchPublicLeaves(contractAddress: string | null): Promise
 }
 
 interface ClaimListShape {
-    commitments?: Record<string, { amount: string; unlockTime: number; index: number }>;
+    commitments?: Record<string, unknown>;
 }
 
 async function processDistributionData(data: unknown): Promise<bigint[]> {
@@ -38,14 +38,61 @@ async function processDistributionData(data: unknown): Promise<bigint[]> {
 
     const leavesMap = new Map<number, bigint>();
     let maxIndex = -1;
-    for (const [commitment, meta] of Object.entries(doc.commitments)) {
+    const metadataEntries = Object.entries(doc.commitments).flatMap(
+        ([commitment, meta]) => {
+            if (Array.isArray(meta) && meta.length === 0) {
+                throw new Error(`Invalid commitment metadata for key ${commitment}`);
+            }
+            return (Array.isArray(meta) ? meta : [meta]).map((entry) => [
+                commitment,
+                entry,
+            ] as const);
+        },
+    );
+
+    for (const [commitment, meta] of metadataEntries) {
+        try {
+            BigInt(commitment);
+        } catch {
+            throw new Error(`Invalid commitment key: ${commitment}`);
+        }
+        if (!meta || typeof meta !== 'object') {
+            throw new Error(`Invalid commitment metadata for key ${commitment}`);
+        }
+        const entry = meta as Record<string, unknown>;
+        if (typeof entry.amount !== 'string') {
+            throw new Error(`Invalid commitment amount for key ${commitment}`);
+        }
+        try {
+            BigInt(entry.amount);
+        } catch {
+            throw new Error(`Invalid commitment amount for key ${commitment}`);
+        }
+        if (
+            typeof entry.unlockTime !== 'number' ||
+            !Number.isFinite(entry.unlockTime) ||
+            entry.unlockTime < 0
+        ) {
+            throw new Error(`Invalid commitment unlockTime for key ${commitment}`);
+        }
+        if (
+            typeof entry.index !== 'number' ||
+            !Number.isInteger(entry.index) ||
+            entry.index < 0
+        ) {
+            throw new Error(`Invalid commitment index for key ${commitment}`);
+        }
+        if (leavesMap.has(entry.index)) {
+            throw new Error(`Duplicate commitment index: ${entry.index}`);
+        }
+
         const leaf = await computeLeafFromCommitment(
             commitment,
-            BigInt(meta.amount),
-            meta.unlockTime,
+            BigInt(entry.amount),
+            entry.unlockTime,
         );
-        leavesMap.set(meta.index, leaf);
-        if (meta.index > maxIndex) maxIndex = meta.index;
+        leavesMap.set(entry.index, leaf);
+        if (entry.index > maxIndex) maxIndex = entry.index;
     }
 
     const leaves: bigint[] = [];

@@ -31,9 +31,12 @@
 
     // Check if connected wallet matches the proof's target wallet
     let isWalletMismatch = $derived(
-        walletStore.address &&
-        claimStore.targetWallet &&
-        walletStore.address.toLowerCase() !== claimStore.targetWallet.toLowerCase()
+        Boolean(
+            walletStore.address &&
+                claimStore.targetWallet &&
+                walletStore.address.toLowerCase() !==
+                    claimStore.targetWallet.toLowerCase(),
+        )
     );
 
     function handleRegenerateProof() {

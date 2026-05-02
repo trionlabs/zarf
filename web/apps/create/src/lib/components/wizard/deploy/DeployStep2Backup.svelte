@@ -11,24 +11,37 @@
     let merkleResult = $derived(deployStore.merkleResult);
     let isBackupDownloaded = $derived(deployStore.isBackupDownloaded);
     let isBackupConfirmed = $derived(deployStore.isBackupConfirmed);
+    let backupError = $state<string | null>(null);
 
     function downloadPrivateSecrets() {
         if (!merkleResult) return;
 
-        const userMap = new Map<string, string>();
-        merkleResult.claims.forEach((c) => {
-            if (!userMap.has(c.email)) {
-                userMap.set(c.email, c.pin || "");
-            }
-        });
+        try {
+            const userMap = new Map<string, string>();
+            merkleResult.claims.forEach((c) => {
+                if (!userMap.has(c.email)) {
+                    if (!c.pin) {
+                        throw new Error(`Missing PIN for ${c.email}`);
+                    }
+                    userMap.set(c.email, c.pin);
+                }
+            });
 
-        let csvContent = "email,pin\n";
-        userMap.forEach((pin, email) => {
-            csvContent += `${email},${pin}\n`;
-        });
+            let csvContent = "email,pin\n";
+            userMap.forEach((pin, email) => {
+                csvContent += `${email},${pin}\n`;
+            });
 
-        downloadFile(csvContent, "secrets.csv", "text/csv");
-        deployStore.setBackupDownloaded(true);
+            backupError = null;
+            downloadFile(csvContent, "secrets.csv", "text/csv");
+            deployStore.setBackupDownloaded(true);
+        } catch (e) {
+            backupError =
+                e instanceof Error
+                    ? e.message
+                    : "Could not generate secrets.csv";
+            deployStore.setBackupDownloaded(false);
+        }
     }
 
     function downloadFile(content: string, filename: string, type: string) {
@@ -61,6 +74,11 @@
     </div>
 
     <div class="max-w-md mx-auto">
+        {#if backupError}
+            <ZenAlert variant="error" class="mb-4">
+                {backupError}
+            </ZenAlert>
+        {/if}
         <ZenCard variant="bordered" class="overflow-hidden border-zen-error/20">
             <div class="p-6 flex flex-col items-center text-center">
                 <div

@@ -1,5 +1,4 @@
 <script lang="ts">
-    import { onMount } from "svelte";
     import {
         X,
         Calendar,
@@ -15,9 +14,11 @@
     let {
         contract,
         onClose,
+        chainId,
     }: {
         contract: OnChainVestingContract;
         onClose: () => void;
+        chainId?: number;
     } = $props();
 
     interface OffChainSchedule {
@@ -32,28 +33,51 @@
     let schedule = $state<OffChainSchedule | null>(null);
     let loadingSchedule = $state(true);
     let scheduleError = $state<string | null>(null);
+    let scheduleRequest = 0;
 
-    onMount(async () => {
-        try {
-            const found = await getCidForVesting(contract.address);
-            cid = found;
-            if (!found) {
-                scheduleError = "No IPFS metadata found for this vesting";
-                return;
+    $effect(() => {
+        const address = contract.address;
+        const activeChainId = chainId;
+        const requestId = ++scheduleRequest;
+
+        cid = null;
+        schedule = null;
+        scheduleError = null;
+        loadingSchedule = true;
+
+        (async () => {
+            try {
+                const found = await getCidForVesting(address, activeChainId);
+                if (requestId !== scheduleRequest) return;
+
+                cid = found;
+                if (!found) {
+                    scheduleError = "No IPFS metadata found for this vesting";
+                    return;
+                }
+
+                const data = await fetchIpfsJson<{ schedule: OffChainSchedule }>(
+                    found,
+                );
+                if (requestId !== scheduleRequest) return;
+                schedule = data.schedule;
+            } catch (e) {
+                if (requestId !== scheduleRequest) return;
+                scheduleError = (e as Error).message;
+            } finally {
+                if (requestId === scheduleRequest) {
+                    loadingSchedule = false;
+                }
             }
-            const data = await fetchIpfsJson<{ schedule: OffChainSchedule }>(
-                found,
-            );
-            schedule = data.schedule;
-        } catch (e) {
-            scheduleError = (e as Error).message;
-        } finally {
-            loadingSchedule = false;
-        }
+        })();
+
+        return () => {
+            scheduleRequest++;
+        };
     });
 
     function formatTokenBalance(balance: bigint, decimals: number): string {
-        const divisor = BigInt(10 ** decimals);
+        const divisor = 10n ** BigInt(decimals);
         const integerPart = balance / divisor;
         const remainder = balance % divisor;
         const decimalPart = remainder

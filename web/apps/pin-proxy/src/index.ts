@@ -79,7 +79,7 @@ async function handlePin(
     let body: ClaimList;
     try {
         const raw = await request.text();
-        if (raw.length > maxBytes) {
+        if (new TextEncoder().encode(raw).length > maxBytes) {
             return json({ error: "payload_too_large", maxBytes }, 413, corsHeaders);
         }
         body = JSON.parse(raw);

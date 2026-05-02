@@ -30,7 +30,7 @@ import { mainnet, sepolia } from 'viem/chains';
 import { getAddress, formatEther, type Address } from 'viem';
 import { injected } from '@wagmi/connectors';
 import type { WalletConnection, WalletAccount } from '../types';
-import { getCoreConfig } from '../config/runtime';
+import { __registerCoreConfigResetterForTests, getCoreConfig } from '../config/runtime';
 
 // ============================================================================
 // Constants
@@ -83,6 +83,12 @@ function getWagmiConfig(): Config {
     }
     return _wagmiConfig;
 }
+
+export function __resetWagmiConfigForTests(): void {
+    _wagmiConfig = null;
+}
+
+__registerCoreConfigResetterForTests(__resetWagmiConfigForTests);
 
 /**
  * Public wagmi config export. Lazy-evaluated via Proxy so module init does not

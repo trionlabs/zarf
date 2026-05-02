@@ -285,15 +285,15 @@ class ClaimFlowState {
         this.state.statusMessage = "Loading distribution data...";
         this.state.epochs = [];
 
-        // Lazy-load the WASM-heavy crypto module (~7MB) only when needed.
-        const {
-            computeIdentityCommitment,
-            stringToBytes,
-            pedersenHashBytes,
-            pedersenHashField,
-        } = await this.preloadCrypto();
-
         try {
+            // Lazy-load the WASM-heavy crypto module (~7MB) only when needed.
+            const {
+                computeIdentityCommitment,
+                stringToBytes,
+                pedersenHashBytes,
+                pedersenHashField,
+            } = await this.preloadCrypto();
+
             const result = await discoverEpochsCore(
                 { email, pin, contractAddress },
                 { computeIdentityCommitment, stringToBytes, pedersenHashBytes, pedersenHashField },
