@@ -113,6 +113,12 @@ export interface PlannedDeployConfig {
     immediateUnlock: boolean;
 }
 
+export interface PlannedScheduleSeconds {
+    cliffSeconds: bigint;
+    vestingSeconds: bigint;
+    periodSeconds: bigint;
+}
+
 /**
  * Build the FactoryDeployConfig from validated inputs, applying the
  * past-date override and running the integrity check (allocations sum
@@ -164,6 +170,7 @@ export function buildOptimisticContract(args: {
     owner: Address;
     schedule: DeploySchedule;
     totalAmountWei: bigint;
+    plannedSchedule?: PlannedScheduleSeconds;
     now?: Date;
 }) {
     const now = args.now ?? new Date();
@@ -176,9 +183,15 @@ export function buildOptimisticContract(args: {
         tokenDecimals: args.tokenDecimals ?? 18,
         owner: args.owner,
         vestingStart: BigInt(Math.floor(now.getTime() / 1000)),
-        cliffDuration: cliffDateToSeconds(args.schedule.cliffEndDate, args.schedule.cliffTime || '00:00'),
-        vestingDuration: durationToSeconds(args.schedule.distributionDuration, args.schedule.durationUnit),
-        vestingPeriod: unitToPeriodSeconds(args.schedule.durationUnit),
+        cliffDuration:
+            args.plannedSchedule?.cliffSeconds ??
+            cliffDateToSeconds(args.schedule.cliffEndDate, args.schedule.cliffTime || '00:00'),
+        vestingDuration:
+            args.plannedSchedule?.vestingSeconds ??
+            durationToSeconds(args.schedule.distributionDuration, args.schedule.durationUnit),
+        vestingPeriod:
+            args.plannedSchedule?.periodSeconds ??
+            unitToPeriodSeconds(args.schedule.durationUnit),
         tokenBalance: args.totalAmountWei,
     };
 }

@@ -75,6 +75,7 @@
         try {
             const result = await discoverOwnerVestings(walletStore.address, {
                 forceRefresh: true,
+                chainId: walletStore.chainId ?? undefined,
             });
             onChainContracts = result.contracts;
         } catch (e) {
@@ -296,13 +297,18 @@
     ></button>
 
     <!-- Slide-out panel (right side) -->
-    <aside
+    <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Distribution contract details"
+        tabindex="-1"
         class="fixed top-0 right-0 z-50 h-full w-full sm:w-[28rem] shadow-2xl border-l-[0.5px] border-zen-border-subtle"
         transition:fly={{ x: 400, duration: 250 }}
     >
         <OnChainDetailPanel
             contract={selectedContract}
             onClose={closePanel}
+            chainId={walletStore.chainId ?? undefined}
         />
-    </aside>
+    </div>
 {/if}

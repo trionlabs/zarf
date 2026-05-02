@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {Test, Vm} from "forge-std/Test.sol";
+import {Test} from "forge-std/Test.sol";
 import {ZarfVestingFactory} from "../src/ZarfVestingFactory.sol";
 import {ZarfVesting} from "../src/ZarfVesting.sol";
 import {JWKRegistry} from "../src/JWKRegistry.sol";
@@ -82,11 +82,12 @@ contract ZarfVestingFactoryTest is Test {
     }
 
     function test_CreateVesting_AcceptsEmptyCid() public {
-        // Backward-compat sanity: empty CID is still a valid string
-        vm.recordLogs();
+        address predicted = factory.predictVestingAddress(_params(""), address(this));
+
+        vm.expectEmit(true, true, true, true);
+        emit VestingCreated(predicted, address(this), address(token), 300 ether, 2, "");
+
         factory.createVesting(_params(""));
-        Vm.Log[] memory logs = vm.getRecordedLogs();
-        assertGt(logs.length, 0, "expected at least one log");
     }
 
     function test_CreateVesting_DifferentCidsProduceDifferentAddresses() public {
@@ -94,5 +95,11 @@ contract ZarfVestingFactoryTest is Test {
         address a = factory.predictVestingAddress(_params("cid-a"), address(this));
         address b = factory.predictVestingAddress(_params("cid-b"), address(this));
         assertTrue(a != b, "different CIDs should produce different addresses");
+    }
+
+    function test_CreateVesting_DifferentOwnersProduceDifferentAddresses() public {
+        address a = factory.predictVestingAddress(_params(TEST_CID), address(this));
+        address b = factory.predictVestingAddress(_params(TEST_CID), alice);
+        assertTrue(a != b, "different owners should produce different addresses");
     }
 }

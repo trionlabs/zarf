@@ -38,8 +38,14 @@ export function commitmentToHash(commitment: unknown): Hash {
 
 /** Same conversion for the merkle root. */
 export function rootToHash(root: bigint): Hash {
+    if (root < 0n) {
+        throw new RangeError(`merkle root: must be non-negative (got ${root})`);
+    }
+    if (root > (1n << 256n) - 1n) {
+        throw new RangeError('merkle root: must fit in 32 bytes');
+    }
     const hex = root.toString(16);
-    return `0x${hex.padStart(64, '0')}` as Hash;
+    return `0x${hex.padStart(64, '0').toLowerCase()}` as Hash;
 }
 
 export interface FactoryDeployInputs {

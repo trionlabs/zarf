@@ -32,6 +32,7 @@ export class DeployState {
     approveTxHash = $state<string | null>(null);
     createTxHash = $state<string | null>(null);
     metadataCid = $state<string | null>(null);
+    schedulePlanAtMs = $state<number | null>(null);
 
     // External guards (Derived)
     canContinueToStep2 = $derived(!!this.merkleResult && !!this.metadataCid);
@@ -57,6 +58,7 @@ export class DeployState {
                 approveTxHash: this.approveTxHash,
                 createTxHash: this.createTxHash,
                 metadataCid: this.metadataCid,
+                schedulePlanAtMs: this.schedulePlanAtMs,
                 timestamp: Date.now()
             };
             const key = `deploy_state_${this.distribution.id}`;
@@ -83,17 +85,31 @@ export class DeployState {
                 return;
             }
 
-            if (state) {
-                // Restore critical state
-                this.currentStep = state.currentStep || 1;
+            if (state && typeof state === "object") {
+                if (state.version !== 2) {
+                    localStorage.removeItem(key);
+                    return;
+                }
+
+                const restoredStep = Number(state.currentStep);
+                this.currentStep =
+                    restoredStep >= 1 && restoredStep <= 4
+                        ? (restoredStep as DeployStep)
+                        : 1;
                 this.merkleResult = state.merkleResult;
                 this.isBackupDownloaded = !!state.isBackupDownloaded;
                 this.isBackupConfirmed = !!state.isBackupConfirmed;
 
                 // Restore recovery state
+                this.schedulePlanAtMs =
+                    typeof state.schedulePlanAtMs === "number"
+                        ? state.schedulePlanAtMs
+                        : null;
                 this.approveTxHash = state.approveTxHash || null;
                 this.createTxHash = state.createTxHash || null;
-                this.metadataCid = state.metadataCid || null;
+                this.metadataCid = this.schedulePlanAtMs
+                    ? state.metadataCid || null
+                    : null;
             }
         } catch (e) {
             console.warn("Failed to load deploy state", e);
@@ -141,6 +157,8 @@ export class DeployState {
     setMerkleResult(result: MerkleTreeData) {
         this.isGeneratingMerkle = false;
         this.merkleResult = result;
+        this.metadataCid = null;
+        this.schedulePlanAtMs = null;
         this.save(); // Critical save point
     }
 
@@ -194,6 +212,11 @@ export class DeployState {
         this.save();
     }
 
+    setSchedulePlanAt(date: Date) {
+        this.schedulePlanAtMs = date.getTime();
+        this.save();
+    }
+
     setDeployed(address: Address) {
         this.isDeployed = true;
         this.contractAddress = address;
@@ -205,6 +228,12 @@ export class DeployState {
 
     setDeployError(error: string) {
         this.error = error;
+    }
+
+    clearPendingTransactions() {
+        this.approveTxHash = null;
+        this.createTxHash = null;
+        this.save();
     }
 
     reset(keepDistribution = false) {
@@ -226,6 +255,7 @@ export class DeployState {
         this.approveTxHash = null;
         this.createTxHash = null;
         this.metadataCid = null;
+        this.schedulePlanAtMs = null;
 
         if (typeof window !== "undefined" && this.distribution?.id) {
             localStorage.removeItem(`deploy_state_${this.distribution.id}`);

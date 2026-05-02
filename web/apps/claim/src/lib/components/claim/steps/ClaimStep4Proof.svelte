@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { onMount } from "svelte";
+    import { onDestroy, onMount } from "svelte";
     import { claimStore } from "../../../stores/claimStore.svelte";
 
     import {
@@ -20,6 +20,7 @@
     let statusMessage = $state("Initializing...");
     let isGenerating = $state(true);
     let error = $state<string | null>(null);
+    let advanceTimer: ReturnType<typeof setTimeout> | null = null;
 
     let { contractAddress } = $props<{ contractAddress: string }>();
 
@@ -92,12 +93,18 @@
             progress = 100;
             statusMessage = "Proof Ready!";
             isGenerating = false;
-            setTimeout(() => {
+            advanceTimer = setTimeout(() => {
                 claimStore.nextStep();
             }, 1000);
         } catch (e: any) {
             error = e.message;
             isGenerating = false;
+        }
+    });
+
+    onDestroy(() => {
+        if (advanceTimer) {
+            clearTimeout(advanceTimer);
         }
     });
 </script>

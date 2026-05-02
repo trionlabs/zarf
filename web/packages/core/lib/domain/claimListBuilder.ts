@@ -27,7 +27,11 @@ export interface ClaimListJson {
     merkleRoot: string;
     schedule: ClaimListSchedule;
     leaves: string[];
-    commitments: Record<string, { amount: string; unlockTime: number; index: number }>;
+    commitments: Record<
+        string,
+        | { amount: string; unlockTime: number; index: number }
+        | { amount: string; unlockTime: number; index: number }[]
+    >;
     emailHashes: string[];
 }
 
@@ -61,13 +65,22 @@ export async function buildClaimList(inputs: BuildClaimListInputs): Promise<Clai
 
     const leaves: string[] = sortedByIndex.map((c) => bigintToHex32(c.leaf));
 
-    const commitments: Record<string, { amount: string; unlockTime: number; index: number }> = {};
+    const commitments: ClaimListJson['commitments'] = {};
     for (const c of sortedByIndex) {
-        commitments[normalizeCommitmentKey(c.identityCommitment)] = {
+        const key = normalizeCommitmentKey(c.identityCommitment);
+        const metadata = {
             amount: c.amount.toString(),
             unlockTime: c.unlockTime,
             index: c.leafIndex,
         };
+        const existing = commitments[key];
+        if (!existing) {
+            commitments[key] = metadata;
+        } else if (Array.isArray(existing)) {
+            existing.push(metadata);
+        } else {
+            commitments[key] = [existing, metadata];
+        }
     }
 
     const uniqueEmails = Array.from(new Set(sortedByIndex.map((c) => normalizeEmail(c.email))));

@@ -51,6 +51,7 @@ export function sanitizeBlockchainError(
 
     const e = err as { message?: string; code?: number; toString?: () => string } | null;
     const message = (e?.message || (typeof e?.toString === 'function' ? e.toString() : '') || '').toString();
+    const normalizedMessage = message.toLowerCase();
     const code = e?.code;
 
     // viem / MetaMask "request already pending" surfaces as code -32002 with no useful message
@@ -59,7 +60,9 @@ export function sanitizeBlockchainError(
     }
 
     const matches = (rule: ErrorRule) =>
-        typeof rule.match === 'string' ? message.includes(rule.match) : rule.match.test(message);
+        typeof rule.match === 'string'
+            ? normalizedMessage.includes(rule.match.toLowerCase())
+            : rule.match.test(message);
 
     for (const rule of customRules) if (matches(rule)) return rule.message;
     for (const rule of BUILTIN_RULES) if (matches(rule)) return rule.message;

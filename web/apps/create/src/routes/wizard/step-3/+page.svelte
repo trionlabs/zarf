@@ -7,22 +7,18 @@
     import ZenButton from "@zarf/ui/components/ui/ZenButton.svelte";
     import { fly } from "svelte/transition";
 
-    // Default/demo contract address (consistent for SSR)
-    const DEFAULT_CONTRACT = "0x742d35Cc6634C0532925a3b844Bc454e4438f44e";
-
-    let contractAddress = $state(DEFAULT_CONTRACT);
+    let contractAddress = $state("");
     let copied = $state(false);
 
     onMount(() => {
         wizardStore.goToStep(2);
         // Update with real address after hydration. Source of truth is deployStore;
         // wizardStore no longer mirrors deployment results.
-        if (deployStore.contractAddress) {
-            contractAddress = deployStore.contractAddress;
-        }
+        contractAddress = deployStore.contractAddress ?? "";
     });
 
     function copyToClipboard() {
+        if (!contractAddress) return;
         navigator.clipboard.writeText(contractAddress);
         copied = true;
         setTimeout(() => (copied = false), 2000);
@@ -68,9 +64,13 @@
                 >Contract Address</span
             >
             <div class="flex items-center justify-center gap-3">
-                <span class="font-mono text-lg">{contractAddress}</span>
+                <span class="font-mono text-lg">
+                    {contractAddress || "Not available"}
+                </span>
                 <button
-                    class="p-2 rounded-full hover:bg-zen-fg/5 transition-colors"
+                    class="p-2 rounded-full hover:bg-zen-fg/5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    disabled={!contractAddress}
+                    aria-label="Copy contract address"
                     onclick={copyToClipboard}
                 >
                     {#if copied}

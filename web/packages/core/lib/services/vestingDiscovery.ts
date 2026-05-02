@@ -15,28 +15,56 @@ import {
     createPublicClient,
     http,
     type Address,
+    type Chain,
+    type PublicClient,
 } from 'viem';
-import { sepolia } from 'viem/chains';
+import { mainnet, sepolia } from 'viem/chains';
 import { ZarfVestingFactoryABI } from '../contracts/abis/ZarfVestingFactory';
-import { getCoreConfig } from '../config/runtime';
+import { getActiveChainId, getFactoryAddress as getFactoryAddressForChain } from '../config/contracts';
+import { __registerCoreConfigResetterForTests, getCoreConfig } from '../config/runtime';
 
 export interface DiscoveredVesting {
     address: Address;
 }
 
-function getRpcUrl(): string {
+const SUPPORTED_CHAINS: Record<number, Chain> = {
+    [sepolia.id]: sepolia,
+    [mainnet.id]: mainnet,
+};
+
+const DEFAULT_RPC_URLS: Record<number, string> = {
+    [sepolia.id]: 'https://ethereum-sepolia-rpc.publicnode.com',
+    [mainnet.id]: 'https://ethereum-rpc.publicnode.com',
+};
+
+const _publicClients = new Map<number, PublicClient>();
+
+function getChain(chainId: number): Chain {
+    const chain = SUPPORTED_CHAINS[chainId];
+    if (!chain) {
+        throw new Error(`Unsupported vesting discovery chain id: ${chainId}`);
+    }
+    return chain;
+}
+
+function getRpcUrl(chainId: number): string {
     return (
-        getCoreConfig().rpcUrls[sepolia.id] ||
-        'https://ethereum-sepolia-rpc.publicnode.com'
+        getCoreConfig().rpcUrls[chainId] ||
+        DEFAULT_RPC_URLS[chainId] ||
+        getChain(chainId).rpcUrls.default.http[0]
     );
 }
 
-function getFactoryAddress(): Address | null {
-    return getCoreConfig().factoryAddresses[sepolia.id] ?? null;
-}
-
-function publicClient() {
-    return createPublicClient({ chain: sepolia, transport: http(getRpcUrl()) });
+function publicClient(chainId: number) {
+    let client = _publicClients.get(chainId);
+    if (!client) {
+        client = createPublicClient({
+            chain: getChain(chainId),
+            transport: http(getRpcUrl(chainId)),
+        });
+        _publicClients.set(chainId, client);
+    }
+    return client;
 }
 
 /**
@@ -44,14 +72,16 @@ function publicClient() {
  * factory's on-chain registry: one `getDeploymentCount` call followed by a
  * single multicall that fans out `deployments(i)` for `i in [0, count)`.
  */
-export async function discoverAllVestings(): Promise<DiscoveredVesting[]> {
-    const factory = getFactoryAddress();
+export async function discoverAllVestings(
+    chainId: number = getActiveChainId(),
+): Promise<DiscoveredVesting[]> {
+    const factory = getFactoryAddressForChain(chainId);
     if (!factory) {
-        console.warn('[VestingDiscovery] Sepolia factory address not configured (configureCore)');
+        console.warn(`[VestingDiscovery] Factory address not configured for chain ${chainId} (configureCore)`);
         return [];
     }
 
-    const client = publicClient();
+    const client = publicClient(chainId);
 
     let count: bigint;
     try {
@@ -93,12 +123,15 @@ export async function discoverAllVestings(): Promise<DiscoveredVesting[]> {
  * Look up the `metadataCid` for a single vesting by reading the factory's
  * `vestingMetadataCid(addr)` mapping. One `eth_call`, no logs.
  */
-export async function getCidForVesting(address: Address): Promise<string | null> {
-    const factory = getFactoryAddress();
+export async function getCidForVesting(
+    address: Address,
+    chainId: number = getActiveChainId(),
+): Promise<string | null> {
+    const factory = getFactoryAddressForChain(chainId);
     if (!factory) return null;
 
     try {
-        const cid = (await publicClient().readContract({
+        const cid = (await publicClient(chainId).readContract({
             address: factory,
             abi: ZarfVestingFactoryABI,
             functionName: 'vestingMetadataCid',
@@ -110,3 +143,9 @@ export async function getCidForVesting(address: Address): Promise<string | null>
         return null;
     }
 }
+
+export function __resetVestingDiscoveryForTests(): void {
+    _publicClients.clear();
+}
+
+__registerCoreConfigResetterForTests(__resetVestingDiscoveryForTests);

@@ -20,6 +20,8 @@ export interface EpochMetadata {
     index: number;
 }
 
+export type CommitmentMetadata = EpochMetadata | EpochMetadata[];
+
 export interface DistributionData {
     /** Hex string '0x...' */
     merkleRoot: string;
@@ -33,7 +35,7 @@ export interface DistributionData {
      * Map of IdentityCommitment (hex) -> EpochMetadata.
      * Allows O(1) lookup during the brute-force discovery loop.
      */
-    commitments: Record<string, EpochMetadata>;
+    commitments: Record<string, CommitmentMetadata>;
     /** Optional list of all leaf hashes for audit / proof reconstruction */
     leaves?: string[];
     /** Optional list of email hashes for claim-side filtering (added in newer distributions) */
@@ -47,10 +49,8 @@ export interface DistributionData {
  *
  * Design notes:
  * - Top-level shape (merkleRoot, schedule, commitments) is strictly enforced.
- * - `commitments` is spot-checked on a single entry rather than walked in
- *   full — distributions can have thousands of entries and full validation
- *   would dominate the discovery loop. The expensive check is in the brute-
- *   force discovery itself (each lookup must produce a well-typed entry).
+ * - `commitments` is fully validated before returning. IPFS documents are
+ *   untrusted, and downstream discovery code relies on this schema.
  * - `leaves` and `emailHashes` are optional but, if present, must be arrays.
  */
 export function validateDistributionData(raw: unknown): DistributionData {
@@ -77,22 +77,39 @@ export function validateDistributionData(raw: unknown): DistributionData {
     if (typeof d.commitments !== 'object' || d.commitments === null) {
         throw new Error('distribution: missing commitments map');
     }
-    const commitments = d.commitments as Record<string, unknown>;
-    const sampleKey = Object.keys(commitments)[0];
-    if (sampleKey !== undefined) {
-        const sample = commitments[sampleKey];
-        if (typeof sample !== 'object' || sample === null) {
-            throw new Error(`distribution: commitments['${sampleKey}'] is not an object`);
+    const validateMetadata = (key: string, value: unknown, suffix = ''): void => {
+        if (typeof value !== 'object' || value === null) {
+            throw new Error(`distribution: commitments['${key}']${suffix} is not an object`);
         }
-        const m = sample as Record<string, unknown>;
+        const m = value as Record<string, unknown>;
         if (typeof m.amount !== 'string') {
-            throw new Error(`distribution: commitments['${sampleKey}'].amount must be a string`);
+            throw new Error(`distribution: commitments['${key}']${suffix}.amount must be a string`);
+        }
+        try {
+            BigInt(m.amount);
+        } catch {
+            throw new Error(`distribution: commitments['${key}']${suffix}.amount must be a bigint string`);
         }
         if (typeof m.unlockTime !== 'number' || !Number.isFinite(m.unlockTime)) {
-            throw new Error(`distribution: commitments['${sampleKey}'].unlockTime must be a finite number`);
+            throw new Error(`distribution: commitments['${key}']${suffix}.unlockTime must be a finite number`);
         }
-        if (typeof m.index !== 'number' || !Number.isInteger(m.index)) {
-            throw new Error(`distribution: commitments['${sampleKey}'].index must be an integer`);
+        if (m.unlockTime < 0) {
+            throw new Error(`distribution: commitments['${key}']${suffix}.unlockTime must be non-negative`);
+        }
+        if (typeof m.index !== 'number' || !Number.isInteger(m.index) || m.index < 0) {
+            throw new Error(`distribution: commitments['${key}']${suffix}.index must be a non-negative integer`);
+        }
+    };
+
+    const commitments = d.commitments as Record<string, unknown>;
+    for (const [key, value] of Object.entries(commitments)) {
+        if (Array.isArray(value)) {
+            if (value.length === 0) {
+                throw new Error(`distribution: commitments['${key}'] array must not be empty`);
+            }
+            value.forEach((entry, index) => validateMetadata(key, entry, `[${index}]`));
+        } else {
+            validateMetadata(key, value);
         }
     }
 

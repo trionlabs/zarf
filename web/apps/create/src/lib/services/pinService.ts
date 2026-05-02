@@ -64,11 +64,16 @@ async function postPin(body: string, timeoutMs: number): Promise<PinResponse> {
         throw new PinError(`Pin proxy returned ${res.status}: ${detail.slice(0, 200)}`);
     }
 
-    const json = (await res.json()) as PinResponse;
-    if (!json?.cid || typeof json.cid !== 'string') {
+    let json: unknown;
+    try {
+        json = await res.json();
+    } catch (err) {
+        throw new PinError('Pin proxy returned invalid JSON', err);
+    }
+    if (!json || typeof json !== 'object' || typeof (json as PinResponse).cid !== 'string') {
         throw new PinError('Pin proxy response missing cid');
     }
-    return json;
+    return json as PinResponse;
 }
 
 /**
