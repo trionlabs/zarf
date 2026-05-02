@@ -13,6 +13,8 @@
 import type { Address } from 'viem';
 
 export interface CoreRuntimeConfig {
+    /** Explicit chain used by read-only discovery flows when a caller does not pass one. */
+    activeChainId?: number;
     /** Per-chain RPC URL overrides. If absent for a chain, public fallbacks are used. */
     rpcUrls: Partial<Record<number, string>>;
     /** Per-chain factory contract addresses. */
@@ -28,6 +30,7 @@ export interface CoreRuntimeConfig {
 }
 
 let _config: CoreRuntimeConfig | null = null;
+const _configResettersForTests = new Set<() => void>();
 
 /**
  * Configure core. Call once from the app's root layout, before any code that
@@ -58,9 +61,20 @@ export function getCoreConfig(): CoreRuntimeConfig {
 }
 
 /**
+ * Register a config-derived cache resetter. Services with memoized clients use
+ * this so `__resetCoreConfigForTests()` can rebuild them after reconfiguration.
+ */
+export function __registerCoreConfigResetterForTests(reset: () => void): void {
+    _configResettersForTests.add(reset);
+}
+
+/**
  * Test-only escape hatch: reset the configured singleton so tests can call
  * `configureCore` again with different inputs. Do not call from app code.
  */
 export function __resetCoreConfigForTests(): void {
     _config = null;
+    for (const reset of _configResettersForTests) {
+        reset();
+    }
 }

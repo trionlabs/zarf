@@ -17,6 +17,20 @@ describe('validateDistributionData — accepts', () => {
     it('an empty commitments map (no entries → no spot-check)', () => {
         expect(() => validateDistributionData({ ...validData, commitments: {} })).not.toThrow();
     });
+
+    it('commitment entries can be arrays for duplicate commitment metadata', () => {
+        expect(() =>
+            validateDistributionData({
+                ...validData,
+                commitments: {
+                    '0xdeadbeef': [
+                        { amount: '1', unlockTime: 1, index: 0 },
+                        { amount: '2', unlockTime: 2, index: 1 },
+                    ],
+                },
+            }),
+        ).not.toThrow();
+    });
 });
 
 describe('validateDistributionData — rejects (each path must throw a descriptive error)', () => {

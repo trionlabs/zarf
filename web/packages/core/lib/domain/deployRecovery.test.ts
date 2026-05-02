@@ -70,6 +70,27 @@ describe('recoverPendingDeploy', () => {
         expect(out).toEqual({ kind: 'rpcError', pending: 'create', error: err });
     });
 
+    it('"rpcError" sets pending="approve" when approve receipt fetch fails', async () => {
+        const err = new Error('RPC down');
+        const out = await recoverPendingDeploy(
+            { approveTxHash: HASH_A, createTxHash: null },
+            { waitForReceipt: async () => { throw err; }, parseVestingAddress: parseOk },
+        );
+        expect(out).toEqual({ kind: 'rpcError', pending: 'approve', error: err });
+    });
+
+    it('normalizes non-Error thrown values for rpcError', async () => {
+        const out = await recoverPendingDeploy(
+            { approveTxHash: null, createTxHash: HASH_C },
+            { waitForReceipt: async () => { throw 'RPC down'; }, parseVestingAddress: parseOk },
+        );
+        expect(out.kind).toBe('rpcError');
+        if (out.kind === 'rpcError') {
+            expect(out.error).toBeInstanceOf(Error);
+            expect(out.error.message).toBe('RPC down');
+        }
+    });
+
     it('createTxHash takes priority over approveTxHash (does NOT re-verify approve)', async () => {
         const wait = vi.fn().mockResolvedValue(fakeReceipt('success'));
         await recoverPendingDeploy(

@@ -68,7 +68,9 @@
     onMount(async () => {
         try {
             const vestings = await discoverAllVestings();
-            discoveredAddresses = vestings.map((v) => v.address);
+            discoveredAddresses = Array.from(
+                new Set(vestings.map((v) => v.address)),
+            );
         } catch (e) {
             console.warn("[Claim] Chain discovery failed", e);
         }

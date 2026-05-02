@@ -73,6 +73,17 @@ export function padMerkleProof(
     indices: string[],
     depth: number = TREE_DEPTH,
 ) {
+    if (siblings.length !== indices.length) {
+        throw new Error(
+            `padMerkleProof: siblings/indices length mismatch (${siblings.length}/${indices.length})`,
+        );
+    }
+    if (siblings.length > depth || indices.length > depth) {
+        throw new Error(
+            `padMerkleProof: proof length ${siblings.length}/${indices.length} exceeds depth ${depth}`,
+        );
+    }
+
     const paddedSiblings = [...siblings];
     const paddedIndices = [...indices];
 
@@ -94,10 +105,14 @@ export function padMerkleProof(
  */
 export function padEmail(email: string, length: number = MAX_EMAIL_LENGTH) {
     const emailBytes = Array.from(new TextEncoder().encode(email));
+    const byteLength = emailBytes.length;
+    if (byteLength > length) {
+        throw new Error(`Email exceeds MAX_EMAIL_LENGTH (${length} bytes)`);
+    }
     while (emailBytes.length < length) {
         emailBytes.push(0);
     }
-    return { storage: emailBytes, len: email.length };
+    return { storage: emailBytes, len: byteLength };
 }
 
 /**

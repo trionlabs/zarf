@@ -250,7 +250,9 @@ export class FactoryDeployService {
         } catch (error: unknown) {
             const message = sanitizeError(error);
             this.onProgress({ step: 'error', message });
-            throw error;
+            const sanitized = new Error(message);
+            (sanitized as Error & { cause?: unknown }).cause = error;
+            throw sanitized;
         }
     }
 

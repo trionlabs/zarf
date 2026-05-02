@@ -18,6 +18,16 @@ export type WaitForReceipt = (hash: Hash) => Promise<TransactionReceipt>;
 
 export type ParseVestingAddress = (receipt: TransactionReceipt) => Address;
 
+function toError(value: unknown): Error {
+    if (value instanceof Error) return value;
+    if (typeof value === 'string') return new Error(value);
+    try {
+        return new Error(JSON.stringify(value));
+    } catch {
+        return new Error(String(value));
+    }
+}
+
 export type RecoveryResult =
     /** No pending tx hashes; nothing to recover. */
     | { kind: 'none' }
@@ -58,7 +68,7 @@ export async function recoverPendingDeploy(
         try {
             receipt = await deps.waitForReceipt(pending.createTxHash);
         } catch (e) {
-            return { kind: 'rpcError', pending: 'create', error: e as Error };
+            return { kind: 'rpcError', pending: 'create', error: toError(e) };
         }
         if (receipt.status !== 'success') {
             return { kind: 'createReverted' };
@@ -76,7 +86,7 @@ export async function recoverPendingDeploy(
         try {
             receipt = await deps.waitForReceipt(pending.approveTxHash);
         } catch (e) {
-            return { kind: 'rpcError', pending: 'approve', error: e as Error };
+            return { kind: 'rpcError', pending: 'approve', error: toError(e) };
         }
         return receipt.status === 'success' ? { kind: 'approveConfirmed' } : { kind: 'approveReverted' };
     }

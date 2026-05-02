@@ -7,29 +7,54 @@
  * @module services/distributionDiscovery
  */
 
-import { createPublicClient, http, type Address, type PublicClient } from 'viem';
-import { sepolia } from 'viem/chains';
+import { createPublicClient, http, type Address, type Chain, type PublicClient } from 'viem';
+import { mainnet, sepolia } from 'viem/chains';
 import { ZarfVestingFactoryABI } from '../contracts/abis/ZarfVestingFactory';
 import { ZarfVestingABI } from '../contracts/abis/ZarfVesting';
 import { ERC20ABI } from '../contracts/abis/ERC20';
-import { getFactoryAddress } from '../config/contracts';
-import { getCoreConfig } from '../config/runtime';
+import { getActiveChainId, getFactoryAddress } from '../config/contracts';
+import { __registerCoreConfigResetterForTests, getCoreConfig } from '../config/runtime';
 
 // ============ Public Client (Lazy Initialization) ============
 
-let _publicClient: PublicClient | null = null;
+const SUPPORTED_CHAINS: Record<number, Chain> = {
+    [sepolia.id]: sepolia,
+    [mainnet.id]: mainnet,
+};
 
-function getPublicClient(): PublicClient {
-    if (!_publicClient) {
-        const rpcUrl =
-            getCoreConfig().rpcUrls[sepolia.id] ||
-            'https://ethereum-sepolia-rpc.publicnode.com';
-        _publicClient = createPublicClient({
-            chain: sepolia,
-            transport: http(rpcUrl)
-        });
+const DEFAULT_RPC_URLS: Record<number, string> = {
+    [sepolia.id]: 'https://ethereum-sepolia-rpc.publicnode.com',
+    [mainnet.id]: 'https://ethereum-rpc.publicnode.com',
+};
+
+const _publicClients = new Map<number, PublicClient>();
+
+function getChain(chainId: number): Chain {
+    const chain = SUPPORTED_CHAINS[chainId];
+    if (!chain) {
+        throw new Error(`Unsupported discovery chain id: ${chainId}`);
     }
-    return _publicClient;
+    return chain;
+}
+
+function getRpcUrl(chainId: number): string {
+    return (
+        getCoreConfig().rpcUrls[chainId] ||
+        DEFAULT_RPC_URLS[chainId] ||
+        getChain(chainId).rpcUrls.default.http[0]
+    );
+}
+
+function getPublicClient(chainId: number): PublicClient {
+    let client = _publicClients.get(chainId);
+    if (!client) {
+        client = createPublicClient({
+            chain: getChain(chainId),
+            transport: http(getRpcUrl(chainId))
+        });
+        _publicClients.set(chainId, client);
+    }
+    return client;
 }
 
 // ============ Types ============
@@ -80,34 +105,46 @@ interface CacheEntry {
     timestamp: number;
 }
 
-const cache = new Map<Address, CacheEntry>();
+const cache = new Map<string, CacheEntry>();
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
-function getCachedResult(owner: Address): DiscoveryResult | null {
-    const entry = cache.get(owner);
+function cacheKey(owner: Address, chainId: number): string {
+    return `${chainId}:${owner.toLowerCase()}`;
+}
+
+function getCachedResult(owner: Address, chainId: number): DiscoveryResult | null {
+    const entry = cache.get(cacheKey(owner, chainId));
     if (!entry) return null;
 
     const isExpired = Date.now() - entry.timestamp > CACHE_TTL_MS;
     if (isExpired) {
-        cache.delete(owner);
+        cache.delete(cacheKey(owner, chainId));
         return null;
     }
 
     return entry.data;
 }
 
-function setCacheResult(owner: Address, result: DiscoveryResult): void {
-    cache.set(owner, {
+function setCacheResult(owner: Address, chainId: number, result: DiscoveryResult): void {
+    cache.set(cacheKey(owner, chainId), {
         data: result,
         timestamp: Date.now()
     });
 }
 
-export function invalidateCache(owner?: Address): void {
-    if (owner) {
-        cache.delete(owner);
-    } else {
+export function invalidateCache(owner?: Address, chainId?: number): void {
+    if (!owner && chainId === undefined) {
         cache.clear();
+        return;
+    }
+
+    for (const key of cache.keys()) {
+        const [keyChainId, keyOwner] = key.split(':');
+        const matchesOwner = !owner || keyOwner === owner.toLowerCase();
+        const matchesChain = chainId === undefined || Number(keyChainId) === chainId;
+        if (matchesOwner && matchesChain) {
+            cache.delete(key);
+        }
     }
 }
 
@@ -115,8 +152,12 @@ export function invalidateCache(owner?: Address): void {
  * Manually add a contract to the cache (Optimistic UI)
  * Call this immediately after a successful deployment
  */
-export function addOptimisticContract(owner: Address, contract: OnChainVestingContract): void {
-    const cached = getCachedResult(owner);
+export function addOptimisticContract(
+    owner: Address,
+    contract: OnChainVestingContract,
+    chainId: number = getActiveChainId(),
+): void {
+    const cached = getCachedResult(owner, chainId);
 
     // Create new result based on cache or empty state
     const currentContracts = cached ? cached.contracts : [];
@@ -131,7 +172,7 @@ export function addOptimisticContract(owner: Address, contract: OnChainVestingCo
         fetchedAt: Date.now()
     };
 
-    setCacheResult(owner, newResult);
+    setCacheResult(owner, chainId, newResult);
     console.log('[DiscoveryService] Optimistically added contract:', contract.address);
 }
 
@@ -142,12 +183,15 @@ export function addOptimisticContract(owner: Address, contract: OnChainVestingCo
  * @param owner Wallet address of the owner
  * @returns Array of contract addresses
  */
-export async function fetchOwnerDeploymentAddresses(owner: Address): Promise<Address[]> {
-    const client = getPublicClient();
+export async function fetchOwnerDeploymentAddresses(
+    owner: Address,
+    chainId: number = getActiveChainId(),
+): Promise<Address[]> {
+    const client = getPublicClient(chainId);
 
-    const FACTORY_ADDRESS = getFactoryAddress();
+    const FACTORY_ADDRESS = getFactoryAddress(chainId);
     if (!FACTORY_ADDRESS) {
-        throw new Error('Factory address not configured');
+        throw new Error(`Factory address not configured for chain ${chainId}`);
     }
 
     try {
@@ -190,9 +234,10 @@ export function sanitizeString(str: string, maxLength: number): string {
  * @returns Contract metadata or null if failed
  */
 export async function fetchContractMetadata(
-    contractAddress: Address
+    contractAddress: Address,
+    chainId: number = getActiveChainId(),
 ): Promise<OnChainVestingContract | null> {
-    const client = getPublicClient();
+    const client = getPublicClient(chainId);
 
     try {
         // Batch read all contract data using Multicall (allowFailure: true for resilience)
@@ -330,13 +375,15 @@ export async function discoverOwnerVestings(
     options: {
         forceRefresh?: boolean;
         maxContracts?: number;
+        chainId?: number;
     } = {}
 ): Promise<DiscoveryResult> {
     const { forceRefresh = false, maxContracts = 50 } = options;
+    const chainId = getActiveChainId(options.chainId);
 
     // Check cache first
     if (!forceRefresh) {
-        const cached = getCachedResult(owner);
+        const cached = getCachedResult(owner, chainId);
         if (cached) {
             console.log('[DiscoveryService] Returning cached result');
             return cached;
@@ -344,7 +391,7 @@ export async function discoverOwnerVestings(
     }
 
     // Fetch addresses from Factory
-    const addresses = await fetchOwnerDeploymentAddresses(owner);
+    const addresses = await fetchOwnerDeploymentAddresses(owner, chainId);
 
     if (addresses.length === 0) {
         const result: DiscoveryResult = {
@@ -352,7 +399,7 @@ export async function discoverOwnerVestings(
             total: 0,
             fetchedAt: Date.now()
         };
-        setCacheResult(owner, result);
+        setCacheResult(owner, chainId, result);
         return result;
     }
 
@@ -360,7 +407,7 @@ export async function discoverOwnerVestings(
     const addressesToFetch = addresses.slice(0, maxContracts);
 
     // Fetch metadata for each contract in parallel
-    const metadataPromises = addressesToFetch.map(addr => fetchContractMetadata(addr));
+    const metadataPromises = addressesToFetch.map(addr => fetchContractMetadata(addr, chainId));
     const metadataResults = await Promise.all(metadataPromises);
 
     // Filter out failed fetches
@@ -374,7 +421,7 @@ export async function discoverOwnerVestings(
         fetchedAt: Date.now()
     };
 
-    setCacheResult(owner, result);
+    setCacheResult(owner, chainId, result);
 
     return result;
 }
@@ -382,10 +429,13 @@ export async function discoverOwnerVestings(
 /**
  * Get deployment count for an owner (cheaper than full discovery)
  */
-export async function getOwnerDeploymentCount(owner: Address): Promise<number> {
-    const client = getPublicClient();
+export async function getOwnerDeploymentCount(
+    owner: Address,
+    chainId: number = getActiveChainId(),
+): Promise<number> {
+    const client = getPublicClient(chainId);
 
-    const FACTORY_ADDRESS = getFactoryAddress();
+    const FACTORY_ADDRESS = getFactoryAddress(chainId);
     if (!FACTORY_ADDRESS) {
         return 0;
     }
@@ -404,3 +454,10 @@ export async function getOwnerDeploymentCount(owner: Address): Promise<number> {
         return 0;
     }
 }
+
+export function __resetDistributionDiscoveryForTests(): void {
+    _publicClients.clear();
+    cache.clear();
+}
+
+__registerCoreConfigResetterForTests(__resetDistributionDiscoveryForTests);

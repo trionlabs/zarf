@@ -20,24 +20,33 @@ export const CHAIN_IDS = {
 
 // ============ Factory Addresses ============
 
-/**
- * Factory address for the active chain (Sepolia preferred, Mainnet fallback).
- * Returns undefined if neither has been configured.
- */
-export function getFactoryAddress(): Address | undefined {
-    const { factoryAddresses } = getCoreConfig();
-    return (
-        factoryAddresses[CHAIN_IDS.SEPOLIA] ??
-        factoryAddresses[CHAIN_IDS.MAINNET]
+export function getActiveChainId(chainId?: number): number {
+    if (chainId !== undefined) return chainId;
+
+    const cfg = getCoreConfig();
+    if (cfg.activeChainId !== undefined) return cfg.activeChainId;
+
+    const configuredFactoryChains = Object.entries(cfg.factoryAddresses)
+        .filter(([, address]) => Boolean(address))
+        .map(([id]) => Number(id));
+
+    if (configuredFactoryChains.length === 1) {
+        return configuredFactoryChains[0];
+    }
+
+    throw new Error(
+        'core: activeChainId is required when factory addresses are missing or configured for multiple chains',
     );
 }
 
 /**
  * Factory address for a specific chain id.
  */
-export function getFactoryAddressForChain(chainId: number): Address | undefined {
+export function getFactoryAddress(chainId: number): Address | undefined {
     return getCoreConfig().factoryAddresses[chainId];
 }
+
+export const getFactoryAddressForChain = getFactoryAddress;
 
 // ============ Other Contract Addresses ============
 

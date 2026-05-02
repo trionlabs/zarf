@@ -117,9 +117,12 @@
                 currentMessage = "Deployment confirmed.";
                 break;
             case "createConfirmedNoAddress":
-                currentStep = "complete";
+                error =
+                    "Deployment transaction confirmed, but the VestingCreated event could not be read. Please import the contract manually or contact support.";
+                currentStep = "error";
                 isDeploying = false;
-                currentMessage = "Deployment confirmed.";
+                currentMessage = "Deployment needs manual recovery.";
+                deployStore.clearPendingTransactions();
                 break;
             case "createReverted":
                 error = "Transaction failed on-chain.";
@@ -209,20 +212,27 @@
                 );
             }
 
-            config = planDeploy({
-                factoryAddress: currentFactoryAddress as Address,
-                tokenAddress: wizardStore.tokenDetails.tokenAddress as Address,
-                owner: walletAddress!,
-                name: distribution.name,
-                description: distribution.description || "",
-                schedule: distribution.schedule,
-                totalAmountWei: parseUnits(String(distribution.amount), tokenDecimals),
-                merkleRoot: factoryInputs.merkleRoot,
-                commitments: factoryInputs.commitments,
-                amounts: factoryInputs.amounts,
-                allocationsTotal: factoryInputs.totalAllocation,
-                metadataCid,
-            });
+            const plannedAt = deployStore.schedulePlanAtMs
+                ? new Date(deployStore.schedulePlanAtMs)
+                : new Date();
+
+            config = planDeploy(
+                {
+                    factoryAddress: currentFactoryAddress as Address,
+                    tokenAddress: wizardStore.tokenDetails.tokenAddress as Address,
+                    owner: walletAddress!,
+                    name: distribution.name,
+                    description: distribution.description || "",
+                    schedule: distribution.schedule,
+                    totalAmountWei: parseUnits(String(distribution.amount), tokenDecimals),
+                    merkleRoot: factoryInputs.merkleRoot,
+                    commitments: factoryInputs.commitments,
+                    amounts: factoryInputs.amounts,
+                    allocationsTotal: factoryInputs.totalAllocation,
+                    metadataCid,
+                },
+                plannedAt,
+            );
         } catch (e) {
             error = `Pre-deploy step failed: ${(e as Error).message}`;
             isDeploying = false;
@@ -268,17 +278,26 @@
 
                 // Optimistic UI Update — show in dashboard before next RPC fetch
                 try {
-                    addOptimisticContract(walletAddress, buildOptimisticContract({
-                        address: vestingAddress,
-                        name: distribution.name,
-                        description: distribution.description || "",
-                        tokenAddress: wizardStore.tokenDetails.tokenAddress as Address,
-                        tokenSymbol: wizardStore.tokenDetails.tokenSymbol,
-                        tokenDecimals: wizardStore.tokenDetails.tokenDecimals,
-                        owner: walletAddress,
-                        schedule: distribution.schedule,
-                        totalAmountWei: config.totalAmount,
-                    }));
+                    addOptimisticContract(
+                        walletAddress,
+                        buildOptimisticContract({
+                            address: vestingAddress,
+                            name: distribution.name,
+                            description: distribution.description || "",
+                            tokenAddress: wizardStore.tokenDetails.tokenAddress as Address,
+                            tokenSymbol: wizardStore.tokenDetails.tokenSymbol,
+                            tokenDecimals: wizardStore.tokenDetails.tokenDecimals,
+                            owner: walletAddress,
+                            schedule: distribution.schedule,
+                            totalAmountWei: config.totalAmount,
+                            plannedSchedule: {
+                                cliffSeconds: config.cliffSeconds,
+                                vestingSeconds: config.vestingSeconds,
+                                periodSeconds: config.periodSeconds,
+                            },
+                        }),
+                        chainId,
+                    );
                 } catch (err) {
                     console.warn("Optimistic cache update failed", err);
                 }

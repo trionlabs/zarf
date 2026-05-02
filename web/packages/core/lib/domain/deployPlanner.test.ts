@@ -67,4 +67,18 @@ describe('buildOptimisticContract', () => {
         expect(out.tokenBalance).toBe(1234n);
         expect(out.vestingStart).toBe(1735689600n);  // 2025-01-01 UTC
     });
+
+    it('uses planned schedule seconds when provided', () => {
+        const out = buildOptimisticContract({
+            address: '0xa' as Address, name: '', description: '',
+            tokenAddress: '0xt' as Address,
+            owner: '0xo' as Address,
+            schedule: { cliffEndDate: futureDate, cliffTime: '00:00', distributionDuration: 1, durationUnit: 'months' },
+            totalAmountWei: 1234n,
+            plannedSchedule: { cliffSeconds: 0n, vestingSeconds: 1n, periodSeconds: 1n },
+        });
+        expect(out.cliffDuration).toBe(0n);
+        expect(out.vestingDuration).toBe(1n);
+        expect(out.vestingPeriod).toBe(1n);
+    });
 });

@@ -10,8 +10,8 @@ contract DeployVestingScript is Script {
         address deployer = vm.addr(deployerPrivateKey);
         
         address token = vm.envAddress("VITE_ZRFT_TEST_TOKEN"); // Use Test Token
-        address verifier = vm.envAddress("VITE_VERIFIER_ADDRESS");
-        address registry = vm.envAddress("VITE_JWK_REGISTRY_ADDRESS");
+        address verifier = _envAddressWithFallback("VITE_VERIFIER_ADDRESS", "VERIFIER_ADDRESS");
+        address registry = _envAddressWithFallback("VITE_JWK_REGISTRY_ADDRESS", "JWK_REGISTRY_ADDRESS");
 
         vm.startBroadcast(deployerPrivateKey);
 
@@ -32,5 +32,14 @@ contract DeployVestingScript is Script {
         console.log("ZarfVesting deployed at:", address(vesting));
 
         vm.stopBroadcast();
+    }
+
+    function _envAddressWithFallback(
+        string memory primaryName,
+        string memory legacyName
+    ) internal view returns (address) {
+        address value = vm.envOr(primaryName, address(0));
+        if (value != address(0)) return value;
+        return vm.envAddress(legacyName);
     }
 }
