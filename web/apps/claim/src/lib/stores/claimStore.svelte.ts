@@ -1,10 +1,20 @@
 import { browser } from '$app/environment';
 import type { ZKProof, MerkleClaim, MerkleTreeData } from "@zarf/ui/types";
-import { calculateVestingPeriods, type VestingPeriod } from "@zarf/core/utils";
 import { toastStore } from "@zarf/ui/stores/toastStore.svelte";
 
-import { fetchDistributionData, type DistributionData } from "../services/distribution";
+import { fetchDistributionData, type DistributionData } from "@zarf/core/services/distribution";
 import { isEpochClaimed } from "@zarf/core/contracts";
+import {
+    totalAllocation as totalAllocationOf,
+    claimedAmount as claimedAmountOf,
+    unlockedAmount as unlockedAmountOf,
+    claimableAmount as claimableAmountOf,
+    isCliffPassed as isCliffPassedOf,
+    cliffEndDate as cliffEndDateOf,
+    findNextClaimableIdx,
+    buildVestingPeriods,
+} from "@zarf/core/domain/claimFlow";
+import { discoverEpochs as discoverEpochsCore } from "@zarf/core/domain/epochDiscovery";
 import { type Address } from 'viem';
 
 /**
@@ -62,43 +72,21 @@ class ClaimFlowState {
     // Getters (Derived from State)
     // ==========================================
 
-    get totalAllocation() {
-        return this.state.epochs.reduce((sum, e) => sum + e.amount, 0n);
-    }
+    get totalAllocation()  { return totalAllocationOf(this.state.epochs); }
+    get claimedAmount()    { return claimedAmountOf(this.state.epochs); }
+    get unlockedAmount()   { return unlockedAmountOf(this.state.epochs); }
+    get vestedAmount()     { return this.unlockedAmount; }
+    get claimableAmount()  { return claimableAmountOf(this.state.epochs); }
+    get isEligible()       { return this.state.epochs.length > 0; }
 
-    get claimedAmount() {
-        return this.state.epochs.filter(e => e.isClaimed).reduce((sum, e) => sum + e.amount, 0n);
-    }
-
-    get unlockedAmount() {
-        return this.state.epochs.filter(e => !e.isLocked).reduce((sum, e) => sum + e.amount, 0n);
-    }
-
-    get vestedAmount() {
-        return this.unlockedAmount;
-    }
-
-    get claimableAmount() {
-        return this.state.epochs.filter(e => !e.isLocked && !e.isClaimed).reduce((sum, e) => sum + e.amount, 0n);
-    }
-
-    get isEligible() {
-        return this.state.epochs.length > 0;
-    }
-
-    get isCliffPassed() {
-        if (!this.state.vestingSchedule) return true;
-        const start = Number(this.state.vestingSchedule.vestingStart);
-        const cliff = Number(this.state.vestingSchedule.cliffDuration);
-        return (Date.now() / 1000) >= (start + cliff);
-    }
-
-    get cliffEndDate() {
-        if (!this.state.vestingSchedule) return null;
-        const start = Number(this.state.vestingSchedule.vestingStart);
-        const cliff = Number(this.state.vestingSchedule.cliffDuration);
-        return new Date((start + cliff) * 1000);
-    }
+    /**
+     * Has the cliff passed? Returns `true | false | null` — `null` means
+     * "schedule not loaded yet"; UI should treat as "unknown", not as eligible.
+     * (Previously this returned `true` on null schedule, which momentarily
+     * showed a CTA before data loaded.)
+     */
+    get isCliffPassed() { return isCliffPassedOf(this.state.vestingSchedule); }
+    get cliffEndDate()  { return cliffEndDateOf(this.state.vestingSchedule); }
 
     // UI Helpers (Direct Accessors)
     get currentStep() { return this.state.currentStep; }
@@ -114,30 +102,7 @@ class ClaimFlowState {
     get vestingSchedule() { return this.state.vestingSchedule; }
 
     get periods() {
-        const claimedMap: Record<number, boolean> = {};
-        // Map based on index (assuming index 0 corresponds to period 1?)
-        // In the utility logic: "Check if this specific epoch index is marked as claimed"
-        // In Store: epochs[0] corresponds to period 1?
-        // Let's verify discovery logic.
-        // Discovery: `index` increments. `leafIndex` comes from CSV.
-        // Vesting Logic: `result.push({ index: i + 1 ... })`
-        // Loop `i=0`. `claimedEpochs[i]`.
-        // So yes, `this.state.epochs[i]` corresponds to vesting period `i`.
-        
-        // Note: `this.state.epochs` might be sparse if we only found SOME epochs?
-        // Discovery finds ALL epochs usually.
-        // But let's be safe. If `epochs` array is aligned with time (index 0 = first unlock), then this works.
-        // Yes, the discovery loop pushes in order of discovery (0 to MAX).
-        
-        this.state.epochs.forEach((e, i) => {
-            if (e.isClaimed) claimedMap[i] = true;
-        });
-
-        return calculateVestingPeriods(
-            this.state.vestingSchedule,
-            this.totalAllocation,
-            claimedMap
-        );
+        return buildVestingPeriods(this.state.vestingSchedule, this.state.epochs);
     }
 
     get selectedEpoch() {
@@ -254,13 +219,10 @@ class ClaimFlowState {
     }
 
     selectNextClaimableEpoch() {
-        if (!this.state.epochs) return false;
-        const index = this.state.epochs.findIndex(e => !e.isLocked && !e.isClaimed);
-        if (index !== -1) {
-            this.state.selectedEpochIndex = index;
-            return true;
-        }
-        return false;
+        const idx = findNextClaimableIdx(this.state.epochs);
+        if (idx === null) return false;
+        this.state.selectedEpochIndex = idx;
+        return true;
     }
 
     // --- Persistence ---
@@ -312,7 +274,10 @@ class ClaimFlowState {
     }
 
     /**
-     * DISCOVERY LOGIC (Discrete Vesting)
+     * Off-chain epoch discovery via the recursive hash chain.
+     * The actual algorithm lives in @zarf/core/domain/epochDiscovery (pure,
+     * unit-tested). This method wires up Svelte concerns: WASM lazy-load,
+     * status messages, error toasts, and the post-success transition.
      */
     async discoverEpochs(email: string, jwt: string, pin: string, contractAddress: string) {
         this.state.loading = true;
@@ -320,136 +285,47 @@ class ClaimFlowState {
         this.state.statusMessage = "Loading distribution data...";
         this.state.epochs = [];
 
-        // Dynamic Loading of Heavy Crypto Libs (Lazy Load)
-        // This prevents the 7MB WASM bundle from loading on initial page load
-        const {
-            computeIdentityCommitment,
-            stringToBytes,
-            pedersenHashBytes,
-            pedersenHashField
-        } = await this.preloadCrypto();
-
         try {
-            console.log('[Discovery] Starting for:', email);
-            // Store JWT if passed (it might be needed for the circuit inputs if using Google JWK)
-            // But wait, the circuit just needs the signature? 
-            // In the "privacy" architecture, do we use the JWT signature in the ZK proof?
-            // Yes, usually "header.payload.signature" is input.
-            // So we MUST store it.
-            // Let's create a dedicated field for it if not exists, or misuse 'masterSalt' if that was the intent.
-            // But we have 'jwt' in state definition in the Class above? No, we removed it in the big refactor?
-            // Let me check the Class definition again.
+            // Lazy-load the WASM-heavy crypto module (~7MB) only when needed.
+            const {
+                computeIdentityCommitment,
+                stringToBytes,
+                pedersenHashBytes,
+                pedersenHashField,
+            } = await this.preloadCrypto();
 
-            // Checking the file content provided in previous turn:
-            // state = $state({ ... email: "", pin: "", ... })
-            // It does NOT have jwt in the state object in my last write!
+            const result = await discoverEpochsCore(
+                { email, pin, contractAddress },
+                { computeIdentityCommitment, stringToBytes, pedersenHashBytes, pedersenHashField },
+                {
+                    fetchDistribution: fetchDistributionData,
+                    isEpochClaimed: (commitment, addr) => isEpochClaimed(commitment, addr as Address),
+                },
+            );
 
-            // I need to add 'jwt' to the state object definition first.
+            this.setSchedule(result.schedule);
+            // Adapt domain epochs → claim store's EpochClaim shape.
+            const found: EpochClaim[] = result.epochs.map((e) => ({
+                email,
+                amount: e.amount,
+                salt: e.salt,
+                identityCommitment: e.identityCommitment,
+                leafIndex: e.leafIndex,
+                leaf: 0n,
+                unlockTime: e.unlockTime,
+                isClaimed: e.isClaimed,
+                isLocked: e.isLocked,
+                canClaim: e.canClaim,
+            }));
 
-
-            // 1. Fetch Static Distribution Data
-            const data = await fetchDistributionData(contractAddress);
-            this.setSchedule(data.schedule);
-
-            // 2. Create Lookup Map (O(1)) and handle key normalization
-            const commitmentMap = data.commitments;
-            // Normalized map
-            const normalizedMap: Record<string, typeof data.commitments[string]> = {};
-
-            for (const [key, val] of Object.entries(commitmentMap)) {
-                normalizedMap[key.toLowerCase()] = val;
-                // Add unpadded version if needed
-                const cleanKey = '0x' + key.slice(2).replace(/^0+/, '');
-                if (cleanKey !== key.toLowerCase()) {
-                    normalizedMap[cleanKey.toLowerCase()] = val;
-                }
-            }
-
-            console.log('[Discovery] Total Commitments:', Object.keys(commitmentMap).length);
-
-            // 3. Discovery Loop
-            const foundEpochs: EpochClaim[] = [];
-            let index = 0;
-            const MAX_EPOCHS = 200;
-
-            this.state.statusMessage = "Discovering epochs...";
-
-            // Hash Chain State Initialization
-            const masterSaltBytes = stringToBytes(pin);
-            let currentSecret = await pedersenHashBytes(masterSaltBytes); // Epoch 0 Result
-
-            while (index < MAX_EPOCHS) {
-                // a. Derive Epoch Secret (Recursive Hash Chain)
-                if (index > 0) {
-                    currentSecret = await pedersenHashField(currentSecret);
-                }
-                const epochSecret = '0x' + currentSecret.toString(16);
-
-                // b. Compute Commitment
-                // Pass BigInt secret directly to avoid re-encoding ambiguity
-                const commitmentBigInt = await computeIdentityCommitment(email, currentSecret);
-                // Standardize: 0x + 64 chars hex
-                const commitment = '0x' + commitmentBigInt.toString(16).padStart(64, '0');
-                const commitmentLower = commitment.toLowerCase();
-
-                // c. Check Existence (Offline)
-                let meta = normalizedMap[commitmentLower];
-
-                if (!meta) {
-                    // Try unpadded
-                    const unpadded = '0x' + commitment.slice(2).replace(/^0+/, '').toLowerCase();
-                    meta = normalizedMap[unpadded];
-                }
-
-                if (meta) {
-                    // FOUND ONE!
-                    // console.log(`[Discovery] Found epoch ${index} logic...`);
-
-                    // d. Check Status (On-Chain)
-                    let isClaimed = false;
-                    try {
-                        isClaimed = await isEpochClaimed(commitment, contractAddress as Address);
-                    } catch (err) {
-                        console.warn(`[Discovery] Status check failed for ${index}`, err);
-                    }
-
-                    foundEpochs.push({
-                        email,
-                        amount: BigInt(meta.amount),
-                        salt: epochSecret,
-                        identityCommitment: commitment,
-                        leafIndex: meta.index,
-                        leaf: 0n,
-                        unlockTime: meta.unlockTime,
-                        isClaimed,
-                        isLocked: (Date.now() / 1000) < meta.unlockTime,
-                        canClaim: !isClaimed && (Date.now() / 1000) >= meta.unlockTime
-                    });
-
-                    index++;
-                } else {
-                    if (index === 0) break; // Wrong PIN/Email
-                    else break; // Done
-                }
-            }
-
-            if (foundEpochs.length === 0) {
-                throw new Error("No allocation found. Please check your Email and PIN.");
-            }
-
-            // Success!
             this.setCredentials(email, "", pin);
             this.state.jwt = jwt;
-            this.setEpochs(foundEpochs);
-            this.nextStep(); // Move to Dashboard
-
+            this.setEpochs(found);
+            this.nextStep();
         } catch (e: any) {
             console.error("Discovery failed:", e);
             let msg = e.message || "Failed to discover epochs.";
-
             if (msg.includes("404")) msg = "Contract distribution data not found.";
-            else if (msg.includes("No allocation found")) { /* keep */ }
-
             this.setError(msg);
             throw new Error(msg);
         } finally {

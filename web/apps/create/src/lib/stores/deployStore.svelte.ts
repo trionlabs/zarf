@@ -1,5 +1,4 @@
 import type { Distribution, Recipient, MerkleTreeData } from './types';
-import type { DeployProgress, DeployConfig } from '../services/deploy';
 import type { Address } from 'viem';
 import { safeParse, safeStringify } from '@zarf/core/utils/json';
 
@@ -16,6 +15,8 @@ export class DeployState {
     merkleResult = $state<MerkleTreeData | null>(null);
     isGeneratingMerkle = $state(false);
     merkleError = $state<string | null>(null);
+    isPinning = $state(false);
+    pinError = $state<string | null>(null);
 
     // Step 2 & 3
     isBackupDownloaded = $state(false);
@@ -24,16 +25,17 @@ export class DeployState {
     walletAddress = $state<Address | null>(null);
 
     // Step 4
-    deployProgress = $state<DeployProgress | null>(null);
     contractAddress = $state<Address | null>(null);
     isDeployed = $state(false);
 
     // Recovery Fields (The Write-Ahead Log)
     approveTxHash = $state<string | null>(null);
     createTxHash = $state<string | null>(null);
+    metadataCid = $state<string | null>(null);
+    schedulePlanAtMs = $state<number | null>(null);
 
     // External guards (Derived)
-    canContinueToStep2 = $derived(!!this.merkleResult);
+    canContinueToStep2 = $derived(!!this.merkleResult && !!this.metadataCid);
     canContinueToStep3 = $derived(this.isBackupDownloaded && this.isBackupConfirmed);
     canContinueToStep4 = $derived(this.isWalletConnected);
 
@@ -55,6 +57,8 @@ export class DeployState {
                 // Recovery fields
                 approveTxHash: this.approveTxHash,
                 createTxHash: this.createTxHash,
+                metadataCid: this.metadataCid,
+                schedulePlanAtMs: this.schedulePlanAtMs,
                 timestamp: Date.now()
             };
             const key = `deploy_state_${this.distribution.id}`;
@@ -81,16 +85,31 @@ export class DeployState {
                 return;
             }
 
-            if (state) {
-                // Restore critical state
-                this.currentStep = state.currentStep || 1;
+            if (state && typeof state === "object") {
+                if (state.version !== 2) {
+                    localStorage.removeItem(key);
+                    return;
+                }
+
+                const restoredStep = Number(state.currentStep);
+                this.currentStep =
+                    restoredStep >= 1 && restoredStep <= 4
+                        ? (restoredStep as DeployStep)
+                        : 1;
                 this.merkleResult = state.merkleResult;
                 this.isBackupDownloaded = !!state.isBackupDownloaded;
                 this.isBackupConfirmed = !!state.isBackupConfirmed;
 
                 // Restore recovery state
+                this.schedulePlanAtMs =
+                    typeof state.schedulePlanAtMs === "number"
+                        ? state.schedulePlanAtMs
+                        : null;
                 this.approveTxHash = state.approveTxHash || null;
                 this.createTxHash = state.createTxHash || null;
+                this.metadataCid = this.schedulePlanAtMs
+                    ? state.metadataCid || null
+                    : null;
             }
         } catch (e) {
             console.warn("Failed to load deploy state", e);
@@ -138,12 +157,24 @@ export class DeployState {
     setMerkleResult(result: MerkleTreeData) {
         this.isGeneratingMerkle = false;
         this.merkleResult = result;
+        this.metadataCid = null;
+        this.schedulePlanAtMs = null;
         this.save(); // Critical save point
     }
 
     setMerkleError(error: string) {
         this.isGeneratingMerkle = false;
         this.merkleError = error;
+    }
+
+    startPinning() {
+        this.isPinning = true;
+        this.pinError = null;
+    }
+
+    setPinError(error: string) {
+        this.isPinning = false;
+        this.pinError = error;
     }
 
     // Backup Actions
@@ -163,11 +194,6 @@ export class DeployState {
         this.walletAddress = address;
     }
 
-    // Deploy Actions
-    updateDeployProgress(progress: DeployProgress) {
-        this.deployProgress = progress;
-    }
-
     // Persist Transaction Hashes (The Write-Ahead Log)
     setApproveTx(hash: string) {
         this.approveTxHash = hash;
@@ -176,6 +202,18 @@ export class DeployState {
 
     setCreateTx(hash: string) {
         this.createTxHash = hash;
+        this.save();
+    }
+
+    setMetadataCid(cid: string) {
+        this.metadataCid = cid;
+        this.isPinning = false;
+        this.pinError = null;
+        this.save();
+    }
+
+    setSchedulePlanAt(date: Date) {
+        this.schedulePlanAtMs = date.getTime();
         this.save();
     }
 
@@ -192,6 +230,12 @@ export class DeployState {
         this.error = error;
     }
 
+    clearPendingTransactions() {
+        this.approveTxHash = null;
+        this.createTxHash = null;
+        this.save();
+    }
+
     reset(keepDistribution = false) {
         this.currentStep = 1;
         this.isLoading = false;
@@ -200,15 +244,18 @@ export class DeployState {
         this.merkleResult = null;
         this.isGeneratingMerkle = false;
         this.merkleError = null;
+        this.isPinning = false;
+        this.pinError = null;
         this.isBackupDownloaded = false;
         this.isBackupConfirmed = false;
         this.isWalletConnected = false;
         this.walletAddress = null;
-        this.deployProgress = null;
         this.contractAddress = null;
         this.isDeployed = false;
         this.approveTxHash = null;
         this.createTxHash = null;
+        this.metadataCid = null;
+        this.schedulePlanAtMs = null;
 
         if (typeof window !== "undefined" && this.distribution?.id) {
             localStorage.removeItem(`deploy_state_${this.distribution.id}`);

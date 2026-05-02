@@ -6,6 +6,9 @@
 
     import { wizardStore } from "../../../stores/wizardStore.svelte";
     import { parseUnits } from "viem";
+    import { buildClaimList } from "@zarf/core/domain/claimListBuilder";
+    import { planScheduleSeconds } from "@zarf/core/domain/deployPlanner";
+    import { pinClaimList } from "../../../services/pinService";
     import ZenButton from "@zarf/ui/components/ui/ZenButton.svelte";
 
     // Direct state access from Runes Class
@@ -13,6 +16,33 @@
     let isGeneratingMerkle = $derived(deployStore.isGeneratingMerkle);
     let merkleResult = $derived(deployStore.merkleResult);
     let merkleError = $derived(deployStore.merkleError);
+    let isPinning = $derived(deployStore.isPinning);
+    let pinError = $derived(deployStore.pinError);
+    let metadataCid = $derived(deployStore.metadataCid);
+
+    async function pinList(result: typeof merkleResult) {
+        if (!distribution || !result) return;
+        deployStore.startPinning();
+        try {
+            const planAt = new Date();
+            deployStore.setSchedulePlanAt(planAt);
+            const seconds = planScheduleSeconds(distribution.schedule, planAt);
+            const claimList = await buildClaimList({
+                claims: result.claims,
+                root: result.root,
+                cliffSeconds: seconds.cliffSeconds,
+                vestingSeconds: seconds.vestingSeconds,
+                periodSeconds: seconds.periodSeconds,
+            });
+            const pinned = await pinClaimList(claimList);
+            deployStore.setMetadataCid(pinned.cid);
+        } catch (e: any) {
+            console.error("Pin error:", e);
+            deployStore.setPinError(
+                e.message || "Failed to pin claim list to IPFS",
+            );
+        }
+    }
 
     async function generateTree() {
         if (!distribution) return;
@@ -41,6 +71,7 @@
                 distribution.schedule,
             );
             deployStore.setMerkleResult(result);
+            await pinList(result);
         } catch (e: any) {
             console.error("Merkle generation error:", e);
             deployStore.setMerkleError(
@@ -50,18 +81,33 @@
     }
 
     $effect(() => {
-        // If we already have a result, don't regenerate
-        if (merkleResult) return;
+        // If everything is ready, don't regenerate
+        if (merkleResult && metadataCid) return;
+
+        // Pin already-generated merkle if pinning failed earlier or never ran
+        if (merkleResult && !metadataCid && !isPinning && !pinError) {
+            pinList(merkleResult);
+            return;
+        }
 
         // If data is ready and not already generating or error, start
         // This fixes the race condition where distribution loads after mount
-        if (distribution && !isGeneratingMerkle && !merkleError) {
+        if (
+            distribution &&
+            !merkleResult &&
+            !isGeneratingMerkle &&
+            !merkleError
+        ) {
             generateTree();
         }
     });
 
     function retry() {
-        generateTree();
+        if (merkleResult) {
+            pinList(merkleResult);
+        } else {
+            generateTree();
+        }
     }
 </script>
 
@@ -159,7 +205,40 @@
                     Retry
                 </ZenButton>
             </div>
-        {:else if merkleResult}
+        {:else if isPinning}
+            <div class="flex flex-col items-center gap-4" in:fly={{ y: 10 }}>
+                <div
+                    class="w-8 h-8 border-2 border-zen-primary border-t-transparent rounded-full animate-spin"
+                ></div>
+                <div>
+                    <h3 class="font-bold">Pinning claim list to IPFS...</h3>
+                    <p class="text-sm text-zen-fg-subtle">
+                        Publishing the off-chain claim list so recipients can
+                        discover it.
+                    </p>
+                </div>
+            </div>
+        {:else if pinError}
+            <div
+                class="text-zen-error flex flex-col items-center gap-2"
+                in:fly={{ y: 10 }}
+            >
+                <div
+                    class="w-12 h-12 rounded-full bg-zen-error/10 flex items-center justify-center mb-2"
+                >
+                    <AlertTriangle class="w-6 h-6 text-zen-error" />
+                </div>
+                <h3 class="font-bold">Pinning Failed</h3>
+                <p class="text-sm opacity-80 max-w-md">{pinError}</p>
+                <ZenButton
+                    variant="danger"
+                    class="mt-4 border border-zen-error"
+                    onclick={retry}
+                >
+                    Retry
+                </ZenButton>
+            </div>
+        {:else if merkleResult && metadataCid}
             <div
                 class="text-zen-success flex flex-col items-center gap-2"
                 in:fly={{ y: 10 }}
@@ -177,6 +256,15 @@
                     <span
                         class="bg-zen-fg/10 px-2 py-1 rounded text-xs select-all"
                         >0x{merkleResult.root.toString(16)}</span
+                    >
+                </p>
+                <p
+                    class="text-sm text-zen-fg-subtle font-mono text-center mt-2"
+                >
+                    Claim list CID:<br />
+                    <span
+                        class="bg-zen-fg/10 px-2 py-1 rounded text-xs select-all"
+                        >{metadataCid}</span
                     >
                 </p>
             </div>

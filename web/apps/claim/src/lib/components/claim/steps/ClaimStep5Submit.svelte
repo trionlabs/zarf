@@ -10,6 +10,7 @@
         Loader2,
     } from "lucide-svelte";
     import { walletStore } from "@zarf/ui/stores/walletStore.svelte";
+    import { sanitizeBlockchainError } from "@zarf/ui/utils/errorSanitizer";
     import type { Address } from "viem";
     import ZenButton from "@zarf/ui/components/ui/ZenButton.svelte";
 
@@ -30,9 +31,12 @@
 
     // Check if connected wallet matches the proof's target wallet
     let isWalletMismatch = $derived(
-        walletStore.address &&
-        claimStore.targetWallet &&
-        walletStore.address.toLowerCase() !== claimStore.targetWallet.toLowerCase()
+        Boolean(
+            walletStore.address &&
+                claimStore.targetWallet &&
+                walletStore.address.toLowerCase() !==
+                    claimStore.targetWallet.toLowerCase(),
+        )
     );
 
     function handleRegenerateProof() {
@@ -42,44 +46,16 @@
         }
     }
 
-    function sanitizeError(err: any): string {
-        const message = err?.message || err?.toString() || "";
-
-        // User rejected transaction
-        if (
-            message.includes("rejected") ||
-            message.includes("denied") ||
-            message.includes("User denied")
-        ) {
-            return "Transaction was rejected. Please try again when ready.";
-        }
-
-        // Insufficient funds
-        if (message.includes("insufficient funds")) {
-            return "Insufficient funds to cover gas fees.";
-        }
-
-        // Already claimed
-        if (message.includes("already claimed") || message.includes("AlreadyClaimed")) {
-            return "This epoch has already been claimed.";
-        }
-
-        // Network issues
-        if (message.includes("network") || message.includes("disconnected")) {
-            return "Network error. Please check your connection and try again.";
-        }
-
-        // Contract revert
-        if (message.includes("revert") || message.includes("execution reverted")) {
-            return "Transaction failed. The contract rejected this claim.";
-        }
-
-        // Fallback - truncate if too long
-        if (message.length > 100) {
-            return "Transaction failed. Please try again.";
-        }
-
-        return message || "An unexpected error occurred.";
+    function sanitizeError(err: unknown): string {
+        return sanitizeBlockchainError(err, {
+            customRules: [
+                { match: /already claimed|AlreadyClaimed/i,
+                  message: "This epoch has already been claimed." },
+                { match: /revert|execution reverted/i,
+                  message: "Transaction failed. The contract rejected this claim." },
+            ],
+            fallback: "Transaction failed. Please try again.",
+        });
     }
 
     async function handleSubmit() {

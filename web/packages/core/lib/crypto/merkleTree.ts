@@ -7,28 +7,14 @@
  * @module crypto/merkleTree
  */
 
-// SSR-safe browser check (framework-agnostic)
-const browser = typeof window !== 'undefined';
+import { browser } from '../utils/ssr';
 
 // Buffer polyfill is handled by hooks.client.ts in each app
 // This ensures Buffer is available before bb.js loads
 
 import type { Barretenberg } from '@aztec/bb.js';
 import type { WhitelistEntry, MerkleTreeData, MerkleProof, MerkleClaim, Schedule } from '../types';
-
-// ============================================================================
-// Constants
-// ============================================================================
-
-/**
- * Fixed Merkle tree depth (must match Noir circuit)
- */
-const TREE_DEPTH = 20;
-
-/**
- * Maximum email length for padding (must match circuit)
- */
-const MAX_EMAIL_LENGTH = 64;
+import { TREE_DEPTH, MAX_EMAIL_LENGTH } from '../constants';
 
 // ============================================================================
 // Barretenberg Singleton

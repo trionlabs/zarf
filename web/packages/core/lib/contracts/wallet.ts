@@ -9,8 +9,7 @@
  * @module contracts/wallet
  */
 
-// SSR-safe browser check (framework-agnostic)
-const browser = typeof window !== 'undefined';
+import { browser } from '../utils/ssr';
 import {
     createConfig,
     http,
@@ -31,6 +30,7 @@ import { mainnet, sepolia } from 'viem/chains';
 import { getAddress, formatEther, type Address } from 'viem';
 import { injected } from '@wagmi/connectors';
 import type { WalletConnection, WalletAccount } from '../types';
+import { __registerCoreConfigResetterForTests, getCoreConfig } from '../config/runtime';
 
 // ============================================================================
 // Constants
@@ -53,12 +53,11 @@ function getWagmiConfig(): Config {
             timeout: 10_000,
         };
 
-        // Use Alchemy from env as primary, with public fallbacks
-        // Ordered by reliability - publicnode and llamarpc tend to be most stable
+        const { rpcUrls } = getCoreConfig();
+
+        // App-provided URL is preferred; public nodes are stable fallbacks.
         const sepoliaRpcs = [
-            // Priority 1: Alchemy (if available)
-            ...(import.meta.env.VITE_SEPOLIA_RPC_URL ? [http(import.meta.env.VITE_SEPOLIA_RPC_URL, httpOptions)] : []),
-            // Priority 2: Public nodes (ordered by reliability)
+            ...(rpcUrls[sepolia.id] ? [http(rpcUrls[sepolia.id], httpOptions)] : []),
             http('https://ethereum-sepolia-rpc.publicnode.com', httpOptions),
             http('https://rpc.sepolia.org', httpOptions),
             http('https://sepolia.drpc.org', httpOptions),
@@ -66,9 +65,7 @@ function getWagmiConfig(): Config {
         ];
 
         const mainnetRpcs = [
-            // Priority 1: Alchemy (if available)
-            ...(import.meta.env.VITE_MAINNET_RPC_URL ? [http(import.meta.env.VITE_MAINNET_RPC_URL, httpOptions)] : []),
-            // Priority 2: Public nodes
+            ...(rpcUrls[mainnet.id] ? [http(rpcUrls[mainnet.id], httpOptions)] : []),
             http('https://ethereum-rpc.publicnode.com', httpOptions),
             http('https://eth.llamarpc.com', httpOptions),
             http('https://rpc.ankr.com/eth', httpOptions),
@@ -87,7 +84,36 @@ function getWagmiConfig(): Config {
     return _wagmiConfig;
 }
 
-export const wagmiConfig = browser ? getWagmiConfig() : ({} as Config);
+export function __resetWagmiConfigForTests(): void {
+    _wagmiConfig = null;
+}
+
+__registerCoreConfigResetterForTests(__resetWagmiConfigForTests);
+
+/**
+ * Public wagmi config export. Lazy-evaluated via Proxy so module init does not
+ * call `getCoreConfig()` before the app's root layout has run `configureCore`.
+ * Identity is stable across calls (Proxy reused), so wagmi internals using the
+ * config as a WeakMap key continue to work.
+ */
+export const wagmiConfig: Config = new Proxy({} as Config, {
+    get: (_t, prop) => {
+        const real = browser ? getWagmiConfig() : ({} as Config);
+        return Reflect.get(real, prop, real);
+    },
+    has: (_t, prop) => {
+        const real = browser ? getWagmiConfig() : ({} as Config);
+        return Reflect.has(real, prop);
+    },
+    ownKeys: () => {
+        const real = browser ? getWagmiConfig() : ({} as Config);
+        return Reflect.ownKeys(real);
+    },
+    getOwnPropertyDescriptor: (_t, prop) => {
+        const real = browser ? getWagmiConfig() : ({} as Config);
+        return Reflect.getOwnPropertyDescriptor(real, prop);
+    },
+});
 
 // ============================================================================
 // Connection Management
@@ -201,7 +227,6 @@ export function formatAddress(address: Address | undefined, chars: number = 4): 
         const checksummedAddress = getAddress(address);
         return `${checksummedAddress.slice(0, chars + 2)}...${checksummedAddress.slice(-chars)}`;
     } catch (e) {
-        if (import.meta.env.DEV) console.warn(`Invalid Ethereum address format: ${address}`);
         return '';
     }
 }

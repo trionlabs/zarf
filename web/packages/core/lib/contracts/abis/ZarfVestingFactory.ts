@@ -24,6 +24,7 @@ export interface CreateVestingParams {
     cliffDuration: bigint;
     vestingDuration: bigint;
     vestingPeriod: bigint;
+    metadataCid: string; // IPFS CID of off-chain claim list
 }
 
 export const ZarfVestingFactoryABI = [
@@ -36,7 +37,8 @@ export const ZarfVestingFactoryABI = [
             { name: 'owner', type: 'address', indexed: true },
             { name: 'token', type: 'address', indexed: true },
             { name: 'totalAmount', type: 'uint256', indexed: false },
-            { name: 'recipientCount', type: 'uint256', indexed: false }
+            { name: 'recipientCount', type: 'uint256', indexed: false },
+            { name: 'metadataCid', type: 'string', indexed: false }
         ]
     },
 
@@ -108,6 +110,13 @@ export const ZarfVestingFactoryABI = [
         outputs: [{ type: 'address' }],
         stateMutability: 'view'
     },
+    {
+        type: 'function',
+        name: 'vestingMetadataCid',
+        inputs: [{ name: 'vesting', type: 'address' }],
+        outputs: [{ type: 'string' }],
+        stateMutability: 'view'
+    },
     // NEW: predictVestingAddress for deterministic filename
     {
         type: 'function',
@@ -125,7 +134,8 @@ export const ZarfVestingFactoryABI = [
                     { name: 'amounts', type: 'uint256[]' },
                     { name: 'cliffDuration', type: 'uint256' },
                     { name: 'vestingDuration', type: 'uint256' },
-                    { name: 'vestingPeriod', type: 'uint256' }
+                    { name: 'vestingPeriod', type: 'uint256' },
+                    { name: 'metadataCid', type: 'string' }
                 ]
             },
             { name: 'owner', type: 'address' }
@@ -151,7 +161,8 @@ export const ZarfVestingFactoryABI = [
                     { name: 'amounts', type: 'uint256[]' },
                     { name: 'cliffDuration', type: 'uint256' },
                     { name: 'vestingDuration', type: 'uint256' },
-                    { name: 'vestingPeriod', type: 'uint256' }
+                    { name: 'vestingPeriod', type: 'uint256' },
+                    { name: 'metadataCid', type: 'string' }
                 ]
             }
         ],
@@ -174,7 +185,8 @@ export const ZarfVestingFactoryABI = [
                     { name: 'amounts', type: 'uint256[]' },
                     { name: 'cliffDuration', type: 'uint256' },
                     { name: 'vestingDuration', type: 'uint256' },
-                    { name: 'vestingPeriod', type: 'uint256' }
+                    { name: 'vestingPeriod', type: 'uint256' },
+                    { name: 'metadataCid', type: 'string' }
                 ]
             },
             { name: 'depositAmount', type: 'uint256' }

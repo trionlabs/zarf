@@ -1,14 +1,15 @@
 /**
  * Contract Configuration
- * 
- * Centralized configuration for deployed contract addresses.
- * Supports multiple networks (Sepolia, Mainnet).
- * 
+ *
+ * Centralized configuration for deployed contract addresses across networks.
+ * Reads come through `getCoreConfig()` so this module is free of
+ * `import.meta.env` and works in any runtime (browser, Node tests, server-side).
+ *
  * @module config/contracts
  */
 
-// SSR-safe browser check (framework-agnostic)
-const browser = typeof window !== 'undefined';
+import type { Address } from 'viem';
+import { getCoreConfig } from './runtime';
 
 // ============ Chain IDs ============
 
@@ -19,51 +20,47 @@ export const CHAIN_IDS = {
 
 // ============ Factory Addresses ============
 
-/**
- * Get the Factory address from environment variables
- * Falls back based on current network context
- */
-function getFactoryAddress(): string | undefined {
-    if (!browser) return undefined;
+export function getActiveChainId(chainId?: number): number {
+    if (chainId !== undefined) return chainId;
 
-    // Try Sepolia first (most common for testing)
-    const sepoliaAddress = import.meta.env.VITE_FACTORY_ADDRESS_SEPOLIA;
-    if (sepoliaAddress) return sepoliaAddress;
+    const cfg = getCoreConfig();
+    if (cfg.activeChainId !== undefined) return cfg.activeChainId;
 
-    // Fallback to Mainnet
-    const mainnetAddress = import.meta.env.VITE_FACTORY_ADDRESS_MAINNET;
-    if (mainnetAddress) return mainnetAddress;
+    const configuredFactoryChains = Object.entries(cfg.factoryAddresses)
+        .filter(([, address]) => Boolean(address))
+        .map(([id]) => Number(id));
 
-    console.warn('[ContractConfig] No Factory address configured in environment');
-    return undefined;
-}
-
-/**
- * Factory contract address for the current environment
- */
-export const FACTORY_ADDRESS = getFactoryAddress();
-
-/**
- * Get Factory address for a specific chain
- */
-export function getFactoryAddressForChain(chainId: number): string | undefined {
-    switch (chainId) {
-        case CHAIN_IDS.SEPOLIA:
-            return import.meta.env.VITE_FACTORY_ADDRESS_SEPOLIA || '0xf2fb07b180c5de4c3a73d63d39404092b6727aae';
-        case CHAIN_IDS.MAINNET:
-            return import.meta.env.VITE_FACTORY_ADDRESS_MAINNET;
-        default:
-            console.warn(`[ContractConfig] No Factory address for chain ${chainId}`);
-            return undefined;
+    if (configuredFactoryChains.length === 1) {
+        return configuredFactoryChains[0];
     }
+
+    throw new Error(
+        'core: activeChainId is required when factory addresses are missing or configured for multiple chains',
+    );
 }
+
+/**
+ * Factory address for a specific chain id.
+ */
+export function getFactoryAddress(chainId: number): Address | undefined {
+    return getCoreConfig().factoryAddresses[chainId];
+}
+
+export const getFactoryAddressForChain = getFactoryAddress;
 
 // ============ Other Contract Addresses ============
 
-export const CONTRACT_ADDRESSES = {
-    // JWK Registry (for ZK proof verification)
-    JWK_REGISTRY: import.meta.env.VITE_JWK_REGISTRY_ADDRESS as string | undefined,
-
-    // Verifier (Honk/Mock)
-    VERIFIER: import.meta.env.VITE_VERIFIER_ADDRESS as string | undefined
-} as const;
+/**
+ * Lazy accessor for ancillary contract addresses. Returns a fresh object on
+ * each call so consumers always observe the latest configured values.
+ */
+export function getContractAddresses(): {
+    JWK_REGISTRY: Address | undefined;
+    VERIFIER: Address | undefined;
+} {
+    const cfg = getCoreConfig();
+    return {
+        JWK_REGISTRY: cfg.jwkRegistryAddress,
+        VERIFIER: cfg.verifierAddress,
+    };
+}

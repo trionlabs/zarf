@@ -1,9 +1,12 @@
 /**
  * Input Validator
- * 
+ *
  * Validates the schema of the uploaded claim-data.json file.
  * Ensures all cryptographic fields are present and correctly formatted.
  */
+
+import { isValidEmail } from '@zarf/core/utils/email';
+import { isValidAddress } from '@zarf/core/utils/address';
 
 export interface ClaimData {
     email: string;
@@ -18,7 +21,6 @@ export interface ClaimData {
     recipient: string;
 }
 
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const HEX_REGEX = /^0x[a-fA-F0-9]+$/;
 
 /**
@@ -31,7 +33,7 @@ export function validateClaimData(json: any): { success: boolean; data?: ClaimDa
     }
 
     // 1. Email
-    if (!json.email || typeof json.email !== 'string' || !EMAIL_REGEX.test(json.email)) {
+    if (!json.email || !isValidEmail(json.email)) {
         return { success: false, error: `Invalid or missing email: ${json.email}` };
     }
 
@@ -51,8 +53,8 @@ export function validateClaimData(json: any): { success: boolean; data?: ClaimDa
     }
 
     // 5. Recipient
-    if (!json.recipient || typeof json.recipient !== 'string' || !/^0x[a-fA-F0-9]{40}$/.test(json.recipient)) {
-        return { success: false, error: 'Invalid recipient address. Must be a 42-char ox-string.' };
+    if (!json.recipient || typeof json.recipient !== 'string' || !isValidAddress(json.recipient)) {
+        return { success: false, error: 'Invalid recipient address. Must be a 42-char 0x-string.' };
     }
 
     // 6. Merkle Root

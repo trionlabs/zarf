@@ -9,9 +9,9 @@ import "../src/ZarfVestingFactory.sol";
 /// @dev Run with: forge script script/DeployFactory.s.sol --rpc-url $RPC_URL --broadcast --verify
 contract DeployFactory is Script {
     function run() external {
-        // Load environment variables
-        address verifier = vm.envAddress("VERIFIER_ADDRESS");
-        address jwkRegistry = vm.envAddress("JWK_REGISTRY_ADDRESS");
+        // Load environment variables (VITE_-prefixed because frontend reads them too)
+        address verifier = _envAddressWithFallback("VITE_VERIFIER_ADDRESS", "VERIFIER_ADDRESS");
+        address jwkRegistry = _envAddressWithFallback("VITE_JWK_REGISTRY_ADDRESS", "JWK_REGISTRY_ADDRESS");
 
         console.log("Deploying ZarfVestingFactory...");
         console.log("  Verifier:", verifier);
@@ -28,6 +28,15 @@ contract DeployFactory is Script {
         console.log("");
         console.log("Add to .env:");
         console.log("  VITE_FACTORY_ADDRESS=", address(factory));
+    }
+
+    function _envAddressWithFallback(
+        string memory primaryName,
+        string memory legacyName
+    ) internal view returns (address) {
+        address value = vm.envOr(primaryName, address(0));
+        if (value != address(0)) return value;
+        return vm.envAddress(legacyName);
     }
 }
 

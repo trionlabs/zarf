@@ -22,6 +22,11 @@ interface ImportMetaEnv {
     readonly VITE_JWK_REGISTRY_ADDRESS?: string;
     readonly VITE_RPC_URL?: string;
     readonly VITE_NETWORK?: string;
+    readonly VITE_ACTIVE_CHAIN_ID?: string;
+    readonly VITE_CHAIN_ID?: string;
+    readonly VITE_FACTORY_DEPLOY_BLOCK_SEPOLIA?: string;
+    readonly VITE_SEPOLIA_RPC_URL?: string;
+    readonly VITE_MAINNET_RPC_URL?: string;
     readonly VITE_FACTORY_ADDRESS_SEPOLIA?: string;
     readonly VITE_FACTORY_ADDRESS_MAINNET?: string;
 }

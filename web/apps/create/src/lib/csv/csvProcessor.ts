@@ -9,30 +9,14 @@
  * @module csv/csvProcessor
  */
 
-import type { WhitelistEntry } from '../stores/types';
-import { isAddress } from 'viem';
-import { normalizeEmail } from '@zarf/core/utils/email';
+// CSV produces UI-draft entries (amount: number from a form field), which is the
+// `Recipient` shape, not the post-merkle on-chain `Recipient` (amount: bigint).
+import type { Recipient } from '../stores/types';
+import { normalizeEmail, isValidEmail } from '@zarf/core/utils/email';
+import { isValidAddress } from '@zarf/core/utils/address';
 
 // Re-export for backward compatibility
 export { normalizeEmail };
-
-// ============================================================================
-// Validators & Normalizers
-// ============================================================================
-
-/**
- * Basic address format validation
- */
-function isValidAddress(address: string): boolean {
-    return isAddress(address, { strict: false });
-}
-
-/**
- * Basic email format validation
- */
-function isValidEmail(email: string): boolean {
-    return email.includes('@') && email.length > 3;
-}
 
 /**
  * Normalizes address for consistent hashing and comparison.
@@ -46,7 +30,7 @@ export function normalizeAddress(address: string): string {
 // ============================================================================
 
 export interface ParseResult {
-    entries: WhitelistEntry[];
+    entries: Recipient[];
     errors: string[];
 }
 
@@ -60,7 +44,7 @@ export interface ParseResult {
  */
 export function parseCSV(content: string): ParseResult {
     const lines = content.trim().split('\n');
-    const entries: WhitelistEntry[] = [];
+    const entries: Recipient[] = [];
     const errors: string[] = [];
 
 

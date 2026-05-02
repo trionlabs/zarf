@@ -23,16 +23,18 @@ contract ZarfVestingFactory {
         uint256 cliffDuration;    // Cliff duration in seconds
         uint256 vestingDuration;  // Total vesting duration in seconds
         uint256 vestingPeriod;    // Duration of each unlock period in seconds
+        string metadataCid;       // IPFS CID of off-chain claim list (leaves, schedule, hashes)
     }
 
     // ============ Events ============
-    
+
     event VestingCreated(
         address indexed vesting,
         address indexed owner,
         address indexed token,
         uint256 totalAmount,
-        uint256 recipientCount
+        uint256 recipientCount,
+        string metadataCid
     );
 
     // ============ Errors ============
@@ -51,6 +53,7 @@ contract ZarfVestingFactory {
     
     address[] public deployments;
     mapping(address => address[]) public ownerDeployments;
+    mapping(address => string) public vestingMetadataCid;
 
     // ============ Constructor ============
     
@@ -88,25 +91,25 @@ contract ZarfVestingFactory {
         _safeTransfer(params.token, vesting, totalAmount);
         
         // 6. Track deployment
-        _trackDeployment(vesting, msg.sender);
-        
-        emit VestingCreated(vesting, msg.sender, params.token, totalAmount, params.commitments.length);
+        _trackDeployment(vesting, msg.sender, params.metadataCid);
+
+        emit VestingCreated(vesting, msg.sender, params.token, totalAmount, params.commitments.length, params.metadataCid);
     }
-    
+
     function createVesting(CreateVestingParams calldata params) external returns (address vesting) {
          if (params.commitments.length != params.amounts.length) revert ArrayLengthMismatch();
          if (params.commitments.length == 0) revert ZeroAllocations();
          vesting = _deployAndInitialize(params, msg.sender);
-         _trackDeployment(vesting, msg.sender);
+         _trackDeployment(vesting, msg.sender, params.metadataCid);
          uint256 total = _sumAmounts(params.amounts);
-         emit VestingCreated(vesting, msg.sender, params.token, total, params.commitments.length);
+         emit VestingCreated(vesting, msg.sender, params.token, total, params.commitments.length, params.metadataCid);
     }
 
     // ============ Internal Deployment Logic ============
 
     function _deployAndInitialize(CreateVestingParams calldata params, address owner) internal returns (address) {
         // 1. Calculate Salt (for CREATE2 deterministic address)
-        bytes32 salt = keccak256(abi.encode(params));
+        bytes32 salt = keccak256(abi.encode(owner, params));
         
         // 2. Deploy (Constructor args: verifier, jwkRegistry)
         ZarfVesting vest = new ZarfVesting{salt: salt}(
@@ -137,7 +140,7 @@ contract ZarfVestingFactory {
         );
         
         // Salt calculation
-        bytes32 salt = keccak256(abi.encode(params));
+        bytes32 salt = keccak256(abi.encode(owner, params));
         
         bytes32 bytecodeHash = keccak256(abi.encodePacked(
             type(ZarfVesting).creationCode,
@@ -175,9 +178,10 @@ contract ZarfVestingFactory {
 
     // ============ Internal Utils ============
     
-    function _trackDeployment(address vesting, address owner) internal {
+    function _trackDeployment(address vesting, address owner, string calldata metadataCid) internal {
         deployments.push(vesting);
         ownerDeployments[owner].push(vesting);
+        vestingMetadataCid[vesting] = metadataCid;
     }
     
     function _sumAmounts(uint256[] calldata amounts) internal pure returns (uint256 total) {

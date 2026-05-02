@@ -4,14 +4,15 @@
     "private": true,
     "type": "module",
     "scripts": {
-        "postinstall": "node scripts/copy-wasm.js"
+        "postinstall": "node scripts/copy-wasm.js",
+        "test": "vitest run",
+        "test:watch": "vitest"
     },
     "exports": {
         ".": "./lib/index.ts",
         "./types": "./lib/types.ts",
         "./contracts": "./lib/contracts/contracts.ts",
         "./contracts/wallet": "./lib/contracts/wallet.ts",
-        "./contracts/walletLazy": "./lib/contracts/walletLazy.ts",
         "./contracts/abis/*": "./lib/contracts/abis/*.ts",
         "./crypto": "./lib/crypto/index.ts",
         "./crypto/*": "./lib/crypto/*.ts",
@@ -22,7 +23,9 @@
         "./config": "./lib/config/index.ts",
         "./config/*": "./lib/config/*.ts",
         "./zk": "./lib/zk/index.ts",
-        "./zk/*": "./lib/zk/*.ts"
+        "./zk/*": "./lib/zk/*.ts",
+        "./services/*": "./lib/services/*.ts",
+        "./domain/*": "./lib/domain/*.ts"
     },
     "peerDependencies": {
         "@aztec/bb.js": "^2.1.9",
@@ -45,8 +48,10 @@
         "@noir-lang/noirc_abi": "1.0.0-beta.18",
         "@wagmi/connectors": "^7.1.5",
         "@wagmi/core": "^3.3.1",
+        "happy-dom": "^20.9.0",
         "noir-jwt": "^0.4.5",
         "viem": "^2.45.0",
+        "vitest": "^4.1.5",
         "wagmi": "^3.4.1"
     }
 }

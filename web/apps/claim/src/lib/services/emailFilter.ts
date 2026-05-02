@@ -9,6 +9,8 @@
 
 import { hashEmail } from '@zarf/core/utils/email';
 import type { Address } from 'viem';
+import { getCidForVesting } from '@zarf/core/services/vestingDiscovery';
+import { fetchIpfsJson } from '@zarf/core/utils/ipfsFetch';
 
 /**
  * Distribution data structure with optional emailHashes
@@ -36,16 +38,11 @@ export async function isEmailInDistribution(
     userEmailHash: string
 ): Promise<boolean> {
     try {
-        const response = await fetch(
-            `/distributions/${address.toLowerCase()}.json`
-        );
-
-        if (!response.ok) {
+        const data = await fetchDistribution(address);
+        if (!data) {
             console.warn(`[EmailFilter] Distribution not found: ${address}`);
             return false;
         }
-
-        const data: DistributionWithHashes = await response.json();
 
         // Backward compatibility: no emailHashes means visible to everyone
         if (!data.emailHashes || !Array.isArray(data.emailHashes)) {
@@ -64,6 +61,12 @@ export async function isEmailInDistribution(
         // On error, default to showing (fail open for UX)
         return true;
     }
+}
+
+async function fetchDistribution(address: string): Promise<DistributionWithHashes | null> {
+    const cid = await getCidForVesting(address as Address);
+    if (!cid) return null;
+    return await fetchIpfsJson<DistributionWithHashes>(cid);
 }
 
 /**
