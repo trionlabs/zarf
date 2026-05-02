@@ -11,13 +11,36 @@ import type { Address } from 'viem';
 const SEPOLIA = 11155111;
 const MAINNET = 1;
 
-const factoryDeployBlockSepolia = (() => {
-    const raw = import.meta.env.VITE_FACTORY_DEPLOY_BLOCK_SEPOLIA as string | undefined;
+function parseOptionalBigIntEnv(name: string): bigint | undefined {
+    const env = import.meta.env as ImportMetaEnv & Record<string, string | undefined>;
+    const raw = env[name];
     if (!raw) return undefined;
-    try { return BigInt(raw); } catch { return undefined; }
+    try {
+        const parsed = BigInt(raw);
+        if (parsed < 0n) throw new Error('must be non-negative');
+        return parsed;
+    } catch {
+        throw new Error(`Invalid ${name}: "${raw}"`);
+    }
+}
+
+function parseActiveChainId(): number {
+    const raw = (import.meta.env.VITE_ACTIVE_CHAIN_ID ||
+        import.meta.env.VITE_CHAIN_ID ||
+        String(SEPOLIA)) as string;
+    const parsed = Number(raw);
+    if (!Number.isInteger(parsed) || parsed <= 0) {
+        throw new Error(`Invalid VITE_ACTIVE_CHAIN_ID: "${raw}"`);
+    }
+    return parsed;
+}
+
+const factoryDeployBlockSepolia = (() => {
+    return parseOptionalBigIntEnv('VITE_FACTORY_DEPLOY_BLOCK_SEPOLIA');
 })();
 
 configureCore({
+    activeChainId: parseActiveChainId(),
     rpcUrls: {
         [SEPOLIA]: import.meta.env.VITE_SEPOLIA_RPC_URL || import.meta.env.VITE_RPC_URL,
         [MAINNET]: import.meta.env.VITE_MAINNET_RPC_URL,

@@ -24,7 +24,9 @@
         if (!distribution || !result) return;
         deployStore.startPinning();
         try {
-            const seconds = planScheduleSeconds(distribution.schedule);
+            const planAt = new Date();
+            deployStore.setSchedulePlanAt(planAt);
+            const seconds = planScheduleSeconds(distribution.schedule, planAt);
             const claimList = await buildClaimList({
                 claims: result.claims,
                 root: result.root,

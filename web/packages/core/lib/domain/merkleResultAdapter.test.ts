@@ -26,6 +26,8 @@ describe('commitmentToHash / rootToHash', () => {
         expect(() => commitmentToHash(undefined)).toThrow(/missing/);
         expect(() => commitmentToHash('0xZZ')).toThrow(/valid hex/);
         expect(() => commitmentToHash('0x' + 'a'.repeat(65))).toThrow(/> 32 bytes/);
+        expect(() => rootToHash(-1n)).toThrow(/non-negative/);
+        expect(() => rootToHash(1n << 256n)).toThrow(/32 bytes/);
     });
 });
 

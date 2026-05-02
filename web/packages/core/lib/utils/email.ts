@@ -15,7 +15,7 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
  * (which accepted `a@b`) and inputValidator.
  */
 export function isValidEmail(email: string): boolean {
-    return typeof email === 'string' && EMAIL_REGEX.test(email);
+    return typeof email === 'string' && EMAIL_REGEX.test(email.trim());
 }
 
 /**

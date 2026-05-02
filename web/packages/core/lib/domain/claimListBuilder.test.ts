@@ -84,7 +84,26 @@ describe('buildClaimList', () => {
         });
         const key = Object.keys(out.commitments)[0];
         expect(key).toMatch(/^0x[0-9a-f]{64}$/);
-        expect(out.commitments[key].amount).toBe('12345');
+        const entry = out.commitments[key];
+        expect(Array.isArray(entry)).toBe(false);
+        if (!Array.isArray(entry)) {
+            expect(entry.amount).toBe('12345');
+        }
+    });
+
+    it('preserves duplicate commitment metadata as an array', async () => {
+        const out = await buildClaimList({
+            ...inputs,
+            claims: [
+                claim({ leafIndex: 0, amount: 100n, identityCommitment: '0xabc' }),
+                claim({ leafIndex: 1, amount: 200n, identityCommitment: '0xabc' }),
+            ],
+        });
+        const key = Object.keys(out.commitments)[0];
+        expect(out.commitments[key]).toEqual([
+            { amount: '100', unlockTime: 1_700_000_000, index: 0 },
+            { amount: '200', unlockTime: 1_700_000_000, index: 1 },
+        ]);
     });
 
     it('schedule.totalPeriods = vestingSeconds / periodSeconds', async () => {

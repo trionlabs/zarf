@@ -14,7 +14,7 @@
  * @module domain/epochDiscovery
  */
 
-import type { DistributionData } from '../services/distribution';
+import type { DistributionData, CommitmentMetadata, EpochMetadata } from '../services/distribution';
 
 /** Subset of @zarf/core/crypto/merkleTree the discovery loop calls. Inject for testing. */
 export interface DiscoveryCryptoDeps {
@@ -60,13 +60,18 @@ export const MAX_EPOCHS = 200;
  */
 export function buildCommitmentLookup(
     commitments: DistributionData['commitments'],
-): Record<string, DistributionData['commitments'][string]> {
-    const out: Record<string, DistributionData['commitments'][string]> = {};
+): Record<string, EpochMetadata[]> {
+    const out: Record<string, EpochMetadata[]> = {};
+    const append = (key: string, metadata: CommitmentMetadata) => {
+        const values = Array.isArray(metadata) ? metadata : [metadata];
+        out[key] = [...(out[key] ?? []), ...values];
+    };
+
     for (const [key, val] of Object.entries(commitments)) {
         const lower = key.toLowerCase();
-        out[lower] = val;
+        append(lower, val);
         const unpadded = '0x' + key.slice(2).replace(/^0+/, '').toLowerCase();
-        if (unpadded !== lower) out[unpadded] = val;
+        if (unpadded !== lower) append(unpadded, val);
     }
     return out;
 }
@@ -76,9 +81,9 @@ export function buildCommitmentLookup(
  * forms. Returns the matched metadata or undefined.
  */
 export function lookupCommitment(
-    map: Record<string, DistributionData['commitments'][string]>,
+    map: Record<string, EpochMetadata[]>,
     paddedCommitment: string,
-): DistributionData['commitments'][string] | undefined {
+): EpochMetadata[] | undefined {
     const lower = paddedCommitment.toLowerCase();
     const direct = map[lower];
     if (direct) return direct;
@@ -128,8 +133,8 @@ export async function discoverEpochs(
 
         const commitmentBigInt = await crypto.computeIdentityCommitment(email, currentSecret);
         const commitment = '0x' + commitmentBigInt.toString(16).padStart(64, '0');
-        const meta = lookupCommitment(lookup, commitment);
-        if (!meta) break;
+        const metas = lookupCommitment(lookup, commitment);
+        if (!metas || metas.length === 0) break;
 
         let isClaimed = false;
         try {
@@ -140,16 +145,18 @@ export async function discoverEpochs(
         }
 
         const now = nowSeconds();
-        epochs.push({
-            identityCommitment: commitment,
-            salt: '0x' + currentSecret.toString(16),
-            amount: BigInt(meta.amount),
-            leafIndex: meta.index,
-            unlockTime: meta.unlockTime,
-            isClaimed,
-            isLocked: now < meta.unlockTime,
-            canClaim: !isClaimed && now >= meta.unlockTime,
-        });
+        for (const meta of metas) {
+            epochs.push({
+                identityCommitment: commitment,
+                salt: '0x' + currentSecret.toString(16),
+                amount: BigInt(meta.amount),
+                leafIndex: meta.index,
+                unlockTime: meta.unlockTime,
+                isClaimed,
+                isLocked: now < meta.unlockTime,
+                canClaim: !isClaimed && now >= meta.unlockTime,
+            });
+        }
     }
 
     if (epochs.length === 0) {

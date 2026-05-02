@@ -109,7 +109,7 @@ contract ZarfVestingFactory {
 
     function _deployAndInitialize(CreateVestingParams calldata params, address owner) internal returns (address) {
         // 1. Calculate Salt (for CREATE2 deterministic address)
-        bytes32 salt = keccak256(abi.encode(params));
+        bytes32 salt = keccak256(abi.encode(owner, params));
         
         // 2. Deploy (Constructor args: verifier, jwkRegistry)
         ZarfVesting vest = new ZarfVesting{salt: salt}(
@@ -140,7 +140,7 @@ contract ZarfVestingFactory {
         );
         
         // Salt calculation
-        bytes32 salt = keccak256(abi.encode(params));
+        bytes32 salt = keccak256(abi.encode(owner, params));
         
         bytes32 bytecodeHash = keccak256(abi.encodePacked(
             type(ZarfVesting).creationCode,

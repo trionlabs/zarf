@@ -33,14 +33,25 @@ describe('padMerkleProof', () => {
         padMerkleProof(inSibs, ['0x0']);
         expect(inSibs).toEqual(['0xaa']);
     });
+
+    it('rejects mismatched or over-depth proofs', () => {
+        expect(() => padMerkleProof(['0xaa'], [])).toThrow(/length mismatch/);
+        expect(() =>
+            padMerkleProof(Array(TREE_DEPTH + 1).fill('0x0'), Array(TREE_DEPTH + 1).fill('0x0')),
+        ).toThrow(/exceeds depth/);
+    });
 });
 
 describe('padEmail', () => {
-    it('locks: storage uses UTF-8 bytes; len uses string length (not byte length)', () => {
-        // 'é' = 1 char, 2 UTF-8 bytes. The circuit gets bytes; len reports chars.
+    it('uses UTF-8 byte length for len', () => {
+        // 'é' = 1 char, 2 UTF-8 bytes.
         const { storage, len } = padEmail('é', 8);
         expect(storage).toEqual([0xc3, 0xa9, 0, 0, 0, 0, 0, 0]);
-        expect(len).toBe(1);
+        expect(len).toBe(2);
+    });
+
+    it('rejects emails that exceed the circuit byte slot', () => {
+        expect(() => padEmail('ééééé', 8)).toThrow(/MAX_EMAIL_LENGTH/);
     });
 });
 

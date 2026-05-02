@@ -38,7 +38,7 @@
 
     // Format helpers
     function formatTokenBalance(balance: bigint, decimals: number): string {
-        const divisor = BigInt(10 ** decimals);
+        const divisor = 10n ** BigInt(decimals);
         const integerPart = balance / divisor;
         return BigInt(integerPart).toLocaleString();
     }

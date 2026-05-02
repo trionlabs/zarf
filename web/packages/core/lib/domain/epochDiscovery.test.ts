@@ -24,8 +24,18 @@ describe('buildCommitmentLookup + lookupCommitment', () => {
             [padded(0xabc)]: meta(0, '100', 0),  // padded form
             '0xdead':        meta(1, '200', 0),  // unpadded form
         });
-        expect(lookupCommitment(map, padded(0xabc))?.amount).toBe('100');
-        expect(lookupCommitment(map, padded(0xdead))?.amount).toBe('200');
+        expect(lookupCommitment(map, padded(0xabc))?.[0].amount).toBe('100');
+        expect(lookupCommitment(map, padded(0xdead))?.[0].amount).toBe('200');
+    });
+
+    it('preserves multiple metadata entries for one commitment', () => {
+        const map = buildCommitmentLookup({
+            [padded(0xabc)]: [
+                meta(0, '100', 0),
+                meta(1, '200', 10),
+            ],
+        });
+        expect(lookupCommitment(map, padded(0xabc))?.map((m) => m.index)).toEqual([0, 1]);
     });
 });
 
@@ -143,5 +153,21 @@ describe('discoverEpochs', () => {
         expect(result.epochs[0].isClaimed).toBe(true);
         expect(result.epochs[0].canClaim).toBe(false);
         expect(result.epochs[1].isClaimed).toBe(false);
+    });
+
+    it('discovers multiple metadata entries for the same commitment', async () => {
+        const commitments: DistributionData['commitments'] = {
+            [padded(66)]: [
+                meta(0, '100', 0),
+                meta(1, '200', 10),
+            ],
+        };
+        const result = await discoverEpochs(
+            { email: 'a@b.co', pin: 'A', contractAddress: '0xv', nowSeconds: () => 1000 },
+            fakeCrypto,
+            fakeData(commitments),
+        );
+        expect(result.epochs.map((e) => e.amount)).toEqual([100n, 200n]);
+        expect(result.epochs.map((e) => e.leafIndex)).toEqual([0, 1]);
     });
 });
