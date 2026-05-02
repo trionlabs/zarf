@@ -2,7 +2,7 @@
 <html lang="en" data-theme="glass-porcelain">
 
 <head>
-	<!-- Buffer polyfill - MUST load synchronously before any modules (MetaMask SES timing) -->
+	<!-- Buffer polyfill - MUST load synchronously before any modules -->
 	<script src="https://unpkg.com/buffer@6.0.3/index.js"></script>
 	<script>
 		if (typeof globalThis !== 'undefined' && typeof buffer !== 'undefined') {
@@ -21,7 +21,7 @@
 		href="https://fonts.googleapis.com/css2?family=Saira:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap"
 		rel="stylesheet">
 
-	<!-- SES/Svelte 5 Compatibility Patch: runtime defensive shim against MetaMask lockdown -->
+	<!-- SES/Svelte 5 Compatibility Patch: runtime defensive shim against extension lockdown -->
 	<script>
 		(function () {
 			if (typeof window === 'undefined') return;

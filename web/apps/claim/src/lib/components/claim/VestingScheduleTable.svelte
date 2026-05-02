@@ -1,6 +1,6 @@
 <script lang="ts">
     import { claimStore } from "../../stores/claimStore.svelte";
-    import { formatUnits } from "viem";
+    import { formatTokenAmount } from "@zarf/core/utils/amount";
     import type { VestingPeriod } from "@zarf/core/utils";
     import {
         Check,
@@ -19,9 +19,7 @@
 
     // Format token amounts
     const format = (val: bigint) =>
-        Number(formatUnits(val, 18)).toLocaleString(undefined, {
-            maximumFractionDigits: 2,
-        });
+        formatTokenAmount(val, claimStore.tokenDecimals, 2);
 
     // Format dates
     const formatDate = (ts: number) =>
@@ -149,7 +147,7 @@
                             >
                                 {period.formattedAmount}
                                 <span class="text-zen-fg-faint ml-1"
-                                    >ZARF</span
+                                    >{claimStore.tokenSymbol}</span
                                 >
                             </td>
                             <td

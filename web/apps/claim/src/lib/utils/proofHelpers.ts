@@ -1,6 +1,5 @@
 import { buildMerkleTree, getMerkleProof } from '@zarf/core/crypto/merkleTree';
 import type { MerkleProof } from '@zarf/ui/types';
-import type { Address } from 'viem';
 import { getCidForVesting } from '@zarf/core/services/vestingDiscovery';
 import { fetchIpfsJson } from '@zarf/core/utils/ipfsFetch';
 
@@ -16,7 +15,7 @@ export async function fetchPublicLeaves(contractAddress: string | null): Promise
         throw new Error('Distribution Data Error: contractAddress is required');
     }
 
-    const cid = await getCidForVesting(contractAddress as Address);
+    const cid = await getCidForVesting(contractAddress);
     if (!cid) {
         throw new Error(`No metadata CID found for vesting ${contractAddress}`);
     }

@@ -1,12 +1,9 @@
 <script lang="ts">
     import { walletStore } from "@zarf/ui/stores/walletStore.svelte";
-    import { wagmiConfig } from "@zarf/core/contracts/wallet";
     import { deployStore } from "../../../stores/deployStore.svelte";
     import { wizardStore } from "../../../stores/wizardStore.svelte";
-    import { getWalletClient } from "@wagmi/core";
-    import { ERC20ABI } from "@zarf/core/contracts/abis/ERC20";
-    import type { Address } from "viem";
-    import { formatUnits, publicActions } from "viem";
+    import { getTokenBalance, readTokenContract } from "@zarf/core/contracts";
+    import { formatTokenAmount, parseTokenAmount } from "@zarf/core/utils/amount";
     import {
         Wallet,
         Loader2,
@@ -35,7 +32,7 @@
         isLoading: false,
         balance: BigInt(0),
         symbol: "",
-        decimals: 18,
+        decimals: 7,
         hasEnoughBalance: false,
         error: null as string | null,
     });
@@ -61,48 +58,25 @@
         checkState.error = null;
 
         try {
-            // MASTERCLASS: Use wallet's RPC via publicActions extension
-            // Routes reads through MetaMask - no CORS, no public RPC limits
-            const walletClient = await getWalletClient(wagmiConfig);
-            if (!walletClient) throw new Error("Wallet not connected");
-
-            const client = walletClient.extend(publicActions);
-
             const tokenAddress = wizardStore.tokenDetails.tokenAddress;
             if (!tokenAddress) throw new Error("No token address configured");
 
-            const [balance, decimals, symbol] = await Promise.all([
-                client.readContract({
-                    address: tokenAddress,
-                    abi: ERC20ABI,
-                    functionName: "balanceOf",
-                    args: [walletStore.address],
-                }),
-                client.readContract({
-                    address: tokenAddress,
-                    abi: ERC20ABI,
-                    functionName: "decimals",
-                }),
-                client.readContract({
-                    address: tokenAddress,
-                    abi: ERC20ABI,
-                    functionName: "symbol",
-                }),
-            ]);
+            const metadata = await readTokenContract(tokenAddress);
+            const decimals =
+                metadata.decimals ?? wizardStore.tokenDetails.tokenDecimals ?? 7;
+            const symbol =
+                metadata.symbol ?? wizardStore.tokenDetails.tokenSymbol ?? "XLM";
+            const balance = await getTokenBalance(tokenAddress, walletStore.address);
+            const requiredAmount = parseTokenAmount(distribution.amount, decimals);
 
-            const requiredAmount = BigInt(distribution.amount);
-
-            checkState.balance = balance as bigint;
-            checkState.decimals = decimals as number;
-            checkState.symbol = symbol as string;
-            checkState.hasEnoughBalance = (balance as bigint) >= requiredAmount;
+            checkState.balance = balance;
+            checkState.decimals = decimals;
+            checkState.symbol = symbol;
+            checkState.hasEnoughBalance = balance >= requiredAmount;
         } catch (e: any) {
             console.error("Balance check failed:", e);
-            // Provide user-friendly error messages based on error type
             if (e.message?.includes('NetworkError') || e.message?.includes('fetch')) {
-                checkState.error = "Network error connecting to RPC. Please check your internet connection and try again.";
-            } else if (e.message?.includes('call revert') || e.message?.includes('execution reverted')) {
-                checkState.error = "Token contract call failed. Is the contract address correct for this network?";
+                checkState.error = "Network error connecting to Stellar RPC. Please check your internet connection and try again.";
             } else {
                 checkState.error = e.message || "Failed to fetch token balance. Please try again.";
             }
@@ -261,7 +235,7 @@
             {#if walletStore.isWrongNetwork}
                 <div class="mt-4">
                     <ZenAlert variant="warning">
-                        Please switch to Ethereum Mainnet or Sepolia Testnet to continue.
+                        Please switch Freighter to the configured Stellar network.
                     </ZenAlert>
                 </div>
             {/if}
@@ -307,14 +281,10 @@
                                 <div
                                     class="text-3xl sm:text-4xl font-mono font-bold tracking-tight mt-2 truncate"
                                 >
-                                    {Number(
-                                        formatUnits(
-                                            checkState.balance,
-                                            checkState.decimals,
-                                        ),
-                                    ).toLocaleString(undefined, {
-                                        maximumFractionDigits: 4,
-                                    })}
+                                    {formatTokenAmount(
+                                        checkState.balance,
+                                        checkState.decimals,
+                                    )}
                                     <span
                                         class="text-lg text-zen-fg-faint ml-1 font-sans font-normal"
                                         >{checkState.symbol}</span

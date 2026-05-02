@@ -5,35 +5,26 @@
         FactoryDeployService,
         getFactoryAddress,
         isFactoryAvailable,
-        parseVestingAddressFromReceipt,
-        type FactoryDeployConfig,
         type FactoryDeployProgress,
     } from "../../../services/factoryDeploy";
     import { addOptimisticContract } from "@zarf/core/services/distributionDiscovery";
     import { buildFactoryDeployInputs } from "@zarf/core/domain/merkleResultAdapter";
     import { planDeploy, buildOptimisticContract } from "@zarf/core/domain/deployPlanner";
-    import { recoverPendingDeploy } from "@zarf/core/domain/deployRecovery";
+    import { getContractExplorerUrl, getExplorerUrl } from "@zarf/core/contracts";
+    import { parseTokenAmount } from "@zarf/core/utils/amount";
     import { walletStore } from "@zarf/ui/stores/walletStore.svelte";
     import { goto } from "$app/navigation";
     import {
         Check,
         Rocket,
-        AlertTriangle,
         ExternalLink,
         Loader2,
         AlertCircle,
         Copy,
         Download,
-        FileText,
-        Users,
         Calendar,
-        Coins,
     } from "lucide-svelte";
-    import type { Address, Hash } from "viem";
-    import { parseUnits } from "viem";
-    import { onMount } from "svelte";
-    import { waitForTransactionReceipt } from "@wagmi/core";
-    import { wagmiConfig } from "@zarf/core/contracts/wallet";
+    import type { TransactionHash } from "@zarf/core/types";
     import ZenButton from "@zarf/ui/components/ui/ZenButton.svelte";
     import ZenCard from "@zarf/ui/components/ui/ZenCard.svelte";
     import ZenAlert from "@zarf/ui/components/ui/ZenAlert.svelte";
@@ -48,8 +39,8 @@
 
     // Wallet state
     let walletAddress = $derived(walletStore.address);
-    let chainId = $derived(walletStore.chainId);
     let isWrongNetwork = $derived(walletStore.isWrongNetwork);
+    let networkName = $derived(walletStore.networkName);
 
     // Local deployment state
     let isDeploying = $state(false);
@@ -61,93 +52,16 @@
 
     // Use persisted state from store
     // This enables recovery after refresh
-    let approveTxHash = $derived(deployStore.approveTxHash as Hash | null);
-    let createTxHash = $derived(deployStore.createTxHash as Hash | null);
+    let approveTxHash = $derived(deployStore.approveTxHash as TransactionHash | null);
+    let createTxHash = $derived(deployStore.createTxHash as TransactionHash | null);
+    let submittedCreateTxHash = $state<TransactionHash | null>(null);
 
     // Factory availability check
-    let factoryAddress = $derived(chainId ? getFactoryAddress(chainId) : null);
-    let factoryAvailable = $derived(
-        chainId ? isFactoryAvailable(chainId) : false,
-    );
+    let factoryAvailable = $derived(isFactoryAvailable());
 
     // Clean Markup: Extract template logic to $derived
-    const showFactoryWarning = $derived(!factoryAvailable && Boolean(chainId));
+    const showFactoryWarning = $derived(!factoryAvailable);
     const showNotDeployedIdle = $derived(!isDeployed && currentStep === "idle");
-
-    // Recovery: resume pending transactions after page refresh.
-    // Pure decision via recoverPendingDeploy(); component just dispatches the result.
-    onMount(async () => {
-        if (!deployStore.createTxHash && !deployStore.approveTxHash) return;
-
-        const pendingKind = deployStore.createTxHash ? "create" : "approve";
-        currentStep = pendingKind;
-        isDeploying = true;
-        currentMessage =
-            pendingKind === "create"
-                ? "Checking deployment status..."
-                : "Checking approval status...";
-
-        const result = await recoverPendingDeploy(
-            {
-                approveTxHash: deployStore.approveTxHash as Hash | null,
-                createTxHash: deployStore.createTxHash as Hash | null,
-            },
-            {
-                waitForReceipt: (hash) =>
-                    waitForTransactionReceipt(wagmiConfig, { hash }),
-                parseVestingAddress: parseVestingAddressFromReceipt,
-            },
-        );
-
-        switch (result.kind) {
-            case "none":
-                isDeploying = false;
-                currentStep = "idle";
-                break;
-            case "createConfirmed":
-                if (distribution) {
-                    deployStore.setDeployed(result.vestingAddress);
-                    wizardStore.moveDistributionToLaunched(
-                        distribution.id,
-                        result.transactionHash,
-                    );
-                }
-                currentStep = "complete";
-                isDeploying = false;
-                currentMessage = "Deployment confirmed.";
-                break;
-            case "createConfirmedNoAddress":
-                error =
-                    "Deployment transaction confirmed, but the VestingCreated event could not be read. Please import the contract manually or contact support.";
-                currentStep = "error";
-                isDeploying = false;
-                currentMessage = "Deployment needs manual recovery.";
-                deployStore.clearPendingTransactions();
-                break;
-            case "createReverted":
-                error = "Transaction failed on-chain.";
-                isDeploying = false;
-                currentStep = "error";
-                break;
-            case "approveConfirmed":
-                currentStep = "idle";
-                isDeploying = false;
-                break;
-            case "approveReverted":
-                error = "Approval transaction failed.";
-                isDeploying = false;
-                currentStep = "error";
-                break;
-            case "rpcError":
-                if (import.meta.env.DEV)
-                    console.error(`Failed to check ${result.pending} tx`, result.error);
-                currentMessage =
-                    result.pending === "create"
-                        ? "Waiting for confirmation..."
-                        : "Waiting for approval confirmation...";
-                break;
-        }
-    });
 
     function resetDeployState() {
         if (confirm("Are you sure you want to reset the deployment state?")) {
@@ -160,27 +74,17 @@
     }
 
     async function handleDeploy() {
-        if (!distribution || !merkleResult || !walletAddress || !chainId)
+        if (!distribution || !merkleResult || !walletAddress)
             return;
 
-        // Auto-switch network if wrong
         if (isWrongNetwork) {
-            try {
-                currentMessage = "Switching to Sepolia network...";
-                await walletStore.switchChain(11155111); // Sepolia
-                // Wait for network switch to propagate
-                await new Promise((resolve) => setTimeout(resolve, 1000));
-            } catch (e: unknown) {
-                error =
-                    "Failed to switch network. Please switch manually in MetaMask.";
-                return;
-            }
+            error = "Switch Freighter to the configured Stellar network before deploying.";
+            return;
         }
 
-        // Re-check factory after potential network switch
-        const currentFactoryAddress = getFactoryAddress(chainId);
+        const currentFactoryAddress = getFactoryAddress();
         if (!currentFactoryAddress) {
-            error = "Factory contract not available on this network.";
+            error = "Stellar factory contract is not configured.";
             return;
         }
 
@@ -191,8 +95,8 @@
         // approveTxHash = null;
         // createTxHash = null;
 
-        // Get token decimals (default to 18 if not set)
-        const tokenDecimals = wizardStore.tokenDetails.tokenDecimals ?? 18;
+        // Get token decimals (Stellar assets commonly use 7 decimals)
+        const tokenDecimals = wizardStore.tokenDetails.tokenDecimals ?? 7;
 
         // Validate every claim, build factory inputs, and plan the deploy
         // (past-date override + integrity check). Pure-TS — testable.
@@ -218,16 +122,15 @@
 
             config = planDeploy(
                 {
-                    factoryAddress: currentFactoryAddress as Address,
-                    tokenAddress: wizardStore.tokenDetails.tokenAddress as Address,
+                    factoryAddress: currentFactoryAddress,
+                    tokenAddress: wizardStore.tokenDetails.tokenAddress!,
                     owner: walletAddress!,
                     name: distribution.name,
                     description: distribution.description || "",
                     schedule: distribution.schedule,
-                    totalAmountWei: parseUnits(String(distribution.amount), tokenDecimals),
+                    totalAmount: parseTokenAmount(String(distribution.amount), tokenDecimals),
                     merkleRoot: factoryInputs.merkleRoot,
-                    commitments: factoryInputs.commitments,
-                    amounts: factoryInputs.amounts,
+                    recipientCount: factoryInputs.recipientCount,
                     allocationsTotal: factoryInputs.totalAllocation,
                     metadataCid,
                 },
@@ -253,6 +156,7 @@
                     if (progress.step === "approve") {
                         deployStore.setApproveTx(progress.txHash);
                     } else if (progress.step === "create") {
+                        submittedCreateTxHash = progress.txHash;
                         deployStore.setCreateTx(progress.txHash);
                     }
                 }
@@ -273,7 +177,7 @@
                 // Persist to Global Store
                 wizardStore.moveDistributionToLaunched(
                     distribution.id,
-                    createTxHash || "0x",
+                    submittedCreateTxHash || createTxHash || "",
                 );
 
                 // Optimistic UI Update — show in dashboard before next RPC fetch
@@ -284,19 +188,18 @@
                             address: vestingAddress,
                             name: distribution.name,
                             description: distribution.description || "",
-                            tokenAddress: wizardStore.tokenDetails.tokenAddress as Address,
+                            tokenAddress: wizardStore.tokenDetails.tokenAddress!,
                             tokenSymbol: wizardStore.tokenDetails.tokenSymbol,
                             tokenDecimals: wizardStore.tokenDetails.tokenDecimals,
                             owner: walletAddress,
                             schedule: distribution.schedule,
-                            totalAmountWei: config.totalAmount,
+                            totalAmount: config.totalAmount,
                             plannedSchedule: {
                                 cliffSeconds: config.cliffSeconds,
                                 vestingSeconds: config.vestingSeconds,
                                 periodSeconds: config.periodSeconds,
                             },
                         }),
-                        chainId,
                     );
                 } catch (err) {
                     console.warn("Optimistic cache update failed", err);
@@ -329,15 +232,13 @@
     function downloadReport() {
         if (!contractAddress || !distribution) return;
 
-        const network = chainId === 1 ? "mainnet" : "sepolia";
         const timestamp = new Date().toISOString();
 
         const report = `ZARF VESTING CONTRACT DEPLOYMENT REPORT
 ========================================
 
 Contract Address: ${contractAddress}
-Network: ${network}
-Chain ID: ${chainId}
+Network: ${networkName}
 
 Distribution Details
 --------------------
@@ -350,7 +251,7 @@ Token Details
 -------------
 Symbol: ${wizardStore.tokenDetails.tokenSymbol || "N/A"}
 Address: ${wizardStore.tokenDetails.tokenAddress || "N/A"}
-Decimals: ${wizardStore.tokenDetails.tokenDecimals || 18}
+Decimals: ${wizardStore.tokenDetails.tokenDecimals || 7}
 
 Vesting Schedule
 ----------------
@@ -365,7 +266,7 @@ Create TX: ${createTxHash || "N/A"}
 
 Links
 -----
-Contract: https://${network === "mainnet" ? "" : "sepolia."}etherscan.io/address/${contractAddress}
+Contract: ${getContractExplorerUrl(contractAddress)}
 
 Generated: ${timestamp}
 `;
@@ -382,9 +283,8 @@ Generated: ${timestamp}
     // Generate identicon colors from address
     function getIdenticonColors(address: string): string[] {
         const colors = [];
-        const hex = address.slice(2, 18); // Take 16 hex chars
-        for (let i = 0; i < 16; i += 2) {
-            const value = parseInt(hex.slice(i, i + 2), 16);
+        for (let i = 0; i < 8; i++) {
+            const value = address.charCodeAt(i % address.length) + i * 17;
             const lightness = 20 + (value % 60); // 20-80% lightness
             const hue = (value * 2.8) % 360; // Spread across hue
             colors.push(`oklch(${lightness}% 0.08 ${hue})`);
@@ -400,7 +300,7 @@ Generated: ${timestamp}
             // Use email or identityCommitment as unique key
             const key = c.email || c.identityCommitment || String(c.leafIndex);
             const displayName = c.email || `Recipient ${c.identityCommitment?.slice(0, 8)}...`;
-            const amount = Number(c.amount) / Math.pow(10, wizardStore.tokenDetails.tokenDecimals || 18);
+            const amount = Number(c.amount) / Math.pow(10, wizardStore.tokenDetails.tokenDecimals || 7);
             if (grouped.has(key)) {
                 grouped.get(key)!.amount += amount;
             } else {
@@ -423,21 +323,12 @@ Generated: ${timestamp}
         handleDeploy();
     }
 
-    // Etherscan URL helpers
-    function getEtherscanUrl(hash: Hash): string {
-        const baseUrl =
-            chainId === 1
-                ? "https://etherscan.io"
-                : "https://sepolia.etherscan.io";
-        return `${baseUrl}/tx/${hash}`;
+    function getTransactionUrl(hash: TransactionHash): string {
+        return getExplorerUrl(hash);
     }
 
-    function getContractEtherscanUrl(address: Address): string {
-        const baseUrl =
-            chainId === 1
-                ? "https://etherscan.io"
-                : "https://sepolia.etherscan.io";
-        return `${baseUrl}/address/${address}`;
+    function getContractUrl(address: string): string {
+        return getContractExplorerUrl(address);
     }
 
     // Step status helper
@@ -613,7 +504,7 @@ Generated: ${timestamp}
                                         <!-- TX Hash Link -->
                                         {#if txHash}
                                             <a
-                                                href={getEtherscanUrl(txHash)}
+                                                href={getTransactionUrl(txHash)}
                                                 target="_blank"
                                                 rel="noopener noreferrer"
                                                 class="inline-flex items-center gap-1 px-2 py-1 text-xs font-mono text-zen-fg-muted hover:text-zen-fg transition-colors"
@@ -655,7 +546,7 @@ Generated: ${timestamp}
                 <div class="flex items-center gap-4 text-sm text-zen-fg-muted">
                     {#if approveTxHash}
                         <a
-                            href={getEtherscanUrl(approveTxHash)}
+                            href={getTransactionUrl(approveTxHash)}
                             target="_blank"
                             rel="noopener noreferrer"
                             class="inline-flex items-center gap-1.5 hover:text-zen-fg transition-colors"
@@ -667,7 +558,7 @@ Generated: ${timestamp}
                     {/if}
                     {#if createTxHash}
                         <a
-                            href={getEtherscanUrl(createTxHash)}
+                            href={getTransactionUrl(createTxHash)}
                             target="_blank"
                             rel="noopener noreferrer"
                             class="inline-flex items-center gap-1.5 hover:text-zen-fg transition-colors"
@@ -844,7 +735,7 @@ Generated: ${timestamp}
                                         {/if}
                                     </button>
                                     <a
-                                        href={getContractEtherscanUrl(contractAddress)}
+                                        href={getContractUrl(contractAddress)}
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         class="p-1 text-zen-fg-subtle hover:text-zen-fg transition-colors"

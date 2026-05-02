@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import type { Address, Hash } from 'viem';
 import { planScheduleSeconds, planDeploy, buildOptimisticContract } from './deployPlanner';
 
 const futureDate = '2099-01-01';
@@ -38,11 +37,12 @@ describe('planScheduleSeconds', () => {
 
 describe('planDeploy', () => {
     const inputs = {
-        factoryAddress: '0xfac' as Address, tokenAddress: '0xtok' as Address, owner: '0xown' as Address,
+        factoryAddress: 'CFACTORY', tokenAddress: 'CTOKEN', owner: 'GOWNER',
         name: 'X', description: 'Y',
         schedule: { cliffEndDate: futureDate, cliffTime: '00:00', distributionDuration: 12, durationUnit: 'months' as const },
-        totalAmountWei: 1000n,
-        merkleRoot: '0xroot' as Hash, commitments: ['0xc1' as Hash], amounts: [1000n],
+        totalAmount: 1000n,
+        merkleRoot: '0x' + '01'.repeat(32) as `0x${string}`,
+        recipientCount: 1,
         allocationsTotal: 1000n,
         metadataCid: 'bafkreitestcid',
     };
@@ -53,28 +53,28 @@ describe('planDeploy', () => {
 });
 
 describe('buildOptimisticContract', () => {
-    it('falls back to TOKEN / 18 when symbol/decimals are null; vestingStart from injected clock', () => {
+    it('uses TOKEN / 7 when symbol/decimals are unknown; vestingStart from injected clock', () => {
         const out = buildOptimisticContract({
-            address: '0xa' as Address, name: '', description: '',
-            tokenAddress: '0xt' as Address, tokenSymbol: null, tokenDecimals: null,
-            owner: '0xo' as Address,
+            address: 'CVESTING', name: '', description: '',
+            tokenAddress: 'CTOKEN', tokenSymbol: null, tokenDecimals: null,
+            owner: 'GOWNER',
             schedule: { cliffEndDate: futureDate, cliffTime: '00:00', distributionDuration: 1, durationUnit: 'months' },
-            totalAmountWei: 1234n,
+            totalAmount: 1234n,
             now: new Date('2025-01-01T00:00:00Z'),
         });
         expect(out.tokenSymbol).toBe('TOKEN');
-        expect(out.tokenDecimals).toBe(18);
+        expect(out.tokenDecimals).toBe(7);
         expect(out.tokenBalance).toBe(1234n);
         expect(out.vestingStart).toBe(1735689600n);  // 2025-01-01 UTC
     });
 
     it('uses planned schedule seconds when provided', () => {
         const out = buildOptimisticContract({
-            address: '0xa' as Address, name: '', description: '',
-            tokenAddress: '0xt' as Address,
-            owner: '0xo' as Address,
+            address: 'CVESTING', name: '', description: '',
+            tokenAddress: 'CTOKEN',
+            owner: 'GOWNER',
             schedule: { cliffEndDate: futureDate, cliffTime: '00:00', distributionDuration: 1, durationUnit: 'months' },
-            totalAmountWei: 1234n,
+            totalAmount: 1234n,
             plannedSchedule: { cliffSeconds: 0n, vestingSeconds: 1n, periodSeconds: 1n },
         });
         expect(out.cliffDuration).toBe(0n);

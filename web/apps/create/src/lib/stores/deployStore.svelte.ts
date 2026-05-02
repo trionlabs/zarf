@@ -1,5 +1,5 @@
 import type { Distribution, Recipient, MerkleTreeData } from './types';
-import type { Address } from 'viem';
+import type { StellarAddress, StellarContractId } from '@zarf/core/types';
 import { safeParse, safeStringify } from '@zarf/core/utils/json';
 
 export type DeployStep = 1 | 2 | 3 | 4;
@@ -22,10 +22,10 @@ export class DeployState {
     isBackupDownloaded = $state(false);
     isBackupConfirmed = $state(false);
     isWalletConnected = $state(false);
-    walletAddress = $state<Address | null>(null);
+    walletAddress = $state<StellarAddress | null>(null);
 
     // Step 4
-    contractAddress = $state<Address | null>(null);
+    contractAddress = $state<StellarContractId | null>(null);
     isDeployed = $state(false);
 
     // Recovery Fields (The Write-Ahead Log)
@@ -189,7 +189,7 @@ export class DeployState {
     }
 
     // Wallet Actions
-    setWalletState(connected: boolean, address: Address | null) {
+    setWalletState(connected: boolean, address: StellarAddress | null) {
         this.isWalletConnected = connected;
         this.walletAddress = address;
     }
@@ -217,7 +217,7 @@ export class DeployState {
         this.save();
     }
 
-    setDeployed(address: Address) {
+    setDeployed(address: StellarContractId) {
         this.isDeployed = true;
         this.contractAddress = address;
         // Clean up log on success

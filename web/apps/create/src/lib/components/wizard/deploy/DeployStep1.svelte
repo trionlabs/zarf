@@ -5,7 +5,7 @@
     import { AlertTriangle, CheckCircle2 } from "lucide-svelte";
 
     import { wizardStore } from "../../../stores/wizardStore.svelte";
-    import { parseUnits } from "viem";
+    import { parseTokenAmount } from "@zarf/core/utils/amount";
     import { buildClaimList } from "@zarf/core/domain/claimListBuilder";
     import { planScheduleSeconds } from "@zarf/core/domain/deployPlanner";
     import { pinClaimList } from "../../../services/pinService";
@@ -50,16 +50,15 @@
         deployStore.startMerkleGeneration();
 
         try {
-            const tokenDecimals = wizardStore.tokenDetails.tokenDecimals ?? 18;
+            const tokenDecimals = wizardStore.tokenDetails.tokenDecimals ?? 7;
 
             // Map recipients to { email, amount } format expected by service
-            // CRITICAL: Convert amount to WEI using token decimals
-            // This ensures the Merkle Root matches the on-chain wei values
+            // CRITICAL: Convert amount to token base units using token decimals.
+            // This ensures the Merkle Root matches the on-chain values.
             const entries = distribution.recipients.map((r: any) => ({
                 email: r.email || "",
-                // Convert human-readable amount (e.g. 100) to wei (e.g. 100000...)
                 // We pass BigInt directly to avoid precision loss
-                amount: parseUnits(String(r.amount), tokenDecimals),
+                amount: parseTokenAmount(String(r.amount), tokenDecimals),
             }));
 
             // ADR-023: Discrete Vesting - Generator needs Schedule

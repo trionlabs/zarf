@@ -11,7 +11,7 @@
     } from "lucide-svelte";
     import { walletStore } from "@zarf/ui/stores/walletStore.svelte";
     import { sanitizeBlockchainError } from "@zarf/ui/utils/errorSanitizer";
-    import type { Address } from "viem";
+    import { formatTokenAmount } from "@zarf/core/utils/amount";
     import ZenButton from "@zarf/ui/components/ui/ZenButton.svelte";
 
     let { contractAddress } = $props<{ contractAddress: string }>();
@@ -70,8 +70,8 @@
             const result = await submitClaim(
                 proof.proof,
                 rawInputs,
-                walletStore.address as Address,
-                contractAddress as Address,
+                walletStore.address,
+                contractAddress,
             );
 
             claimStore.setTxHash(result.hash);
@@ -135,11 +135,11 @@
                     <span
                         class="text-5xl font-light tracking-tighter text-zen-fg"
                     >
-                        {(Number(allocation) / 1e18).toLocaleString()}
+                        {formatTokenAmount(allocation, claimStore.tokenDecimals, 4)}
                     </span>
                     <span
                         class="text-sm font-medium text-zen-primary uppercase tracking-widest"
-                        >AZTC</span
+                        >{claimStore.tokenSymbol}</span
                     >
                 </div>
             </div>
@@ -211,7 +211,7 @@
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {#if txHash}
                         <a
-                            href={getExplorerUrl(txHash as `0x${string}`)}
+                            href={getExplorerUrl(txHash)}
                             target="_blank"
                             rel="noopener noreferrer"
                             class="flex items-center justify-center border border-zen-border-subtle bg-zen-bg hover:bg-zen-fg/5 h-14 rounded-2xl text-[10px] uppercase tracking-widest font-bold transition-colors"

@@ -4,7 +4,6 @@
     // We import from merkleTree which handles the Barretenberg WASM loading
     import { Lock, Mail, KeyRound, Loader2, ArrowRight, LogOut } from "lucide-svelte";
     import { redirectToGoogle } from "@zarf/ui/utils/googleAuth";
-    import type { Address } from "viem";
     import { PIN_LENGTH } from "@zarf/core/constants";
     import { browser } from "$app/environment";
     import { onMount } from "svelte";

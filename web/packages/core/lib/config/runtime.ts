@@ -10,23 +10,26 @@
  *
  * @module config/runtime
  */
-import type { Address } from 'viem';
+import type { StellarAddress, StellarContractId } from '../types';
+
+export interface StellarRuntimeConfig {
+    rpcUrl?: string;
+    horizonUrl?: string;
+    networkPassphrase?: string;
+    factoryAddress?: StellarContractId;
+    vestingAddress?: StellarContractId;
+    jwkRegistryAddress?: StellarContractId;
+    verifierAddress?: StellarContractId;
+    tokenAddress?: StellarContractId;
+    nativeTokenAddress?: StellarContractId;
+    explorerBaseUrl?: string;
+    networkName?: string;
+    deployerAddress?: StellarAddress;
+}
 
 export interface CoreRuntimeConfig {
-    /** Explicit chain used by read-only discovery flows when a caller does not pass one. */
-    activeChainId?: number;
-    /** Per-chain RPC URL overrides. If absent for a chain, public fallbacks are used. */
-    rpcUrls: Partial<Record<number, string>>;
-    /** Per-chain factory contract addresses. */
-    factoryAddresses: Partial<Record<number, Address>>;
-    /** Per-chain factory deploy block (used to bound event log scans). */
-    factoryDeployBlocks?: Partial<Record<number, bigint>>;
-    /** Optional: ZarfVesting contract address for direct (non-factory) flows. */
-    vestingAddress?: Address;
-    /** Optional: JWK registry contract for ZK proof verification. */
-    jwkRegistryAddress?: Address;
-    /** Optional: standalone Verifier contract (Honk/Mock). */
-    verifierAddress?: Address;
+    /** Stellar/Soroban runtime configuration. */
+    stellar: StellarRuntimeConfig;
 }
 
 let _config: CoreRuntimeConfig | null = null;
@@ -58,6 +61,10 @@ export function getCoreConfig(): CoreRuntimeConfig {
         );
     }
     return _config;
+}
+
+export function getStellarConfig(): StellarRuntimeConfig {
+    return getCoreConfig().stellar;
 }
 
 /**

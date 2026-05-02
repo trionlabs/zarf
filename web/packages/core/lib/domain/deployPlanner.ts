@@ -2,20 +2,23 @@
  * Pure-TS deployment planner.
  *
  * Owns the schedule math and config-shape construction that previously lived
- * inline inside `DeployStep4Deploy.svelte`. No wagmi/viem/svelte imports —
+ * inline inside `DeployStep4Deploy.svelte`. No Svelte imports —
  * everything in here is unit-testable.
  *
- * Wagmi-bound concerns (TX submission, chain switching, receipt waiting)
- * stay in the component. The component supplies the wagmi-shaped numbers
- * (cliff/vesting/period seconds, totalAmount in wei) and gets back a
+ * Stellar-bound concerns (Freighter signing, TX submission, receipt waiting)
+ * stay in the app service. The component supplies parsed token amounts and gets back a
  * fully-validated `FactoryDeployConfig` plus the `OnChainVestingContract`
  * shape used for optimistic cache updates.
  *
  * @module domain/deployPlanner
  */
 
-import type { Address, Hash } from 'viem';
-import type { DurationUnit } from '../types';
+import type {
+    DurationUnit,
+    HexString,
+    StellarAddress,
+    StellarContractId,
+} from '../types';
 import {
     durationToSeconds,
     cliffDateToSeconds,
@@ -77,18 +80,17 @@ export function planScheduleSeconds(
  * walletAddress is connected, merkle inputs are validated).
  */
 export interface DeployPlanInputs {
-    factoryAddress: Address;
-    tokenAddress: Address;
-    owner: Address;
+    factoryAddress: StellarContractId;
+    tokenAddress: StellarContractId;
+    owner: StellarAddress;
     name: string;
     description: string;
     schedule: DeploySchedule;
-    /** Total amount (in wei), parsed from user input + token decimals. */
-    totalAmountWei: bigint;
+    /** Total amount in the token's base unit, parsed from user input + token decimals. */
+    totalAmount: bigint;
     /** Pre-validated factory inputs from `buildFactoryDeployInputs`. */
-    merkleRoot: Hash;
-    commitments: Hash[];
-    amounts: bigint[];
+    merkleRoot: HexString;
+    recipientCount: number;
     /** Sum of amounts; used for the integrity check. */
     allocationsTotal: bigint;
     /** IPFS CID of the off-chain claim list. */
@@ -97,16 +99,15 @@ export interface DeployPlanInputs {
 
 /** Subset of `FactoryDeployConfig` we construct here. Caller can spread or assign as-needed. */
 export interface PlannedDeployConfig {
-    factoryAddress: Address;
-    tokenAddress: Address;
-    merkleRoot: Hash;
-    commitments: Hash[];
-    amounts: bigint[];
+    factoryAddress: StellarContractId;
+    tokenAddress: StellarContractId;
+    merkleRoot: HexString;
+    recipientCount: number;
     cliffSeconds: bigint;
     vestingSeconds: bigint;
     periodSeconds: bigint;
     totalAmount: bigint;
-    owner: Address;
+    owner: StellarAddress;
     name: string;
     description: string;
     metadataCid: string;
@@ -125,7 +126,7 @@ export interface PlannedScheduleSeconds {
  * must equal totalAmount). Throws if the integrity check fails.
  */
 export function planDeploy(inputs: DeployPlanInputs, now: Date = new Date()): PlannedDeployConfig {
-    if (inputs.allocationsTotal !== inputs.totalAmountWei) {
+    if (inputs.allocationsTotal !== inputs.totalAmount) {
         throw new Error(
             'Integrity error: allocations sum does not match distribution total. Please recreate the distribution.',
         );
@@ -140,12 +141,11 @@ export function planDeploy(inputs: DeployPlanInputs, now: Date = new Date()): Pl
         factoryAddress: inputs.factoryAddress,
         tokenAddress: inputs.tokenAddress,
         merkleRoot: inputs.merkleRoot,
-        commitments: inputs.commitments,
-        amounts: inputs.amounts,
+        recipientCount: inputs.recipientCount,
         cliffSeconds,
         vestingSeconds,
         periodSeconds,
-        totalAmount: inputs.totalAmountWei,
+        totalAmount: inputs.totalAmount,
         owner: inputs.owner,
         name: inputs.name,
         description: inputs.description,
@@ -161,15 +161,15 @@ export function planDeploy(inputs: DeployPlanInputs, now: Date = new Date()): Pl
  * distribution before the next RPC fetch.
  */
 export function buildOptimisticContract(args: {
-    address: Address;
+    address: StellarContractId;
     name: string;
     description: string;
-    tokenAddress: Address;
+    tokenAddress: StellarContractId;
     tokenSymbol?: string | null;
     tokenDecimals?: number | null;
-    owner: Address;
+    owner: StellarAddress;
     schedule: DeploySchedule;
-    totalAmountWei: bigint;
+    totalAmount: bigint;
     plannedSchedule?: PlannedScheduleSeconds;
     now?: Date;
 }) {
@@ -180,7 +180,7 @@ export function buildOptimisticContract(args: {
         description: args.description,
         token: args.tokenAddress,
         tokenSymbol: args.tokenSymbol || 'TOKEN',
-        tokenDecimals: args.tokenDecimals ?? 18,
+        tokenDecimals: args.tokenDecimals ?? 7,
         owner: args.owner,
         vestingStart: BigInt(Math.floor(now.getTime() / 1000)),
         cliffDuration:
@@ -192,6 +192,7 @@ export function buildOptimisticContract(args: {
         vestingPeriod:
             args.plannedSchedule?.periodSeconds ??
             unitToPeriodSeconds(args.schedule.durationUnit),
-        tokenBalance: args.totalAmountWei,
+        tokenBalance: args.totalAmount,
+        metadataCid: null,
     };
 }

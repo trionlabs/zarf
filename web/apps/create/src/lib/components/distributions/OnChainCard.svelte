@@ -1,12 +1,10 @@
 <script lang="ts">
-    import { goto } from "$app/navigation";
     import {
-        BarChart3,
         ExternalLink,
-        Hourglass,
-        CheckCircle2,
     } from "lucide-svelte";
     import type { OnChainVestingContract } from "@zarf/core/services/distributionDiscovery";
+    import { getContractExplorerUrl } from "@zarf/core/contracts";
+    import { formatTokenAmount } from "@zarf/core/utils/amount";
     import ZenCard from "@zarf/ui/components/ui/ZenCard.svelte";
     import ZenButton from "@zarf/ui/components/ui/ZenButton.svelte";
     import ZenBadge from "@zarf/ui/components/ui/ZenBadge.svelte";
@@ -37,12 +35,6 @@
     const style = $derived(styles[variant as keyof typeof styles]);
 
     // Format helpers
-    function formatTokenBalance(balance: bigint, decimals: number): string {
-        const divisor = 10n ** BigInt(decimals);
-        const integerPart = balance / divisor;
-        return BigInt(integerPart).toLocaleString();
-    }
-
     function calculateProgress(start: bigint, duration: bigint): number {
         if (start === 0n) return 0;
         const now = BigInt(Math.floor(Date.now() / 1000));
@@ -124,9 +116,10 @@
                         <div
                             class="text-xl md:text-2xl font-black text-zen-fg tracking-tight leading-none"
                         >
-                            {formatTokenBalance(
+                            {formatTokenAmount(
                                 contract.tokenBalance,
                                 contract.tokenDecimals,
+                                0,
                             )}
                         </div>
                     </div>
@@ -152,12 +145,12 @@
                     class="flex items-center gap-3 w-full md:w-auto pt-4 md:pt-0 border-t-[0.5px] md:border-t-0 border-zen-border-subtle mt-auto"
                 >
                     <a
-                        href={`https://sepolia.etherscan.io/address/${contract.address}`}
+                        href={getContractExplorerUrl(contract.address)}
                         target="_blank"
                         rel="noreferrer"
                         class="w-8 h-8 md:w-10 md:h-10 rounded-full bg-transparent text-zen-fg-subtle hover:text-zen-fg transition-colors flex items-center justify-center"
                         onclick={(e) => e.stopPropagation()}
-                        title="View on Etherscan"
+                        title="View on Stellar explorer"
                     >
                         <ExternalLink class="w-4 h-4 md:w-5 md:h-5" />
                     </a>

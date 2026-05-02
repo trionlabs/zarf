@@ -13,7 +13,7 @@
         AlertTriangle,
     } from "lucide-svelte";
     import { generateClaimProof } from "@zarf/core/zk";
-    import type { Address } from "viem";
+    import { recipientId } from "@zarf/core/contracts";
     import ZenButton from "@zarf/ui/components/ui/ZenButton.svelte";
 
     let progress = $state(0);
@@ -67,6 +67,7 @@
             if (!jwt) throw new Error("JWT is missing.");
 
             const publicKey = await getPublicKeyForJwt(jwt);
+            const recipient = await recipientId(contractAddress, targetWallet);
 
             statusMessage = "Initializing ZK Worker...";
             progress = 40;
@@ -80,7 +81,7 @@
                     amount,
                     merkleProof,
                     merkleRoot,
-                    recipient: targetWallet as Address,
+                    recipient,
                     unlockTime: BigInt(unlockTime),
                 },
                 (message) => {

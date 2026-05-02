@@ -32,12 +32,12 @@ describe('commitmentToHash / rootToHash', () => {
 });
 
 describe('buildFactoryDeployInputs', () => {
-    it('produces parallel arrays and correct total for valid claims', () => {
+    it('produces Soroban factory inputs and correct total for valid claims', () => {
         const out = buildFactoryDeployInputs(
             [baseClaim({ amount: 1n }), baseClaim({ amount: 2n }), baseClaim({ amount: 3n })],
             0xabcn,
         );
-        expect(out.amounts).toEqual([1n, 2n, 3n]);
+        expect(out.recipientCount).toBe(3);
         expect(out.totalAllocation).toBe(6n);
         expect(out.merkleRoot).toHaveLength(66);
     });

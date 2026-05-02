@@ -6,53 +6,25 @@
  * App-specific env-var names live here, NOT in @zarf/core.
  */
 import { configureCore } from '@zarf/core/config/runtime';
-import type { Address } from 'viem';
 
-const SEPOLIA = 11155111;
-const MAINNET = 1;
-
-function parseOptionalBigIntEnv(name: string): bigint | undefined {
-    const env = import.meta.env as ImportMetaEnv & Record<string, string | undefined>;
-    const raw = env[name];
-    if (!raw) return undefined;
-    try {
-        const parsed = BigInt(raw);
-        if (parsed < 0n) throw new Error('must be non-negative');
-        return parsed;
-    } catch {
-        throw new Error(`Invalid ${name}: "${raw}"`);
-    }
+function requiredEnv(name: keyof ImportMetaEnv): string {
+    const value = import.meta.env[name];
+    if (!value) throw new Error(`Missing required ${name}`);
+    return value;
 }
-
-function parseActiveChainId(): number {
-    const raw = (import.meta.env.VITE_ACTIVE_CHAIN_ID ||
-        import.meta.env.VITE_CHAIN_ID ||
-        String(SEPOLIA)) as string;
-    const parsed = Number(raw);
-    if (!Number.isInteger(parsed) || parsed <= 0) {
-        throw new Error(`Invalid VITE_ACTIVE_CHAIN_ID: "${raw}"`);
-    }
-    return parsed;
-}
-
-const factoryDeployBlockSepolia = (() => {
-    return parseOptionalBigIntEnv('VITE_FACTORY_DEPLOY_BLOCK_SEPOLIA');
-})();
 
 configureCore({
-    activeChainId: parseActiveChainId(),
-    rpcUrls: {
-        [SEPOLIA]: import.meta.env.VITE_SEPOLIA_RPC_URL || import.meta.env.VITE_RPC_URL,
-        [MAINNET]: import.meta.env.VITE_MAINNET_RPC_URL,
+    stellar: {
+        rpcUrl: requiredEnv('VITE_STELLAR_RPC_URL'),
+        horizonUrl: requiredEnv('VITE_STELLAR_HORIZON_URL'),
+        networkPassphrase: requiredEnv('VITE_STELLAR_NETWORK_PASSPHRASE'),
+        networkName: import.meta.env.VITE_STELLAR_NETWORK_NAME,
+        factoryAddress: requiredEnv('VITE_STELLAR_FACTORY_ADDRESS'),
+        vestingAddress: import.meta.env.VITE_STELLAR_VESTING_ADDRESS,
+        jwkRegistryAddress: import.meta.env.VITE_STELLAR_JWK_REGISTRY_ADDRESS,
+        verifierAddress: import.meta.env.VITE_STELLAR_VERIFIER_ADDRESS,
+        tokenAddress: import.meta.env.VITE_STELLAR_TOKEN_ADDRESS,
+        nativeTokenAddress: import.meta.env.VITE_STELLAR_NATIVE_TOKEN_ADDRESS,
+        explorerBaseUrl: requiredEnv('VITE_STELLAR_EXPLORER_URL'),
     },
-    factoryAddresses: {
-        [SEPOLIA]: import.meta.env.VITE_FACTORY_ADDRESS_SEPOLIA as Address | undefined,
-        [MAINNET]: import.meta.env.VITE_FACTORY_ADDRESS_MAINNET as Address | undefined,
-    },
-    factoryDeployBlocks: {
-        [SEPOLIA]: factoryDeployBlockSepolia,
-    },
-    vestingAddress: import.meta.env.VITE_VESTING_ADDRESS as Address | undefined,
-    jwkRegistryAddress: import.meta.env.VITE_JWK_REGISTRY_ADDRESS as Address | undefined,
-    verifierAddress: import.meta.env.VITE_VERIFIER_ADDRESS as Address | undefined,
 });

@@ -5,8 +5,10 @@
  * Keep this file focused on data structures, not UI component props.
  */
 
-import type { Address } from 'viem';
-import type { Connector } from '@wagmi/core';
+export type StellarAddress = string;
+export type StellarContractId = string;
+export type TransactionHash = string;
+export type HexString = `0x${string}`;
 
 // ============================================================================
 // Whitelist & CSV Types
@@ -132,7 +134,7 @@ export interface DecodedJWT {
  */
 export interface OAuthState {
     /** Contract address to claim from (optional) */
-    address?: `0x${string}`;
+    address?: StellarContractId;
 }
 
 // ============================================================================
@@ -145,7 +147,7 @@ export interface OAuthState {
 export interface ZKPublicInputs {
     identityCommitment: string;      // Pedersen(email, secret) - Public Identifier
     merkleRoot: string;     // Merkle root (hex)
-    recipient: Address;     // Recipient wallet address
+    recipient: string;      // Recipient field element used by the Stellar circuit
     amount: bigint;         // Claimed amount
 }
 
@@ -159,7 +161,7 @@ export interface ZKProof {
     // Convenience duplicates (same as publicInputs)
     identityCommitment: string;       // REPLACED emailHash
     merkleRoot: string;
-    recipient: Address;
+    recipient: string;
     amount: bigint;
 }
 
@@ -172,7 +174,7 @@ export interface ZKClaimData {
     amount: bigint;             // Claimed amount
     merkleProof: MerkleProof;   // Merkle proof siblings & indices
     merkleRoot: bigint;         // Merkle root
-    recipient: Address;         // Recipient wallet address
+    recipient: string;          // Stellar recipient field element
     unlockTime: bigint;         // ADR-023: Discrete Vesting unlock timestamp
 }
 
@@ -184,8 +186,9 @@ export interface ZKClaimData {
  * Wallet connection result
  */
 export interface WalletConnection {
-    address: Address;
-    chainId: number;
+    address: StellarAddress;
+    network: string;
+    networkPassphrase: string;
 }
 
 /**
@@ -193,9 +196,9 @@ export interface WalletConnection {
  */
 export interface WalletAccount {
     isConnected: boolean;
-    address?: Address;
-    chainId?: number;
-    connector?: Connector; // Added connector property
+    address?: StellarAddress;
+    network?: string;
+    networkPassphrase?: string;
 }
 
 // ============================================================================
@@ -206,7 +209,7 @@ export interface WalletAccount {
  * Vesting contract information
  */
 export interface VestingInfo {
-    vestingAddress: Address;
+    vestingAddress: StellarContractId;
     totalAmount: bigint;
     claimedAmount: bigint;
     merkleRoot: string;
@@ -228,7 +231,7 @@ export interface VestingSchedule {
  * Transaction result
  */
 export interface TransactionResult {
-    hash: `0x${string}`;
+    hash: TransactionHash;
     blockNumber?: bigint;
 }
 
@@ -249,8 +252,8 @@ export type AsyncState<T> =
  * Network configuration
  */
 export interface NetworkConfig {
-    chainId: number;
     name: string;
     rpcUrl: string;
     explorerUrl: string;
+    networkPassphrase: string;
 }

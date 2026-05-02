@@ -6,18 +6,16 @@
   - State: walletStore.isModalOpen
 
   Features:
-  - Lists all detected Injected Connectors (EIP-6963)
-  - Handles connection logic
+  - Prompts Freighter access
 -->
 <script lang="ts">
     import { walletStore } from "../../stores/walletStore.svelte";
-    import { X } from "lucide-svelte";
-    import type { Connector } from "@wagmi/core";
+    import { X, Wallet } from "lucide-svelte";
     import ZenButton from "../ui/ZenButton.svelte";
 
-    async function handleConnect(connector: Connector) {
+    async function handleConnect() {
         try {
-            await walletStore.connect(connector);
+            await walletStore.connect();
             // Modal closes automatically via store logic on success
         } catch (e) {
             // Error handling is done in store
@@ -69,65 +67,46 @@
 
             <!-- Body -->
             <div class="p-5 space-y-4">
-                {#if walletStore.connectors.length > 1}
-                    <p class="text-sm text-zen-fg-muted">
-                        Multiple wallets detected. Please select one.
-                    </p>
-                {:else if walletStore.connectors.length === 0}
-                    <p class="text-sm text-zen-warning">
-                        No wallets detected. Please install a Web3 wallet.
-                    </p>
-                {/if}
+                <p class="text-sm text-zen-fg-muted">
+                    Zarf connects to Stellar through Freighter.
+                </p>
 
                 <div class="space-y-2">
-                    {#each walletStore.connectors as connector}
-                        <button
-                            class="
-                                w-full flex items-center gap-3 p-3.5
-                                rounded-xl border-[0.5px] border-zen-border
-                                bg-transparent hover:bg-zen-fg/5
-                                hover:border-zen-border-strong
-                                transition-all duration-200
-                            "
-                            onclick={() => handleConnect(connector)}
+                    <button
+                        class="
+                            w-full flex items-center gap-3 p-3.5
+                            rounded-xl border-[0.5px] border-zen-border
+                            bg-transparent hover:bg-zen-fg/5
+                            hover:border-zen-border-strong
+                            transition-all duration-200
+                        "
+                        onclick={handleConnect}
+                    >
+                        <div
+                            class="w-8 h-8 rounded-lg bg-zen-fg/10 flex items-center justify-center text-xs font-bold text-zen-fg-muted"
                         >
-                            <!-- Icon -->
-                            {#if connector.icon}
-                                <img
-                                    src={connector.icon}
-                                    alt={connector.name}
-                                    class="w-8 h-8 rounded-lg"
-                                />
-                            {:else}
-                                <div
-                                    class="w-8 h-8 rounded-lg bg-zen-fg/10 flex items-center justify-center text-xs font-bold text-zen-fg-muted"
-                                >
-                                    W
-                                </div>
-                            {/if}
-                            <div class="flex flex-col items-start">
-                                <span class="font-medium text-zen-fg">{connector.name}</span>
-                                <span class="text-xs text-zen-fg-faint">Detected Wallet</span>
-                            </div>
-                        </button>
-                    {/each}
+                            <Wallet class="w-4 h-4" />
+                        </div>
+                        <div class="flex flex-col items-start">
+                            <span class="font-medium text-zen-fg">Freighter</span>
+                            <span class="text-xs text-zen-fg-faint">Stellar wallet</span>
+                        </div>
+                    </button>
 
-                    {#if walletStore.connectors.length === 0}
-                        <a
-                            href="https://metamask.io/download/"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            class="
-                                w-full flex items-center justify-center gap-2 p-3.5
-                                rounded-xl
-                                bg-zen-primary text-zen-primary-content
-                                font-medium text-sm
-                                hover:opacity-90 transition-opacity
-                            "
-                        >
-                            Install MetaMask
-                        </a>
-                    {/if}
+                    <a
+                        href="https://www.freighter.app/"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="
+                            w-full flex items-center justify-center gap-2 p-3.5
+                            rounded-xl
+                            bg-zen-primary text-zen-primary-content
+                            font-medium text-sm
+                            hover:opacity-90 transition-opacity
+                        "
+                    >
+                        Install Freighter
+                    </a>
                 </div>
             </div>
 

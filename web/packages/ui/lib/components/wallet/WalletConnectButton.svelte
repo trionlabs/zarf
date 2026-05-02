@@ -4,17 +4,13 @@
   A smart button that shows:
   - "Connect Wallet" when disconnected (Triggers Global Modal)
   - Address + Network badge when connected
-  - Dropdown menu for Balance/Disconnect/Copy/Switch Network
+  - Dropdown menu for Balance/Disconnect/Copy/Explorer
 
   Uses Zen design tokens
 -->
 <script lang="ts">
     import { onMount } from "svelte";
-    import {
-        walletStore,
-        MAINNET_CHAIN_ID,
-        SEPOLIA_CHAIN_ID,
-    } from "../../stores/walletStore.svelte";
+    import { walletStore } from "../../stores/walletStore.svelte";
     import { Copy, Check, ExternalLink, RefreshCw, LogOut, ChevronDown, Wallet } from "lucide-svelte";
     import ZenButton from "../ui/ZenButton.svelte";
     import ZenSpinner from "../ui/ZenSpinner.svelte";
@@ -32,19 +28,12 @@
         walletStore.isWrongNetwork ? "bg-zen-warning animate-pulse" : "bg-zen-success",
     );
 
-    const etherscanUrl = $derived.by(() => {
+    const explorerUrl = $derived.by(() => {
         if (!walletStore.address) return null;
-        switch (walletStore.chainId) {
-            case MAINNET_CHAIN_ID:
-                return `https://etherscan.io/address/${walletStore.address}`;
-            case SEPOLIA_CHAIN_ID:
-                return `https://sepolia.etherscan.io/address/${walletStore.address}`;
-            default:
-                return null;
-        }
+        return `https://stellar.expert/explorer/public/account/${walletStore.address}`;
     });
 
-    const canShowEtherscan = $derived(etherscanUrl !== null);
+    const canShowExplorer = $derived(explorerUrl !== null);
 
     // Close dropdown when clicking outside
     function handleClickOutside(event: MouseEvent) {
@@ -68,15 +57,6 @@
     async function handleDisconnect() {
         await walletStore.disconnect();
         isOpen = false;
-    }
-
-    async function handleSwitchNetwork(chainId: number) {
-        try {
-            await walletStore.switchChain(chainId);
-            isOpen = false;
-        } catch (e) {
-            /* Handled by store */
-        }
     }
 
     async function handleChangeWallet() {
@@ -144,38 +124,19 @@
                     </div>
                 </div>
 
-                <!-- Network Selection -->
-                <div class="px-4 py-2">
+                <!-- Network -->
+                <div class="px-4 py-2 border-b border-zen-border-subtle">
                     <span class="text-[10px] uppercase tracking-wider text-zen-fg-subtle font-medium">Network</span>
+                    <div class="mt-1 flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full {walletStore.isWrongNetwork ? 'bg-zen-warning' : 'bg-zen-success'}"></span>
+                        <span class="text-sm text-zen-fg-muted">{walletStore.networkName}</span>
+                    </div>
+                    {#if walletStore.isWrongNetwork}
+                        <p class="mt-2 text-xs text-zen-warning">
+                            Select the configured Stellar network in Freighter.
+                        </p>
+                    {/if}
                 </div>
-
-                <button
-                    type="button"
-                    class="w-full flex items-center justify-between px-4 py-2.5 hover:bg-zen-fg/5 transition-colors text-left"
-                    onclick={() => handleSwitchNetwork(MAINNET_CHAIN_ID)}
-                >
-                    <div class="flex items-center gap-2">
-                        <span class="w-2 h-2 rounded-full bg-blue-500"></span>
-                        <span class="text-sm {walletStore.chainId === MAINNET_CHAIN_ID ? 'font-semibold text-zen-fg' : 'text-zen-fg-muted'}">Ethereum</span>
-                    </div>
-                    {#if walletStore.chainId === MAINNET_CHAIN_ID}
-                        <Check class="w-4 h-4 text-zen-success" />
-                    {/if}
-                </button>
-
-                <button
-                    type="button"
-                    class="w-full flex items-center justify-between px-4 py-2.5 hover:bg-zen-fg/5 transition-colors text-left"
-                    onclick={() => handleSwitchNetwork(SEPOLIA_CHAIN_ID)}
-                >
-                    <div class="flex items-center gap-2">
-                        <span class="w-2 h-2 rounded-full bg-purple-500"></span>
-                        <span class="text-sm {walletStore.chainId === SEPOLIA_CHAIN_ID ? 'font-semibold text-zen-fg' : 'text-zen-fg-muted'}">Sepolia</span>
-                    </div>
-                    {#if walletStore.chainId === SEPOLIA_CHAIN_ID}
-                        <Check class="w-4 h-4 text-zen-success" />
-                    {/if}
-                </button>
 
                 <div class="h-px bg-zen-border-subtle mx-4"></div>
 
@@ -194,15 +155,15 @@
                     {/if}
                 </button>
 
-                {#if canShowEtherscan}
+                {#if canShowExplorer}
                     <a
-                        href={etherscanUrl}
+                        href={explorerUrl}
                         target="_blank"
                         rel="noopener noreferrer"
                         class="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-zen-fg/5 transition-colors text-left"
                     >
                         <ExternalLink class="w-4 h-4 text-zen-fg-subtle" />
-                        <span class="text-sm text-zen-fg-muted">View on Etherscan</span>
+                        <span class="text-sm text-zen-fg-muted">View on Stellar Expert</span>
                     </a>
                 {/if}
 

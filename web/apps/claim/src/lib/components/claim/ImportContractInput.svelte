@@ -1,7 +1,8 @@
 <script lang="ts">
     import { readVestingContract } from "@zarf/core/contracts";
-    import { Search, AlertCircle, ArrowRight, Loader2, Inbox } from "lucide-svelte";
-    import type { Address } from "viem";
+    import { ArrowRight, Loader2, Inbox } from "lucide-svelte";
+    import type { StellarContractId } from "@zarf/core/types";
+    import { isValidContractAddress } from "@zarf/core/utils/address";
     import {
         fetchContractMetadata,
         type OnChainVestingContract,
@@ -11,7 +12,7 @@
 
     let { onImport, vaultAddresses = [], isFiltering = false } = $props<{
         onImport: (addr: string) => void;
-        vaultAddresses: Address[];
+        vaultAddresses: StellarContractId[];
         isFiltering?: boolean;
     }>();
 
@@ -52,7 +53,7 @@
         isFetchingVault = true;
 
         Promise.all(
-            addressesToFetch.map(async (addr: Address) => {
+            addressesToFetch.map(async (addr: StellarContractId) => {
                 const meta = await fetchContractMetadata(addr);
                 if (meta) {
                     return {
@@ -90,13 +91,8 @@
     async function handleSubmit() {
         const addr = address.trim();
 
-        if (/^0x[a-fA-F0-9]{64}$/.test(addr)) {
-            error = "This is a Transaction Hash, not a Contract Address.";
-            return;
-        }
-
-        if (!/^0x[a-fA-F0-9]{40}$/.test(addr)) {
-            error = "Invalid Ethereum Address";
+        if (!isValidContractAddress(addr)) {
+            error = "Enter a valid Stellar vesting contract ID.";
             return;
         }
 
@@ -104,7 +100,7 @@
         error = null;
 
         try {
-            await readVestingContract(address as Address);
+            await readVestingContract(addr);
             onImport(address);
         } catch (e) {
             error = "Could not find a valid Zarf Vesting contract";
@@ -231,7 +227,7 @@
         >
         <AddressInput
             bind:value={address}
-            placeholder="Enter manual contract address 0x..."
+            placeholder="Enter Stellar contract ID C..."
             {error}
             {isLoading}
             onAction={handleSubmit}

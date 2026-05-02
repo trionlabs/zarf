@@ -1,89 +1,29 @@
 /**
- * Distribution Discovery Service
- *
- * Fetches deployed vesting contracts directly from the blockchain (Factory Registry).
- * Implements RPC-based discovery for zero-backend architecture.
- *
- * @module services/distributionDiscovery
+ * Distribution discovery service for Stellar/Soroban factory deployments.
  */
 
-import { createPublicClient, http, type Address, type Chain, type PublicClient } from 'viem';
-import { mainnet, sepolia } from 'viem/chains';
-import { ZarfVestingFactoryABI } from '../contracts/abis/ZarfVestingFactory';
-import { ZarfVestingABI } from '../contracts/abis/ZarfVesting';
-import { ERC20ABI } from '../contracts/abis/ERC20';
-import { getActiveChainId, getFactoryAddress } from '../config/contracts';
-import { __registerCoreConfigResetterForTests, getCoreConfig } from '../config/runtime';
-
-// ============ Public Client (Lazy Initialization) ============
-
-const SUPPORTED_CHAINS: Record<number, Chain> = {
-    [sepolia.id]: sepolia,
-    [mainnet.id]: mainnet,
-};
-
-const DEFAULT_RPC_URLS: Record<number, string> = {
-    [sepolia.id]: 'https://ethereum-sepolia-rpc.publicnode.com',
-    [mainnet.id]: 'https://ethereum-rpc.publicnode.com',
-};
-
-const _publicClients = new Map<number, PublicClient>();
-
-function getChain(chainId: number): Chain {
-    const chain = SUPPORTED_CHAINS[chainId];
-    if (!chain) {
-        throw new Error(`Unsupported discovery chain id: ${chainId}`);
-    }
-    return chain;
-}
-
-function getRpcUrl(chainId: number): string {
-    return (
-        getCoreConfig().rpcUrls[chainId] ||
-        DEFAULT_RPC_URLS[chainId] ||
-        getChain(chainId).rpcUrls.default.http[0]
-    );
-}
-
-function getPublicClient(chainId: number): PublicClient {
-    let client = _publicClients.get(chainId);
-    if (!client) {
-        client = createPublicClient({
-            chain: getChain(chainId),
-            transport: http(getRpcUrl(chainId))
-        });
-        _publicClients.set(chainId, client);
-    }
-    return client;
-}
-
-// ============ Types ============
+import type { StellarAddress, StellarContractId } from '../types';
+import {
+    getCidForVesting,
+    getOwnerDeployment,
+    getOwnerDeploymentCount as readOwnerDeploymentCount,
+    readVestingContract,
+} from '../contracts/contracts';
 
 export interface OnChainVestingContract {
-    /** Contract address */
-    address: Address;
-    /** Human-readable name (stored on-chain) */
+    address: StellarContractId;
     name: string;
-    /** Description/category (stored on-chain) */
     description: string;
-    /** Token address */
-    token: Address;
-    /** Token symbol */
+    token: StellarContractId;
     tokenSymbol: string;
-    /** Token decimals */
     tokenDecimals: number;
-    /** Contract owner */
-    owner: Address;
-    /** Vesting start timestamp (seconds) */
+    owner: StellarAddress;
     vestingStart: bigint;
-    /** Cliff duration (seconds) */
     cliffDuration: bigint;
-    /** Total vesting duration (seconds) */
     vestingDuration: bigint;
-    /** Unlock period (seconds) */
     vestingPeriod: bigint;
-    /** Token balance in contract */
     tokenBalance: bigint;
+    metadataCid: string | null;
 }
 
 export interface DiscoveryResult {
@@ -95,10 +35,8 @@ export interface DiscoveryResult {
 export interface DiscoveryError {
     code: 'RPC_ERROR' | 'NO_FACTORY' | 'PARTIAL_FAILURE';
     message: string;
-    failedAddresses?: Address[];
+    failedAddresses?: StellarContractId[];
 }
-
-// ============ Cache ============
 
 interface CacheEntry {
     data: DiscoveryResult;
@@ -106,255 +44,93 @@ interface CacheEntry {
 }
 
 const cache = new Map<string, CacheEntry>();
-const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+const CACHE_TTL_MS = 5 * 60 * 1000;
 
-function cacheKey(owner: Address, chainId: number): string {
-    return `${chainId}:${owner.toLowerCase()}`;
+function cacheKey(owner: StellarAddress): string {
+    return owner;
 }
 
-function getCachedResult(owner: Address, chainId: number): DiscoveryResult | null {
-    const entry = cache.get(cacheKey(owner, chainId));
+function getCachedResult(owner: StellarAddress): DiscoveryResult | null {
+    const entry = cache.get(cacheKey(owner));
     if (!entry) return null;
 
-    const isExpired = Date.now() - entry.timestamp > CACHE_TTL_MS;
-    if (isExpired) {
-        cache.delete(cacheKey(owner, chainId));
+    if (Date.now() - entry.timestamp > CACHE_TTL_MS) {
+        cache.delete(cacheKey(owner));
         return null;
     }
 
     return entry.data;
 }
 
-function setCacheResult(owner: Address, chainId: number, result: DiscoveryResult): void {
-    cache.set(cacheKey(owner, chainId), {
+function setCacheResult(owner: StellarAddress, result: DiscoveryResult): void {
+    cache.set(cacheKey(owner), {
         data: result,
-        timestamp: Date.now()
+        timestamp: Date.now(),
     });
 }
 
-export function invalidateCache(owner?: Address, chainId?: number): void {
-    if (!owner && chainId === undefined) {
+export function invalidateCache(owner?: StellarAddress): void {
+    if (!owner) {
         cache.clear();
         return;
     }
-
-    for (const key of cache.keys()) {
-        const [keyChainId, keyOwner] = key.split(':');
-        const matchesOwner = !owner || keyOwner === owner.toLowerCase();
-        const matchesChain = chainId === undefined || Number(keyChainId) === chainId;
-        if (matchesOwner && matchesChain) {
-            cache.delete(key);
-        }
-    }
+    cache.delete(cacheKey(owner));
 }
 
-/**
- * Manually add a contract to the cache (Optimistic UI)
- * Call this immediately after a successful deployment
- */
 export function addOptimisticContract(
-    owner: Address,
+    owner: StellarAddress,
     contract: OnChainVestingContract,
-    chainId: number = getActiveChainId(),
 ): void {
-    const cached = getCachedResult(owner, chainId);
-
-    // Create new result based on cache or empty state
+    const cached = getCachedResult(owner);
     const currentContracts = cached ? cached.contracts : [];
-    const newContracts = [contract, ...currentContracts];
+    const uniqueContracts = Array.from(
+        new Map([contract, ...currentContracts].map((c) => [c.address, c])).values(),
+    );
 
-    // Deduplicate by address
-    const uniqueContracts = Array.from(new Map(newContracts.map(c => [c.address, c])).values());
-
-    const newResult: DiscoveryResult = {
+    setCacheResult(owner, {
         contracts: uniqueContracts,
         total: uniqueContracts.length,
-        fetchedAt: Date.now()
-    };
-
-    setCacheResult(owner, chainId, newResult);
-    console.log('[DiscoveryService] Optimistically added contract:', contract.address);
+        fetchedAt: Date.now(),
+    });
 }
 
-// ============ Discovery Functions ============
-
-/**
- * Fetch all vesting contract addresses deployed by a specific owner
- * @param owner Wallet address of the owner
- * @returns Array of contract addresses
- */
 export async function fetchOwnerDeploymentAddresses(
-    owner: Address,
-    chainId: number = getActiveChainId(),
-): Promise<Address[]> {
-    const client = getPublicClient(chainId);
+    owner: StellarAddress,
+): Promise<StellarContractId[]> {
+    const count = await readOwnerDeploymentCount(owner);
+    if (count === 0) return [];
 
-    const FACTORY_ADDRESS = getFactoryAddress(chainId);
-    if (!FACTORY_ADDRESS) {
-        throw new Error(`Factory address not configured for chain ${chainId}`);
-    }
-
-    try {
-        const addresses = await client.readContract({
-            address: FACTORY_ADDRESS as Address,
-            abi: ZarfVestingFactoryABI,
-            functionName: 'getOwnerDeployments',
-            args: [owner]
-        }) as Address[];
-
-        return addresses;
-    } catch (error) {
-        console.error('[DiscoveryService] Failed to fetch owner deployments:', error);
-        throw {
-            code: 'RPC_ERROR',
-            message: 'Failed to fetch deployments from Factory'
-        } as DiscoveryError;
-    }
+    return Promise.all(
+        Array.from({ length: count }, (_, i) => getOwnerDeployment(owner, i)),
+    );
 }
 
-/**
- * Sanitize and truncate strings from untrusted on-chain sources.
- * Removes ASCII control characters (0x00-0x1F, 0x7F-0x9F) and caps length.
- * Exported for testing; safe for general use.
- */
 export function sanitizeString(str: string, maxLength: number): string {
     if (!str) return '';
-    // Remove control characters and non-printable chars
-    let clean = str.replace(/[\x00-\x1F\x7F-\x9F]/g, '');
-    // Truncate
-    if (clean.length > maxLength) {
-        clean = clean.substring(0, maxLength);
-    }
-    return clean;
+    const clean = str.replace(/[\x00-\x1F\x7F-\x9F]/g, '');
+    return clean.length > maxLength ? clean.substring(0, maxLength) : clean;
 }
 
-/**
- * Fetch metadata for a single vesting contract
- * @param contractAddress Vesting contract address
- * @returns Contract metadata or null if failed
- */
 export async function fetchContractMetadata(
-    contractAddress: Address,
-    chainId: number = getActiveChainId(),
+    contractAddress: StellarContractId,
 ): Promise<OnChainVestingContract | null> {
-    const client = getPublicClient(chainId);
-
     try {
-        // Batch read all contract data using Multicall (allowFailure: true for resilience)
-        const results = await client.multicall({
-            contracts: [
-                {
-                    address: contractAddress,
-                    abi: ZarfVestingABI,
-                    functionName: 'name'
-                },
-                {
-                    address: contractAddress,
-                    abi: ZarfVestingABI,
-                    functionName: 'description'
-                },
-                {
-                    address: contractAddress,
-                    abi: ZarfVestingABI,
-                    functionName: 'token'
-                },
-                {
-                    address: contractAddress,
-                    abi: ZarfVestingABI,
-                    functionName: 'owner'
-                },
-                {
-                    address: contractAddress,
-                    abi: ZarfVestingABI,
-                    functionName: 'vestingStart'
-                },
-                {
-                    address: contractAddress,
-                    abi: ZarfVestingABI,
-                    functionName: 'cliffDuration'
-                },
-                {
-                    address: contractAddress,
-                    abi: ZarfVestingABI,
-                    functionName: 'vestingDuration'
-                },
-                {
-                    address: contractAddress,
-                    abi: ZarfVestingABI,
-                    functionName: 'vestingPeriod'
-                }
-            ],
-            allowFailure: true // Resilience: don't crash on single call failure
-        });
-
-        // Check if any critical calls failed
-        const hasCriticalFailure = results.slice(0, 4).some(r => r.status === 'failure');
-        if (hasCriticalFailure) {
-            console.warn(`[DiscoveryService] Critical metadata fetch failed for ${contractAddress}`);
-            return null;
-        }
-
-        // Sanitize strings immediately
-        const name = sanitizeString(
-            results[0].status === 'success' ? results[0].result as string : 'Unknown Distribution',
-            50 // Max 50 chars for name
-        );
-
-        const description = sanitizeString(
-            results[1].status === 'success' ? results[1].result as string : '',
-            200 // Max 200 chars for description
-        );
-
-        const tokenAddress = results[2].result as Address;
-        const owner = results[3].result as Address;
-        const vestingStart = results[4].status === 'success' ? results[4].result as bigint : 0n;
-        const cliffDuration = results[5].status === 'success' ? results[5].result as bigint : 0n;
-        const vestingDuration = results[6].status === 'success' ? results[6].result as bigint : 0n;
-        const vestingPeriod = results[7].status === 'success' ? results[7].result as bigint : 0n;
-
-        // Fetch token metadata (also with resilience)
-        const tokenResults = await client.multicall({
-            contracts: [
-                {
-                    address: tokenAddress,
-                    abi: ERC20ABI,
-                    functionName: 'symbol'
-                },
-                {
-                    address: tokenAddress,
-                    abi: ERC20ABI,
-                    functionName: 'decimals'
-                },
-                {
-                    address: tokenAddress,
-                    abi: ERC20ABI,
-                    functionName: 'balanceOf',
-                    args: [contractAddress]
-                }
-            ],
-            allowFailure: true // Resilience: handle non-standard tokens
-        });
-
-        const tokenSymbol = sanitizeString(
-            tokenResults[0].status === 'success' ? tokenResults[0].result as string : '???',
-            10 // Max 10 chars for symbol
-        );
-        const tokenDecimals = tokenResults[1].status === 'success' ? tokenResults[1].result as number : 18;
-        const tokenBalance = tokenResults[2].status === 'success' ? tokenResults[2].result as bigint : 0n;
-
+        const metadata = await readVestingContract(contractAddress);
+        const metadataCid = await getCidForVesting(contractAddress);
         return {
             address: contractAddress,
-            name,
-            description,
-            token: tokenAddress,
-            tokenSymbol,
-            tokenDecimals,
-            owner,
-            vestingStart,
-            cliffDuration,
-            vestingDuration,
-            vestingPeriod,
-            tokenBalance
+            name: sanitizeString(metadata.name || 'Unknown Distribution', 50),
+            description: sanitizeString(metadata.description || '', 200),
+            token: metadata.token,
+            tokenSymbol: sanitizeString(metadata.tokenSymbol || 'XLM', 10),
+            tokenDecimals: metadata.tokenDecimals,
+            owner: metadata.owner,
+            vestingStart: 0n,
+            cliffDuration: 0n,
+            vestingDuration: 0n,
+            vestingPeriod: 0n,
+            tokenBalance: 0n,
+            metadataCid,
         };
     } catch (error) {
         console.error(`[DiscoveryService] Failed to fetch metadata for ${contractAddress}:`, error);
@@ -362,102 +138,42 @@ export async function fetchContractMetadata(
     }
 }
 
-/**
- * Fetch all vesting contracts for an owner with full metadata
- * Uses caching to avoid excessive RPC calls
- *
- * @param owner Wallet address of the owner
- * @param options Discovery options
- * @returns Discovery result with contracts
- */
 export async function discoverOwnerVestings(
-    owner: Address,
+    owner: StellarAddress,
     options: {
         forceRefresh?: boolean;
         maxContracts?: number;
-        chainId?: number;
-    } = {}
+    } = {},
 ): Promise<DiscoveryResult> {
     const { forceRefresh = false, maxContracts = 50 } = options;
-    const chainId = getActiveChainId(options.chainId);
 
-    // Check cache first
     if (!forceRefresh) {
-        const cached = getCachedResult(owner, chainId);
-        if (cached) {
-            console.log('[DiscoveryService] Returning cached result');
-            return cached;
-        }
+        const cached = getCachedResult(owner);
+        if (cached) return cached;
     }
 
-    // Fetch addresses from Factory
-    const addresses = await fetchOwnerDeploymentAddresses(owner, chainId);
-
-    if (addresses.length === 0) {
-        const result: DiscoveryResult = {
-            contracts: [],
-            total: 0,
-            fetchedAt: Date.now()
-        };
-        setCacheResult(owner, chainId, result);
-        return result;
-    }
-
-    // Limit to maxContracts for performance
+    const addresses = await fetchOwnerDeploymentAddresses(owner);
     const addressesToFetch = addresses.slice(0, maxContracts);
-
-    // Fetch metadata for each contract in parallel
-    const metadataPromises = addressesToFetch.map(addr => fetchContractMetadata(addr, chainId));
-    const metadataResults = await Promise.all(metadataPromises);
-
-    // Filter out failed fetches
+    const metadataResults = await Promise.all(
+        addressesToFetch.map((addr) => fetchContractMetadata(addr)),
+    );
     const contracts = metadataResults.filter(
-        (c): c is OnChainVestingContract => c !== null
+        (c): c is OnChainVestingContract => c !== null,
     );
 
-    const result: DiscoveryResult = {
+    const result = {
         contracts,
         total: addresses.length,
-        fetchedAt: Date.now()
+        fetchedAt: Date.now(),
     };
-
-    setCacheResult(owner, chainId, result);
-
+    setCacheResult(owner, result);
     return result;
 }
 
-/**
- * Get deployment count for an owner (cheaper than full discovery)
- */
-export async function getOwnerDeploymentCount(
-    owner: Address,
-    chainId: number = getActiveChainId(),
-): Promise<number> {
-    const client = getPublicClient(chainId);
-
-    const FACTORY_ADDRESS = getFactoryAddress(chainId);
-    if (!FACTORY_ADDRESS) {
-        return 0;
-    }
-
-    try {
-        const count = await client.readContract({
-            address: FACTORY_ADDRESS as Address,
-            abi: ZarfVestingFactoryABI,
-            functionName: 'getOwnerDeploymentCount',
-            args: [owner]
-        }) as bigint;
-
-        return Number(count);
-    } catch (error) {
-        console.error('[DiscoveryService] Failed to get deployment count:', error);
-        return 0;
-    }
+export async function getOwnerDeploymentCount(owner: StellarAddress): Promise<number> {
+    return readOwnerDeploymentCount(owner);
 }
 
 export function __resetDistributionDiscoveryForTests(): void {
-    _publicClients.clear();
     cache.clear();
 }
-
-__registerCoreConfigResetterForTests(__resetDistributionDiscoveryForTests);

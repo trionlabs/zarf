@@ -2,7 +2,6 @@
     import { onMount } from "svelte";
     import { readVestingContract } from "@zarf/core/contracts";
     import { initiateGoogleLogin } from "@zarf/ui/utils/googleAuth";
-    import type { Address } from "viem";
     import ZenButton from "@zarf/ui/components/ui/ZenButton.svelte";
 
     let { contractAddress, isAuthenticated } = $props<{
@@ -15,7 +14,7 @@
     // Fetch details on mount
     onMount(async () => {
         try {
-            const data = await readVestingContract(contractAddress as Address);
+            const data = await readVestingContract(contractAddress);
             details = { name: data.name, tokenSymbol: data.tokenSymbol };
         } catch (e) {
             console.error("Failed to load details", e);

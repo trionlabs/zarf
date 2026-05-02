@@ -1,6 +1,6 @@
 <script lang="ts">
     import { claimStore } from "../../stores/claimStore.svelte";
-    import { formatUnits } from "viem";
+    import { formatTokenAmount } from "@zarf/core/utils/amount";
     import VestingTimeline from "./VestingTimeline.svelte";
     import VestingScheduleTable from "./VestingScheduleTable.svelte";
     import CliffCountdown from "./CliffCountdown.svelte";
@@ -11,9 +11,7 @@
 
     // Computed formatters
     const format = (val: bigint) =>
-        Number(formatUnits(val, 18)).toLocaleString(undefined, {
-            maximumFractionDigits: 0,
-        });
+        formatTokenAmount(val, claimStore.tokenDecimals, 0);
 
     let total = $derived(claimStore.totalAllocation);
     let claimed = $derived(claimStore.claimedAmount);
@@ -83,7 +81,7 @@
                         {format(total)}
                         <span
                             class="text-sm text-zen-fg-subtle font-sans font-normal"
-                            >ZARF</span
+                            >{claimStore.tokenSymbol}</span
                         >
                     </div>
                 </div>

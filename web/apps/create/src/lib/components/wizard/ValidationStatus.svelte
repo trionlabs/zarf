@@ -1,5 +1,6 @@
 <script lang="ts">
     import { wizardStore } from "../../stores/wizardStore.svelte";
+    import { isValidContractAddress } from "@zarf/core/utils/address";
     import { Check, X } from "lucide-svelte";
 
     // Validation rules for Step 0 (Token Entry)
@@ -8,8 +9,7 @@
             label: "Contract address",
             valid:
                 wizardStore.tokenDetails.tokenAddress !== null &&
-                wizardStore.tokenDetails.tokenAddress.startsWith("0x") &&
-                wizardStore.tokenDetails.tokenAddress.length === 42,
+                isValidContractAddress(wizardStore.tokenDetails.tokenAddress),
             touched:
                 wizardStore.tokenDetails.tokenAddress !== null &&
                 wizardStore.tokenDetails.tokenAddress.length > 0,
@@ -19,7 +19,7 @@
             valid: wizardStore.tokenDetails.tokenName !== null,
             touched:
                 wizardStore.tokenDetails.tokenAddress !== null &&
-                wizardStore.tokenDetails.tokenAddress.length === 42,
+                isValidContractAddress(wizardStore.tokenDetails.tokenAddress),
         },
     ]);
 

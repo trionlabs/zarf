@@ -1,6 +1,6 @@
 <script lang="ts">
     import { onMount } from "svelte";
-    import type { Address } from "viem";
+    import type { StellarContractId } from "@zarf/core/types";
     import { authStore } from "@zarf/ui/stores/authStore.svelte";
     import {
         extractTokenFromUrl,
@@ -22,8 +22,8 @@
     let isAuthenticating = $state(false);
     let isFiltering = $state(false);
     let hasFiltered = $state(false);
-    let filteredAddresses = $state<Address[]>([]);
-    let discoveredAddresses = $state<Address[]>([]);
+    let filteredAddresses = $state<StellarContractId[]>([]);
+    let discoveredAddresses = $state<StellarContractId[]>([]);
 
     // Track if user is authenticated
     let isAuthenticated = $derived(authStore.isAuthenticated);
@@ -48,7 +48,7 @@
         }
     });
 
-    async function filterDistributions(email: string, addresses: Address[]) {
+    async function filterDistributions(email: string, addresses: StellarContractId[]) {
         isFiltering = true;
         hasFiltered = false;
 

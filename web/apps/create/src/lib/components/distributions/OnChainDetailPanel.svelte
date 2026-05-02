@@ -10,15 +10,15 @@
     import type { OnChainVestingContract } from "@zarf/core/services/distributionDiscovery";
     import { getCidForVesting } from "@zarf/core/services/vestingDiscovery";
     import { fetchIpfsJson } from "@zarf/core/utils/ipfsFetch";
+    import { getContractExplorerUrl } from "@zarf/core/contracts";
+    import { formatTokenAmount } from "@zarf/core/utils/amount";
 
     let {
         contract,
         onClose,
-        chainId,
     }: {
         contract: OnChainVestingContract;
         onClose: () => void;
-        chainId?: number;
     } = $props();
 
     interface OffChainSchedule {
@@ -37,7 +37,6 @@
 
     $effect(() => {
         const address = contract.address;
-        const activeChainId = chainId;
         const requestId = ++scheduleRequest;
 
         cid = null;
@@ -47,7 +46,7 @@
 
         (async () => {
             try {
-                const found = await getCidForVesting(address, activeChainId);
+                const found = await getCidForVesting(address);
                 if (requestId !== scheduleRequest) return;
 
                 cid = found;
@@ -75,17 +74,6 @@
             scheduleRequest++;
         };
     });
-
-    function formatTokenBalance(balance: bigint, decimals: number): string {
-        const divisor = 10n ** BigInt(decimals);
-        const integerPart = balance / divisor;
-        const remainder = balance % divisor;
-        const decimalPart = remainder
-            .toString()
-            .padStart(decimals, "0")
-            .slice(0, 4);
-        return `${integerPart.toLocaleString()}.${decimalPart}`;
-    }
 
     function formatDuration(seconds: number): string {
         if (seconds <= 0) return "—";
@@ -181,9 +169,10 @@
                 >
             </div>
             <p class="text-2xl font-mono font-bold text-zen-success">
-                {formatTokenBalance(
+                {formatTokenAmount(
                     contract.tokenBalance,
                     contract.tokenDecimals,
+                    4,
                 )}
                 <span class="text-sm font-normal opacity-60"
                     >{contract.tokenSymbol}</span
@@ -275,13 +264,13 @@
     <!-- Footer Actions -->
     <footer class="p-4 border-t-[0.5px] border-zen-border-subtle space-y-2">
         <a
-            href={`https://sepolia.etherscan.io/address/${contract.address}`}
+            href={getContractExplorerUrl(contract.address)}
             target="_blank"
             rel="noreferrer"
             class="flex items-center justify-center gap-2 w-full px-4 py-2 rounded-lg border border-zen-border text-zen-fg-muted hover:bg-zen-fg/5 transition-colors text-sm font-medium"
         >
             <ExternalLink class="w-4 h-4" />
-            View on Etherscan
+            View on Stellar Explorer
         </a>
         {#if ipfsGatewayUrl}
             <a

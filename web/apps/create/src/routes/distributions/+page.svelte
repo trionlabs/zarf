@@ -75,7 +75,6 @@
         try {
             const result = await discoverOwnerVestings(walletStore.address, {
                 forceRefresh: true,
-                chainId: walletStore.chainId ?? undefined,
             });
             onChainContracts = result.contracts;
         } catch (e) {
@@ -223,7 +222,7 @@
                     <DistributionEmptyState
                         icon={Wallet}
                         title="Connect Wallet"
-                        description="Connect your wallet to view your on-chain distributions on the Sepolia network."
+                        description="Connect your wallet to view your on-chain distributions on Stellar."
                         action={connectAction}
                     />
                 {:else if isFetching && onChainContracts.length === 0}
@@ -308,7 +307,6 @@
         <OnChainDetailPanel
             contract={selectedContract}
             onClose={closePanel}
-            chainId={walletStore.chainId ?? undefined}
         />
     </div>
 {/if}

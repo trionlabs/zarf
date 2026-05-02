@@ -3,7 +3,7 @@ import type { ZKProof, MerkleClaim, MerkleTreeData } from "@zarf/ui/types";
 import { toastStore } from "@zarf/ui/stores/toastStore.svelte";
 
 import { fetchDistributionData, type DistributionData } from "@zarf/core/services/distribution";
-import { isEpochClaimed } from "@zarf/core/contracts";
+import { isEpochClaimed, readVestingContract } from "@zarf/core/contracts";
 import {
     totalAllocation as totalAllocationOf,
     claimedAmount as claimedAmountOf,
@@ -15,7 +15,6 @@ import {
     buildVestingPeriods,
 } from "@zarf/core/domain/claimFlow";
 import { discoverEpochs as discoverEpochsCore } from "@zarf/core/domain/epochDiscovery";
-import { type Address } from 'viem';
 
 /**
  * Claim Store - InMemory State for the Claim Flow (Discrete Vesting Edition)
@@ -47,6 +46,8 @@ class ClaimFlowState {
         masterSalt: null as string | null,
         epochs: [] as EpochClaim[],
         vestingSchedule: null as DistributionData['schedule'] | null,
+        tokenSymbol: "XLM" as string,
+        tokenDecimals: 7 as number,
         currentStep: 1 as ClaimStep,
         targetWallet: null as string | null,
         loading: false,
@@ -100,6 +101,8 @@ class ClaimFlowState {
     get jwt() { return this.state.jwt; } // Added
     get targetWallet() { return this.state.targetWallet; } // Added
     get vestingSchedule() { return this.state.vestingSchedule; }
+    get tokenSymbol() { return this.state.tokenSymbol; }
+    get tokenDecimals() { return this.state.tokenDecimals; }
 
     get periods() {
         return buildVestingPeriods(this.state.vestingSchedule, this.state.epochs);
@@ -179,6 +182,8 @@ class ClaimFlowState {
         this.state.selectedEpochIndex = null;
         this.state.proof = null;
         this.state.txHash = null;
+        this.state.tokenSymbol = "XLM";
+        this.state.tokenDecimals = 7;
 
         // Optionally clear session
         if (browser) {
@@ -286,6 +291,10 @@ class ClaimFlowState {
         this.state.epochs = [];
 
         try {
+            const metadata = await readVestingContract(contractAddress);
+            this.state.tokenSymbol = metadata.tokenSymbol;
+            this.state.tokenDecimals = metadata.tokenDecimals;
+
             // Lazy-load the WASM-heavy crypto module (~7MB) only when needed.
             const {
                 computeIdentityCommitment,
@@ -299,7 +308,7 @@ class ClaimFlowState {
                 { computeIdentityCommitment, stringToBytes, pedersenHashBytes, pedersenHashField },
                 {
                     fetchDistribution: fetchDistributionData,
-                    isEpochClaimed: (commitment, addr) => isEpochClaimed(commitment, addr as Address),
+                    isEpochClaimed,
                 },
             );
 

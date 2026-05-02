@@ -11,8 +11,7 @@
  * @module stores/types
  */
 
-import type { Address } from 'viem';
-import type { Schedule } from '@zarf/core';
+import type { Schedule, StellarAddress, StellarContractId } from '@zarf/core';
 
 // Re-export domain types for app-local convenience.
 export type {
@@ -34,7 +33,7 @@ export type {
  */
 export interface TokenDetails {
     // Token Contract Info (fetched from API)
-    tokenAddress: Address | null;
+    tokenAddress: StellarContractId | null;
     tokenName: string | null;        // Fetched from contract
     tokenSymbol: string | null;      // Fetched from contract (ticker)
     tokenDecimals: number | null;    // Fetched from contract
@@ -141,10 +140,10 @@ export interface SelectedTranche {
  * Wallet connection state
  */
 export interface WalletState {
-    address: Address | null;
+    address: StellarAddress | null;
     isConnected: boolean;
     isConnecting: boolean; // Loading state
-    chainId: number | null;
+    networkPassphrase: string | null;
 }
 
 // ============================================================================
