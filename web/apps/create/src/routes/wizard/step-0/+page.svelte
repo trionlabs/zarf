@@ -15,7 +15,7 @@
         fetchTokenMetadata,
         type TokenMetadata,
     } from "$lib/services/tokenMetadata";
-    import { isValidAddress } from "@zarf/core/utils/address";
+    import { isValidContractAddress } from "@zarf/core/utils/address";
     import { fade, fly } from "svelte/transition";
     import ZenButton from "@zarf/ui/components/ui/ZenButton.svelte";
     import ZenCard from "@zarf/ui/components/ui/ZenCard.svelte";
@@ -58,7 +58,7 @@
     });
 
     // --- Derived ---
-    const isAddressValid = $derived(isValidAddress(tokenAddress));
+    const isAddressValid = $derived(isValidContractAddress(tokenAddress));
     const canProceed = $derived(
         isAddressValid && tokenMetadata !== null && !isFetching,
     );
@@ -67,7 +67,7 @@
     async function handlePaste() {
         try {
             const text = await navigator.clipboard.readText();
-            if (isValidAddress(text)) {
+            if (isValidContractAddress(text)) {
                 tokenAddress = text;
                 handleAddressInput();
             } else {
@@ -83,9 +83,9 @@
         error = null;
         tokenMetadata = null;
 
-        if (!isValidAddress(tokenAddress)) {
-            if (tokenAddress.length > 0 && !tokenAddress.startsWith("0x")) {
-                error = "Address must start with 0x";
+        if (!isValidContractAddress(tokenAddress)) {
+            if (tokenAddress.length > 0 && !tokenAddress.startsWith("C")) {
+                error = "Stellar contract IDs start with C";
             }
             return;
         }
@@ -100,16 +100,13 @@
         error = null;
 
         try {
-            const result = await fetchTokenMetadata(
-                tokenAddress as `0x${string}`,
-                "sepolia",
-            );
+            const result = await fetchTokenMetadata(tokenAddress);
 
             if (result.success && result.data) {
                 tokenMetadata = result.data;
                 // Sync to store immediately
                 wizardStore.setTokenDetails({
-                    tokenAddress: tokenAddress as `0x${string}`,
+                    tokenAddress,
                     tokenName: tokenMetadata.name,
                     tokenSymbol: tokenMetadata.symbol,
                     tokenDecimals: tokenMetadata.decimals,
@@ -259,7 +256,7 @@
                 </div>
             {:else if !tokenAddress}
                 <p class="text-zen-fg-faint text-sm font-light">
-                    Supports Sepolia Testnet
+                    Supports Stellar
                 </p>
             {/if}
         </div>

@@ -13,7 +13,6 @@
         "./types": "./lib/types.ts",
         "./contracts": "./lib/contracts/contracts.ts",
         "./contracts/wallet": "./lib/contracts/wallet.ts",
-        "./contracts/abis/*": "./lib/contracts/abis/*.ts",
         "./crypto": "./lib/crypto/index.ts",
         "./crypto/*": "./lib/crypto/*.ts",
         "./utils": "./lib/utils/index.ts",
@@ -32,13 +31,11 @@
         "@noir-lang/acvm_js": "1.0.0-beta.18",
         "@noir-lang/noir_js": "1.0.0-beta.18",
         "@noir-lang/noirc_abi": "1.0.0-beta.18",
-        "@wagmi/connectors": "^7.0.5",
-        "@wagmi/core": "^3.0.1",
-        "noir-jwt": "^0.4.5",
-        "viem": "^2.43.3",
-        "wagmi": "^3.1.2"
+        "noir-jwt": "^0.4.5"
     },
     "dependencies": {
+        "@stellar/freighter-api": "^6.0.1",
+        "@stellar/stellar-sdk": "^15.0.1",
         "buffer": "^6.0.3"
     },
     "devDependencies": {
@@ -46,12 +43,8 @@
         "@noir-lang/acvm_js": "1.0.0-beta.18",
         "@noir-lang/noir_js": "1.0.0-beta.18",
         "@noir-lang/noirc_abi": "1.0.0-beta.18",
-        "@wagmi/connectors": "^7.1.5",
-        "@wagmi/core": "^3.3.1",
         "happy-dom": "^20.9.0",
         "noir-jwt": "^0.4.5",
-        "viem": "^2.45.0",
-        "vitest": "^4.1.5",
-        "wagmi": "^3.4.1"
+        "vitest": "^4.1.5"
     }
 }

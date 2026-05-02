@@ -8,42 +8,14 @@
  * @module config/contracts
  */
 
-import type { Address } from 'viem';
-import { getCoreConfig } from './runtime';
-
-// ============ Chain IDs ============
-
-export const CHAIN_IDS = {
-    SEPOLIA: 11155111,
-    MAINNET: 1
-} as const;
-
-// ============ Factory Addresses ============
-
-export function getActiveChainId(chainId?: number): number {
-    if (chainId !== undefined) return chainId;
-
-    const cfg = getCoreConfig();
-    if (cfg.activeChainId !== undefined) return cfg.activeChainId;
-
-    const configuredFactoryChains = Object.entries(cfg.factoryAddresses)
-        .filter(([, address]) => Boolean(address))
-        .map(([id]) => Number(id));
-
-    if (configuredFactoryChains.length === 1) {
-        return configuredFactoryChains[0];
-    }
-
-    throw new Error(
-        'core: activeChainId is required when factory addresses are missing or configured for multiple chains',
-    );
-}
+import type { StellarContractId } from '../types';
+import { getStellarConfig } from './runtime';
 
 /**
- * Factory address for a specific chain id.
+ * Factory address for the configured Stellar deployment.
  */
-export function getFactoryAddress(chainId: number): Address | undefined {
-    return getCoreConfig().factoryAddresses[chainId];
+export function getFactoryAddress(): StellarContractId | undefined {
+    return getStellarConfig().factoryAddress;
 }
 
 export const getFactoryAddressForChain = getFactoryAddress;
@@ -55,10 +27,10 @@ export const getFactoryAddressForChain = getFactoryAddress;
  * each call so consumers always observe the latest configured values.
  */
 export function getContractAddresses(): {
-    JWK_REGISTRY: Address | undefined;
-    VERIFIER: Address | undefined;
+    JWK_REGISTRY: StellarContractId | undefined;
+    VERIFIER: StellarContractId | undefined;
 } {
-    const cfg = getCoreConfig();
+    const cfg = getStellarConfig();
     return {
         JWK_REGISTRY: cfg.jwkRegistryAddress,
         VERIFIER: cfg.verifierAddress,

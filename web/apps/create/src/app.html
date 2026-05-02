@@ -2,7 +2,7 @@
 <html lang="en" data-theme="glass-porcelain">
 
 <head>
-	<!-- Buffer polyfill - MUST load synchronously before any modules (MetaMask SES timing) -->
+	<!-- Buffer polyfill - MUST load synchronously before any modules -->
 	<script src="https://unpkg.com/buffer@6.0.3/index.js"></script>
 	<script>
 		if (typeof globalThis !== 'undefined' && typeof buffer !== 'undefined') {
@@ -14,7 +14,7 @@
 	<meta charset="utf-8" />
 	<link rel="icon" href="%sveltekit.assets%/favicon.svg" />
 
-	<!-- SES/Svelte 5 Compatibility Patch: runtime defensive shim against MetaMask lockdown -->
+	<!-- SES/Svelte 5 Compatibility Patch: runtime defensive shim against extension lockdown -->
 	<script>
 		(function () {
 			if (typeof window === 'undefined') return;
@@ -48,7 +48,7 @@
 	<!-- DOM Preservation - MUST RUN FIRST before any extensions can lockdown -->
 	<script>
 		(function () {
-			// Capture native DOM getters before MetaMask's SES can freeze them
+			// Capture native DOM getters before browser extensions can freeze them
 			var nodeProto = Node.prototype;
 			var elemProto = Element.prototype;
 			window.__NATIVE_DOM_REFS__ = {

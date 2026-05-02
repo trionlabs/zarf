@@ -5,16 +5,19 @@
  * lived in csvProcessor.ts and tokenMetadata.ts.
  */
 
-import { isAddress } from 'viem';
+import { StrKey } from '@stellar/stellar-sdk';
 
 /**
- * Lexical address validation: 0x + 40 hex characters, no checksum check.
- *
- * Use this for "is the user input shaped like an address?" gating —
- * paste detection, form validation, CSV parsing. Don't use it as the
- * sole gate before sending value; checksum-validate or trust the
- * downstream contract.
+ * Stellar address validation for account IDs (G...) and contract IDs (C...).
  */
 export function isValidAddress(address: string): boolean {
-    return isAddress(address, { strict: false });
+    return StrKey.isValidEd25519PublicKey(address) || StrKey.isValidContract(address);
+}
+
+export function isValidAccountAddress(address: string): boolean {
+    return StrKey.isValidEd25519PublicKey(address);
+}
+
+export function isValidContractAddress(address: string): boolean {
+    return StrKey.isValidContract(address);
 }

@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { StrKey } from '@stellar/stellar-sdk';
+import { Buffer } from 'buffer';
 import { isValidEmail } from './email';
 import { isValidAddress } from './address';
 
@@ -18,11 +20,13 @@ describe('isValidEmail', () => {
 });
 
 describe('isValidAddress', () => {
-    it('accepts and rejects 0x+40-hex strings', () => {
-        expect(isValidAddress('0x742d35cc6634c0532925a3b844bc9e7595f0bcb1')).toBe(true);
-        expect(isValidAddress('0x742D35CC6634C0532925A3B844BC9E7595F0BCB1')).toBe(true);
-        expect(isValidAddress('0x12345')).toBe(false);
-        expect(isValidAddress('742d35cc6634c0532925a3b844bc9e7595f0bcb1')).toBe(false);  // no 0x
+    it('accepts Stellar account and contract IDs', () => {
+        const account = StrKey.encodeEd25519PublicKey(Buffer.alloc(32, 1));
+        const contract = StrKey.encodeContract(Buffer.alloc(32, 2));
+
+        expect(isValidAddress(account)).toBe(true);
+        expect(isValidAddress(contract)).toBe(true);
+        expect(isValidAddress('0x742d35cc6634c0532925a3b844bc9e7595f0bcb1')).toBe(false);
         expect(isValidAddress('')).toBe(false);
     });
 });

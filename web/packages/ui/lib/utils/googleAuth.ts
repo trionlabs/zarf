@@ -8,6 +8,7 @@
  */
 
 import type { DecodedJWT, GooglePublicKey, JWTHeader, JWTPayload, OAuthState } from '../types';
+import { isValidContractAddress } from '@zarf/core/utils/address';
 
 // ============================================================================
 // Constants
@@ -15,9 +16,6 @@ import type { DecodedJWT, GooglePublicKey, JWTHeader, JWTPayload, OAuthState } f
 
 const GOOGLE_AUTH_ENDPOINT = 'https://accounts.google.com/o/oauth2/v2/auth';
 const GOOGLE_CERTS_URL = 'https://www.googleapis.com/oauth2/v3/certs';
-
-/** Regex pattern for validating Ethereum addresses */
-const ETH_ADDRESS_REGEX = /^0x[a-fA-F0-9]{40}$/;
 
 // ============================================================================
 // Browser Environment Guards
@@ -46,7 +44,7 @@ function assertBrowser(): void {
  * 
  * @example
  * ```typescript
- * const encoded = encodeOAuthState({ address: '0x123...' });
+ * const encoded = encodeOAuthState({ address: 'C...' });
  * // Use encoded in OAuth URL
  * ```
  */
@@ -88,7 +86,7 @@ export function decodeOAuthState(stateParam: string | null): OAuthState | null {
         const decoded = JSON.parse(stateParam);
 
         // Validate address format if present
-        if (decoded.address && !ETH_ADDRESS_REGEX.test(decoded.address)) {
+        if (decoded.address && !isValidContractAddress(decoded.address)) {
             console.warn('[OAuth] Invalid address in state, ignoring');
             delete decoded.address;
         }
@@ -160,7 +158,7 @@ export function initiateGoogleLogin(
  * redirectToGoogle();
  * 
  * // With contract address preservation
- * redirectToGoogle('0x1234...abcd');
+ * redirectToGoogle('C...');
  * ```
  */
 export function redirectToGoogle(contractAddress?: string): void {
@@ -178,8 +176,8 @@ export function redirectToGoogle(contractAddress?: string): void {
     // Build state with optional contract address
     const oauthState: OAuthState = {};
     if (contractAddress) {
-        if (ETH_ADDRESS_REGEX.test(contractAddress)) {
-            oauthState.address = contractAddress as `0x${string}`;
+        if (isValidContractAddress(contractAddress)) {
+            oauthState.address = contractAddress;
         } else {
             console.warn('[Auth] Invalid contract address format, not preserving');
         }

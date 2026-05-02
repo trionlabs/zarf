@@ -1,48 +1,41 @@
 /**
- * Wallet Store - Svelte 5 Runes + Wagmi/Viem Integration
+ * Wallet Store - Svelte 5 Runes + Stellar/Freighter Integration
  * 
  * Single source of truth for wallet connection state.
- * Supports ETH Balance Fetching and Multi-Connector management.
+ * Supports Freighter connection, network validation, and XLM balance display.
  * 
  * @module stores/walletStore
  */
 
 import { browser } from '$app/environment';
 import {
-    connectWallet as wagmiConnect,
-    disconnectWallet as wagmiDisconnect,
-    reconnectWallet as wagmiReconnect,
-    switchChain as wagmiSwitchChain,
-    getNativeBalance as wagmiGetBalance,
-    getWalletConnectors,
+    connectWallet as stellarConnect,
+    disconnectWallet as stellarDisconnect,
+    reconnectWallet as stellarReconnect,
+    switchChain as stellarSwitchChain,
+    getNativeBalance as stellarGetBalance,
     getWalletAccount,
     watchWalletAccount,
     formatAddress,
-    isSupportedChain,
-    getChainName,
-    wagmiConfig,
-    SEPOLIA_CHAIN_ID,
-    MAINNET_CHAIN_ID
+    isSupportedNetwork,
+    getConfiguredNetworkName,
 } from "@zarf/core/contracts/wallet";
-import type { Address } from 'viem';
-import type { Connector } from '@wagmi/core';
-import type { WalletAccount } from "@zarf/core/types";
+import type { StellarAddress, WalletAccount } from "@zarf/core/types";
 import { sanitizeBlockchainError } from '../utils/errorSanitizer';
 
-// Types unchanged
 interface WalletBalance { value: bigint; formatted: string; symbol: string; }
 
 interface WalletState {
-    address: Address | null;
+    address: StellarAddress | null;
     isConnected: boolean;
     isConnecting: boolean;
     isDisconnecting: boolean;
     isReconnecting: boolean;
     isSwitchingNetwork: boolean;
-    chainId: number | null;
+    network: string | null;
+    networkPassphrase: string | null;
     balance: WalletBalance | null;
     error: string | null;
-    connectors: readonly Connector[];
     isModalOpen: boolean; // Added
 }
 
@@ -53,10 +46,10 @@ const initialState: WalletState = {
     isDisconnecting: false,
     isReconnecting: false,
     isSwitchingNetwork: false,
-    chainId: null,
+    network: null,
+    networkPassphrase: null,
     balance: null,
     error: null,
-    connectors: [],
     isModalOpen: false // Added
 };
 
@@ -65,8 +58,8 @@ let unwatchFn: (() => void) | null = null;
 let isInitialized = false;
 
 // Derived Values
-const isWrongNetwork = $derived(state.isConnected && state.chainId !== null && !isSupportedChain(state.chainId));
-const networkName = $derived(state.chainId ? getChainName(state.chainId) : 'Unknown');
+const isWrongNetwork = $derived(state.isConnected && !isSupportedNetwork(state.networkPassphrase ?? undefined));
+const networkName = $derived(state.network || getConfiguredNetworkName());
 const shortAddress = $derived(state.address ? formatAddress(state.address) : null);
 const isLoading = $derived(state.isConnecting || state.isDisconnecting || state.isReconnecting || state.isSwitchingNetwork);
 const formattedBalance = $derived(state.balance ? `${parseFloat(state.balance.formatted).toFixed(4)} ${state.balance.symbol}` : null);
@@ -77,16 +70,16 @@ const formattedBalance = $derived(state.balance ? `${parseFloat(state.balance.fo
  * Centralized state updater to prevent logic duplication.
  * Updates core state, connector list, and triggers balance fetch if needed.
  */
-function updateInternalState(account: { address?: Address, isConnected: boolean, chainId?: number }) {
+function updateInternalState(account: WalletAccount) {
     if (!browser) return;
 
     const prevAddress = state.address;
-    const prevChainId = state.chainId;
+    const prevNetworkPassphrase = state.networkPassphrase;
 
     state.address = account.address ?? null;
     state.isConnected = account.isConnected;
-    state.chainId = account.chainId ?? null;
-    state.connectors = getWalletConnectors(); // Always refresh connectors
+    state.network = account.network ?? null;
+    state.networkPassphrase = account.networkPassphrase ?? null;
 
     // Reset transient loading flags
     state.isConnecting = false;
@@ -102,7 +95,7 @@ function updateInternalState(account: { address?: Address, isConnected: boolean,
     // Balance Fetch Logic
     if (state.isConnected && state.address) {
         // Fetch if address/chain changed or valid connected state exists
-        if (state.address !== prevAddress || state.chainId !== prevChainId || !state.balance) {
+        if (state.address !== prevAddress || state.networkPassphrase !== prevNetworkPassphrase || !state.balance) {
             refreshBalance();
         }
     } else {
@@ -110,21 +103,22 @@ function updateInternalState(account: { address?: Address, isConnected: boolean,
     }
 }
 
-function syncFromWagmi() {
+function syncFromWallet() {
     if (!browser) return;
-    const account = getWalletAccount();
-    updateInternalState({ ...account, address: account.address ?? undefined });
+    getWalletAccount()
+        .then(updateInternalState)
+        .catch(() => updateInternalState({ isConnected: false }));
 }
 
 function sanitizeError(err: unknown): string {
     return sanitizeBlockchainError(err, {
         customRules: [
-            { match: /No wallet|No injected/i,
-              message: 'No Ethereum wallet detected. Please install MetaMask.' },
+            { match: /No wallet|No Stellar wallet|Freighter/i,
+                message: 'No Stellar wallet detected. Please install Freighter.' },
             { match: 'already pending',
-              message: 'A connection request is already pending. Check your wallet.' },
-            { match: 'Chain not configured',
-              message: 'Network switch failed. Please switch manually in your wallet.' },
+                message: 'A connection request is already pending. Check your wallet.' },
+            { match: 'Network changes',
+                message: 'Switch to the configured Stellar network in Freighter.' },
         ],
     });
 }
@@ -137,10 +131,10 @@ async function init() {
     state.isReconnecting = true;
 
     // 1. Attempt Auto-Reconnect
-    try { await wagmiReconnect(); } catch (e) { } finally { state.isReconnecting = false; }
+    try { await stellarReconnect(); } catch (e) { } finally { state.isReconnecting = false; }
 
     // 2. Initial Sync
-    syncFromWagmi();
+    syncFromWallet();
 
     // 3. Setup Watcher
     if (unwatchFn) unwatchFn();
@@ -155,20 +149,9 @@ async function init() {
  * Call this from UI components instead of connect().
  */
 async function requestConnection() {
-    state.connectors = getWalletConnectors(); // Refresh list first
-
-    if (state.connectors.length > 1) {
-        state.isModalOpen = true; // Multiple wallets -> Show Modal
-    } else if (state.connectors.length === 1) {
-        try {
-            await connect(state.connectors[0]); // Single wallet -> Auto Connect
-        } catch (e) {
-            // If auto-connect fails (e.g. Injected provider missing), fallback to modal
-            state.isModalOpen = true;
-        }
-    } else {
-        // No wallet detected
-        // Don't set error string immediately, let the modal show the empty state/install link
+    try {
+        await connect();
+    } catch (e) {
         state.isModalOpen = true;
     }
 }
@@ -181,25 +164,16 @@ function closeModal() {
 async function refreshBalance() {
     if (!state.address || !state.isConnected) return;
     try {
-        const bal = await wagmiGetBalance(state.address, state.chainId ?? undefined);
+        const bal = await stellarGetBalance(state.address);
         state.balance = bal;
     } catch (e) {
         if ((import.meta as any).env.DEV) console.warn('Failed to fetch balance', e);
     }
 }
 
-async function connect(connector?: Connector) {
+async function connect() {
     if (!browser) return;
     if (state.isReconnecting) { state.error = 'Please wait, restoring previous session...'; return; }
-
-    // Optimization: If already connected to THIS connector, just return
-    if (state.isConnected && connector && state.address) {
-        const account = getWalletAccount();
-        if (account.connector?.id === connector.id) {
-            state.isModalOpen = false;
-            return;
-        }
-    }
 
     // Close modal if open
     state.isModalOpen = false;
@@ -207,12 +181,18 @@ async function connect(connector?: Connector) {
     state.isConnecting = true;
     state.error = null;
     try {
-        const result = await wagmiConnect(connector);
+        const result = await stellarConnect();
+        updateInternalState({
+            isConnected: true,
+            address: result.address,
+            network: result.network,
+            networkPassphrase: result.networkPassphrase,
+        });
         return result;
     } catch (err: any) {
         // If it's already connected error, we can ignore it and just sync state
         if (err.name === 'ConnectorAlreadyConnectedError') {
-            syncFromWagmi();
+            syncFromWallet();
             return;
         }
         state.error = sanitizeError(err);
@@ -227,17 +207,18 @@ async function disconnect() {
     state.isDisconnecting = true;
     state.error = null;
     try {
-        await wagmiDisconnect();
+        await stellarDisconnect();
+        updateInternalState({ isConnected: false });
         // State update handled by watcher
     } catch (err: any) { state.error = sanitizeError(err); } finally { state.isDisconnecting = false; }
 }
 
-async function switchChain(chainId: number) {
+async function switchChain() {
     if (!browser) return;
     state.isSwitchingNetwork = true;
     state.error = null;
     try {
-        await wagmiSwitchChain(chainId);
+        await stellarSwitchChain();
         // State update handled by watcher
     } catch (err: any) { state.error = sanitizeError(err); } finally { state.isSwitchingNetwork = false; }
 }
@@ -258,10 +239,10 @@ export const walletStore = {
     get isConnecting() { return state.isConnecting; },
     get isDisconnecting() { return state.isDisconnecting; },
     get isSwitchingNetwork() { return state.isSwitchingNetwork; },
-    get chainId() { return state.chainId; },
+    get network() { return state.network; },
+    get networkPassphrase() { return state.networkPassphrase; },
     get balance() { return state.balance; },
     get error() { return state.error; },
-    get connectors() { return state.connectors; },
     get isModalOpen() { return state.isModalOpen; }, // Exposed
 
     // Derived getters
@@ -286,9 +267,6 @@ export const walletStore = {
 
 export {
     formatAddress,
-    isSupportedChain,
-    getChainName,
-    wagmiConfig,
-    MAINNET_CHAIN_ID,
-    SEPOLIA_CHAIN_ID
+    isSupportedNetwork,
+    getConfiguredNetworkName,
 };

@@ -8,22 +8,21 @@
 
     let { contracts = [] }: { contracts?: ContractInfo[] } = $props();
 
-    // Default contracts if none provided (for backwards compatibility)
     const defaultContracts: ContractInfo[] = [
         {
             name: "Vesting (Env)",
-            address: import.meta.env.VITE_VESTING_ADDRESS ?? "",
+            address: import.meta.env.VITE_STELLAR_VESTING_ADDRESS ?? "",
         },
-        { name: "Token (Test)", address: import.meta.env.VITE_ZRFT_TEST_TOKEN ?? "" },
+        { name: "Token", address: import.meta.env.VITE_STELLAR_TOKEN_ADDRESS ?? "" },
         {
             name: "Factory",
-            address: import.meta.env.VITE_FACTORY_ADDRESS_SEPOLIA ?? "",
+            address: import.meta.env.VITE_STELLAR_FACTORY_ADDRESS ?? "",
         },
         {
             name: "JWK Registry",
-            address: import.meta.env.VITE_JWK_REGISTRY_ADDRESS ?? "",
+            address: import.meta.env.VITE_STELLAR_JWK_REGISTRY_ADDRESS ?? "",
         },
-        { name: "Verifier", address: import.meta.env.VITE_VERIFIER_ADDRESS ?? "" },
+        { name: "Verifier", address: import.meta.env.VITE_STELLAR_VERIFIER_ADDRESS ?? "" },
     ];
 
     const displayContracts = $derived(contracts.length > 0 ? contracts : defaultContracts);
@@ -36,6 +35,11 @@
         copiedAddress = addr;
         setTimeout(() => (copiedAddress = null), 2000);
     }
+
+    function explorerHref(addr: string): string {
+        const base = import.meta.env.VITE_STELLAR_EXPLORER_URL;
+        return addr && base ? `${base.replace(/\/$/, "")}/contract/${addr}` : "#";
+    }
 </script>
 
 <div
@@ -46,7 +50,7 @@
         class="w-full flex justify-between items-center px-4 py-1 bg-[var(--zen-fg)]/10 hover:bg-[var(--zen-fg)]/15 cursor-pointer border-t-[0.5px] border-[var(--zen-bg)]/10"
         onclick={() => (isOpen = !isOpen)}
     >
-        <span class="font-bold opacity-70">Sepolia Contracts Debug Bar</span>
+        <span class="font-bold opacity-70">Stellar Contracts Debug Bar</span>
         <span class="opacity-50">{isOpen ? "▼" : "▲"}</span>
     </button>
 
@@ -62,7 +66,7 @@
                     >
                     <div class="flex items-center gap-2">
                         <a
-                            href={`https://sepolia.etherscan.io/address/${c.address}`}
+                            href={explorerHref(c.address)}
                             target="_blank"
                             class="truncate hover:text-zen-primary transition-colors flex-1"
                             title={c.address}

@@ -1,7 +1,7 @@
 /**
  * DOM Intrinsics Compatibility Layer for SES/Svelte 5
  *
- * MetaMask and WalletConnect use SES (Secure EcmaScript) which freezes
+ * Some browser extensions use SES (Secure EcmaScript) which freezes
  * JavaScript intrinsics. Svelte 5 relies on Object.getOwnPropertyDescriptor
  * to get DOM getters like nextSibling, firstChild, etc.
  *

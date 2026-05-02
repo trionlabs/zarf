@@ -8,7 +8,7 @@
  */
 
 import { hashEmail } from '@zarf/core/utils/email';
-import type { Address } from 'viem';
+import type { StellarContractId } from '@zarf/core/types';
 import { getCidForVesting } from '@zarf/core/services/vestingDiscovery';
 import { fetchIpfsJson } from '@zarf/core/utils/ipfsFetch';
 
@@ -64,7 +64,7 @@ export async function isEmailInDistribution(
 }
 
 async function fetchDistribution(address: string): Promise<DistributionWithHashes | null> {
-    const cid = await getCidForVesting(address as Address);
+    const cid = await getCidForVesting(address as StellarContractId);
     if (!cid) return null;
     return await fetchIpfsJson<DistributionWithHashes>(cid);
 }
@@ -78,9 +78,9 @@ async function fetchDistribution(address: string): Promise<DistributionWithHashe
  * @returns Filtered array of addresses where user is eligible
  */
 export async function filterDistributionsByEmail(
-    addresses: Address[],
+    addresses: StellarContractId[],
     email: string
-): Promise<Address[]> {
+): Promise<StellarContractId[]> {
     // No email = no distributions (security: don't leak distribution list)
     if (!email) {
         return [];

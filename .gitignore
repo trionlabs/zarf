@@ -4,6 +4,8 @@
 # circuits
 circuits/Prover.toml
 circuits/target/
+target/
+node_modules/
 
 # poc
 poc/node_modules

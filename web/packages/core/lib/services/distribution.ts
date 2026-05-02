@@ -7,7 +7,7 @@
  * @module services/distribution
  */
 
-import type { Address } from 'viem';
+import type { StellarContractId } from '../types';
 import { getCidForVesting } from './vestingDiscovery';
 import { fetchIpfsJson } from '../utils/ipfsFetch';
 
@@ -133,7 +133,7 @@ export function validateDistributionData(raw: unknown): DistributionData {
  * @param address - The vesting contract address
  */
 export async function fetchDistributionData(address: string): Promise<DistributionData> {
-    const cid = await getCidForVesting(address as Address);
+    const cid = await getCidForVesting(address as StellarContractId);
     if (!cid) {
         throw new Error(`No metadata CID registered for vesting ${address}`);
     }

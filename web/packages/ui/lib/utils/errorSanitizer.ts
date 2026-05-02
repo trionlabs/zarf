@@ -27,7 +27,7 @@ export interface SanitizeErrorOptions {
 }
 
 const BUILTIN_RULES: ErrorRule[] = [
-    // User rejection — must come first; covers MetaMask, WalletConnect, viem variants
+    // User rejection must come first.
     { match: /reject|denied/i, message: 'Request rejected. Please try again when ready.' },
 
     // Funds / balance / allowance
@@ -54,7 +54,7 @@ export function sanitizeBlockchainError(
     const normalizedMessage = message.toLowerCase();
     const code = e?.code;
 
-    // viem / MetaMask "request already pending" surfaces as code -32002 with no useful message
+    // Some wallets surface "request already pending" as code -32002 with no useful message.
     if (code === -32002) {
         return 'A wallet request is already pending. Check your wallet and try again.';
     }

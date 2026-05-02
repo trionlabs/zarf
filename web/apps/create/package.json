@@ -31,12 +31,8 @@
     },
     "dependencies": {
         "@aztec/bb.js": "^2.1.11",
-        "lucide-svelte": "^0.563.0",
-        "@wagmi/connectors": "^7.1.5",
-        "@wagmi/core": "^3.3.1",
         "@zarf/core": "workspace:*",
         "@zarf/ui": "workspace:*",
-        "viem": "^2.45.0",
-        "wagmi": "^3.4.1"
+        "lucide-svelte": "^0.563.0"
     }
 }
