@@ -8,6 +8,8 @@ const COMMON_CONNECT_ORIGINS = [
     'https://cloudflare-ipfs.com',
     'https://ipfs.io',
     'https://dweb.link',
+    'https://horizon-testnet.stellar.org',
+    'https://horizon.stellar.org',
 ];
 
 function originFrom(value: string | boolean | undefined): string | null {
