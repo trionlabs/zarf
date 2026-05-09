@@ -19,7 +19,13 @@
     },
     "observability": {
         "enabled": true
-    }
+    },
+    "routes": [
+        {
+            "pattern": "jwt.zarf.to",
+            "custom_domain": true
+        }
+    ]
     // Required secrets:
     //   wrangler secret put REGISTRY_OWNER_SECRET
     //   wrangler secret put ADMIN_TOKEN
