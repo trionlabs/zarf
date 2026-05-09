@@ -179,6 +179,9 @@ importers:
 
   apps/landing:
     dependencies:
+      '@zarf/core':
+        specifier: workspace:*
+        version: link:../../packages/core
       '@zarf/ui':
         specifier: workspace:*
         version: link:../../packages/ui
