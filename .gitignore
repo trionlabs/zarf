@@ -15,9 +15,7 @@ poc/public/wasm/*.wasm.gz
 poc/public/circuits/zarf.json
 
 # contracts
-contracts/cache/
-contracts/out/
-contracts/broadcast/
+contracts/soroban/**/target/
 
 # notes, backlogs, docs & ai
 docs/

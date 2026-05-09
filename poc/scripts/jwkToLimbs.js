@@ -5,7 +5,7 @@
  * This script:
  * 1. Fetches Google's current OAuth public keys
  * 2. Converts each RSA modulus to 18 limbs of 120 bits
- * 3. Outputs Solidity-compatible bytes32[] arrays for JWKRegistry.registerKey()
+ * 3. Outputs Soroban-friendly hex arrays for JWKRegistry.register_key()
  *
  * Usage:
  *   node jwkToLimbs.js                    # Fetch from Google
@@ -62,14 +62,14 @@ function jwkModulusToLimbs(modulusBase64Url) {
 }
 
 /**
- * Format limbs as Solidity bytes32 array
+ * Format limbs as a Soroban CLI JSON array of BytesN<32> hex strings
  */
-function formatAsSolidityArray(limbs, indent = '    ') {
-  const lines = limbs.map((limb, i) => {
-    const hex = limb.toString(16).padStart(64, '0');
-    return `${indent}bytes32(0x${hex})${i < limbs.length - 1 ? ',' : ''}`;
-  });
-  return lines.join('\n');
+function formatAsSorobanArray(limbs) {
+  return JSON.stringify(
+    limbs.map((limb) => limb.toString(16).padStart(64, '0')),
+    null,
+    2,
+  );
 }
 
 /**
@@ -141,10 +141,8 @@ async function main() {
       console.log(`  [${i.toString().padStart(2)}] 0x${limb.toString(16)}`);
     });
 
-    console.log('\n--- Solidity Format ---');
-    console.log('bytes32[18] memory pubkeyLimbs = [');
-    console.log(formatAsSolidityArray(limbs));
-    console.log('];');
+    console.log('\n--- Soroban CLI Format ---');
+    console.log(formatAsSorobanArray(limbs));
 
     console.log('\n--- JavaScript Format ---');
     console.log('const pubkeyLimbs = [');
@@ -155,9 +153,16 @@ async function main() {
     console.log('];');
 
     console.log('\n--- Registration Command ---');
-    console.log(`jwkRegistry.registerKey("${key.kid}", pubkeyLimbs);`);
+    console.log('stellar contract invoke \\');
+    console.log('  --id <JWK_REGISTRY_CONTRACT_ID> \\');
+    console.log('  --source <SOURCE_ACCOUNT> \\');
+    console.log('  --network testnet \\');
+    console.log('  -- \\');
+    console.log('  register_key \\');
+    console.log(`  --kid "${key.kid}" \\`);
+    console.log('  --pubkey_limbs \'[...]\'');
 
-    console.log('\n--- Environment Variables (for Foundry script) ---');
+    console.log('\n--- Environment Variables ---');
     console.log(`JWK_KID="${key.kid}"`);
     limbs.forEach((limb, i) => {
       console.log(`JWK_LIMB_${i}=${limb.toString()}`);

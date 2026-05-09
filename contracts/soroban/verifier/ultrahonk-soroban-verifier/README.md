@@ -52,7 +52,7 @@ Notes:
 - Library scope: verification only (not a prover or circuit compiler). Input files must use the bb v2 proof/vk byte layout.
 - The verifier internally re-derives the Fiat–Shamir transcript and checks both Sum‑check and Shplonk batch openings over BN254.
 - `std` feature enables file I/O helpers; the core logic is `no_std` + `alloc` friendly.
-- Enable the `trace` feature to print step-by-step internals for cross‑checking with Solidity outputs.
+- Enable the `trace` feature to print step-by-step internals for cross-checking verifier outputs.
 
 ## Cargo Features
 - `std`: enables std I/O helpers for convenient loading.

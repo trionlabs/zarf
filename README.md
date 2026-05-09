@@ -29,24 +29,26 @@ Configure cliff periods, linear release schedules, and complex vesting terms dir
 
 
 1. **Off-chain ZK Proof Generation**: Users generate proofs of email ownership locally in the browser or via a secure relayer.
-2. **Smart Contracts (EVM)**:
-    - **Registry**: Manages trusted DKIM keys and verifiers.
-    - **Escrow**: Holds funds securely until a valid proof is submitted.
-    - **Verifier**: On-chain Groth16 verifier (generated via Noir) validates the ZK proof.
+2. **Smart Contracts (Stellar/Soroban)**:
+    - **JWK Registry**: Manages trusted Google JWK key hashes for email proof validation.
+    - **Vesting and Factory**: Holds funds, creates vesting contracts, and releases funds after valid claims.
+    - **UltraHonk Verifier**: Stores the Noir verification key and validates ZK proofs on Soroban.
 3. **Frontend**: A seamless Svelte-based interface for sending and claiming.
 
 ## Tech Stack
 
 - **Zero-Knowledge**: [Noir](https://noir-lang.org/) (Project Aztec)
-- **Contracts**: Solidity (EVM)
+- **Contracts**: Stellar/Soroban smart contracts in Rust
 - **Frontend**: [Svelte](https://svelte.dev/) + [Vite](https://vitejs.dev/)
-- **Interaction**: [Viem](https://viem.sh/) / Wagmi
+- **Interaction**: [Stellar SDK](https://stellar.github.io/js-stellar-sdk/) / Freighter
 
 ## Development
 
 ### Prerequisites
 
 - [Noir](https://noir-lang.org/) v1.0.0-beta.17
+- Rust + `wasm32v1-none`
+- [Stellar CLI](https://developers.stellar.org/docs/tools/cli/install-cli)
 - Node.js 18+
 - pnpm
 
@@ -62,9 +64,17 @@ Configure cliff periods, linear release schedules, and complex vesting terms dir
     cd circuits
     nargo build
     ```
-    *Generates the verifier contract and proving keys.*
+    *Generates the Noir circuit artifact used by the Stellar proof generator.*
 
-3. **Run Development Server**
+3. **Test Soroban Contracts**
+    ```bash
+    cargo test --manifest-path contracts/soroban/verifier/Cargo.toml
+    cargo test --manifest-path contracts/soroban/zarf/jwk-registry/Cargo.toml
+    cargo test --manifest-path contracts/soroban/zarf/vesting/Cargo.toml
+    cargo test --manifest-path contracts/soroban/zarf/factory/Cargo.toml
+    ```
+
+4. **Run Development Server**
     ```bash
     cd web
     pnpm dev

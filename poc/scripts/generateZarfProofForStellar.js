@@ -3,7 +3,7 @@
  * Generate a Zarf proof in raw bb format for the yugocabrio Stellar verifier.
  * Outputs: proof, vk, public_inputs as raw bytes to /tmp/zarf-stellar-artifacts/
  *
- * Updates over generateTestProof.js:
+ * Stellar-specific behavior:
  * - Uses current circuit signature (secret + unlock_time instead of salt)
  * - Computes leaf with new formula: pedersen(identity_commitment, amount, unlock_time)
  * - Saves raw bytes (not hex JSON) for Stellar verifier compatibility
@@ -18,7 +18,7 @@ import { readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { webcrypto } from 'crypto';
-import { keccak256 } from 'viem';
+import { keccak_256 } from '@noble/hashes/sha3.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const TREE_DEPTH = 20;
@@ -132,6 +132,9 @@ function fieldHex(v) {
 }
 function bytesToHex(bytes) {
   return `0x${Array.from(bytes).map((b) => b.toString(16).padStart(2, '0')).join('')}`;
+}
+function keccak256(bytes) {
+  return bytesToHex(keccak_256(bytes));
 }
 function parseArgs(argv) {
   const args = {};

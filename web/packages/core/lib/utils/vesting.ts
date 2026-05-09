@@ -236,7 +236,7 @@ export function calculateVestingPeriods(
     for (let i = 0; i < totalPeriods; i++) {
         // Unlock time = Start + Cliff + ((i + 1) * PeriodLength)
         // Usually cliff is part of the duration, but in some contracts cliff is a delay.
-        // Based on typical solidity: start + cliff + duration.
+        // Based on contract vesting semantics: start + cliff + duration.
         // Let's match the logic previously used in the UI:
         // unlockTimestamp = info.vestingStart + info.cliffDuration + (i + 1) * info.vestingPeriod;
 

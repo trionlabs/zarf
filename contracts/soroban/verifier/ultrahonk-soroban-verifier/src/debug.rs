@@ -72,7 +72,7 @@ pub fn dump_pairs(coms: &[G1Point], scalars: &[Fr], head_tail: usize) {
 }
 
 /// Outputs a specific slice of commitment/scalar pairs, useful for
-/// cross-checking against Solidity's first 40 entities (1..=40).
+/// cross-checking the first 40 entities (1..=40).
 #[allow(dead_code)]
 pub fn dump_pairs_range(coms: &[G1Point], scalars: &[Fr], start: usize, end_inclusive: usize) {
     #[cfg(feature = "trace")]
