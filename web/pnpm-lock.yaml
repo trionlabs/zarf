@@ -155,6 +155,28 @@ importers:
         specifier: ^4.61.0
         version: 4.61.0(@cloudflare/workers-types@4.20260128.0)
 
+  apps/jwk-rotation:
+    dependencies:
+      '@noble/hashes':
+        specifier: ^1.8.0
+        version: 1.8.0
+      '@stellar/stellar-sdk':
+        specifier: ^15.0.1
+        version: 15.0.1
+      buffer:
+        specifier: ^6.0.3
+        version: 6.0.3
+    devDependencies:
+      '@cloudflare/workers-types':
+        specifier: ^4.20251218.0
+        version: 4.20260128.0
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      wrangler:
+        specifier: ^4.61.0
+        version: 4.61.0(@cloudflare/workers-types@4.20260128.0)
+
   apps/landing:
     dependencies:
       '@zarf/ui':
