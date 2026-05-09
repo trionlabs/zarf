@@ -2,15 +2,6 @@
 <html lang="en" data-theme="glass-porcelain">
 
 <head>
-	<!-- Buffer polyfill - MUST load synchronously before any modules -->
-	<script src="https://unpkg.com/buffer@6.0.3/index.js"></script>
-	<script>
-		if (typeof globalThis !== 'undefined' && typeof buffer !== 'undefined') {
-			globalThis.Buffer = buffer.Buffer;
-			window.Buffer = buffer.Buffer;
-		}
-	</script>
-
 	<meta charset="utf-8" />
 	<link rel="icon" href="%sveltekit.assets%/favicon.svg" />
 
