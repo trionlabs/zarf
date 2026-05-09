@@ -35,6 +35,7 @@
     let onChainContracts = $state<OnChainVestingContract[]>([]);
     let fetchError = $state<string | null>(null);
     let selectedContract = $state<OnChainVestingContract | null>(null);
+    let fetchRequestId = 0;
 
     function handleSelect(c: OnChainVestingContract) {
         selectedContract = c;
@@ -66,29 +67,37 @@
     );
 
     // Fetch Logic
-    async function fetchOnChain() {
-        if (!walletStore.address) return;
+    async function fetchOnChain(forceRefresh = false, owner = walletStore.address) {
+        if (!owner) return;
+
+        const requestId = ++fetchRequestId;
 
         isFetching = true;
         fetchError = null;
 
         try {
-            const result = await discoverOwnerVestings(walletStore.address, {
-                forceRefresh: true,
+            const result = await discoverOwnerVestings(owner, {
+                forceRefresh,
             });
+
+            if (requestId !== fetchRequestId) return;
             onChainContracts = result.contracts;
         } catch (e) {
+            if (requestId !== fetchRequestId) return;
             console.error("Discovery failed:", e);
             fetchError = "Could not fetch distributions from blockchain.";
         } finally {
-            isFetching = false;
+            if (requestId === fetchRequestId) {
+                isFetching = false;
+            }
         }
     }
 
     // Reactivity
     $effect(() => {
-        if (walletStore.isConnected && activeTab !== "drafts") {
-            fetchOnChain();
+        const owner = walletStore.address;
+        if (walletStore.isConnected && owner && activeTab !== "drafts") {
+            fetchOnChain(false, owner);
         }
     });
 
@@ -239,7 +248,7 @@
                         {#snippet title()}Network Error{/snippet}
                         {fetchError}
                         {#snippet actions()}
-                            <ZenButton variant="ghost" size="sm" onclick={fetchOnChain}>
+                            <ZenButton variant="ghost" size="sm" onclick={() => fetchOnChain(true)}>
                                 Retry
                             </ZenButton>
                         {/snippet}

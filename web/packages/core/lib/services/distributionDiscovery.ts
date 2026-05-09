@@ -8,6 +8,7 @@ import {
     getCidForVesting,
     getOwnerDeployment,
     getOwnerDeploymentCount as readOwnerDeploymentCount,
+    getTokenBalance,
     readVestingContract,
 } from '../contracts/contracts';
 
@@ -117,7 +118,17 @@ export async function fetchContractMetadata(
 ): Promise<OnChainVestingContract | null> {
     try {
         const metadata = await readVestingContract(contractAddress);
-        const metadataCid = await getCidForVesting(contractAddress);
+        const [metadataCid, tokenBalance] = await Promise.all([
+            getCidForVesting(contractAddress),
+            getTokenBalance(metadata.token, contractAddress).catch((error) => {
+                console.warn(
+                    `[DiscoveryService] Failed to fetch token balance for ${contractAddress}:`,
+                    error,
+                );
+                return 0n;
+            }),
+        ]);
+
         return {
             address: contractAddress,
             name: sanitizeString(metadata.name || 'Unknown Distribution', 50),
@@ -130,7 +141,7 @@ export async function fetchContractMetadata(
             cliffDuration: 0n,
             vestingDuration: 0n,
             vestingPeriod: 0n,
-            tokenBalance: 0n,
+            tokenBalance,
             metadataCid,
         };
     } catch (error) {
