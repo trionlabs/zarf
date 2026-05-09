@@ -9,6 +9,8 @@ const COMMON_CONNECT_ORIGINS = [
     'https://ipfs.io',
     'https://dweb.link',
     'https://www.googleapis.com',
+    'https://horizon-testnet.stellar.org',
+    'https://horizon.stellar.org',
 ];
 
 function originFrom(value: string | boolean | undefined): string | null {
