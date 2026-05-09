@@ -30,7 +30,9 @@ const env = import.meta.env as Record<string, string | boolean | undefined>;
 
 function readEnv(name: string): string | undefined {
     const value = env[name];
-    return typeof value === 'string' && value.length > 0 ? value : undefined;
+    if (typeof value !== 'string') return undefined;
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : undefined;
 }
 
 function readStoredNetwork(): StellarNetworkId | undefined {
