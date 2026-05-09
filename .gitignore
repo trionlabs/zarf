@@ -35,6 +35,5 @@ test/*.dev
 .agents/
 .gemini/
 .claude/
-.github/
 .kiro/
 .cursor/

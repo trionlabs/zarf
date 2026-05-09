@@ -27,6 +27,7 @@
         "wrangler": "^4.61.0"
     },
     "dependencies": {
+        "@zarf/core": "workspace:*",
         "@zarf/ui": "workspace:*",
         "lucide-svelte": "^0.563.0"
     }

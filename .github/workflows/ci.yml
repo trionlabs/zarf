@@ -1,0 +1,90 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  soroban:
+    name: Soroban Contracts
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32v1-none
+
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            contracts/soroban/verifier
+            contracts/soroban/zarf/jwk-registry
+            contracts/soroban/zarf/vesting
+            contracts/soroban/zarf/factory
+
+      - name: Build verifier WASM
+        run: cargo build --manifest-path contracts/soroban/verifier/Cargo.toml --target wasm32v1-none --release
+
+      - name: Build Zarf contract WASMs
+        run: |
+          cargo build --manifest-path contracts/soroban/zarf/jwk-registry/Cargo.toml --target wasm32v1-none --release
+          cargo build --manifest-path contracts/soroban/zarf/vesting/Cargo.toml --target wasm32v1-none --release
+          cargo build --manifest-path contracts/soroban/zarf/factory/Cargo.toml --target wasm32v1-none --release
+
+      - name: Test verifier
+        run: cargo test --manifest-path contracts/soroban/verifier/Cargo.toml
+
+      - name: Test JWK registry
+        run: cargo test --manifest-path contracts/soroban/zarf/jwk-registry/Cargo.toml
+
+      - name: Test vesting
+        run: cargo test --manifest-path contracts/soroban/zarf/vesting/Cargo.toml
+
+      - name: Test factory
+        run: cargo test --manifest-path contracts/soroban/zarf/factory/Cargo.toml
+
+  web:
+    name: Web, Core, and Workers
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.23.0
+
+      - name: Install dependencies
+        run: pnpm --dir web install --frozen-lockfile
+
+      - name: Test core
+        run: pnpm --dir web --filter @zarf/core test
+
+      - name: Check shared types
+        run: pnpm --dir web check:type-forks
+
+      - name: Check Svelte apps
+        run: |
+          pnpm --dir web --filter @zarf/landing check
+          pnpm --dir web --filter @zarf/create check
+          pnpm --dir web --filter @zarf/claim check
+
+      - name: Check worker apps
+        run: |
+          pnpm --dir web --filter @zarf/pin-proxy typecheck
+          pnpm --dir web --filter @zarf/jwk-rotation typecheck
