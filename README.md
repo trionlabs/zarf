@@ -34,6 +34,8 @@ Configure cliff periods, linear release schedules, and complex vesting terms dir
     - **Vesting and Factory**: Holds funds, creates vesting contracts, and releases funds after valid claims.
     - **UltraHonk Verifier**: Stores the Noir verification key and validates ZK proofs on Soroban.
 3. **Frontend**: A seamless Svelte-based interface for sending and claiming.
+4. **JWK Rotation Service**: A scheduled Cloudflare Worker keeps Google OAuth
+   public keys synchronized with the Soroban JWK Registry.
 
 ## Tech Stack
 
@@ -78,6 +80,13 @@ Configure cliff periods, linear release schedules, and complex vesting terms dir
     ```bash
     cd web
     pnpm dev
+    ```
+
+5. **Run JWK Rotation Worker**
+    ```bash
+    cd web
+    pnpm --filter @zarf/jwk-rotation typecheck
+    pnpm dev:jwk-rotation
     ```
 
 ## Team

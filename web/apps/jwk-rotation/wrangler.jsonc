@@ -1,0 +1,37 @@
+{
+    "$schema": "node_modules/wrangler/config-schema.json",
+    "name": "zarf-jwk-rotation",
+    "main": "src/index.ts",
+    "compatibility_date": "2025-01-15",
+    "compatibility_flags": ["nodejs_compat"],
+    "triggers": {
+        // Google OAuth keys usually rotate roughly every couple of weeks.
+        // Polling every 6 hours gives us plenty of overlap while avoiding noise.
+        "crons": ["0 */6 * * *"]
+    },
+    "vars": {
+        "GOOGLE_JWKS_URL": "https://www.googleapis.com/oauth2/v3/certs",
+        "STATE_KEY": "google-oauth-jwks",
+        "STELLAR_RPC_URL": "https://soroban-testnet.stellar.org",
+        "STELLAR_NETWORK_PASSPHRASE": "Test SDF Network ; September 2015",
+        "JWK_REGISTRY_ADDRESS": "CCHROEUE37RFZJASWV43DGBYD4FU5G7H3AD6GKFJ2PEQAXMYGOAHMIDI",
+        "REVOKE_REMOVED_KEYS": "true",
+        "TX_POLL_ATTEMPTS": "20"
+    },
+    "kv_namespaces": [
+        {
+            "binding": "JWK_ROTATION_STATE",
+            "id": "replace_with_kv_namespace_id",
+            "preview_id": "replace_with_preview_kv_namespace_id"
+        }
+    ],
+    "observability": {
+        "enabled": true
+    }
+    // Required secrets:
+    //   wrangler secret put REGISTRY_OWNER_SECRET
+    //   wrangler secret put ADMIN_TOKEN
+    //
+    // Optional alert webhook:
+    //   wrangler secret put ALERT_WEBHOOK_URL
+}
