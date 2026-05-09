@@ -54,6 +54,8 @@
     function sanitizeError(err: unknown): string {
         return sanitizeBlockchainError(err, {
             customRules: [
+                { match: /InvalidPubkey|Contract, #4|is_valid_key_hash/i,
+                  message: "Google's current signing key is not registered on-chain yet. Please run JWK rotation, then retry this claim." },
                 { match: /already claimed|AlreadyClaimed/i,
                   message: "This epoch has already been claimed." },
                 { match: /revert|execution reverted/i,
