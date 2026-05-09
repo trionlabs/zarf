@@ -1,6 +1,7 @@
 {
     "$schema": "node_modules/wrangler/config-schema.json",
     "name": "zarf-pin-proxy",
+    "account_id": "97f6beae024e619ebd9faedf1c00b9e8",
     "main": "src/index.ts",
     "compatibility_date": "2025-01-15",
     "vars": {
@@ -9,7 +10,13 @@
     },
     "observability": {
         "enabled": true
-    }
+    },
+    "routes": [
+        {
+            "pattern": "pin.zarf.to",
+            "custom_domain": true
+        }
+    ]
     // Set the Pinata JWT as a secret (NOT a var):
     //   wrangler secret put PINATA_JWT
     //
