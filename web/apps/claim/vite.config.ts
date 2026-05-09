@@ -46,7 +46,7 @@ export default defineConfig({
 		topLevelAwait(),
 		nodePolyfills({
 			include: ['crypto', 'stream', 'util', 'events', 'buffer'],
-			globals: { Buffer: false, global: false, process: false },
+			globals: { Buffer: 'build', global: false, process: false },
 			protocolImports: true,
 		}),
 		viteStaticCopy({
@@ -110,7 +110,7 @@ export default defineConfig({
 			topLevelAwait(),
 			nodePolyfills({
 				include: ['buffer', 'crypto', 'stream', 'util', 'events'],
-				globals: { Buffer: false, global: false, process: false },
+				globals: { Buffer: 'build', global: false, process: false },
 			}),
 		],
 	},

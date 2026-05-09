@@ -4,3 +4,7 @@ import '$lib/coreInit';
 
 // Marker export so SvelteKit picks this layout module up unambiguously.
 export {};
+
+// Claim is a browser-only wallet/OAuth/proof flow; Cloudflare SSR currently
+// trips over nested Svelte snippets before hydration can take over.
+export const ssr = false;
