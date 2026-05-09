@@ -5,9 +5,10 @@ import type { Handle } from '@sveltejs/kit';
 import { dev } from '$app/environment';
 
 const COMMON_CONNECT_ORIGINS = [
-    'https://cloudflare-ipfs.com',
     'https://ipfs.io',
     'https://dweb.link',
+    'https://gateway.pinata.cloud',
+    'https://w3s.link',
     'https://www.googleapis.com',
     'https://horizon-testnet.stellar.org',
     'https://horizon.stellar.org',
@@ -25,6 +26,7 @@ function originFrom(value: string | boolean | undefined): string | null {
 function connectSources(): string {
     const configured = [
         import.meta.env.VITE_STELLAR_RPC_URL,
+        import.meta.env.VITE_PIN_PROXY_URL,
         import.meta.env.VITE_STELLAR_HORIZON_URL,
         import.meta.env.VITE_STELLAR_TESTNET_RPC_URL,
         import.meta.env.VITE_STELLAR_TESTNET_HORIZON_URL,

@@ -10,7 +10,7 @@
 import { hashEmail } from '@zarf/core/utils/email';
 import type { StellarContractId } from '@zarf/core/types';
 import { getCidForVesting } from '@zarf/core/services/vestingDiscovery';
-import { fetchIpfsJson } from '@zarf/core/utils/ipfsFetch';
+import { fetchIpfsJson, IpfsFetchError } from '@zarf/core/utils/ipfsFetch';
 
 /**
  * Distribution data structure with optional emailHashes
@@ -57,8 +57,13 @@ export async function isEmailInDistribution(
 
         return normalizedDistHashes.includes(normalizedUserHash);
     } catch (error) {
+        if (error instanceof IpfsFetchError) {
+            console.warn(`[EmailFilter] Skipping distribution with unreadable IPFS metadata:`, error.message);
+            return false;
+        }
+
         console.error(`[EmailFilter] Error checking distribution:`, error);
-        // On error, default to showing (fail open for UX)
+        // On non-IPFS errors, default to showing (fail open for UX).
         return true;
     }
 }

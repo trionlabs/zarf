@@ -6,6 +6,7 @@
  *
  * Routes:
  *   POST /pin     - pin a claim list, returns { cid }
+ *   GET  /ipfs/:cid - fetch pinned/public JSON through the proxy gateway
  *   GET  /health  - liveness check
  *
  * Secrets (wrangler secret put):
@@ -37,6 +38,11 @@ interface PinataResponse {
 }
 
 const PINATA_PIN_URL = "https://api.pinata.cloud/pinning/pinJSONToIPFS";
+const IPFS_READ_GATEWAYS = [
+    "https://gateway.pinata.cloud/ipfs",
+    "https://ipfs.io/ipfs",
+    "https://dweb.link/ipfs",
+];
 
 export default {
     async fetch(request: Request, env: Env): Promise<Response> {
@@ -54,6 +60,10 @@ export default {
 
         if (url.pathname === "/pin" && request.method === "POST") {
             return handlePin(request, env, corsHeaders);
+        }
+
+        if (url.pathname.startsWith("/ipfs/") && request.method === "GET") {
+            return handleIpfsRead(url, corsHeaders);
         }
 
         return json({ error: "not_found" }, 404, corsHeaders);
@@ -128,6 +138,45 @@ async function handlePin(
     return json({ cid: data.IpfsHash, size: data.PinSize }, 200, corsHeaders);
 }
 
+async function handleIpfsRead(
+    url: URL,
+    corsHeaders: Record<string, string>
+): Promise<Response> {
+    const cid = validateCid(url.pathname.slice("/ipfs/".length));
+    if (!cid) {
+        return json({ error: "invalid_cid" }, 400, corsHeaders);
+    }
+
+    const errors: string[] = [];
+    for (const gateway of IPFS_READ_GATEWAYS) {
+        try {
+            const upstream = await fetch(`${gateway}/${cid}`, {
+                headers: { Accept: "application/json" },
+            });
+            if (!upstream.ok) {
+                errors.push(`${gateway}: HTTP ${upstream.status}`);
+                continue;
+            }
+
+            const headers = new Headers(corsHeaders);
+            headers.set(
+                "Content-Type",
+                upstream.headers.get("Content-Type") || "application/json"
+            );
+            headers.set("Cache-Control", "public, max-age=300");
+            return new Response(upstream.body, { status: 200, headers });
+        } catch (error) {
+            errors.push(`${gateway}: ${(error as Error).message}`);
+        }
+    }
+
+    return json(
+        { error: "ipfs_gateway_error", detail: errors.join("; ") },
+        502,
+        corsHeaders
+    );
+}
+
 function validateClaimList(body: unknown): string | null {
     if (!body || typeof body !== "object") return "not_an_object";
     const obj = body as Record<string, unknown>;
@@ -142,6 +191,23 @@ function validateClaimList(body: unknown): string | null {
         return "missing_schedule";
     }
     return null;
+}
+
+function validateCid(raw: string): string | null {
+    let decoded: string;
+    try {
+        decoded = decodeURIComponent(raw).trim();
+    } catch {
+        return null;
+    }
+
+    const cid = decoded.startsWith("ipfs://")
+        ? decoded.slice("ipfs://".length)
+        : decoded;
+    const cidV0 = /^Qm[1-9A-HJ-NP-Za-km-z]{44}$/;
+    const cidV1Base32 = /^b[a-z2-7]{40,}$/i;
+    if (cid.includes("/") || cid.includes("?") || cid.includes("#")) return null;
+    return cidV0.test(cid) || cidV1Base32.test(cid) ? cid : null;
 }
 
 function buildCorsHeaders(origin: string | null, env: Env): Record<string, string> {

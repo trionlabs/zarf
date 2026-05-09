@@ -4,6 +4,7 @@ import { toastStore } from "@zarf/ui/stores/toastStore.svelte";
 import { getActiveStellarNetworkId } from "@zarf/core/config/runtime";
 
 import { fetchDistributionData, type DistributionData } from "@zarf/core/services/distribution";
+import { IpfsFetchError } from "@zarf/core/utils/ipfsFetch";
 import { isEpochClaimed, readVestingContract } from "@zarf/core/contracts";
 import {
     totalAllocation as totalAllocationOf,
@@ -344,6 +345,11 @@ class ClaimFlowState {
             console.error("Discovery failed:", e);
             let msg = e.message || "Failed to discover epochs.";
             if (msg.includes("404")) msg = "Contract distribution data not found.";
+            if (e instanceof IpfsFetchError) {
+                msg = e.code === "INVALID_CID"
+                    ? "This distribution is registered with invalid IPFS metadata. Ask the creator to redeploy it with a real IPFS CID."
+                    : "Could not load this distribution from IPFS. Please retry; the configured gateway may be unavailable.";
+            }
             this.setError(msg);
             throw new Error(msg);
         } finally {
