@@ -7,11 +7,13 @@
  *
  * @module utils/ipfsFetch
  */
+import { getCoreConfig } from '../config/runtime';
 
-const GATEWAYS = [
-    'https://cloudflare-ipfs.com/ipfs',
+const PUBLIC_GATEWAYS = [
     'https://ipfs.io/ipfs',
     'https://dweb.link/ipfs',
+    'https://gateway.pinata.cloud/ipfs',
+    'https://w3s.link/ipfs',
 ];
 
 const PER_GATEWAY_TIMEOUT_MS = 5_000;
@@ -20,7 +22,11 @@ const MAX_CACHE_ENTRIES = 256;
 const cache = new Map<string, unknown>();
 
 export class IpfsFetchError extends Error {
-    constructor(message: string, public readonly cid: string) {
+    constructor(
+        message: string,
+        public readonly cid: string,
+        public readonly code: 'INVALID_CID' | 'GATEWAY_FAILURE' = 'GATEWAY_FAILURE',
+    ) {
         super(message);
         this.name = 'IpfsFetchError';
     }
@@ -41,22 +47,51 @@ async function fetchFromGateway<T>(gateway: string, cid: string): Promise<T> {
     }
 }
 
+function configuredGateway(): string | null {
+    try {
+        const configured = getCoreConfig().ipfsGatewayUrl?.trim();
+        if (!configured) return null;
+        return configured.replace(/\/$/, '');
+    } catch {
+        return null;
+    }
+}
+
+function gateways(): string[] {
+    return Array.from(
+        new Set([configuredGateway(), ...PUBLIC_GATEWAYS].filter((g): g is string => Boolean(g))),
+    );
+}
+
 function validateCid(cid: unknown): string {
     if (typeof cid !== 'string') {
-        throw new IpfsFetchError(`Invalid CID: ${String(cid)}`, String(cid));
+        throw new IpfsFetchError(`Invalid CID: ${String(cid)}`, String(cid), 'INVALID_CID');
     }
 
     const trimmed = cid.trim();
+    const withoutScheme = trimmed.startsWith('ipfs://')
+        ? trimmed.slice('ipfs://'.length)
+        : trimmed;
+
     if (
         trimmed.length === 0 ||
         trimmed !== cid ||
-        trimmed.includes('/') ||
-        !/^[a-zA-Z0-9]+$/.test(trimmed)
+        withoutScheme.length === 0 ||
+        withoutScheme.includes('/') ||
+        withoutScheme.includes('?') ||
+        withoutScheme.includes('#') ||
+        !isLikelyCid(withoutScheme)
     ) {
-        throw new IpfsFetchError(`Invalid CID: ${cid}`, cid);
+        throw new IpfsFetchError(`Invalid CID: ${cid}`, cid, 'INVALID_CID');
     }
 
-    return trimmed;
+    return withoutScheme;
+}
+
+function isLikelyCid(value: string): boolean {
+    const cidV0 = /^Qm[1-9A-HJ-NP-Za-km-z]{44}$/;
+    const cidV1Base32 = /^b[a-z2-7]{40,}$/i;
+    return cidV0.test(value) || cidV1Base32.test(value);
 }
 
 function getCached<T>(cid: string): T | undefined {
@@ -89,7 +124,7 @@ export async function fetchIpfsJson<T = unknown>(cid: string): Promise<T> {
     }
 
     const errors: string[] = [];
-    for (const gateway of GATEWAYS) {
+    for (const gateway of gateways()) {
         try {
             const data = await fetchFromGateway<T>(gateway, validCid);
             setCached(validCid, data);
@@ -102,6 +137,7 @@ export async function fetchIpfsJson<T = unknown>(cid: string): Promise<T> {
     throw new IpfsFetchError(
         `All IPFS gateways failed for ${validCid}: ${errors.join('; ')}`,
         validCid,
+        'GATEWAY_FAILURE',
     );
 }
 

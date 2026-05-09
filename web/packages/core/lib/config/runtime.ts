@@ -36,6 +36,8 @@ export interface CoreRuntimeConfig {
     /** Optional named Stellar/Soroban profiles for runtime network switching. */
     stellarNetworks?: Partial<Record<StellarNetworkId, StellarRuntimeConfig>>;
     defaultStellarNetwork?: StellarNetworkId;
+    /** Optional app-controlled IPFS gateway base, e.g. https://pin.zarf.to/ipfs. */
+    ipfsGatewayUrl?: string;
 }
 
 export interface StellarNetworkOption {

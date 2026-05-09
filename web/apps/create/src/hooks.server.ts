@@ -5,9 +5,10 @@ import type { Handle } from '@sveltejs/kit';
 import { dev } from '$app/environment';
 
 const COMMON_CONNECT_ORIGINS = [
-    'https://cloudflare-ipfs.com',
     'https://ipfs.io',
     'https://dweb.link',
+    'https://gateway.pinata.cloud',
+    'https://w3s.link',
     'https://horizon-testnet.stellar.org',
     'https://horizon.stellar.org',
 ];
