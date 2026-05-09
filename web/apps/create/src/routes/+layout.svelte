@@ -2,6 +2,7 @@
     import "../app.css";
     import { wizardStore } from "$lib/stores/wizardStore.svelte";
     import { walletStore } from "@zarf/ui/stores/walletStore.svelte";
+    import { networkStore } from "@zarf/ui/stores/networkStore.svelte";
     import { authStore } from "@zarf/ui/stores/authStore.svelte";
     import { themeStore } from "@zarf/ui/stores/themeStore.svelte";
     import { onMount } from "svelte";
@@ -19,6 +20,7 @@
         if (browser) {
             wizardStore.restore();
             themeStore.restore();
+            networkStore.restore();
             walletStore.init();
             authStore.restoreGmailSession();
         }

@@ -17,7 +17,9 @@
 		"deploy:landing": "pnpm --filter @zarf/landing run deploy",
 		"deploy:create": "pnpm --filter @zarf/create run deploy",
 		"deploy:claim": "pnpm --filter @zarf/claim run deploy",
+		"deploy:pin-proxy": "pnpm --filter @zarf/pin-proxy run deploy",
 		"deploy:jwk-rotation": "pnpm --filter @zarf/jwk-rotation run deploy",
+		"deploy:all": "pnpm deploy:landing && pnpm deploy:create && pnpm deploy:claim && pnpm deploy:pin-proxy && pnpm deploy:jwk-rotation",
 		"check:type-forks": "node scripts/check-type-forks.mjs"
 	},
 	"pnpm": {

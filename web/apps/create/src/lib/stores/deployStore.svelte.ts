@@ -1,5 +1,6 @@
 import type { Distribution, Recipient, MerkleTreeData } from './types';
 import type { StellarAddress, StellarContractId } from '@zarf/core/types';
+import { getActiveStellarNetworkId } from '@zarf/core/config/runtime';
 import { safeParse, safeStringify } from '@zarf/core/utils/json';
 
 export type DeployStep = 1 | 2 | 3 | 4;
@@ -43,6 +44,14 @@ export class DeployState {
         // No auto-load in constructor because we need distributionId
     }
 
+    private storageKey(distributionId: string): string {
+        try {
+            return `deploy_state_${getActiveStellarNetworkId()}_${distributionId}`;
+        } catch {
+            return `deploy_state_${distributionId}`;
+        }
+    }
+
     // Persistence Logic ("Write-Ahead Log")
     private save() {
         if (typeof window === "undefined" || !this.distribution?.id) return;
@@ -61,7 +70,7 @@ export class DeployState {
                 schedulePlanAtMs: this.schedulePlanAtMs,
                 timestamp: Date.now()
             };
-            const key = `deploy_state_${this.distribution.id}`;
+            const key = this.storageKey(this.distribution.id);
             localStorage.setItem(key, safeStringify(state));
         } catch (e) {
             console.warn("Failed to save deploy state", e);
@@ -72,7 +81,7 @@ export class DeployState {
         if (typeof window === "undefined") return;
 
         try {
-            const key = `deploy_state_${distributionId}`;
+            const key = this.storageKey(distributionId);
             const raw = localStorage.getItem(key);
             if (!raw) return;
 
@@ -222,7 +231,7 @@ export class DeployState {
         this.contractAddress = address;
         // Clean up log on success
         if (typeof window !== "undefined" && this.distribution?.id) {
-            localStorage.removeItem(`deploy_state_${this.distribution.id}`);
+            localStorage.removeItem(this.storageKey(this.distribution.id));
         }
     }
 
@@ -258,7 +267,7 @@ export class DeployState {
         this.schedulePlanAtMs = null;
 
         if (typeof window !== "undefined" && this.distribution?.id) {
-            localStorage.removeItem(`deploy_state_${this.distribution.id}`);
+            localStorage.removeItem(this.storageKey(this.distribution.id));
         }
     }
 }

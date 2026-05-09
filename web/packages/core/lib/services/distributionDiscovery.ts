@@ -3,6 +3,7 @@
  */
 
 import type { StellarAddress, StellarContractId } from '../types';
+import { getActiveStellarNetworkId } from '../config/runtime';
 import {
     getCidForVesting,
     getOwnerDeployment,
@@ -47,7 +48,7 @@ const cache = new Map<string, CacheEntry>();
 const CACHE_TTL_MS = 5 * 60 * 1000;
 
 function cacheKey(owner: StellarAddress): string {
-    return owner;
+    return `${getActiveStellarNetworkId()}:${owner}`;
 }
 
 function getCachedResult(owner: StellarAddress): DiscoveryResult | null {

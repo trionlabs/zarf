@@ -20,8 +20,10 @@ import {
     isSupportedNetwork,
     getConfiguredNetworkName,
 } from "@zarf/core/contracts/wallet";
+import { getAccountExplorerUrl } from "@zarf/core/contracts";
 import type { StellarAddress, WalletAccount } from "@zarf/core/types";
 import { sanitizeBlockchainError } from '../utils/errorSanitizer';
+import { networkStore } from './networkStore.svelte';
 
 interface WalletBalance { value: bigint; formatted: string; symbol: string; }
 
@@ -58,8 +60,12 @@ let unwatchFn: (() => void) | null = null;
 let isInitialized = false;
 
 // Derived Values
-const isWrongNetwork = $derived(state.isConnected && !isSupportedNetwork(state.networkPassphrase ?? undefined));
-const networkName = $derived(state.network || getConfiguredNetworkName());
+const activeNetworkId = $derived(networkStore.activeId);
+const configuredNetworkName = $derived(networkStore.active?.label ?? getConfiguredNetworkName());
+const isWrongNetwork = $derived(
+    activeNetworkId && state.isConnected && !isSupportedNetwork(state.networkPassphrase ?? undefined),
+);
+const networkName = $derived(state.network || configuredNetworkName);
 const shortAddress = $derived(state.address ? formatAddress(state.address) : null);
 const isLoading = $derived(state.isConnecting || state.isDisconnecting || state.isReconnecting || state.isSwitchingNetwork);
 const formattedBalance = $derived(state.balance ? `${parseFloat(state.balance.formatted).toFixed(4)} ${state.balance.symbol}` : null);
@@ -250,6 +256,14 @@ export const walletStore = {
     get networkName() { return networkName; },
     get shortAddress() { return shortAddress; },
     get formattedBalance() { return formattedBalance; },
+    get accountExplorerUrl() {
+        if (!state.address) return null;
+        try {
+            return getAccountExplorerUrl(state.address);
+        } catch {
+            return null;
+        }
+    },
     get isLoading() { return isLoading; },
 
     // Actions

@@ -11,20 +11,12 @@
     },
     "vars": {
         "GOOGLE_JWKS_URL": "https://www.googleapis.com/oauth2/v3/certs",
-        "STATE_KEY": "google-oauth-jwks",
         "STELLAR_RPC_URL": "https://soroban-testnet.stellar.org",
         "STELLAR_NETWORK_PASSPHRASE": "Test SDF Network ; September 2015",
         "JWK_REGISTRY_ADDRESS": "CCHROEUE37RFZJASWV43DGBYD4FU5G7H3AD6GKFJ2PEQAXMYGOAHMIDI",
         "REVOKE_REMOVED_KEYS": "true",
         "TX_POLL_ATTEMPTS": "20"
     },
-    "kv_namespaces": [
-        {
-            "binding": "JWK_ROTATION_STATE",
-            "id": "replace_with_kv_namespace_id",
-            "preview_id": "replace_with_preview_kv_namespace_id"
-        }
-    ],
     "observability": {
         "enabled": true
     }

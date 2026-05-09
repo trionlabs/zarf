@@ -89,6 +89,58 @@ Configure cliff periods, linear release schedules, and complex vesting terms dir
     pnpm dev:jwk-rotation
     ```
 
+## Continuous Deployment
+
+GitHub Actions deploys the five web apps after `CI` succeeds on `main`.
+The deploy workflow can also be started manually from Actions.
+
+Required GitHub repository secrets:
+
+- `CLOUDFLARE_API_TOKEN`
+- `CLOUDFLARE_ACCOUNT_ID`
+- `PINATA_JWT` for `@zarf/pin-proxy`
+- `REGISTRY_OWNER_SECRET` for `@zarf/jwk-rotation`
+- `ADMIN_TOKEN` for `@zarf/jwk-rotation`
+- `ALERT_WEBHOOK_URL` optional for `@zarf/jwk-rotation`
+
+Minimum GitHub repository variables for the Svelte apps:
+
+- `VITE_STELLAR_TESTNET_RPC_URL`
+- `VITE_STELLAR_TESTNET_FACTORY_ADDRESS`
+- `VITE_STELLAR_MAINNET_RPC_URL`
+- `VITE_STELLAR_MAINNET_FACTORY_ADDRESS`
+
+Those four values are enough to show both networks in the UI toggle.
+If only one network is configured, the UI only shows that network.
+
+App-specific public variables:
+
+- `VITE_PIN_PROXY_URL` for `@zarf/create`
+- `VITE_GOOGLE_CLIENT_ID` for `@zarf/claim`
+
+Optional selector variable:
+
+- `VITE_STELLAR_DEFAULT_NETWORK`: `testnet` or `mainnet`
+
+The older unprefixed `VITE_STELLAR_*` variables still work as a testnet
+fallback for local development, but production should use the explicit
+`TESTNET` and `MAINNET` profiles so the UI network toggle can show both.
+Horizon, explorer, network passphrase, and network labels are built-in
+constants for Stellar testnet/mainnet.
+
+The workflow deploys:
+
+- `@zarf/landing` -> `zarf-landing` / `https://zarf.to`
+- `@zarf/create` -> `zarf-create` / `https://create.zarf.to`
+- `@zarf/claim` -> `zarf-claim` / `https://claim.zarf.to`
+- `@zarf/pin-proxy` -> `zarf-pin-proxy`
+- `@zarf/jwk-rotation` -> `zarf-jwk-rotation`
+
+Worker runtime secrets are stored as GitHub secrets and synced to Cloudflare
+during deployment with `wrangler secret bulk`. The JWK rotation worker is
+stateless and reads the current registry state from the Soroban contract, so it
+does not need a KV namespace.
+
 ## Team
 
 Built by **Trion Labs**. We are a team of engineers and researchers specialized in Applied Cryptography, Zero-Knowledge Systems, and Protocol Design.

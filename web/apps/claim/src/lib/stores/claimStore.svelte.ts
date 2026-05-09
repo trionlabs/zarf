@@ -1,6 +1,7 @@
 import { browser } from '$app/environment';
 import type { ZKProof, MerkleClaim, MerkleTreeData } from "@zarf/ui/types";
 import { toastStore } from "@zarf/ui/stores/toastStore.svelte";
+import { getActiveStellarNetworkId } from "@zarf/core/config/runtime";
 
 import { fetchDistributionData, type DistributionData } from "@zarf/core/services/distribution";
 import { isEpochClaimed, readVestingContract } from "@zarf/core/contracts";
@@ -187,7 +188,7 @@ class ClaimFlowState {
 
         // Optionally clear session
         if (browser) {
-            sessionStorage.removeItem('claim_flow_state');
+            sessionStorage.removeItem(this.sessionKey());
         }
     }
 
@@ -232,6 +233,14 @@ class ClaimFlowState {
 
     // --- Persistence ---
 
+    private sessionKey() {
+        try {
+            return `claim_flow_state:${getActiveStellarNetworkId()}`;
+        } catch {
+            return 'claim_flow_state';
+        }
+    }
+
     private saveSession() {
         if (!browser) return;
 
@@ -242,13 +251,13 @@ class ClaimFlowState {
             // PIN is never persisted for security (ADR-025)
         };
 
-        sessionStorage.setItem('claim_flow_state', JSON.stringify(data));
+        sessionStorage.setItem(this.sessionKey(), JSON.stringify(data));
     }
 
     private recoverSession() {
         if (!browser) return;
 
-        const raw = sessionStorage.getItem('claim_flow_state');
+        const raw = sessionStorage.getItem(this.sessionKey());
         if (!raw) return;
 
         try {
@@ -260,7 +269,7 @@ class ClaimFlowState {
             this.state.pin = null; // Ensure PIN is never recovered
         } catch (e) {
             console.warn('Failed to recover claim session', e);
-            sessionStorage.removeItem('claim_flow_state');
+            sessionStorage.removeItem(this.sessionKey());
         }
     }
 

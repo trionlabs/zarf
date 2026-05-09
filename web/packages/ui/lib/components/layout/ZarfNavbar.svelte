@@ -3,6 +3,7 @@
     import WalletConnectButton from "@zarf/ui/components/wallet/WalletConnectButton.svelte";
     import WalletBadge from "@zarf/ui/components/wallet/WalletBadge.svelte";
     import ZarfLogo from "@zarf/ui/components/brand/ZarfLogo.svelte";
+    import NetworkToggle from "@zarf/ui/components/layout/NetworkToggle.svelte";
     import { authStore } from "@zarf/ui/stores/authStore.svelte";
     import { redirectToGoogle } from "@zarf/ui/utils/googleAuth";
     import type { Snippet } from "svelte";
@@ -12,12 +13,14 @@
         showEmail = false,
         showWallet = false,
         showWalletBadge = false,
+        showNetworkToggle = true,
         children,
     } = $props<{
         hideActions?: boolean;
         showEmail?: boolean;
         showWallet?: boolean;
         showWalletBadge?: boolean;
+        showNetworkToggle?: boolean;
         children?: Snippet;
     }>();
 </script>
@@ -94,6 +97,10 @@
                         <span>Sign in</span>
                     </button>
                 {/if}
+            {/if}
+
+            {#if showNetworkToggle}
+                <NetworkToggle />
             {/if}
 
             <!-- Wallet Section (Create app - full button) -->

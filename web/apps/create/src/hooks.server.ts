@@ -10,8 +10,8 @@ const COMMON_CONNECT_ORIGINS = [
     'https://dweb.link',
 ];
 
-function originFrom(value: string | undefined): string | null {
-    if (!value) return null;
+function originFrom(value: string | boolean | undefined): string | null {
+    if (typeof value !== 'string' || !value) return null;
     try {
         return new URL(value).origin;
     } catch {
@@ -24,6 +24,10 @@ function connectSources(): string {
         import.meta.env.VITE_PIN_PROXY_URL,
         import.meta.env.VITE_STELLAR_RPC_URL,
         import.meta.env.VITE_STELLAR_HORIZON_URL,
+        import.meta.env.VITE_STELLAR_TESTNET_RPC_URL,
+        import.meta.env.VITE_STELLAR_TESTNET_HORIZON_URL,
+        import.meta.env.VITE_STELLAR_MAINNET_RPC_URL,
+        import.meta.env.VITE_STELLAR_MAINNET_HORIZON_URL,
     ]
         .map(originFrom)
         .filter((origin): origin is string => Boolean(origin));

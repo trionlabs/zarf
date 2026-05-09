@@ -4,7 +4,7 @@
     "main": "src/index.ts",
     "compatibility_date": "2025-01-15",
     "vars": {
-        "ALLOWED_ORIGINS": "http://localhost:5173,http://localhost:5174,http://localhost:5175",
+        "ALLOWED_ORIGINS": "http://localhost:5173,http://localhost:5174,http://localhost:5175,https://create.zarf.to",
         "MAX_BODY_BYTES": "1048576"
     },
     "observability": {
