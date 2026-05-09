@@ -123,7 +123,7 @@ async function initialize() {
 
 /**
  * Main Proof Generation Logic
- * Ported verbatim from poc/src/lib/jwtProver.js to ensure compatibility.
+ * Kept byte-for-byte compatible with the browser proof input contract.
  */
 async function generateProof(payload: ProofRequest['payload']) {
     if (!cachedNoir || !cachedBackend) throw new Error('Not initialized');

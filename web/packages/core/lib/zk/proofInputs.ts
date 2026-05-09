@@ -146,7 +146,7 @@ export function buildCircuitInputs(
         amount: toHex(amount),
         merkle_siblings: siblings,
         merkle_path_indices: indices,
-        // Public inputs (must match solidity layout)
+        // Public inputs (must match the Soroban claim layout)
         pubkey_modulus_limbs: jwtInputs.pubkey_modulus_limbs,
         merkle_root: toHex(merkleRoot),
         unlock_time: toHex(unlockTime), // ADR-023
