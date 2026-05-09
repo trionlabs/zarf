@@ -36,14 +36,14 @@
         full: "max-w-[calc(100vw-2rem)] max-h-[calc(100vh-2rem)]",
     };
 
-    function handleBackdropClick(e: MouseEvent) {
-        if (closeOnBackdrop && e.target === e.currentTarget) {
+    function handleBackdropClick() {
+        if (closeOnBackdrop) {
             onclose?.();
         }
     }
 
     function handleKeydown(e: KeyboardEvent) {
-        if (closeOnEscape && e.key === "Escape") {
+        if (open && closeOnEscape && e.key === "Escape") {
             onclose?.();
         }
     }
@@ -55,14 +55,22 @@
     <!-- Backdrop -->
     <div
         class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[var(--zen-fg)]/50 backdrop-blur-sm animate-zen-fade-in"
-        onclick={handleBackdropClick}
-        role="dialog"
-        aria-modal="true"
     >
+        {#if closeOnBackdrop}
+            <button
+                type="button"
+                class="absolute inset-0 cursor-default border-0 bg-transparent p-0"
+                onclick={handleBackdropClick}
+                aria-label="Close modal"
+            ></button>
+        {:else}
+            <div class="absolute inset-0" aria-hidden="true"></div>
+        {/if}
+
         <!-- Modal Box -->
         <div
             class="
-                relative w-full {sizeClasses[size]}
+                relative z-10 w-full {sizeClasses[size]}
                 bg-zen-bg
                 border-[0.5px] border-zen-border-subtle
                 rounded-2xl
@@ -71,6 +79,9 @@
                 overflow-hidden
                 {className}
             "
+            role="dialog"
+            aria-modal="true"
+            tabindex="-1"
         >
             <!-- Close Button -->
             {#if showCloseButton}

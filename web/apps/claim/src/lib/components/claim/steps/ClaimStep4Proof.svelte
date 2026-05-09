@@ -3,16 +3,12 @@
     import { claimStore } from "../../../stores/claimStore.svelte";
 
     import {
-        fetchPublicLeaves,
-        getProofForLeaf,
-    } from "../../../utils/proofHelpers";
-    import { getPublicKeyForJwt } from "../../../utils/googleJwk";
-    import {
         CheckCircle,
         ShieldCheck,
         AlertTriangle,
+        RefreshCw,
+        Wallet,
     } from "lucide-svelte";
-    import { generateClaimProof } from "@zarf/core/zk";
     import { recipientId } from "@zarf/core/contracts";
     import ZenButton from "@zarf/ui/components/ui/ZenButton.svelte";
 
@@ -28,7 +24,17 @@
     let selectedEpoch = $derived(claimStore.selectedEpoch);
     let targetWallet = $derived(claimStore.targetWallet);
 
-    onMount(async () => {
+    async function generateProofForClaim() {
+        if (advanceTimer) {
+            clearTimeout(advanceTimer);
+            advanceTimer = null;
+        }
+
+        error = null;
+        isGenerating = true;
+        progress = 0;
+        statusMessage = "Loading proof modules...";
+
         try {
             if (!selectedEpoch && claimStore.epochs.length > 0) {
                 claimStore.selectNextClaimableEpoch();
@@ -39,14 +45,24 @@
                 return;
             }
 
+            const [
+                { computeLeaf },
+                { fetchPublicLeaves, getProofForLeaf },
+                { getPublicKeyForJwt },
+                { generateClaimProof },
+            ] = await Promise.all([
+                import("@zarf/core/crypto/merkleTree"),
+                import("../../../utils/proofHelpers"),
+                import("../../../utils/googleJwk"),
+                import("@zarf/core/zk"),
+            ]);
+
             statusMessage = "Fetching Merkle Data...";
             progress = 10;
 
             const amount = BigInt(selectedEpoch.amount);
             const salt = selectedEpoch.salt;
             const unlockTime = selectedEpoch.unlockTime;
-
-            const { computeLeaf } = await import("@zarf/core/crypto/merkleTree");
 
             const leaf = await computeLeaf(
                 email,
@@ -98,9 +114,26 @@
                 claimStore.nextStep();
             }, 1000);
         } catch (e: any) {
-            error = e.message;
+            error = e.message || "Proof generation failed.";
             isGenerating = false;
+            statusMessage = "Proof generation failed.";
         }
+    }
+
+    function retryProofGeneration() {
+        void generateProofForClaim();
+    }
+
+    function changeWallet() {
+        if (advanceTimer) {
+            clearTimeout(advanceTimer);
+            advanceTimer = null;
+        }
+        claimStore.state.currentStep = 3;
+    }
+
+    onMount(() => {
+        void generateProofForClaim();
     });
 
     onDestroy(() => {
@@ -127,19 +160,31 @@
                     >
                         Generation Failed
                     </h2>
-                    <p
-                        class="text-sm text-zen-fg-subtle font-light max-w-xs mx-auto italic"
-                    >
+                    <p class="text-sm text-zen-fg-subtle font-light max-w-sm mx-auto">
+                        Your eligibility is still intact. No transaction was sent, and you can retry proof generation from the same wallet.
+                    </p>
+                    <p class="text-xs text-zen-error/80 font-mono max-w-sm mx-auto break-words">
                         {error}
                     </p>
                 </div>
-                <ZenButton
-                    variant="secondary"
-                    class="px-8 h-12 rounded-2xl text-[10px] uppercase tracking-widest font-bold"
-                    onclick={() => window.location.reload()}
-                >
-                    Retry Generation
-                </ZenButton>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-sm mx-auto">
+                    <ZenButton
+                        variant="primary"
+                        class="h-12 rounded-2xl text-[10px] uppercase tracking-widest font-bold"
+                        onclick={retryProofGeneration}
+                    >
+                        <RefreshCw class="w-3.5 h-3.5" />
+                        Retry Proof
+                    </ZenButton>
+                    <ZenButton
+                        variant="secondary"
+                        class="h-12 rounded-2xl text-[10px] uppercase tracking-widest font-bold"
+                        onclick={changeWallet}
+                    >
+                        <Wallet class="w-3.5 h-3.5" />
+                        Change Wallet
+                    </ZenButton>
+                </div>
             </div>
         {:else if isGenerating}
             <!-- Sophisticated Loading State -->

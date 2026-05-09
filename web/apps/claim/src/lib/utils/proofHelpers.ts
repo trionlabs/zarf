@@ -1,4 +1,3 @@
-import { buildMerkleTree, getMerkleProof } from '@zarf/core/crypto/merkleTree';
 import type { MerkleProof } from '@zarf/ui/types';
 import { getCidForVesting } from '@zarf/core/services/vestingDiscovery';
 import { fetchIpfsJson } from '@zarf/core/utils/ipfsFetch';
@@ -123,6 +122,7 @@ export async function getProofForLeaf(userLeaf: bigint, publicLeaves: bigint[]):
     // Build the tree (re-verify root)
     // Note: In a heavily optimized app, we might download the ready-made proof from the JSON 
     // instead of rebuilding the tree client-side. But for now, ensuring correctness by rebuilding is safer.
+    const { buildMerkleTree, getMerkleProof } = await import('@zarf/core/crypto/merkleTree');
     const tree = await buildMerkleTree(leaves);
 
     // Get Proof

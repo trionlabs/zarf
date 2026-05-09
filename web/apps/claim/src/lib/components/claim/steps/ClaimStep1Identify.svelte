@@ -55,10 +55,6 @@
             // New Pattern: Delegate discovery loop to the Store
             // This handles Fetch JSON -> Derive Keys -> Check Local -> Check Chain
             await claimStore.discoverEpochs(email, jwt!, pin, contractAddress);
-
-            if (claimStore.isEligible) {
-                claimStore.nextStep();
-            }
         } catch (e: any) {
             console.error("Unlock failed:", e);
             error = e.message || "Failed to verify identity.";
