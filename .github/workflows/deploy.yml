@@ -45,7 +45,7 @@ jobs:
           - app: jwk-rotation
             package: "@zarf/jwk-rotation"
             kind: worker
-            url: zarf-jwk-rotation
+            url: https://jwt.zarf.to
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -179,18 +179,84 @@ jobs:
           APP_NAME: ${{ matrix.app }}
           PACKAGE_NAME: ${{ matrix.package }}
         run: |
-          if [ "$APP_NAME" = "pin-proxy" ]; then
-            printf 'PINATA_JWT=%s\n' "$PINATA_JWT" \
-              | pnpm --filter "$PACKAGE_NAME" exec wrangler secret bulk
-          fi
+          secret_file="$(mktemp)"
+          trap 'rm -f "$secret_file"' EXIT
 
-          if [ "$APP_NAME" = "jwk-rotation" ]; then
-            {
-              printf 'REGISTRY_OWNER_SECRET=%s\n' "$REGISTRY_OWNER_SECRET"
-              printf 'ADMIN_TOKEN=%s\n' "$ADMIN_TOKEN"
-              if [ -n "${ALERT_WEBHOOK_URL:-}" ]; then
-                printf 'ALERT_WEBHOOK_URL=%s\n' "$ALERT_WEBHOOK_URL"
-              fi
-            } | pnpm --filter "$PACKAGE_NAME" exec wrangler secret bulk
-          fi
+          SECRET_FILE="$secret_file" node <<'NODE'
+          const fs = require("node:fs");
+
+          const appName = process.env.APP_NAME;
+          const secrets =
+            appName === "jwk-rotation"
+              ? {
+                  REGISTRY_OWNER_SECRET: process.env.REGISTRY_OWNER_SECRET || "",
+                  ADMIN_TOKEN: process.env.ADMIN_TOKEN || "",
+                }
+              : {
+                  PINATA_JWT: process.env.PINATA_JWT || "",
+                };
+
+          if (appName === "jwk-rotation" && process.env.ALERT_WEBHOOK_URL) {
+            secrets.ALERT_WEBHOOK_URL = process.env.ALERT_WEBHOOK_URL;
+          }
+
+          fs.writeFileSync(process.env.SECRET_FILE, JSON.stringify(secrets));
+          NODE
+
+          pnpm --filter "$PACKAGE_NAME" exec wrangler secret bulk "$secret_file"
         working-directory: web
+
+      - name: Verify Worker runtime secrets
+        if: ${{ matrix.app == 'pin-proxy' || matrix.app == 'jwk-rotation' }}
+        env:
+          APP_NAME: ${{ matrix.app }}
+          PACKAGE_NAME: ${{ matrix.package }}
+        run: |
+          secret_file="$(mktemp)"
+          pnpm --filter "$PACKAGE_NAME" exec wrangler secret list --format=json > "$secret_file"
+
+          SECRET_FILE="$secret_file" node <<'NODE'
+          const fs = require("node:fs");
+
+          const appName = process.env.APP_NAME;
+          const secrets = JSON.parse(fs.readFileSync(process.env.SECRET_FILE, "utf8"));
+          const present = new Set(secrets.map((secret) => secret.name));
+          const required =
+            appName === "jwk-rotation"
+              ? ["REGISTRY_OWNER_SECRET", "ADMIN_TOKEN"]
+              : ["PINATA_JWT"];
+          const missing = required.filter((name) => !present.has(name));
+
+          if (missing.length > 0) {
+            console.error(`Missing Cloudflare Worker secret(s) for ${appName}: ${missing.join(", ")}`);
+            process.exit(1);
+          }
+          NODE
+        working-directory: web
+
+      - name: Verify jwk rotation health
+        if: ${{ matrix.app == 'jwk-rotation' }}
+        env:
+          WORKER_URL: ${{ matrix.url }}
+        run: |
+          for attempt in {1..10}; do
+            health="$(curl -fsS "$WORKER_URL/health")"
+            if HEALTH="$health" node <<'NODE'
+          const health = JSON.parse(process.env.HEALTH);
+
+          if (health.hasRegistry && health.hasRpc && health.hasOwnerSecret && health.hasAdminToken) {
+            process.exit(0);
+          }
+
+          console.error(JSON.stringify(health, null, 2));
+          process.exit(1);
+          NODE
+            then
+              exit 0
+            fi
+
+            sleep 3
+          done
+
+          echo "::error::jwk-rotation health check did not expose all required runtime bindings"
+          exit 1
