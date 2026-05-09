@@ -1,0 +1,196 @@
+name: Deploy
+
+on:
+  workflow_run:
+    workflows:
+      - CI
+    types:
+      - completed
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy ${{ matrix.app }}
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    concurrency:
+      group: deploy-${{ matrix.app }}
+      cancel-in-progress: false
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - app: landing
+            package: "@zarf/landing"
+            kind: svelte
+            url: https://zarf.to
+          - app: create
+            package: "@zarf/create"
+            kind: svelte
+            url: https://create.zarf.to
+          - app: claim
+            package: "@zarf/claim"
+            kind: svelte
+            url: https://claim.zarf.to
+          - app: pin-proxy
+            package: "@zarf/pin-proxy"
+            kind: worker
+            url: zarf-pin-proxy
+          - app: jwk-rotation
+            package: "@zarf/jwk-rotation"
+            kind: worker
+            url: zarf-jwk-rotation
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      VITE_GOOGLE_CLIENT_ID: ${{ vars.VITE_GOOGLE_CLIENT_ID || secrets.VITE_GOOGLE_CLIENT_ID }}
+      VITE_PIN_PROXY_URL: ${{ vars.VITE_PIN_PROXY_URL || secrets.VITE_PIN_PROXY_URL }}
+      VITE_STELLAR_DEFAULT_NETWORK: ${{ vars.VITE_STELLAR_DEFAULT_NETWORK || secrets.VITE_STELLAR_DEFAULT_NETWORK }}
+      VITE_STELLAR_TESTNET_RPC_URL: ${{ vars.VITE_STELLAR_TESTNET_RPC_URL || secrets.VITE_STELLAR_TESTNET_RPC_URL }}
+      VITE_STELLAR_TESTNET_FACTORY_ADDRESS: ${{ vars.VITE_STELLAR_TESTNET_FACTORY_ADDRESS || secrets.VITE_STELLAR_TESTNET_FACTORY_ADDRESS }}
+      VITE_STELLAR_MAINNET_RPC_URL: ${{ vars.VITE_STELLAR_MAINNET_RPC_URL || secrets.VITE_STELLAR_MAINNET_RPC_URL }}
+      VITE_STELLAR_MAINNET_FACTORY_ADDRESS: ${{ vars.VITE_STELLAR_MAINNET_FACTORY_ADDRESS || secrets.VITE_STELLAR_MAINNET_FACTORY_ADDRESS }}
+      PINATA_JWT: ${{ secrets.PINATA_JWT }}
+      REGISTRY_OWNER_SECRET: ${{ secrets.REGISTRY_OWNER_SECRET }}
+      ADMIN_TOKEN: ${{ secrets.ADMIN_TOKEN }}
+      ALERT_WEBHOOK_URL: ${{ secrets.ALERT_WEBHOOK_URL }}
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.23.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+        working-directory: web
+
+      - name: Check Cloudflare secrets
+        run: |
+          missing=()
+          for name in CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID; do
+            if [ -z "${!name:-}" ]; then
+              missing+=("$name")
+            fi
+          done
+
+          if [ "${#missing[@]}" -gt 0 ]; then
+            printf '::error::Missing required GitHub secret(s): %s\n' "${missing[*]}"
+            exit 1
+          fi
+
+      - name: Check frontend environment
+        if: ${{ matrix.kind == 'svelte' }}
+        env:
+          APP_NAME: ${{ matrix.app }}
+        run: |
+          has_profile() {
+            local prefix="$1"
+            for suffix in RPC_URL FACTORY_ADDRESS; do
+              local name="VITE_STELLAR_${prefix}_${suffix}"
+              if [ -z "${!name:-}" ]; then
+                return 1
+              fi
+            done
+            return 0
+          }
+
+          missing=()
+          if ! has_profile TESTNET; then
+            missing+=(VITE_STELLAR_TESTNET_RPC_URL VITE_STELLAR_TESTNET_FACTORY_ADDRESS)
+          fi
+
+          if ! has_profile MAINNET; then
+            echo '::warning::Mainnet profile needs VITE_STELLAR_MAINNET_RPC_URL and VITE_STELLAR_MAINNET_FACTORY_ADDRESS. The deployed UI will only offer configured Stellar networks.'
+          fi
+
+          if [ "$APP_NAME" = "create" ]; then
+            if [ -z "${VITE_PIN_PROXY_URL:-}" ]; then
+              missing+=(VITE_PIN_PROXY_URL)
+            fi
+          fi
+
+          if [ "$APP_NAME" = "claim" ]; then
+            if [ -z "${VITE_GOOGLE_CLIENT_ID:-}" ]; then
+              missing+=(VITE_GOOGLE_CLIENT_ID)
+            fi
+          fi
+
+          if [ "${#missing[@]}" -gt 0 ]; then
+            printf '::error::Missing required frontend env for %s: %s\n' "$APP_NAME" "${missing[*]}"
+            exit 1
+          fi
+
+      - name: Check Worker runtime secrets
+        if: ${{ matrix.app == 'pin-proxy' || matrix.app == 'jwk-rotation' }}
+        env:
+          APP_NAME: ${{ matrix.app }}
+        run: |
+          missing=()
+
+          if [ "$APP_NAME" = "pin-proxy" ] && [ -z "${PINATA_JWT:-}" ]; then
+            missing+=(PINATA_JWT)
+          fi
+
+          if [ "$APP_NAME" = "jwk-rotation" ]; then
+            if [ -z "${REGISTRY_OWNER_SECRET:-}" ]; then
+              missing+=(REGISTRY_OWNER_SECRET)
+            fi
+            if [ -z "${ADMIN_TOKEN:-}" ]; then
+              missing+=(ADMIN_TOKEN)
+            fi
+          fi
+
+          if [ "${#missing[@]}" -gt 0 ]; then
+            printf '::error::Missing required GitHub secret(s) for %s: %s\n' "$APP_NAME" "${missing[*]}"
+            exit 1
+          fi
+
+      - name: Deploy ${{ matrix.app }}
+        env:
+          PACKAGE_NAME: ${{ matrix.package }}
+        run: pnpm --filter "$PACKAGE_NAME" run deploy
+        working-directory: web
+
+      - name: Sync Worker runtime secrets
+        if: ${{ matrix.app == 'pin-proxy' || matrix.app == 'jwk-rotation' }}
+        env:
+          APP_NAME: ${{ matrix.app }}
+          PACKAGE_NAME: ${{ matrix.package }}
+        run: |
+          if [ "$APP_NAME" = "pin-proxy" ]; then
+            printf 'PINATA_JWT=%s\n' "$PINATA_JWT" \
+              | pnpm --filter "$PACKAGE_NAME" exec wrangler secret bulk
+          fi
+
+          if [ "$APP_NAME" = "jwk-rotation" ]; then
+            {
+              printf 'REGISTRY_OWNER_SECRET=%s\n' "$REGISTRY_OWNER_SECRET"
+              printf 'ADMIN_TOKEN=%s\n' "$ADMIN_TOKEN"
+              if [ -n "${ALERT_WEBHOOK_URL:-}" ]; then
+                printf 'ALERT_WEBHOOK_URL=%s\n' "$ALERT_WEBHOOK_URL"
+              fi
+            } | pnpm --filter "$PACKAGE_NAME" exec wrangler secret bulk
+          fi
+        working-directory: web

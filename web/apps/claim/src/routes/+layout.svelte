@@ -2,6 +2,7 @@
     import "../app.css";
     import AppShell from "$lib/components/layout/AppShell.svelte";
     import { walletStore } from "@zarf/ui/stores/walletStore.svelte";
+    import { networkStore } from "@zarf/ui/stores/networkStore.svelte";
     import { authStore } from "@zarf/ui/stores/authStore.svelte";
     import { themeStore } from "@zarf/ui/stores/themeStore.svelte";
     import { onMount } from "svelte";
@@ -14,6 +15,7 @@
     onMount(() => {
         if (browser) {
             themeStore.restore();
+            networkStore.restore();
             walletStore.init();
             authStore.restoreGmailSession();
         }

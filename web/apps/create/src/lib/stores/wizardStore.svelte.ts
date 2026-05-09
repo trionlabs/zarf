@@ -11,9 +11,18 @@
  */
 
 import { browser } from '$app/environment';
+import { getActiveStellarNetworkId } from '@zarf/core/config/runtime';
 import type { WizardState, TokenDetails, Distribution } from './types';
 
 const STORAGE_KEY = 'zarf_wizard_state';
+
+function storageKey(): string {
+    try {
+        return `${STORAGE_KEY}:${getActiveStellarNetworkId()}`;
+    } catch {
+        return STORAGE_KEY;
+    }
+}
 
 // ============================================================================
 // Initial State
@@ -71,7 +80,7 @@ function persist() {
     if (!browser) return;
 
     try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        localStorage.setItem(storageKey(), JSON.stringify(state));
     } catch (error) {
         console.warn('[WizardStore] Failed to persist:', error);
     }
@@ -81,7 +90,7 @@ function restore() {
     if (!browser) return;
 
     try {
-        const saved = localStorage.getItem(STORAGE_KEY);
+        const saved = localStorage.getItem(storageKey());
         if (saved) {
             const parsed = JSON.parse(saved) as WizardState;
             // Validate minimal structure
@@ -91,7 +100,7 @@ function restore() {
         }
     } catch (error) {
         console.warn('[WizardStore] Failed to restore, clearing storage:', error);
-        localStorage.removeItem(STORAGE_KEY);
+        localStorage.removeItem(storageKey());
     }
 }
 
@@ -183,7 +192,7 @@ function goToStep(step: number) {
 function reset() {
     state = structuredClone(initialState);
     if (browser) {
-        localStorage.removeItem(STORAGE_KEY);
+        localStorage.removeItem(storageKey());
     }
 }
 

@@ -29,8 +29,7 @@
     );
 
     const explorerUrl = $derived.by(() => {
-        if (!walletStore.address) return null;
-        return `https://stellar.expert/explorer/public/account/${walletStore.address}`;
+        return walletStore.accountExplorerUrl;
     });
 
     const canShowExplorer = $derived(explorerUrl !== null);

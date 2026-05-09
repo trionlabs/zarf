@@ -12,7 +12,11 @@
  */
 import type { StellarAddress, StellarContractId } from '../types';
 
+export type StellarNetworkId = 'testnet' | 'mainnet' | (string & {});
+
 export interface StellarRuntimeConfig {
+    id?: StellarNetworkId;
+    label?: string;
     rpcUrl?: string;
     horizonUrl?: string;
     networkPassphrase?: string;
@@ -21,19 +25,72 @@ export interface StellarRuntimeConfig {
     jwkRegistryAddress?: StellarContractId;
     verifierAddress?: StellarContractId;
     tokenAddress?: StellarContractId;
-    nativeTokenAddress?: StellarContractId;
     explorerBaseUrl?: string;
     networkName?: string;
     deployerAddress?: StellarAddress;
 }
 
 export interface CoreRuntimeConfig {
-    /** Stellar/Soroban runtime configuration. */
+    /** Active/default Stellar/Soroban runtime configuration. */
     stellar: StellarRuntimeConfig;
+    /** Optional named Stellar/Soroban profiles for runtime network switching. */
+    stellarNetworks?: Partial<Record<StellarNetworkId, StellarRuntimeConfig>>;
+    defaultStellarNetwork?: StellarNetworkId;
 }
 
+export interface StellarNetworkOption {
+    id: StellarNetworkId;
+    label: string;
+    networkPassphrase?: string;
+    configured: boolean;
+}
+
+export const STELLAR_NETWORK_STORAGE_KEY = 'zarf_stellar_network';
+
 let _config: CoreRuntimeConfig | null = null;
+let _activeStellarNetworkId: StellarNetworkId | null = null;
 const _configResettersForTests = new Set<() => void>();
+const _networkListeners = new Set<(id: StellarNetworkId, config: StellarRuntimeConfig) => void>();
+
+function normalizeNetworkName(name?: string, passphrase?: string): string {
+    if (name) return name;
+    if (passphrase === 'Public Global Stellar Network ; September 2015') return 'PUBLIC';
+    if (passphrase === 'Test SDF Network ; September 2015') return 'TESTNET';
+    if (passphrase === 'Test SDF Future Network ; October 2022') return 'FUTURENET';
+    return 'CUSTOM';
+}
+
+function networkEntries(): Array<[StellarNetworkId, StellarRuntimeConfig]> {
+    if (!_config?.stellarNetworks) return [];
+    return Object.entries(_config.stellarNetworks).filter(
+        (entry): entry is [StellarNetworkId, StellarRuntimeConfig] => Boolean(entry[1]),
+    );
+}
+
+function isConfigured(config: StellarRuntimeConfig): boolean {
+    return Boolean(
+        config.rpcUrl &&
+            config.horizonUrl &&
+            config.networkPassphrase &&
+            config.factoryAddress &&
+            config.explorerBaseUrl,
+    );
+}
+
+function getActiveNetworkConfig(): StellarRuntimeConfig {
+    if (!_config) {
+        throw new Error(
+            '[core] configureCore was not called. ' +
+                'Add it to your app root (e.g. src/lib/coreInit.ts imported from +layout.ts).',
+        );
+    }
+
+    if (_activeStellarNetworkId && _config.stellarNetworks?.[_activeStellarNetworkId]) {
+        return _config.stellarNetworks[_activeStellarNetworkId]!;
+    }
+
+    return _config.stellar;
+}
 
 /**
  * Configure core. Call once from the app's root layout, before any code that
@@ -48,6 +105,13 @@ export function configureCore(config: CoreRuntimeConfig): void {
         );
     }
     _config = config;
+
+    const entries = networkEntries();
+    const defaultNetwork = config.defaultStellarNetwork;
+    const hasDefault = defaultNetwork && config.stellarNetworks?.[defaultNetwork];
+    _activeStellarNetworkId = hasDefault
+        ? defaultNetwork
+        : entries[0]?.[0] ?? config.stellar.id ?? null;
 }
 
 /**
@@ -64,7 +128,64 @@ export function getCoreConfig(): CoreRuntimeConfig {
 }
 
 export function getStellarConfig(): StellarRuntimeConfig {
-    return getCoreConfig().stellar;
+    return getActiveNetworkConfig();
+}
+
+export function getConfiguredStellarNetworks(): StellarNetworkOption[] {
+    const entries = networkEntries();
+    if (entries.length === 0) {
+        const stellar = getStellarConfig();
+        return [
+            {
+                id: stellar.id ?? 'testnet',
+                label: stellar.label ?? normalizeNetworkName(stellar.networkName, stellar.networkPassphrase),
+                networkPassphrase: stellar.networkPassphrase,
+                configured: isConfigured(stellar),
+            },
+        ];
+    }
+
+    return entries.map(([id, config]) => ({
+        id,
+        label: config.label ?? normalizeNetworkName(config.networkName, config.networkPassphrase),
+        networkPassphrase: config.networkPassphrase,
+        configured: isConfigured(config),
+    }));
+}
+
+export function getActiveStellarNetworkId(): StellarNetworkId {
+    const activeConfig = getStellarConfig();
+    return _activeStellarNetworkId ?? activeConfig.id ?? 'testnet';
+}
+
+export function setActiveStellarNetwork(id: StellarNetworkId): void {
+    if (!_config) {
+        throw new Error('[core] configureCore was not called.');
+    }
+    const next = _config.stellarNetworks?.[id];
+    if (!next) {
+        throw new Error(`[core] unknown Stellar network profile: ${id}`);
+    }
+    if (!isConfigured(next)) {
+        throw new Error(`[core] Stellar network profile is incomplete: ${id}`);
+    }
+
+    if (_activeStellarNetworkId === id) return;
+    _activeStellarNetworkId = id;
+
+    for (const reset of _configResettersForTests) {
+        reset();
+    }
+    for (const listener of _networkListeners) {
+        listener(id, next);
+    }
+}
+
+export function subscribeStellarNetworkChange(
+    listener: (id: StellarNetworkId, config: StellarRuntimeConfig) => void,
+): () => void {
+    _networkListeners.add(listener);
+    return () => _networkListeners.delete(listener);
 }
 
 /**
@@ -81,6 +202,7 @@ export function __registerCoreConfigResetterForTests(reset: () => void): void {
  */
 export function __resetCoreConfigForTests(): void {
     _config = null;
+    _activeStellarNetworkId = null;
     for (const reset of _configResettersForTests) {
         reset();
     }

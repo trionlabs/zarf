@@ -13,7 +13,6 @@ import { keccak_256 } from "@noble/hashes/sha3";
 import { Buffer } from "buffer";
 
 const DEFAULT_GOOGLE_JWKS_URL = "https://www.googleapis.com/oauth2/v3/certs";
-const DEFAULT_STATE_KEY = "google-oauth-jwks";
 const SIMULATION_SOURCE = StrKey.encodeEd25519PublicKey(Buffer.alloc(32));
 const ZERO_HASH = `0x${"0".repeat(64)}` as const;
 const LIMB_BITS = 120n;
@@ -21,7 +20,6 @@ const LIMB_COUNT = 18;
 const FIELD_BYTES = 32;
 
 interface Env {
-    JWK_ROTATION_STATE: KVNamespace;
     STELLAR_RPC_URL: string;
     STELLAR_NETWORK_PASSPHRASE: string;
     JWK_REGISTRY_ADDRESS: string;
@@ -29,7 +27,6 @@ interface Env {
     ADMIN_TOKEN?: string;
     ALERT_WEBHOOK_URL?: string;
     GOOGLE_JWKS_URL?: string;
-    STATE_KEY?: string;
     REVOKE_REMOVED_KEYS?: string;
     TX_POLL_ATTEMPTS?: string;
 }
@@ -55,22 +52,9 @@ interface ConvertedGoogleKey {
     use?: string;
 }
 
-interface ManagedKey {
-    kid: string;
+interface RegistryKey {
     keyHash: HexString;
-    status: "active" | "revoked";
-    firstSeenAt: string;
-    lastSeenAt: string;
-    lastRegisteredAt?: string;
-    lastRevokedAt?: string;
-}
-
-interface RotationState {
-    version: 1;
-    keys: Record<string, ManagedKey>;
-    lastSyncedAt?: string;
-    lastErrorAt?: string;
-    lastError?: string;
+    active: boolean;
 }
 
 interface RegistryAction {
@@ -106,7 +90,7 @@ export default {
         if (url.pathname === "/health" && request.method === "GET") {
             return json({
                 ok: true,
-                hasState: Boolean(env.JWK_ROTATION_STATE),
+                state: "on-chain",
                 hasRegistry: Boolean(env.JWK_REGISTRY_ADDRESS),
                 hasRpc: Boolean(env.STELLAR_RPC_URL),
                 hasOwnerSecret: Boolean(env.REGISTRY_OWNER_SECRET),
@@ -117,7 +101,17 @@ export default {
         if (url.pathname === "/state" && request.method === "GET") {
             const auth = requireAdmin(request, env);
             if (auth) return auth;
-            return json(await loadState(env));
+            validateConfig(env);
+            const [jwks, registryKeys] = await Promise.all([
+                fetchGoogleJwks(env),
+                loadRegistryKeys(env),
+            ]);
+            const currentKeys = convertGoogleKeys(jwks);
+            return json({
+                currentKeys,
+                registryKeys,
+                activeRegistryKeys: registryKeys.filter((key) => key.active),
+            });
         }
 
         if (url.pathname === "/rotate" && request.method === "POST") {
@@ -158,15 +152,15 @@ async function runRotation(
 
     try {
         validateConfig(env);
-        const [jwks, state] = await Promise.all([fetchGoogleJwks(env), loadState(env)]);
-        const now = new Date().toISOString();
+        const [jwks, registryKeys] = await Promise.all([fetchGoogleJwks(env), loadRegistryKeys(env)]);
         currentKeys.push(...convertGoogleKeys(jwks));
-        const currentByKid = new Map(currentKeys.map((key) => [key.kid, key]));
-        const previousEntries = Object.values(state.keys);
+        const currentHashes = new Set(currentKeys.map((key) => key.keyHash));
+        const activeRegistryHashes = new Set(
+            registryKeys.filter((key) => key.active).map((key) => key.keyHash),
+        );
 
         for (const key of currentKeys) {
-            const previous = state.keys[key.kid];
-            const isValid = await isRegistryKeyValid(env, key.keyHash);
+            const isValid = activeRegistryHashes.has(key.keyHash);
 
             if (!isValid) {
                 const action = await registerKey(env, key, options.dryRun);
@@ -177,74 +171,28 @@ async function runRotation(
                     action: "noop",
                     kid: key.kid,
                     keyHash: key.keyHash,
-                    reason: previous ? "already_active" : "already_registered_on_chain",
+                    reason: "already_active_on_chain",
                 });
             }
-
-            state.keys[key.kid] = {
-                kid: key.kid,
-                keyHash: key.keyHash,
-                status: "active",
-                firstSeenAt: previous?.firstSeenAt ?? now,
-                lastSeenAt: now,
-                lastRegisteredAt: !isValid
-                    ? options.dryRun
-                        ? previous?.lastRegisteredAt
-                        : now
-                    : previous?.lastRegisteredAt,
-                lastRevokedAt: previous?.lastRevokedAt,
-            };
         }
 
         if (parseBoolean(env.REVOKE_REMOVED_KEYS, true)) {
-            for (const previous of previousEntries) {
-                if (previous.status !== "active") continue;
-
-                const current = currentByKid.get(previous.kid);
-                const removed = !current;
-                const replaced = Boolean(current && current.keyHash !== previous.keyHash);
-                if (!removed && !replaced) continue;
-
-                const isValid = await isRegistryKeyValid(env, previous.keyHash);
-                if (isValid) {
-                    const action = await revokeKey(
-                        env,
-                        previous,
-                        removed ? "removed_from_google_jwks" : "kid_hash_changed",
-                        options.dryRun,
-                    );
-                    actions.push(action);
-                    if (action.action === "error") continue;
-                } else {
-                    actions.push({
-                        action: "noop",
-                        kid: previous.kid,
-                        keyHash: previous.keyHash,
-                        reason: "already_inactive_on_chain",
-                    });
+            for (const registryKey of registryKeys) {
+                if (!registryKey.active || currentHashes.has(registryKey.keyHash)) {
+                    continue;
                 }
 
-                if (!options.dryRun) {
-                    state.keys[previous.kid] = {
-                        ...previous,
-                        status: "revoked",
-                        lastRevokedAt: now,
-                    };
-                }
+                const action = await revokeKey(
+                    env,
+                    registryKey,
+                    "removed_from_google_jwks",
+                    options.dryRun,
+                );
+                actions.push(action);
             }
         }
 
         const hasErrors = actions.some((action) => action.action === "error");
-        state.lastSyncedAt = now;
-        if (hasErrors) {
-            state.lastError = "One or more JWK registry transactions failed";
-            state.lastErrorAt = now;
-        } else {
-            state.lastError = undefined;
-            state.lastErrorAt = undefined;
-        }
-        if (!options.dryRun) await saveState(env, state);
-
         const report = summarizeReport({
             ok: !hasErrors,
             dryRun: options.dryRun,
@@ -261,15 +209,6 @@ async function runRotation(
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         console.error("[jwk-rotation] failed", message);
-
-        if (!options.dryRun) {
-            const state = await loadState(env).catch(() => emptyState());
-            state.lastError = message;
-            state.lastErrorAt = new Date().toISOString();
-            await saveState(env, state).catch((saveError) => {
-                console.error("[jwk-rotation] failed to save error state", saveError);
-            });
-        }
 
         const report = summarizeReport({
             ok: false,
@@ -392,14 +331,14 @@ async function registerKey(
 
 async function revokeKey(
     env: Env,
-    key: ManagedKey,
+    key: RegistryKey,
     reason: string,
     dryRun: boolean,
 ): Promise<RegistryAction> {
     if (dryRun) {
         return {
             action: "revoke",
-            kid: key.kid,
+            kid: "unknown",
             keyHash: key.keyHash,
             reason: `dry_run_${reason}`,
         };
@@ -409,7 +348,7 @@ async function revokeKey(
         const txHash = await submitRegistryCall(env, "revoke_key", [scBytesN32(key.keyHash)]);
         return {
             action: "revoke",
-            kid: key.kid,
+            kid: "unknown",
             keyHash: key.keyHash,
             reason,
             txHash,
@@ -417,7 +356,7 @@ async function revokeKey(
     } catch (error) {
         return {
             action: "error",
-            kid: key.kid,
+            kid: "unknown",
             keyHash: key.keyHash,
             reason: "revoke_failed",
             error: error instanceof Error ? error.message : String(error),
@@ -425,14 +364,46 @@ async function revokeKey(
     }
 }
 
+async function loadRegistryKeys(env: Env): Promise<RegistryKey[]> {
+    const count = await getRegisteredKeyCount(env);
+    const keys: RegistryKey[] = [];
+
+    for (let index = 0; index < count; index += 1) {
+        const keyHash = await getRegisteredKey(env, index);
+        const active = await isRegistryKeyValid(env, keyHash);
+        keys.push({ keyHash, active });
+    }
+
+    return keys;
+}
+
+async function getRegisteredKeyCount(env: Env): Promise<number> {
+    const result = await simulateRegistryCall(env, "get_registered_key_count");
+    return Number(scValToNative(result));
+}
+
+async function getRegisteredKey(env: Env, index: number): Promise<HexString> {
+    const result = await simulateRegistryCall(env, "get_registered_key", [scU32(index)]);
+    return bytesToHex(scValToNative(result) as Buffer);
+}
+
 async function isRegistryKeyValid(env: Env, keyHash: HexString): Promise<boolean> {
+    const result = await simulateRegistryCall(env, "is_valid_key_hash", [scBytesN32(keyHash)]);
+    return Boolean(scValToNative(result));
+}
+
+async function simulateRegistryCall(
+    env: Env,
+    method: string,
+    args: xdr.ScVal[] = [],
+): Promise<xdr.ScVal> {
     const server = new rpc.Server(env.STELLAR_RPC_URL);
     const tx = new TransactionBuilder(new Account(SIMULATION_SOURCE, "0"), {
         fee: BASE_FEE,
         networkPassphrase: env.STELLAR_NETWORK_PASSPHRASE,
     })
         .setTimeout(30)
-        .addOperation(new Contract(env.JWK_REGISTRY_ADDRESS).call("is_valid_key_hash", scBytesN32(keyHash)))
+        .addOperation(new Contract(env.JWK_REGISTRY_ADDRESS).call(method, ...args))
         .build();
 
     const result = await server.simulateTransaction(tx);
@@ -442,7 +413,7 @@ async function isRegistryKeyValid(env: Env, keyHash: HexString): Promise<boolean
     if (!result.result) {
         throw new Error("Registry simulation returned no result");
     }
-    return Boolean(scValToNative(result.result.retval));
+    return result.result.retval;
 }
 
 async function submitRegistryCall(
@@ -478,38 +449,8 @@ async function submitRegistryCall(
     return sent.hash;
 }
 
-async function loadState(env: Env): Promise<RotationState> {
-    const stored = await env.JWK_ROTATION_STATE.get(stateKey(env), "json");
-    if (!stored || typeof stored !== "object") return emptyState();
-
-    const maybeState = stored as Partial<RotationState>;
-    if (maybeState.version !== 1 || !maybeState.keys || typeof maybeState.keys !== "object") {
-        return emptyState();
-    }
-    return {
-        version: 1,
-        keys: maybeState.keys,
-        lastSyncedAt: maybeState.lastSyncedAt,
-        lastErrorAt: maybeState.lastErrorAt,
-        lastError: maybeState.lastError,
-    };
-}
-
-async function saveState(env: Env, state: RotationState): Promise<void> {
-    await env.JWK_ROTATION_STATE.put(stateKey(env), JSON.stringify(state, null, 2));
-}
-
-function emptyState(): RotationState {
-    return { version: 1, keys: {} };
-}
-
-function stateKey(env: Env): string {
-    return env.STATE_KEY || DEFAULT_STATE_KEY;
-}
-
 function validateConfig(env: Env): void {
     const missing = [
-        ["JWK_ROTATION_STATE", env.JWK_ROTATION_STATE],
         ["STELLAR_RPC_URL", env.STELLAR_RPC_URL],
         ["STELLAR_NETWORK_PASSPHRASE", env.STELLAR_NETWORK_PASSPHRASE],
         ["JWK_REGISTRY_ADDRESS", env.JWK_REGISTRY_ADDRESS],
@@ -561,6 +502,10 @@ function scBytesN32(value: HexString): xdr.ScVal {
 
 function scVec(values: xdr.ScVal[]): xdr.ScVal {
     return xdr.ScVal.scvVec(values);
+}
+
+function scU32(value: number): xdr.ScVal {
+    return xdr.ScVal.scvU32(value);
 }
 
 function parseBoolean(value: string | undefined | null, fallback: boolean): boolean {

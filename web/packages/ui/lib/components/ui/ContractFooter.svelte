@@ -1,5 +1,8 @@
 <script lang="ts">
     import { Copy, Check } from "lucide-svelte";
+    import { getContractExplorerUrl } from "@zarf/core/contracts";
+    import { getStellarConfig } from "@zarf/core/config/runtime";
+    import { networkStore } from "../../stores/networkStore.svelte";
 
     interface ContractInfo {
         name: string;
@@ -8,22 +11,17 @@
 
     let { contracts = [] }: { contracts?: ContractInfo[] } = $props();
 
-    const defaultContracts: ContractInfo[] = [
-        {
-            name: "Vesting (Env)",
-            address: import.meta.env.VITE_STELLAR_VESTING_ADDRESS ?? "",
-        },
-        { name: "Token", address: import.meta.env.VITE_STELLAR_TOKEN_ADDRESS ?? "" },
-        {
-            name: "Factory",
-            address: import.meta.env.VITE_STELLAR_FACTORY_ADDRESS ?? "",
-        },
-        {
-            name: "JWK Registry",
-            address: import.meta.env.VITE_STELLAR_JWK_REGISTRY_ADDRESS ?? "",
-        },
-        { name: "Verifier", address: import.meta.env.VITE_STELLAR_VERIFIER_ADDRESS ?? "" },
-    ];
+    const defaultContracts = $derived.by<ContractInfo[]>(() => {
+        networkStore.activeId;
+        const cfg = getStellarConfig();
+        return [
+            { name: "Vesting", address: cfg.vestingAddress ?? "" },
+            { name: "Token", address: cfg.tokenAddress ?? "" },
+            { name: "Factory", address: cfg.factoryAddress ?? "" },
+            { name: "JWK Registry", address: cfg.jwkRegistryAddress ?? "" },
+            { name: "Verifier", address: cfg.verifierAddress ?? "" },
+        ];
+    });
 
     const displayContracts = $derived(contracts.length > 0 ? contracts : defaultContracts);
 
@@ -37,8 +35,12 @@
     }
 
     function explorerHref(addr: string): string {
-        const base = import.meta.env.VITE_STELLAR_EXPLORER_URL;
-        return addr && base ? `${base.replace(/\/$/, "")}/contract/${addr}` : "#";
+        if (!addr) return "#";
+        try {
+            return getContractExplorerUrl(addr);
+        } catch {
+            return "#";
+        }
     }
 </script>
 
