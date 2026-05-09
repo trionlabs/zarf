@@ -17,11 +17,16 @@
         icon: Icon,
         containerClass = "",
         class: className = "",
+        id,
         value = $bindable(),
         tag = "input",
         variant = "bordered",
         ...rest
     }: Props = $props();
+
+    const generatedId = $props.id();
+    const inputId = $derived(id ?? generatedId);
+    const errorId = $derived(`${inputId}-error`);
 
     const baseInputClasses = `
         w-full transition-all duration-200
@@ -57,7 +62,10 @@
 
 <div class="w-full {containerClass}">
     {#if label}
-        <label class="block pb-1 pl-1 text-xs font-bold uppercase tracking-widest text-zen-fg-subtle">
+        <label
+            for={inputId}
+            class="block pb-1 pl-1 text-xs font-bold uppercase tracking-widest text-zen-fg-subtle"
+        >
             {label}
         </label>
     {/if}
@@ -71,13 +79,19 @@
 
         {#if tag === "input"}
             <input
+                id={inputId}
                 class="{baseInputClasses} {variantClasses[variant]} {errorClasses} {Icon ? 'pl-12' : ''} {className}"
+                aria-invalid={error ? "true" : undefined}
+                aria-describedby={error ? errorId : undefined}
                 bind:value
                 {...rest}
             />
         {:else}
             <textarea
+                id={inputId}
                 class="{baseInputClasses} {variantClasses[variant]} {errorClasses} resize-none min-h-24 {className}"
+                aria-invalid={error ? "true" : undefined}
+                aria-describedby={error ? errorId : undefined}
                 bind:value
                 {...rest as any}
             ></textarea>
@@ -85,7 +99,7 @@
     </div>
 
     {#if error}
-        <div class="pt-1 pl-1 text-xs font-medium text-zen-error animate-zen-slide-up">
+        <div id={errorId} class="pt-1 pl-1 text-xs font-medium text-zen-error animate-zen-slide-up">
             {error}
         </div>
     {/if}

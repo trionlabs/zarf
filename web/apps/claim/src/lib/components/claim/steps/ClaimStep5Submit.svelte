@@ -46,6 +46,11 @@
         }
     }
 
+    function handleRetrySubmit() {
+        error = null;
+        void handleSubmit();
+    }
+
     function sanitizeError(err: unknown): string {
         return sanitizeBlockchainError(err, {
             customRules: [
@@ -192,10 +197,31 @@
         <!-- Status / Errors -->
         {#if error}
             <div
-                class="flex items-center gap-3 p-4 rounded-xl bg-zen-error/5 border border-zen-error/10 text-zen-error text-xs text-left"
+                class="p-4 rounded-xl bg-zen-error/5 border border-zen-error/10 text-left space-y-3"
             >
-                <AlertTriangle class="w-4 h-4 shrink-0" />
-                <p>{error}</p>
+                <div class="flex items-start gap-3 text-zen-error">
+                    <AlertTriangle class="w-4 h-4 shrink-0 mt-0.5" />
+                    <div class="space-y-1">
+                        <p class="text-sm font-medium">Claim was not submitted</p>
+                        <p class="text-xs text-zen-error/80">{error}</p>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <button
+                        type="button"
+                        class="py-2.5 text-xs font-bold uppercase tracking-widest rounded-xl border border-zen-error/20 text-zen-error hover:bg-zen-error/10 transition-colors"
+                        onclick={handleRetrySubmit}
+                    >
+                        Retry Claim
+                    </button>
+                    <button
+                        type="button"
+                        class="py-2.5 text-xs font-bold uppercase tracking-widest rounded-xl border border-zen-border text-zen-fg-muted hover:border-zen-primary/20 hover:text-zen-primary transition-colors"
+                        onclick={handleRegenerateProof}
+                    >
+                        Regenerate Proof
+                    </button>
+                </div>
             </div>
         {/if}
 
@@ -244,7 +270,7 @@
                         <span class="ml-2">Transmitting...</span>
                     {:else}
                         <div class="flex items-center justify-center gap-3">
-                            Claim to this wallet
+                            {error ? "Try Claim Again" : "Claim to this wallet"}
                             <Send
                                 class="w-3.5 h-3.5 group-hover:-translate-y-1 group-hover:translate-x-1 transition-transform"
                             />

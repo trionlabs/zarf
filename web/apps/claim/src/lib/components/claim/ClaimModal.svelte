@@ -4,7 +4,6 @@
     import ClaimStep3Wallet from "./steps/ClaimStep3Wallet.svelte";
     import ClaimStep4Proof from "./steps/ClaimStep4Proof.svelte";
     import ClaimStep5Submit from "./steps/ClaimStep5Submit.svelte";
-    import ZenModal from "@zarf/ui/components/ui/ZenModal.svelte";
 
     let { contractAddress } = $props<{ contractAddress: string }>();
 
@@ -21,13 +20,17 @@
 {#if isOpen}
     <div
         class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[var(--zen-fg)]/50 backdrop-blur-sm animate-zen-fade-in"
-        onclick={(e) => e.target === e.currentTarget && close()}
-        role="dialog"
-        aria-modal="true"
     >
+        <button
+            type="button"
+            class="absolute inset-0 cursor-default border-0 bg-transparent p-0"
+            onclick={close}
+            aria-label="Close claim modal"
+        ></button>
+
         <div
             class="
-                relative w-full max-w-xl
+                relative z-10 w-full max-w-xl
                 bg-zen-bg
                 border-[0.5px] border-zen-border-subtle
                 rounded-2xl
@@ -35,11 +38,16 @@
                 animate-zen-scale-in
                 overflow-hidden
             "
+            role="dialog"
+            aria-modal="true"
+            tabindex="-1"
         >
             <!-- Close Button -->
             <button
+                type="button"
                 class="absolute right-4 top-4 z-50 p-1.5 rounded-full text-zen-fg-subtle hover:text-zen-fg hover:bg-zen-fg/5 transition-colors"
                 onclick={close}
+                aria-label="Close claim modal"
             >
                 <X class="w-4 h-4" />
             </button>

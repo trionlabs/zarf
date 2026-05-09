@@ -78,7 +78,17 @@ export default defineConfig({
 		rollupOptions: {
 			output: {
 				manualChunks: (id) => {
+					if (id.includes('vite/preload-helper') || id.includes('vite/modulepreload-polyfill')) {
+						return 'vite-runtime';
+					}
 					if (id.includes('node_modules')) {
+						if (
+							id.includes('/buffer/') ||
+							id.includes('/base64-js/') ||
+							id.includes('/ieee754/')
+						) {
+							return 'buffer-vendor';
+						}
 						if (id.includes('@noir-lang') || id.includes('@aztec') || id.includes('aztec')) {
 							return 'noir-vendor';
 						}
