@@ -9,6 +9,7 @@
 interface ImportMetaEnv {
     readonly [key: string]: string | boolean | undefined;
     readonly VITE_GOOGLE_CLIENT_ID?: string;
+    readonly VITE_INDEXER_URL?: string;
     readonly VITE_PIN_PROXY_URL?: string;
     readonly VITE_STELLAR_DEFAULT_NETWORK?: string;
     readonly VITE_STELLAR_RPC_URL?: string;

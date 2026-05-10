@@ -3,21 +3,22 @@
  */
 
 import {
-    Account,
     Address as StellarSdkAddress,
     BASE_FEE,
     Contract,
     ScInt,
-    StrKey,
     TransactionBuilder,
     nativeToScVal,
     rpc,
-    scValToNative,
     xdr,
 } from '@stellar/stellar-sdk';
 import { Buffer } from 'buffer';
 import { getStellarConfig } from '../config/runtime';
 import type { StellarRuntimeConfig } from '../config/runtime';
+import {
+    fetchIndexerJson,
+    indexerNetworkPath,
+} from '../utils/indexerClient';
 import type {
     StellarAddress,
     StellarContractId,
@@ -26,7 +27,6 @@ import type {
 } from '../types';
 import { signTransaction } from './wallet';
 
-const SIMULATION_SOURCE = StrKey.encodeEd25519PublicKey(Buffer.alloc(32));
 const FIELD_BYTES = 32;
 
 export interface VestingContractMetadata {
@@ -47,6 +47,52 @@ export interface TokenContractMetadata {
     logoUrl: string | null;
 }
 
+interface IndexerVestingContract {
+    address?: StellarContractId;
+    name: string;
+    description: string;
+    owner: StellarAddress;
+    token: StellarContractId;
+    merkleRoot: string;
+    tokenSymbol: string;
+    tokenDecimals: number;
+    metadataCid?: string | null;
+}
+
+interface IndexerTokenBalance {
+    balance: string;
+}
+
+interface IndexerTokenAllowance {
+    allowance: string;
+}
+
+interface IndexerRecipientId {
+    recipientId: `0x${string}`;
+}
+
+interface IndexerClaimed {
+    claimed: boolean;
+}
+
+interface IndexerPrediction {
+    address: StellarContractId;
+}
+
+interface IndexerLatestLedger {
+    sequence: number;
+}
+
+interface IndexerVestings {
+    vestings: Array<{ address: StellarContractId }>;
+    total: number;
+}
+
+interface IndexerOwnerVestings {
+    contracts: Array<{ address: StellarContractId }>;
+    total: number;
+}
+
 function cfg(): StellarRuntimeConfig & { rpcUrl: string; networkPassphrase: string } {
     const stellar = getStellarConfig();
     const { rpcUrl, networkPassphrase } = stellar;
@@ -57,10 +103,6 @@ function cfg(): StellarRuntimeConfig & { rpcUrl: string; networkPassphrase: stri
 
 function server(): rpc.Server {
     return new rpc.Server(cfg().rpcUrl);
-}
-
-function fakeAccount(): Account {
-    return new Account(SIMULATION_SOURCE, '0');
 }
 
 function normalizeHex(value: string): string {
@@ -77,10 +119,6 @@ function hexToBuffer(value: string, expectedBytes?: number): Buffer {
         throw new Error(`Expected ${expectedBytes} bytes, got ${out.length}`);
     }
     return out;
-}
-
-function bytesToHex(bytes: Buffer | Uint8Array): `0x${string}` {
-    return `0x${Buffer.from(bytes).toString('hex')}`;
 }
 
 function fieldToBytes(value: string | bigint): Buffer {
@@ -124,29 +162,6 @@ function scU32(value: number): xdr.ScVal {
     return nativeToScVal(value, { type: 'u32' });
 }
 
-async function simulate(
-    contractId: StellarContractId,
-    method: string,
-    args: xdr.ScVal[] = [],
-): Promise<xdr.ScVal> {
-    const tx = new TransactionBuilder(fakeAccount(), {
-        fee: BASE_FEE,
-        networkPassphrase: cfg().networkPassphrase,
-    })
-        .setTimeout(30)
-        .addOperation(new Contract(contractId).call(method, ...args))
-        .build();
-
-    const result = await server().simulateTransaction(tx);
-    if (rpc.Api.isSimulationError(result)) {
-        throw new Error(result.error);
-    }
-    if (!result.result) {
-        throw new Error(`No simulation result for ${method}`);
-    }
-    return result.result.retval;
-}
-
 async function invoke(
     sourceAddress: StellarAddress,
     contractId: StellarContractId,
@@ -181,70 +196,42 @@ async function invoke(
     return { hash: sent.hash, receipt };
 }
 
-function scValToBigInt(value: xdr.ScVal): bigint {
-    const native = scValToNative(value);
-    return BigInt(native.toString());
-}
-
 export async function readVestingContract(
     address: StellarContractId,
 ): Promise<VestingContractMetadata> {
-    const [name, description, owner, token, merkleRoot] = await Promise.all([
-        simulate(address, 'name'),
-        simulate(address, 'description'),
-        simulate(address, 'owner'),
-        simulate(address, 'token'),
-        simulate(address, 'merkle_root'),
-    ]);
-
-    const tokenAddress = StellarSdkAddress.fromScVal(token).toString();
-    let tokenSymbol = 'XLM';
-    let tokenDecimals = 7;
-    try {
-        const [symbol, decimals] = await Promise.all([
-            simulate(tokenAddress, 'symbol'),
-            simulate(tokenAddress, 'decimals'),
-        ]);
-        tokenSymbol = String(scValToNative(symbol));
-        tokenDecimals = Number(scValToNative(decimals));
-    } catch {
-        // SAC metadata is nice-to-have for display; the vesting metadata remains valid.
-    }
+    const indexed = await fetchIndexerJson<IndexerVestingContract>(
+        indexerNetworkPath(`/vestings/${encodeURIComponent(address)}`),
+    );
 
     return {
-        name: String(scValToNative(name)),
-        description: String(scValToNative(description)),
-        owner: StellarSdkAddress.fromScVal(owner).toString(),
-        token: tokenAddress,
-        merkleRoot: bytesToHex(scValToNative(merkleRoot)),
-        tokenSymbol,
-        tokenDecimals,
+        name: indexed.name,
+        description: indexed.description,
+        owner: indexed.owner,
+        token: indexed.token,
+        merkleRoot: indexed.merkleRoot,
+        tokenSymbol: indexed.tokenSymbol,
+        tokenDecimals: indexed.tokenDecimals,
     };
 }
 
 export async function readTokenContract(
     tokenAddress: StellarContractId,
 ): Promise<TokenContractMetadata> {
-    const [name, symbol, decimals] = await Promise.all([
-        simulate(tokenAddress, 'name').catch(() => null),
-        simulate(tokenAddress, 'symbol').catch(() => null),
-        simulate(tokenAddress, 'decimals').catch(() => null),
-    ]);
-
-    return {
-        name: name ? String(scValToNative(name)) : null,
-        symbol: symbol ? String(scValToNative(symbol)) : null,
-        decimals: decimals ? Number(scValToNative(decimals)) : null,
-        totalSupply: null,
-        logoUrl: null,
-    };
+    return fetchIndexerJson<TokenContractMetadata>(
+        indexerNetworkPath(`/tokens/${encodeURIComponent(tokenAddress)}`),
+    );
 }
 
 export async function getTokenBalance(
     tokenAddress: StellarContractId,
     owner: StellarAddress,
 ): Promise<bigint> {
-    return scValToBigInt(await simulate(tokenAddress, 'balance', [scAddress(owner)]));
+    const indexed = await fetchIndexerJson<IndexerTokenBalance>(
+        indexerNetworkPath(
+            `/tokens/${encodeURIComponent(tokenAddress)}/balances/${encodeURIComponent(owner)}`,
+        ),
+    );
+    return BigInt(indexed.balance);
 }
 
 export async function getTokenAllowance(
@@ -252,18 +239,24 @@ export async function getTokenAllowance(
     owner: StellarAddress,
     spender: StellarContractId,
 ): Promise<bigint> {
-    return scValToBigInt(await simulate(tokenAddress, 'allowance', [
-        scAddress(owner),
-        scAddress(spender),
-    ]));
+    const indexed = await fetchIndexerJson<IndexerTokenAllowance>(
+        indexerNetworkPath(
+            `/tokens/${encodeURIComponent(tokenAddress)}/allowances/${encodeURIComponent(owner)}/${encodeURIComponent(spender)}`,
+        ),
+    );
+    return BigInt(indexed.allowance);
 }
 
 export async function recipientId(
     contractAddress: StellarContractId,
     recipient: StellarAddress,
 ): Promise<`0x${string}`> {
-    const result = await simulate(contractAddress, 'recipient_id', [scAddress(recipient)]);
-    return bytesToHex(scValToNative(result));
+    const indexed = await fetchIndexerJson<IndexerRecipientId>(
+        indexerNetworkPath(
+            `/vestings/${encodeURIComponent(contractAddress)}/recipient-id/${encodeURIComponent(recipient)}`,
+        ),
+    );
+    return indexed.recipientId;
 }
 
 export async function isEpochClaimed(
@@ -272,8 +265,12 @@ export async function isEpochClaimed(
 ): Promise<boolean> {
     const target = contractAddress || cfg().vestingAddress;
     if (!target) throw new Error('Missing Stellar vesting contract address');
-    const result = await simulate(target, 'is_claimed', [scBytesN32(epochCommitment)]);
-    return Boolean(scValToNative(result));
+    const indexed = await fetchIndexerJson<IndexerClaimed>(
+        indexerNetworkPath(
+            `/vestings/${encodeURIComponent(target)}/claimed/${encodeURIComponent(epochCommitment)}`,
+        ),
+    );
+    return indexed.claimed;
 }
 
 export async function submitClaim(
@@ -338,66 +335,71 @@ export async function createAndFundVesting(params: {
 }
 
 export async function predictVestingAddress(
-    factoryAddress: StellarContractId,
+    _factoryAddress: StellarContractId,
     salt: `0x${string}`,
 ): Promise<StellarContractId> {
-    const result = await simulate(factoryAddress, 'predict_vesting_address', [scBytesN32(salt)]);
-    return StellarSdkAddress.fromScVal(result).toString();
+    const indexed = await fetchIndexerJson<IndexerPrediction>(
+        indexerNetworkPath(`/factory/predict/${encodeURIComponent(salt)}`),
+    );
+    return indexed.address;
 }
 
 export async function getLatestLedgerSequence(): Promise<number> {
-    const latest = await server().getLatestLedger();
-    return latest.sequence;
+    const indexed = await fetchIndexerJson<IndexerLatestLedger>(
+        indexerNetworkPath('/ledger/latest'),
+    );
+    return indexed.sequence;
 }
 
 export async function getDeploymentCount(
-    factoryAddress: StellarContractId = requireFactoryAddress(),
+    _factoryAddress: StellarContractId = requireFactoryAddress(),
 ): Promise<number> {
-    const result = await simulate(factoryAddress, 'get_deployment_count');
-    return Number(scValToNative(result));
+    const indexed = await fetchIndexerJson<IndexerVestings>(indexerNetworkPath('/vestings'));
+    return indexed.total;
 }
 
 export async function getDeployment(
     index: number,
-    factoryAddress: StellarContractId = requireFactoryAddress(),
+    _factoryAddress: StellarContractId = requireFactoryAddress(),
 ): Promise<StellarContractId> {
-    const result = await simulate(factoryAddress, 'get_deployment', [scU32(index)]);
-    return StellarSdkAddress.fromScVal(result).toString();
+    const indexed = await fetchIndexerJson<IndexerVestings>(indexerNetworkPath('/vestings'));
+    const deployment = indexed.vestings[index];
+    if (!deployment) throw new Error(`No deployment at index ${index}`);
+    return deployment.address;
 }
 
 export async function getOwnerDeploymentCount(
     owner: StellarAddress,
-    factoryAddress: StellarContractId = requireFactoryAddress(),
+    _factoryAddress: StellarContractId = requireFactoryAddress(),
 ): Promise<number> {
-    const result = await simulate(factoryAddress, 'get_owner_deployment_count', [scAddress(owner)]);
-    return Number(scValToNative(result));
+    const indexed = await fetchIndexerJson<IndexerOwnerVestings>(
+        indexerNetworkPath(`/owners/${encodeURIComponent(owner)}/vestings`),
+    );
+    return indexed.total;
 }
 
 export async function getOwnerDeployment(
     owner: StellarAddress,
     index: number,
-    factoryAddress: StellarContractId = requireFactoryAddress(),
+    _factoryAddress: StellarContractId = requireFactoryAddress(),
 ): Promise<StellarContractId> {
-    const result = await simulate(factoryAddress, 'get_owner_deployment', [
-        scAddress(owner),
-        scU32(index),
-    ]);
-    return StellarSdkAddress.fromScVal(result).toString();
+    const indexed = await fetchIndexerJson<IndexerOwnerVestings>(
+        indexerNetworkPath(`/owners/${encodeURIComponent(owner)}/vestings`),
+        { maxContracts: index + 1 },
+    );
+    const deployment = indexed.contracts[index];
+    if (!deployment) throw new Error(`No owner deployment at index ${index}`);
+    return deployment.address;
 }
 
 export async function getCidForVesting(
     vestingAddress: StellarContractId,
-    factoryAddress: StellarContractId = requireFactoryAddress(),
+    _factoryAddress: StellarContractId = requireFactoryAddress(),
 ): Promise<string | null> {
-    try {
-        const result = await simulate(factoryAddress, 'vesting_metadata_cid', [
-            scAddress(vestingAddress),
-        ]);
-        const cid = String(scValToNative(result));
-        return cid.length > 0 ? cid : null;
-    } catch {
-        return null;
-    }
+    const indexed = await fetchIndexerJson<IndexerVestingContract>(
+        indexerNetworkPath(`/vestings/${encodeURIComponent(vestingAddress)}`),
+    );
+    return indexed.metadataCid ?? null;
 }
 
 function requireFactoryAddress(): StellarContractId {

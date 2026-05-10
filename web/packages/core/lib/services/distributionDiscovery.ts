@@ -5,12 +5,9 @@
 import type { StellarAddress, StellarContractId } from '../types';
 import { getActiveStellarNetworkId } from '../config/runtime';
 import {
-    getCidForVesting,
-    getOwnerDeployment,
-    getOwnerDeploymentCount as readOwnerDeploymentCount,
-    getTokenBalance,
-    readVestingContract,
-} from '../contracts/contracts';
+    fetchIndexerJson,
+    indexerNetworkPath,
+} from '../utils/indexerClient';
 
 export interface OnChainVestingContract {
     address: StellarContractId;
@@ -38,6 +35,28 @@ export interface DiscoveryError {
     code: 'RPC_ERROR' | 'NO_FACTORY' | 'PARTIAL_FAILURE';
     message: string;
     failedAddresses?: StellarContractId[];
+}
+
+interface IndexerVestingContract {
+    address: StellarContractId;
+    name: string;
+    description: string;
+    token: StellarContractId;
+    tokenSymbol: string;
+    tokenDecimals: number;
+    owner: StellarAddress;
+    vestingStart: string;
+    cliffDuration: string;
+    vestingDuration: string;
+    vestingPeriod: string;
+    tokenBalance: string;
+    metadataCid: string | null;
+}
+
+interface IndexerDiscoveryResult {
+    contracts: IndexerVestingContract[];
+    total: number;
+    fetchedAt: number;
 }
 
 interface CacheEntry {
@@ -71,6 +90,25 @@ function setCacheResult(owner: StellarAddress, result: DiscoveryResult): void {
     });
 }
 
+function fromIndexerContract(contract: IndexerVestingContract): OnChainVestingContract {
+    return {
+        ...contract,
+        vestingStart: BigInt(contract.vestingStart),
+        cliffDuration: BigInt(contract.cliffDuration),
+        vestingDuration: BigInt(contract.vestingDuration),
+        vestingPeriod: BigInt(contract.vestingPeriod),
+        tokenBalance: BigInt(contract.tokenBalance),
+    };
+}
+
+function fromIndexerDiscovery(result: IndexerDiscoveryResult): DiscoveryResult {
+    return {
+        contracts: result.contracts.map(fromIndexerContract),
+        total: result.total,
+        fetchedAt: result.fetchedAt,
+    };
+}
+
 export function invalidateCache(owner?: StellarAddress): void {
     if (!owner) {
         cache.clear();
@@ -99,12 +137,10 @@ export function addOptimisticContract(
 export async function fetchOwnerDeploymentAddresses(
     owner: StellarAddress,
 ): Promise<StellarContractId[]> {
-    const count = await readOwnerDeploymentCount(owner);
-    if (count === 0) return [];
-
-    return Promise.all(
-        Array.from({ length: count }, (_, i) => getOwnerDeployment(owner, i)),
+    const indexed = await fetchIndexerJson<IndexerDiscoveryResult>(
+        indexerNetworkPath(`/owners/${encodeURIComponent(owner)}/vestings`),
     );
+    return indexed.contracts.map((contract) => contract.address);
 }
 
 export function sanitizeString(str: string, maxLength: number): string {
@@ -117,35 +153,12 @@ export async function fetchContractMetadata(
     contractAddress: StellarContractId,
 ): Promise<OnChainVestingContract | null> {
     try {
-        const metadata = await readVestingContract(contractAddress);
-        const [metadataCid, tokenBalance] = await Promise.all([
-            getCidForVesting(contractAddress),
-            getTokenBalance(metadata.token, contractAddress).catch((error) => {
-                console.warn(
-                    `[DiscoveryService] Failed to fetch token balance for ${contractAddress}:`,
-                    error,
-                );
-                return 0n;
-            }),
-        ]);
-
-        return {
-            address: contractAddress,
-            name: sanitizeString(metadata.name || 'Unknown Distribution', 50),
-            description: sanitizeString(metadata.description || '', 200),
-            token: metadata.token,
-            tokenSymbol: sanitizeString(metadata.tokenSymbol || 'XLM', 10),
-            tokenDecimals: metadata.tokenDecimals,
-            owner: metadata.owner,
-            vestingStart: 0n,
-            cliffDuration: 0n,
-            vestingDuration: 0n,
-            vestingPeriod: 0n,
-            tokenBalance,
-            metadataCid,
-        };
+        const indexed = await fetchIndexerJson<IndexerVestingContract>(
+            indexerNetworkPath(`/vestings/${encodeURIComponent(contractAddress)}`),
+        );
+        return fromIndexerContract(indexed);
     } catch (error) {
-        console.error(`[DiscoveryService] Failed to fetch metadata for ${contractAddress}:`, error);
+        console.warn('[DiscoveryService] Indexer metadata read failed:', error);
         return null;
     }
 }
@@ -164,26 +177,23 @@ export async function discoverOwnerVestings(
         if (cached) return cached;
     }
 
-    const addresses = await fetchOwnerDeploymentAddresses(owner);
-    const addressesToFetch = addresses.slice(0, maxContracts);
-    const metadataResults = await Promise.all(
-        addressesToFetch.map((addr) => fetchContractMetadata(addr)),
+    const indexed = await fetchIndexerJson<IndexerDiscoveryResult>(
+        indexerNetworkPath(`/owners/${encodeURIComponent(owner)}/vestings`),
+        {
+            maxContracts,
+            refresh: forceRefresh || undefined,
+        },
     );
-    const contracts = metadataResults.filter(
-        (c): c is OnChainVestingContract => c !== null,
-    );
-
-    const result = {
-        contracts,
-        total: addresses.length,
-        fetchedAt: Date.now(),
-    };
+    const result = fromIndexerDiscovery(indexed);
     setCacheResult(owner, result);
     return result;
 }
 
 export async function getOwnerDeploymentCount(owner: StellarAddress): Promise<number> {
-    return readOwnerDeploymentCount(owner);
+    const indexed = await fetchIndexerJson<IndexerDiscoveryResult>(
+        indexerNetworkPath(`/owners/${encodeURIComponent(owner)}/vestings`),
+    );
+    return indexed.total;
 }
 
 export function __resetDistributionDiscoveryForTests(): void {

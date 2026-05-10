@@ -1,19 +1,10 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { __resetCoreConfigForTests, configureCore } from '../config/runtime';
 import {
     __resetDistributionDiscoveryForTests,
     fetchContractMetadata,
     sanitizeString,
 } from './distributionDiscovery';
-
-const contractMocks = vi.hoisted(() => ({
-    getCidForVesting: vi.fn(),
-    getOwnerDeployment: vi.fn(),
-    getOwnerDeploymentCount: vi.fn(),
-    getTokenBalance: vi.fn(),
-    readVestingContract: vi.fn(),
-}));
-
-vi.mock('../contracts/contracts', () => contractMocks);
 
 // `sanitizeString` runs on every name/description/symbol read from on-chain
 // untrusted input. Locking down the strip-then-truncate semantics matters:
@@ -40,46 +31,66 @@ describe('sanitizeString', () => {
 
 describe('fetchContractMetadata', () => {
     beforeEach(() => {
-        vi.clearAllMocks();
         __resetDistributionDiscoveryForTests();
+        __resetCoreConfigForTests();
+        vi.unstubAllGlobals();
     });
 
-    it('reads the vesting contract token balance so active distributions can be classified', async () => {
-        contractMocks.readVestingContract.mockResolvedValue({
-            name: 'Team Grant',
-            description: 'May cohort',
-            owner: 'GOWNER',
-            token: 'CTOKEN',
-            merkleRoot: '0xabc',
-            tokenSymbol: 'ZRF',
-            tokenDecimals: 7,
+    afterEach(() => {
+        __resetCoreConfigForTests();
+        vi.unstubAllGlobals();
+    });
+
+    it('uses the configured indexer and maps bigint fields from strings', async () => {
+        configureCore({
+            stellar: { id: 'testnet' },
+            indexerUrl: 'https://indexer.zarf.to',
         });
-        contractMocks.getCidForVesting.mockResolvedValue('bafy-metadata');
-        contractMocks.getTokenBalance.mockResolvedValue(42_000_000n);
+        const fetchMock = vi.fn(async () =>
+            new Response(JSON.stringify({
+                address: 'CVESTING',
+                name: 'Team Grant',
+                description: 'May cohort',
+                token: 'CTOKEN',
+                tokenSymbol: 'ZRF',
+                tokenDecimals: 7,
+                owner: 'GOWNER',
+                vestingStart: '0',
+                cliffDuration: '0',
+                vestingDuration: '0',
+                vestingPeriod: '0',
+                tokenBalance: '42000000',
+                metadataCid: 'bafy-metadata',
+            }), {
+                status: 200,
+                headers: { 'Content-Type': 'application/json' },
+            }),
+        );
+        vi.stubGlobal('fetch', fetchMock);
 
         const metadata = await fetchContractMetadata('CVESTING');
 
-        expect(contractMocks.getTokenBalance).toHaveBeenCalledWith('CTOKEN', 'CVESTING');
+        expect(fetchMock.mock.calls[0][0]).toBe('https://indexer.zarf.to/v1/testnet/vestings/CVESTING');
         expect(metadata?.tokenBalance).toBe(42_000_000n);
         expect(metadata?.metadataCid).toBe('bafy-metadata');
     });
 
-    it('keeps metadata visible if only the balance read fails', async () => {
-        contractMocks.readVestingContract.mockResolvedValue({
-            name: 'Team Grant',
-            description: '',
-            owner: 'GOWNER',
-            token: 'CTOKEN',
-            merkleRoot: '0xabc',
-            tokenSymbol: 'ZRF',
-            tokenDecimals: 7,
+    it('does not fall back to direct RPC when the indexer fails', async () => {
+        configureCore({
+            stellar: { id: 'testnet' },
+            indexerUrl: 'https://indexer.zarf.to',
         });
-        contractMocks.getCidForVesting.mockResolvedValue(null);
-        contractMocks.getTokenBalance.mockRejectedValue(new Error('RPC timeout'));
+        const fetchMock = vi.fn(async () =>
+            new Response(JSON.stringify({ error: 'down' }), {
+                status: 503,
+                headers: { 'Content-Type': 'application/json' },
+            }),
+        );
+        vi.stubGlobal('fetch', fetchMock);
 
         const metadata = await fetchContractMetadata('CVESTING');
 
-        expect(metadata?.address).toBe('CVESTING');
-        expect(metadata?.tokenBalance).toBe(0n);
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+        expect(metadata).toBeNull();
     });
 });
