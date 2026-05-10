@@ -24,10 +24,10 @@ describe('fetchIpfsJson', () => {
         vi.unstubAllGlobals();
     });
 
-    it('uses the configured app gateway before public gateways', async () => {
+    it('uses the configured indexer for IPFS JSON', async () => {
         configureCore({
             stellar: {},
-            ipfsGatewayUrl: 'https://pin.zarf.to/ipfs/',
+            indexerUrl: 'https://indexer.zarf.to',
         });
         const fetchMock = vi.fn(async () =>
             new Response(JSON.stringify({ ok: true }), {
@@ -39,10 +39,14 @@ describe('fetchIpfsJson', () => {
 
         await expect(fetchIpfsJson(CID_V0)).resolves.toEqual({ ok: true });
         expect(fetchMock).toHaveBeenCalledTimes(1);
-        expect(fetchMock.mock.calls[0][0]).toBe(`https://pin.zarf.to/ipfs/${CID_V0}`);
+        expect(fetchMock.mock.calls[0][0]).toBe(`https://indexer.zarf.to/v1/ipfs/${CID_V0}`);
     });
 
-    it('accepts ipfs://CID values and normalizes to the raw CID for gateway fetches', async () => {
+    it('accepts ipfs://CID values and normalizes to the raw CID for the indexer', async () => {
+        configureCore({
+            stellar: {},
+            indexerUrl: 'https://indexer.zarf.to',
+        });
         const fetchMock = vi.fn(async () =>
             new Response(JSON.stringify({ ok: true }), {
                 status: 200,
@@ -52,10 +56,40 @@ describe('fetchIpfsJson', () => {
         vi.stubGlobal('fetch', fetchMock);
 
         await expect(fetchIpfsJson(`ipfs://${CID_V0}`)).resolves.toEqual({ ok: true });
-        expect(fetchMock.mock.calls[0][0]).toBe(`https://ipfs.io/ipfs/${CID_V0}`);
+        expect(fetchMock.mock.calls[0][0]).toBe(`https://indexer.zarf.to/v1/ipfs/${CID_V0}`);
     });
 
-    it('rejects placeholder metadata strings before hitting a gateway', async () => {
+    it('does not try another network target when the indexer fails', async () => {
+        configureCore({
+            stellar: {},
+            indexerUrl: 'https://indexer.zarf.to',
+        });
+        const fetchMock = vi.fn(async () =>
+            new Response(JSON.stringify({ error: 'down' }), {
+                status: 503,
+                headers: { 'Content-Type': 'application/json' },
+            }),
+        );
+        vi.stubGlobal('fetch', fetchMock);
+
+        await expect(fetchIpfsJson(CID_V0)).rejects.toMatchObject({
+            name: 'IndexerRequestError',
+        });
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+        expect(fetchMock.mock.calls[0][0]).toBe(`https://indexer.zarf.to/v1/ipfs/${CID_V0}`);
+    });
+
+    it('requires an indexer URL', async () => {
+        const fetchMock = vi.fn();
+        vi.stubGlobal('fetch', fetchMock);
+
+        await expect(fetchIpfsJson(CID_V0)).rejects.toMatchObject({
+            name: 'IndexerUnavailableError',
+        });
+        expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('rejects placeholder metadata strings before hitting the indexer', async () => {
         const fetchMock = vi.fn();
         vi.stubGlobal('fetch', fetchMock);
 

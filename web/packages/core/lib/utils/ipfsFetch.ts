@@ -1,22 +1,13 @@
 /**
- * IPFS fetch with multi-gateway fallback.
+ * IPFS JSON fetch through the Zarf indexer backend.
  *
- * Tries gateways in order with a per-gateway timeout. Caches successful
- * fetches in-memory for the session with bounded LRU eviction. Designed so a
- * single slow gateway doesn't stall the UI.
+ * The browser never falls back to public gateways. If the indexer is down,
+ * callers receive the backend error and can no-op or show UI state.
  *
  * @module utils/ipfsFetch
  */
-import { getCoreConfig } from '../config/runtime';
+import { fetchIndexerJson } from './indexerClient';
 
-const PUBLIC_GATEWAYS = [
-    'https://ipfs.io/ipfs',
-    'https://dweb.link/ipfs',
-    'https://gateway.pinata.cloud/ipfs',
-    'https://w3s.link/ipfs',
-];
-
-const PER_GATEWAY_TIMEOUT_MS = 5_000;
 const MAX_CACHE_ENTRIES = 256;
 
 const cache = new Map<string, unknown>();
@@ -30,37 +21,6 @@ export class IpfsFetchError extends Error {
         super(message);
         this.name = 'IpfsFetchError';
     }
-}
-
-async function fetchFromGateway<T>(gateway: string, cid: string): Promise<T> {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), PER_GATEWAY_TIMEOUT_MS);
-
-    try {
-        const res = await fetch(`${gateway}/${cid}`, { signal: controller.signal });
-        if (!res.ok) {
-            throw new Error(`HTTP ${res.status}`);
-        }
-        return (await res.json()) as T;
-    } finally {
-        clearTimeout(timer);
-    }
-}
-
-function configuredGateway(): string | null {
-    try {
-        const configured = getCoreConfig().ipfsGatewayUrl?.trim();
-        if (!configured) return null;
-        return configured.replace(/\/$/, '');
-    } catch {
-        return null;
-    }
-}
-
-function gateways(): string[] {
-    return Array.from(
-        new Set([configuredGateway(), ...PUBLIC_GATEWAYS].filter((g): g is string => Boolean(g))),
-    );
 }
 
 function validateCid(cid: unknown): string {
@@ -113,8 +73,7 @@ function setCached(cid: string, data: unknown): void {
 }
 
 /**
- * Fetch JSON content for a CID, racing through gateways sequentially
- * (not in parallel — we want to be polite to public gateways).
+ * Fetch JSON content for a CID through the shared backend cache.
  */
 export async function fetchIpfsJson<T = unknown>(cid: string): Promise<T> {
     const validCid = validateCid(cid);
@@ -123,22 +82,9 @@ export async function fetchIpfsJson<T = unknown>(cid: string): Promise<T> {
         return cached;
     }
 
-    const errors: string[] = [];
-    for (const gateway of gateways()) {
-        try {
-            const data = await fetchFromGateway<T>(gateway, validCid);
-            setCached(validCid, data);
-            return data;
-        } catch (err) {
-            errors.push(`${gateway}: ${(err as Error).message}`);
-        }
-    }
-
-    throw new IpfsFetchError(
-        `All IPFS gateways failed for ${validCid}: ${errors.join('; ')}`,
-        validCid,
-        'GATEWAY_FAILURE',
-    );
+    const indexed = await fetchIndexerJson<T>(`/v1/ipfs/${encodeURIComponent(validCid)}`);
+    setCached(validCid, indexed);
+    return indexed;
 }
 
 export function clearIpfsCache(): void {

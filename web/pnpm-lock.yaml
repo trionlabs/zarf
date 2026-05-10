@@ -155,6 +155,25 @@ importers:
         specifier: ^4.61.0
         version: 4.61.0(@cloudflare/workers-types@4.20260128.0)
 
+  apps/indexer:
+    dependencies:
+      '@stellar/stellar-sdk':
+        specifier: ^15.0.1
+        version: 15.0.1
+      buffer:
+        specifier: ^6.0.3
+        version: 6.0.3
+    devDependencies:
+      '@cloudflare/workers-types':
+        specifier: ^4.20251218.0
+        version: 4.20260128.0
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      wrangler:
+        specifier: ^4.61.0
+        version: 4.61.0(@cloudflare/workers-types@4.20260128.0)
+
   apps/jwk-rotation:
     dependencies:
       '@noble/hashes':
@@ -912,8 +931,8 @@ packages:
       rollup:
         optional: true
 
-  '@rollup/wasm-node@4.60.2':
-    resolution: {integrity: sha512-FOfZOg752WSyKNefpSM3WrhggSTSuKuwcSfF7tdWC9PBYYg7BLwBR267uShFAI1ZyA0gNkdqK16LL9mNOPsQ1Q==}
+  '@rollup/wasm-node@4.60.3':
+    resolution: {integrity: sha512-SVhQ4TJk0BvnJKwceVsCWHtmquucfjU0eu+Bonrjb6W3zombkA/tqw1efaqT2BONX/TJniqkzumF6Sz/sXMJ2w==}
     engines: {node: '>=18.0.0', npm: '>=8.0.0'}
     hasBin: true
 
@@ -2788,7 +2807,7 @@ snapshots:
       estree-walker: 2.0.2
       picomatch: 4.0.3
 
-  '@rollup/wasm-node@4.60.2':
+  '@rollup/wasm-node@4.60.3':
     dependencies:
       '@types/estree': 1.0.8
     optionalDependencies:
@@ -4253,7 +4272,7 @@ snapshots:
       fdir: 6.5.0(picomatch@4.0.3)
       picomatch: 4.0.3
       postcss: 8.5.6
-      rollup: '@rollup/wasm-node@4.60.2'
+      rollup: '@rollup/wasm-node@4.60.3'
       tinyglobby: 0.2.15
     optionalDependencies:
       '@types/node': 25.6.0

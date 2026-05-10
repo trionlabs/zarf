@@ -86,5 +86,6 @@ jobs:
 
       - name: Check worker apps
         run: |
+          pnpm --dir web --filter @zarf/indexer typecheck
           pnpm --dir web --filter @zarf/pin-proxy typecheck
           pnpm --dir web --filter @zarf/jwk-rotation typecheck

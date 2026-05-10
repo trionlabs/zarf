@@ -101,7 +101,5 @@ configureCore({
     stellar,
     stellarNetworks,
     defaultStellarNetwork,
-    ipfsGatewayUrl: readEnv('VITE_PIN_PROXY_URL')
-        ? `${readEnv('VITE_PIN_PROXY_URL')!.replace(/\/$/, '')}/ipfs`
-        : undefined,
+    indexerUrl: readEnv('VITE_INDEXER_URL'),
 });

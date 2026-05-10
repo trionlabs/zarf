@@ -38,6 +38,10 @@ jobs:
             package: "@zarf/claim"
             kind: svelte
             url: https://claim.zarf.to
+          - app: indexer
+            package: "@zarf/indexer"
+            kind: worker
+            url: https://indexer.zarf.to
           - app: pin-proxy
             package: "@zarf/pin-proxy"
             kind: worker
@@ -50,12 +54,20 @@ jobs:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       VITE_GOOGLE_CLIENT_ID: ${{ vars.VITE_GOOGLE_CLIENT_ID || secrets.VITE_GOOGLE_CLIENT_ID }}
+      VITE_INDEXER_URL: ${{ vars.VITE_INDEXER_URL || secrets.VITE_INDEXER_URL || 'https://indexer.zarf.to' }}
       VITE_PIN_PROXY_URL: ${{ vars.VITE_PIN_PROXY_URL || secrets.VITE_PIN_PROXY_URL }}
       VITE_STELLAR_DEFAULT_NETWORK: ${{ vars.VITE_STELLAR_DEFAULT_NETWORK || secrets.VITE_STELLAR_DEFAULT_NETWORK }}
       VITE_STELLAR_TESTNET_RPC_URL: ${{ vars.VITE_STELLAR_TESTNET_RPC_URL || secrets.VITE_STELLAR_TESTNET_RPC_URL }}
       VITE_STELLAR_TESTNET_FACTORY_ADDRESS: ${{ vars.VITE_STELLAR_TESTNET_FACTORY_ADDRESS || secrets.VITE_STELLAR_TESTNET_FACTORY_ADDRESS }}
       VITE_STELLAR_MAINNET_RPC_URL: ${{ vars.VITE_STELLAR_MAINNET_RPC_URL || secrets.VITE_STELLAR_MAINNET_RPC_URL }}
       VITE_STELLAR_MAINNET_FACTORY_ADDRESS: ${{ vars.VITE_STELLAR_MAINNET_FACTORY_ADDRESS || secrets.VITE_STELLAR_MAINNET_FACTORY_ADDRESS }}
+      STELLAR_TESTNET_RPC_URL: ${{ vars.STELLAR_TESTNET_RPC_URL || secrets.STELLAR_TESTNET_RPC_URL || vars.VITE_STELLAR_TESTNET_RPC_URL || secrets.VITE_STELLAR_TESTNET_RPC_URL }}
+      STELLAR_TESTNET_FACTORY_ADDRESS: ${{ vars.STELLAR_TESTNET_FACTORY_ADDRESS || secrets.STELLAR_TESTNET_FACTORY_ADDRESS || vars.VITE_STELLAR_TESTNET_FACTORY_ADDRESS || secrets.VITE_STELLAR_TESTNET_FACTORY_ADDRESS }}
+      STELLAR_TESTNET_NETWORK_PASSPHRASE: ${{ vars.STELLAR_TESTNET_NETWORK_PASSPHRASE || secrets.STELLAR_TESTNET_NETWORK_PASSPHRASE }}
+      STELLAR_MAINNET_RPC_URL: ${{ vars.STELLAR_MAINNET_RPC_URL || secrets.STELLAR_MAINNET_RPC_URL || vars.VITE_STELLAR_MAINNET_RPC_URL || secrets.VITE_STELLAR_MAINNET_RPC_URL }}
+      STELLAR_MAINNET_FACTORY_ADDRESS: ${{ vars.STELLAR_MAINNET_FACTORY_ADDRESS || secrets.STELLAR_MAINNET_FACTORY_ADDRESS || vars.VITE_STELLAR_MAINNET_FACTORY_ADDRESS || secrets.VITE_STELLAR_MAINNET_FACTORY_ADDRESS }}
+      STELLAR_MAINNET_NETWORK_PASSPHRASE: ${{ vars.STELLAR_MAINNET_NETWORK_PASSPHRASE || secrets.STELLAR_MAINNET_NETWORK_PASSPHRASE }}
+      INDEXER_KV_NAMESPACE_TITLE: ${{ vars.INDEXER_KV_NAMESPACE_TITLE || 'zarf-indexer-cache' }}
       PINATA_JWT: ${{ secrets.PINATA_JWT }}
       REGISTRY_OWNER_SECRET: ${{ secrets.REGISTRY_OWNER_SECRET }}
       ADMIN_TOKEN: ${{ secrets.ADMIN_TOKEN }}
@@ -126,12 +138,18 @@ jobs:
           fi
 
           if [ "$APP_NAME" = "create" ]; then
+            if [ -z "${VITE_INDEXER_URL:-}" ]; then
+              missing+=(VITE_INDEXER_URL)
+            fi
             if [ -z "${VITE_PIN_PROXY_URL:-}" ]; then
               missing+=(VITE_PIN_PROXY_URL)
             fi
           fi
 
           if [ "$APP_NAME" = "claim" ]; then
+            if [ -z "${VITE_INDEXER_URL:-}" ]; then
+              missing+=(VITE_INDEXER_URL)
+            fi
             if [ -z "${VITE_GOOGLE_CLIENT_ID:-}" ]; then
               missing+=(VITE_GOOGLE_CLIENT_ID)
             fi
@@ -143,7 +161,7 @@ jobs:
           fi
 
       - name: Check Worker runtime secrets
-        if: ${{ matrix.app == 'pin-proxy' || matrix.app == 'jwk-rotation' }}
+        if: ${{ matrix.app == 'pin-proxy' || matrix.app == 'jwk-rotation' || matrix.app == 'indexer' }}
         env:
           APP_NAME: ${{ matrix.app }}
         run: |
@@ -162,19 +180,132 @@ jobs:
             fi
           fi
 
+          if [ "$APP_NAME" = "indexer" ]; then
+            for name in STELLAR_TESTNET_RPC_URL STELLAR_TESTNET_FACTORY_ADDRESS; do
+              if [ -z "${!name:-}" ]; then
+                missing+=("$name")
+              fi
+            done
+          fi
+
           if [ "${#missing[@]}" -gt 0 ]; then
             printf '::error::Missing required GitHub secret(s) for %s: %s\n' "$APP_NAME" "${missing[*]}"
             exit 1
           fi
 
+      - name: Prepare indexer KV binding
+        if: ${{ matrix.app == 'indexer' }}
+        run: |
+          node <<'NODE'
+          const fs = require("node:fs");
+
+          const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
+          const token = process.env.CLOUDFLARE_API_TOKEN;
+          const title = process.env.INDEXER_KV_NAMESPACE_TITLE || "zarf-indexer-cache";
+
+          if (!accountId || !token) {
+            console.error("Missing Cloudflare account/API token for KV setup");
+            process.exit(1);
+          }
+
+          const api = `https://api.cloudflare.com/client/v4/accounts/${accountId}/storage/kv/namespaces`;
+          const headers = {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          };
+
+          async function cf(path = "", init = {}) {
+            const response = await fetch(`${api}${path}`, { ...init, headers });
+            const body = await response.json().catch(() => null);
+            if (!response.ok || !body?.success) {
+              console.error(JSON.stringify(body, null, 2));
+              throw new Error(`Cloudflare API request failed: HTTP ${response.status}`);
+            }
+            return body;
+          }
+
+          async function findNamespace() {
+            let page = 1;
+            while (true) {
+              const body = await cf(`?per_page=100&page=${page}`);
+              const found = body.result.find((namespace) => namespace.title === title);
+              if (found) return found;
+
+              const info = body.result_info;
+              if (!info || page >= info.total_pages) return null;
+              page += 1;
+            }
+          }
+
+          async function main() {
+            const existing = await findNamespace();
+            const namespace = existing ?? (await cf("", {
+              method: "POST",
+              body: JSON.stringify({ title }),
+            })).result;
+
+            const config = {
+              $schema: "../../node_modules/wrangler/config-schema.json",
+              name: "zarf-indexer",
+              account_id: accountId,
+              main: "src/index.ts",
+              compatibility_date: "2025-01-15",
+              vars: {
+                ALLOWED_ORIGINS:
+                  "http://localhost:5173,http://localhost:5174,http://localhost:5175,https://create.zarf.to,https://claim.zarf.to",
+                CACHE_NAMESPACE: "zarf-indexer:v1",
+                DEPLOYMENTS_TTL_SECONDS: "60",
+                OWNER_TTL_SECONDS: "60",
+                VESTING_TTL_SECONDS: "120",
+                IPFS_TTL_SECONDS: "86400",
+                READ_TTL_SECONDS: "30",
+                LEDGER_TTL_SECONDS: "5",
+              },
+              kv_namespaces: [
+                {
+                  binding: "INDEXER_CACHE",
+                  id: namespace.id,
+                },
+              ],
+              observability: {
+                enabled: true,
+              },
+              routes: [
+                {
+                  pattern: "indexer.zarf.to",
+                  custom_domain: true,
+                },
+              ],
+            };
+
+            fs.writeFileSync(
+              "apps/indexer/wrangler.generated.json",
+              `${JSON.stringify(config, null, 2)}\n`,
+            );
+
+            console.log(`Prepared KV namespace ${title} (${namespace.id})`);
+          }
+
+          main().catch((error) => {
+            console.error(error);
+            process.exit(1);
+          });
+          NODE
+        working-directory: web
+
       - name: Deploy ${{ matrix.app }}
         env:
           PACKAGE_NAME: ${{ matrix.package }}
-        run: pnpm --filter "$PACKAGE_NAME" run deploy
+        run: |
+          if [ "${{ matrix.app }}" = "indexer" ]; then
+            pnpm --filter "$PACKAGE_NAME" exec wrangler deploy --config wrangler.generated.json
+          else
+            pnpm --filter "$PACKAGE_NAME" run deploy
+          fi
         working-directory: web
 
       - name: Sync Worker runtime secrets
-        if: ${{ matrix.app == 'pin-proxy' || matrix.app == 'jwk-rotation' }}
+        if: ${{ matrix.app == 'pin-proxy' || matrix.app == 'jwk-rotation' || matrix.app == 'indexer' }}
         env:
           APP_NAME: ${{ matrix.app }}
           PACKAGE_NAME: ${{ matrix.package }}
@@ -186,15 +317,32 @@ jobs:
           const fs = require("node:fs");
 
           const appName = process.env.APP_NAME;
-          const secrets =
-            appName === "jwk-rotation"
-              ? {
-                  REGISTRY_OWNER_SECRET: process.env.REGISTRY_OWNER_SECRET || "",
-                  ADMIN_TOKEN: process.env.ADMIN_TOKEN || "",
-                }
-              : {
-                  PINATA_JWT: process.env.PINATA_JWT || "",
-                };
+          let secrets;
+
+          if (appName === "jwk-rotation") {
+            secrets = {
+              REGISTRY_OWNER_SECRET: process.env.REGISTRY_OWNER_SECRET || "",
+              ADMIN_TOKEN: process.env.ADMIN_TOKEN || "",
+            };
+          } else if (appName === "indexer") {
+            secrets = {
+              STELLAR_TESTNET_RPC_URL: process.env.STELLAR_TESTNET_RPC_URL || "",
+              STELLAR_TESTNET_FACTORY_ADDRESS: process.env.STELLAR_TESTNET_FACTORY_ADDRESS || "",
+            };
+
+            for (const name of [
+              "STELLAR_TESTNET_NETWORK_PASSPHRASE",
+              "STELLAR_MAINNET_RPC_URL",
+              "STELLAR_MAINNET_FACTORY_ADDRESS",
+              "STELLAR_MAINNET_NETWORK_PASSPHRASE",
+            ]) {
+              if (process.env[name]) secrets[name] = process.env[name];
+            }
+          } else {
+            secrets = {
+              PINATA_JWT: process.env.PINATA_JWT || "",
+            };
+          }
 
           if (appName === "jwk-rotation" && process.env.ALERT_WEBHOOK_URL) {
             secrets.ALERT_WEBHOOK_URL = process.env.ALERT_WEBHOOK_URL;
@@ -207,7 +355,7 @@ jobs:
         working-directory: web
 
       - name: Verify Worker runtime secrets
-        if: ${{ matrix.app == 'pin-proxy' || matrix.app == 'jwk-rotation' }}
+        if: ${{ matrix.app == 'pin-proxy' || matrix.app == 'jwk-rotation' || matrix.app == 'indexer' }}
         env:
           APP_NAME: ${{ matrix.app }}
           PACKAGE_NAME: ${{ matrix.package }}
@@ -224,7 +372,12 @@ jobs:
           const required =
             appName === "jwk-rotation"
               ? ["REGISTRY_OWNER_SECRET", "ADMIN_TOKEN"]
-              : ["PINATA_JWT"];
+              : appName === "indexer"
+                ? [
+                    "STELLAR_TESTNET_RPC_URL",
+                    "STELLAR_TESTNET_FACTORY_ADDRESS",
+                  ]
+                : ["PINATA_JWT"];
           const missing = required.filter((name) => !present.has(name));
 
           if (missing.length > 0) {
@@ -233,6 +386,33 @@ jobs:
           }
           NODE
         working-directory: web
+
+      - name: Verify indexer health
+        if: ${{ matrix.app == 'indexer' }}
+        env:
+          WORKER_URL: ${{ matrix.url }}
+        run: |
+          for attempt in {1..10}; do
+            health="$(curl -fsS "$WORKER_URL/health")"
+            if HEALTH="$health" node <<'NODE'
+          const health = JSON.parse(process.env.HEALTH);
+
+          if (health.ok && health.hasKv) {
+            process.exit(0);
+          }
+
+          console.error(JSON.stringify(health, null, 2));
+          process.exit(1);
+          NODE
+            then
+              exit 0
+            fi
+
+            sleep 3
+          done
+
+          echo "::error::Indexer health check failed"
+          exit 1
 
       - name: Verify jwk rotation health
         if: ${{ matrix.app == 'jwk-rotation' }}
