@@ -32,6 +32,7 @@ function connectSources(): string {
         import.meta.env.VITE_STELLAR_TESTNET_HORIZON_URL,
         import.meta.env.VITE_STELLAR_MAINNET_RPC_URL,
         import.meta.env.VITE_STELLAR_MAINNET_HORIZON_URL,
+        import.meta.env.VITE_INDEXER_URL,
     ]
         .map(originFrom)
         .filter((origin): origin is string => Boolean(origin));
