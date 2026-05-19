@@ -3,7 +3,7 @@
         ExternalLink,
     } from "lucide-svelte";
     import type { OnChainVestingContract } from "@zarf/core/services/distributionDiscovery";
-    import { getContractExplorerUrl } from "@zarf/core/contracts";
+    import { getContractExplorerUrl } from "@zarf/core/contracts/explorer";
     import { formatTokenAmount } from "@zarf/core/utils/amount";
     import ZenCard from "@zarf/ui/components/ui/ZenCard.svelte";
     import ZenButton from "@zarf/ui/components/ui/ZenButton.svelte";

@@ -10,7 +10,7 @@
     import type { OnChainVestingContract } from "@zarf/core/services/distributionDiscovery";
     import { getCidForVesting } from "@zarf/core/services/vestingDiscovery";
     import { fetchIpfsJson } from "@zarf/core/utils/ipfsFetch";
-    import { getContractExplorerUrl } from "@zarf/core/contracts";
+    import { getContractExplorerUrl } from "@zarf/core/contracts/explorer";
     import { formatTokenAmount } from "@zarf/core/utils/amount";
 
     let {

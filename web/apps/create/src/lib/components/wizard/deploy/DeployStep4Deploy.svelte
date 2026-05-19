@@ -10,7 +10,7 @@
     import { addOptimisticContract } from "@zarf/core/services/distributionDiscovery";
     import { buildFactoryDeployInputs } from "@zarf/core/domain/merkleResultAdapter";
     import { planDeploy, buildOptimisticContract } from "@zarf/core/domain/deployPlanner";
-    import { getContractExplorerUrl, getExplorerUrl } from "@zarf/core/contracts";
+    import { getContractExplorerUrl, getExplorerUrl } from "@zarf/core/contracts/explorer";
     import { parseTokenAmount } from "@zarf/core/utils/amount";
     import { walletStore } from "@zarf/ui/stores/walletStore.svelte";
     import { goto } from "$app/navigation";

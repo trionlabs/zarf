@@ -407,21 +407,3 @@ function requireFactoryAddress(): StellarContractId {
     if (!factoryAddress) throw new Error('Missing Stellar factory contract address');
     return factoryAddress;
 }
-
-export function getExplorerUrl(hash: TransactionHash): string {
-    const base = cfg().explorerBaseUrl;
-    if (!base) throw new Error('Missing Stellar explorer URL');
-    return `${base.replace(/\/$/, '')}/tx/${hash}`;
-}
-
-export function getAccountExplorerUrl(address: StellarAddress): string {
-    const base = cfg().explorerBaseUrl;
-    if (!base) throw new Error('Missing Stellar explorer URL');
-    return `${base.replace(/\/$/, '')}/account/${address}`;
-}
-
-export function getContractExplorerUrl(address: StellarContractId): string {
-    const base = cfg().explorerBaseUrl;
-    if (!base) throw new Error('Missing Stellar explorer URL');
-    return `${base.replace(/\/$/, '')}/contract/${address}`;
-}

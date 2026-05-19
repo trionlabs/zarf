@@ -20,7 +20,7 @@ import {
     isSupportedNetwork,
     getConfiguredNetworkName,
 } from "@zarf/core/contracts/wallet";
-import { getAccountExplorerUrl } from "@zarf/core/contracts";
+import { getAccountExplorerUrl } from "@zarf/core/contracts/explorer";
 import type { StellarAddress, WalletAccount } from "@zarf/core/types";
 import { sanitizeBlockchainError } from '../utils/errorSanitizer';
 import { networkStore } from './networkStore.svelte';

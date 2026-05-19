@@ -1,6 +1,6 @@
 <script lang="ts">
     import { Copy, Check } from "lucide-svelte";
-    import { getContractExplorerUrl } from "@zarf/core/contracts";
+    import { getContractExplorerUrl } from "@zarf/core/contracts/explorer";
     import { getStellarConfig } from "@zarf/core/config/runtime";
     import { networkStore } from "@zarf/ui/stores/networkStore.svelte";
 
