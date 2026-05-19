@@ -78,6 +78,19 @@ export default defineConfig({
 						return 'vite-runtime';
 					}
 					if (id.includes('node_modules')) {
+						// Isolate the buffer / base64-js / ieee754 polyfills
+						// into their own chunk. @stellar/stellar-sdk depends
+						// on them via the contracts chunk, which is in the
+						// root layout's static graph; without this split they
+						// co-locate with @aztec/bb.js inside noir-vendor and
+						// keep noir-vendor pinned in the eager closure.
+						if (
+							id.includes('/buffer/') ||
+							id.includes('/base64-js/') ||
+							id.includes('/ieee754/')
+						) {
+							return 'buffer-vendor';
+						}
 						if (id.includes('@noir-lang') || id.includes('@aztec') || id.includes('aztec')) {
 							return 'noir-vendor';
 						}
