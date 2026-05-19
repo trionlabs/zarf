@@ -144,7 +144,7 @@ async function init() {
 
     // 3. Setup Watcher
     if (unwatchFn) unwatchFn();
-    unwatchFn = watchWalletAccount((account: WalletAccount) => {
+    unwatchFn = await watchWalletAccount((account: WalletAccount) => {
         updateInternalState({ ...account, address: account.address ?? undefined });
     });
 }
