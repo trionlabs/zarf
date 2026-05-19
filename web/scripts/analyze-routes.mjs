@@ -12,7 +12,7 @@
 
 import { readFileSync, statSync, readdirSync } from 'node:fs';
 import { gzipSync } from 'node:zlib';
-import { resolve, basename, dirname } from 'node:path';
+import { resolve, basename } from 'node:path';
 
 const appName = process.argv[2];
 if (!appName) {
@@ -27,12 +27,22 @@ const MANIFEST_PATH = resolve(CLIENT_ROOT, '.vite/manifest.json');
 
 const manifest = JSON.parse(readFileSync(MANIFEST_PATH, 'utf-8'));
 
+// Reverse lookup: chunk file (relative to client root) -> manifest `name`.
+// Used to identify vendor chunks (manualChunks-assigned names like
+// "noir-vendor", "stellar-vendor", "vite-runtime") in a hash-stable way.
+const fileToName = new Map();
+for (const v of Object.values(manifest)) {
+    if (v.file && v.name) fileToName.set(v.file, v.name);
+}
+
 // Build name -> entry table; manifest uses fully-qualified src paths as keys.
 function findEntry(predicate) {
     return Object.entries(manifest).find(([, v]) => predicate(v))?.[1];
 }
 function findChunk(key) {
-    // imports are written as "_HASH.js" — match against file basename minus dir.
+    // `imports` and `dynamicImports` entries are written as "_HASH.js"; match
+    // against `file` basename. Manifest keys themselves are full source paths,
+    // not the "_HASH.js" form, so we scan values.
     return Object.values(manifest).find(
         (v) => v.file === `_app/immutable/chunks/${key.replace(/^_/, '')}` ||
                '_' + basename(v.file) === key,
@@ -89,14 +99,18 @@ function fmtKB(n) {
     return (n / 1024).toFixed(1);
 }
 
-// Identify vendor chunks by name field
-function vendorOf(file) {
-    const base = basename(file);
-    if (/vFWMS0_9|DG6dFKCa/.test(base)) return 'noir-vendor';
-    if (/B1QfbzEK/.test(base)) return 'stellar-vendor';
-    // Fall back to first ~6 chars as label
-    return base;
+// Return the manifest-assigned name of a chunk (e.g. "noir-vendor",
+// "stellar-vendor", "ui-vendor", "merkleTree", "ZenButton"). Falls back to
+// basename when the chunk isn't in the manifest (rare; usually only Vite
+// internal helpers without an explicit name).
+//
+// Hash-stable: the manifest writes the same name across rebuilds even when
+// file hashes change.
+function nameFor(file) {
+    return fileToName.get(file) ?? basename(file);
 }
+
+const VENDOR_NAMES = new Set(['noir-vendor', 'stellar-vendor']);
 
 // Find route nodes from manifest (entries named "nodes/N")
 const routeNodes = Object.values(manifest).filter((v) => v.name?.startsWith('nodes/'));
@@ -136,10 +150,10 @@ for (const r of rowSummaries) {
     const vendors = new Set();
     let big = [];
     for (const f of r.eagerFiles) {
-        const v = vendorOf(f);
-        if (v === 'noir-vendor' || v === 'stellar-vendor') vendors.add(v);
+        const n = nameFor(f);
+        if (VENDOR_NAMES.has(n)) vendors.add(n);
         const { gz } = sizesFor(f);
-        if (gz > 100 * 1024) big.push(`${basename(f)} (${fmtKB(gz)} KB gz)`);
+        if (gz > 100 * 1024) big.push(`${n} (${fmtKB(gz)} KB gz)`);
     }
     console.log(
         `${r.node} | ${vendors.has('noir-vendor') ? '**YES**' : 'no'} | ${vendors.has('stellar-vendor') ? '**YES**' : 'no'} | ${big.join('; ') || '—'}`,
@@ -159,10 +173,11 @@ console.log(`- Chunks loaded by AT LEAST ONE route (eager somewhere): ${eagerEve
 console.log(`- Chunks NOT eager on any route (lazy-only): ${possiblyLazy.length}`);
 
 console.log('\nLazy-only chunks (loaded via dynamicImports or never from initial paint):');
-console.log('chunk | raw KB | gz KB | label');
+console.log('chunk | raw KB | gz KB | name');
 console.log('---|---:|---:|---');
 for (const f of possiblyLazy.sort((a, b) => sizesFor(`_app/immutable/chunks/${b}`).gz - sizesFor(`_app/immutable/chunks/${a}`).gz)) {
-    const { raw, gz } = sizesFor(`_app/immutable/chunks/${f}`);
-    const v = vendorOf(f);
-    console.log(`${f} | ${fmtKB(raw)} | ${fmtKB(gz)} | ${v === f ? '' : `**${v}**`}`);
+    const filePath = `_app/immutable/chunks/${f}`;
+    const { raw, gz } = sizesFor(filePath);
+    const n = nameFor(filePath);
+    console.log(`${f} | ${fmtKB(raw)} | ${fmtKB(gz)} | ${n === basename(f) ? '' : `**${n}**`}`);
 }
