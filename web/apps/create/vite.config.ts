@@ -4,6 +4,7 @@ import { defineConfig, type Plugin } from 'vite';
 import wasm from 'vite-plugin-wasm';
 import topLevelAwait from 'vite-plugin-top-level-await';
 import { nodePolyfills } from 'vite-plugin-node-polyfills';
+import { visualizer } from 'rollup-plugin-visualizer';
 
 // Stub large browser-only libraries during SSR.
 const productionStub = (): Plugin => {
@@ -46,6 +47,12 @@ export default defineConfig({
 			include: ['crypto', 'stream', 'util', 'events', 'buffer'],
 			globals: { Buffer: 'build', global: false, process: false },
 			protocolImports: true,
+		}),
+		visualizer({
+			filename: 'stats.html',
+			gzipSize: true,
+			brotliSize: true,
+			template: 'treemap',
 		}),
 	],
 	// Load .env from parent directory (project root)

@@ -5,6 +5,7 @@ import wasm from 'vite-plugin-wasm';
 import topLevelAwait from 'vite-plugin-top-level-await';
 import { nodePolyfills } from 'vite-plugin-node-polyfills';
 import { viteStaticCopy } from 'vite-plugin-static-copy';
+import { visualizer } from 'rollup-plugin-visualizer';
 import type { Plugin } from 'vite';
 
 // Stub large browser-only libraries during SSR.
@@ -55,6 +56,12 @@ export default defineConfig({
 				{ src: '../../packages/core/static/wasm/*', dest: 'wasm' },
 			],
 			structured: false,
+		}),
+		visualizer({
+			filename: 'stats.html',
+			gzipSize: true,
+			brotliSize: true,
+			template: 'treemap',
 		}),
 	],
 	// Load .env from parent directory (project root)
