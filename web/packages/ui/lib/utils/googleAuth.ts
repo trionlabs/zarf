@@ -8,7 +8,15 @@
  */
 
 import type { DecodedJWT, GooglePublicKey, JWTHeader, JWTPayload, OAuthState } from '../types';
-import { isValidContractAddress } from '@zarf/core/utils/address';
+
+// Format-only Stellar contract address shape check. Used here for defensive
+// OAuth-state pre-validation; full StrKey CRC validation lives in
+// @zarf/core/utils/address and runs at form-submit time. Importing it here
+// would pull @stellar/stellar-sdk into the root-layout eager graph via
+// authStore, which is the entry point for both apps.
+function isContractAddressShape(address: string): boolean {
+    return /^C[A-Z2-7]{55}$/.test(address);
+}
 
 // ============================================================================
 // Constants
@@ -86,7 +94,7 @@ export function decodeOAuthState(stateParam: string | null): OAuthState | null {
         const decoded = JSON.parse(stateParam);
 
         // Validate address format if present
-        if (decoded.address && !isValidContractAddress(decoded.address)) {
+        if (decoded.address && !isContractAddressShape(decoded.address)) {
             console.warn('[OAuth] Invalid address in state, ignoring');
             delete decoded.address;
         }
@@ -176,7 +184,7 @@ export function redirectToGoogle(contractAddress?: string): void {
     // Build state with optional contract address
     const oauthState: OAuthState = {};
     if (contractAddress) {
-        if (isValidContractAddress(contractAddress)) {
+        if (isContractAddressShape(contractAddress)) {
             oauthState.address = contractAddress;
         } else {
             console.warn('[Auth] Invalid contract address format, not preserving');
