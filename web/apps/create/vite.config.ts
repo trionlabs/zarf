@@ -69,6 +69,14 @@ export default defineConfig({
 		rollupOptions: {
 			output: {
 				manualChunks: (id) => {
+					// Split Vite's __vitePreload / modulepreload helper into
+					// its own chunk so it doesn't get co-located with
+					// noir-vendor. Without this, entry/app.js statically
+					// imports the helper from the noir-vendor chunk and drags
+					// ~5 MB gz of @aztec/bb.js onto every initial paint.
+					if (id.includes('vite/preload-helper') || id.includes('vite/modulepreload-polyfill')) {
+						return 'vite-runtime';
+					}
 					if (id.includes('node_modules')) {
 						if (id.includes('@noir-lang') || id.includes('@aztec') || id.includes('aztec')) {
 							return 'noir-vendor';
