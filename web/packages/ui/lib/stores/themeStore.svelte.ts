@@ -15,7 +15,7 @@ import type { Theme } from './types';
 const STORAGE_KEY = 'zarf_theme';
 const DEFAULT_THEME: Theme = 'dark';
 
-// DaisyUI theme mapping
+// Theme name → Tailwind v4 @theme registration token
 const THEME_MAP: Record<Theme, string> = {
     light: 'paper-porcelain',
     dark: 'glass-porcelain'
@@ -46,8 +46,8 @@ function persist(theme: Theme) {
 
     try {
         localStorage.setItem(STORAGE_KEY, theme);
-        const daisyTheme = THEME_MAP[theme];
-        document.documentElement.setAttribute('data-theme', daisyTheme);
+        const themeName = THEME_MAP[theme];
+        document.documentElement.setAttribute('data-theme', themeName);
     } catch (error) {
         warn('[ThemeStore] Failed to persist theme:', error);
     }
@@ -64,8 +64,8 @@ function restore() {
 
         if (saved && ['dark', 'light'].includes(saved)) {
             currentTheme = saved;
-            const daisyTheme = THEME_MAP[saved];
-            document.documentElement.setAttribute('data-theme', daisyTheme);
+            const themeName = THEME_MAP[saved];
+            document.documentElement.setAttribute('data-theme', themeName);
         } else {
             // Default theme
             persist(DEFAULT_THEME);

@@ -49,9 +49,9 @@
 					localStorage.setItem('zarf_theme', 'dark');
 				}
 
-				// Map to specific DaisyUI themes
-				var daisyTheme = theme === 'light' ? 'paper-porcelain' : 'glass-porcelain';
-				document.documentElement.setAttribute('data-theme', daisyTheme);
+				// Map theme name to the data-theme attribute consumed by Tailwind v4 @theme registration
+				var themeName = theme === 'light' ? 'paper-porcelain' : 'glass-porcelain';
+				document.documentElement.setAttribute('data-theme', themeName);
 			} catch (e) { }
 		})();
 	</script>
