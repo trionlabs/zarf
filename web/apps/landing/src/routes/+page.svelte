@@ -11,6 +11,7 @@
     import ZarfLogo from "@zarf/ui/components/brand/ZarfLogo.svelte";
     import ZenButton from "@zarf/ui/components/ui/ZenButton.svelte";
     import { Zap } from "lucide-svelte";
+    import { dev } from "@zarf/core/utils/log";
 
     const DEBUG = import.meta.env.DEV;
 
@@ -26,11 +27,7 @@
 
         // 1. Handle Successful OAuth Callback
         if (hash.includes("id_token=")) {
-            if (DEBUG) {
-                console.log(
-                    "[Landing] Detected ID Token, processing redirect...",
-                );
-            }
+            dev("[Landing] Detected ID Token, processing redirect...");
 
             // Parse state to restore context (e.g. contract address)
             const oauthState = extractStateFromUrl();
@@ -40,9 +37,7 @@
 
             // Forward to claim subdomain with state and hash
             const target = `https://claim.zarf.to${addressQuery}${hash}`;
-            if (DEBUG) {
-                console.log("[Landing] Redirecting to:", target);
-            }
+            dev("[Landing] Redirecting to:", target);
             window.location.replace(target);
             return;
         }

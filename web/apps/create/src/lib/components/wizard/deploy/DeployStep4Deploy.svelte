@@ -12,6 +12,7 @@
     import { planDeploy, buildOptimisticContract } from "@zarf/core/domain/deployPlanner";
     import { parseTokenAmount } from "@zarf/core/utils/amount";
     import { toMessage } from "@zarf/core/utils/error";
+    import { dev } from "@zarf/core/utils/log";
     import { walletStore } from "@zarf/ui/stores/walletStore.svelte";
     import { goto } from "$app/navigation";
     import { Check, Rocket, Copy } from "lucide-svelte";
@@ -136,7 +137,7 @@
             return;
         }
         if (config.immediateUnlock) {
-            console.log("Past date detected: configured for immediate unlock");
+            dev("Past date detected: configured for immediate unlock");
         }
 
         const service = new FactoryDeployService(
