@@ -1,6 +1,7 @@
 <script lang="ts">
     import { onMount } from "svelte";
     import { initiateGoogleLogin } from "@zarf/ui/utils/googleAuth";
+    import { dev } from "@zarf/core/utils/log";
     import ZenButton from "@zarf/ui/components/ui/ZenButton.svelte";
 
     let { contractAddress, isAuthenticated } = $props<{
@@ -25,7 +26,7 @@
         const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || "";
         // Use just origin (like POC) - /claim path not registered in Google Console
         const REDIRECT_URI = window.location.origin + "/";
-        console.log("Initiating Google Login with Redirect URI:", REDIRECT_URI);
+        dev("Initiating Google Login with Redirect URI:", REDIRECT_URI);
 
         // Pass contract address as state to preserve context
         const state = JSON.stringify({ address: contractAddress });

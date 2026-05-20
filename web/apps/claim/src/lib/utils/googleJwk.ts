@@ -3,6 +3,10 @@
  * Fetches and caches Google's public keys for JWT verification
  */
 
+import { devTag } from "@zarf/core/utils/log";
+
+const log = devTag('GoogleJWK');
+
 // Google's JWK endpoint
 const GOOGLE_JWK_URL = 'https://www.googleapis.com/oauth2/v3/certs';
 
@@ -32,11 +36,11 @@ export async function fetchGoogleJwks(): Promise<GoogleJwkSet> {
 
     // Return cached if still valid
     if (cachedJwks && (now - cacheTimestamp) < CACHE_DURATION) {
-        console.log('[GoogleJWK] Using cached keys');
+        log('Using cached keys');
         return cachedJwks;
     }
 
-    console.log('[GoogleJWK] Fetching fresh keys from Google...');
+    log('Fetching fresh keys from Google...');
 
     try {
         const response = await fetch(GOOGLE_JWK_URL);
@@ -47,7 +51,7 @@ export async function fetchGoogleJwks(): Promise<GoogleJwkSet> {
         cachedJwks = await response.json();
         cacheTimestamp = now;
 
-        console.log(`[GoogleJWK] Loaded ${cachedJwks?.keys.length} keys`);
+        log(`Loaded ${cachedJwks?.keys.length} keys`);
         return cachedJwks!;
     } catch (error) {
         console.error('[GoogleJWK] Fetch error:', error);
@@ -70,7 +74,7 @@ export async function getPublicKeyForJwt(jwt: string): Promise<GoogleJwk> {
         throw new Error('JWT header missing "kid" (key ID)');
     }
 
-    console.log(`[GoogleJWK] Looking for key with kid: ${kid}`);
+    log(`Looking for key with kid: ${kid}`);
 
     const jwks = await fetchGoogleJwks();
     const key = jwks.keys.find(k => k.kid === kid);
@@ -79,6 +83,6 @@ export async function getPublicKeyForJwt(jwt: string): Promise<GoogleJwk> {
         throw new Error(`No matching Google public key found for kid: ${kid}`);
     }
 
-    console.log(`[GoogleJWK] Found matching key`);
+    log(`Found matching key`);
     return key;
 }

@@ -15,6 +15,7 @@
     import ZenButton from "@zarf/ui/components/ui/ZenButton.svelte";
     import { filterDistributionsByEmail } from "$lib/services/emailFilter";
     import { discoverAllVestings } from "@zarf/core/services/vestingDiscovery";
+    import { dev } from "@zarf/core/utils/log";
 
     import { page } from "$app/state";
     import { goto } from "$app/navigation";
@@ -132,10 +133,7 @@
     let lastAddress = $state<string | null>(null);
     $effect(() => {
         if (importedAddress !== lastAddress) {
-            console.log(
-                "[Claim] Context Changed, Reseting Store:",
-                importedAddress,
-            );
+            dev("[Claim] Context Changed, Reseting Store:", importedAddress);
             claimStore.reset();
             lastAddress = importedAddress;
         }

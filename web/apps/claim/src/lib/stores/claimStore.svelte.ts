@@ -2,6 +2,7 @@ import { browser } from '$app/environment';
 import type { ZKProof, MerkleClaim, MerkleTreeData } from "@zarf/ui/types";
 import { toastStore } from "@zarf/ui/stores/toastStore.svelte";
 import { getActiveStellarNetworkId } from "@zarf/core/config/runtime";
+import { devTag } from "@zarf/core/utils/log";
 
 import type { DistributionData } from "@zarf/core/services/distribution";
 import {
@@ -23,6 +24,8 @@ import {
  * It is effectively an "InMemory" store. 
  * We explicitly DO NOT persist derived secrets to storage.
  */
+
+const log = devTag('claimStore');
 
 export type ClaimStep = 1 | 2 | 3 | 4 | 5;
 
@@ -132,9 +135,9 @@ class ClaimFlowState {
     }
 
     setEpochs(epochs: EpochClaim[]) {
-        console.log('[claimStore] Setting epochs:', epochs.length);
+        log('Setting epochs:', epochs.length);
         this.state.epochs = epochs;
-        console.log('[claimStore] New Total:', this.totalAllocation.toString());
+        log('New Total:', this.totalAllocation.toString());
 
         if (epochs.length > 0) {
             this.saveSession();
@@ -211,14 +214,14 @@ class ClaimFlowState {
         const commitmentLower = commitment.toLowerCase();
         const index = this.state.epochs.findIndex(e => e.identityCommitment.toLowerCase() === commitmentLower);
 
-        console.log('[Store] Mark as Claimed:', commitmentLower, 'Found Index:', index);
+        log('Mark as Claimed:', commitmentLower, 'Found Index:', index);
 
         if (index !== -1) {
             this.state.epochs[index].isClaimed = true;
             this.state.epochs[index].canClaim = false;
             this.saveSession(); // Persist update if applicable
         } else {
-            console.warn('[Store] Could not find epoch for commitment:', commitmentLower);
+            console.warn('[claimStore] Could not find epoch for commitment:', commitmentLower);
         }
     }
 
