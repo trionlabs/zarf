@@ -49,6 +49,7 @@
         use:focusTrap={{
             onEscape: handleClose,
             initialFocus: () => freighterBtn ?? null,
+            hideBackground: true,
         }}
         role="dialog"
         aria-modal="true"

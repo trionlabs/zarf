@@ -26,6 +26,14 @@ export interface FocusTrapOptions {
     onEscape?: () => void;
     /** Temporarily disable Tab cycling without removing the action. Default true. */
     enabled?: boolean;
+    /**
+     * When true, mark every DOM sibling on the ancestor chain (up to <body>)
+     * as `inert` for the lifetime of the trap. This blocks pointer + keyboard
+     * interaction *and* hides the background from assistive tech, matching
+     * the WAI-ARIA modal semantics. Default false (opt-in) to avoid changing
+     * existing callers' behavior.
+     */
+    hideBackground?: boolean;
 }
 
 const FOCUSABLE_SELECTOR = [
@@ -115,7 +123,35 @@ export function focusTrap(
         target.focus();
     }
 
+    // Walk up node's ancestor chain and mark every non-chain sibling `inert`.
+    // We stop at <html> (parentElement of <body> === documentElement) so that
+    // body-level siblings (e.g., toast containers, app shells) are processed
+    // but <head> and <body> themselves are not touched. Returning a restore
+    // list lets destroy() put the world back the way it found it.
+    const inertHistory: { el: HTMLElement; original: boolean }[] = [];
+    function applyBackgroundInert() {
+        let current: HTMLElement = node;
+        while (current.parentElement && current.parentElement !== document.documentElement) {
+            const parent = current.parentElement;
+            for (const sibling of Array.from(parent.children)) {
+                if (sibling === current) continue;
+                if (!(sibling instanceof HTMLElement)) continue;
+                if (sibling.tagName === 'SCRIPT' || sibling.tagName === 'STYLE' || sibling.tagName === 'LINK') continue;
+                inertHistory.push({ el: sibling, original: sibling.inert });
+                sibling.inert = true;
+            }
+            current = parent;
+        }
+    }
+    function restoreBackgroundInert() {
+        for (const { el, original } of inertHistory) {
+            el.inert = original;
+        }
+        inertHistory.length = 0;
+    }
+
     node.addEventListener('keydown', handleKeydown);
+    if (opts.hideBackground) applyBackgroundInert();
     // Defer to give Svelte a microtask to settle any conditional children.
     queueMicrotask(focusInitial);
 
@@ -125,6 +161,7 @@ export function focusTrap(
         },
         destroy() {
             node.removeEventListener('keydown', handleKeydown);
+            restoreBackgroundInert();
             const explicit = resolveTarget(opts.returnFocus);
             const target =
                 explicit ??

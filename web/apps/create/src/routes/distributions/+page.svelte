@@ -318,6 +318,7 @@
         use:focusTrap={{
             onEscape: closePanel,
             initialFocus: () => dialogEl ?? null,
+            hideBackground: true,
         }}
         class="fixed top-0 right-0 z-50 h-full w-full sm:w-[28rem] shadow-2xl border-l-[0.5px] border-zen-border-subtle"
         transition:fly={{ x: 400, duration: 250 }}
