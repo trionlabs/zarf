@@ -28,6 +28,7 @@
     import OnChainDetailPanel from "$lib/components/distributions/OnChainDetailPanel.svelte";
     import DistributionEmptyState from "$lib/components/distributions/DistributionEmptyState.svelte";
     import WalletConnectButton from "@zarf/ui/components/wallet/WalletConnectButton.svelte";
+    import { focusTrap } from "@zarf/ui/actions/focusTrap";
 
     // State
     let activeTab = $state<"drafts" | "active" | "history">("drafts");
@@ -37,16 +38,14 @@
     let selectedContract = $state<OnChainVestingContract | null>(null);
     let fetchRequestId = 0;
 
+    let dialogEl: HTMLDivElement | undefined = $state();
+
     function handleSelect(c: OnChainVestingContract) {
         selectedContract = c;
     }
 
     function closePanel() {
         selectedContract = null;
-    }
-
-    function onKeydown(e: KeyboardEvent) {
-        if (e.key === "Escape") closePanel();
     }
 
     // Derived Lists
@@ -292,24 +291,34 @@
     </div>
 </div>
 
-<svelte:window on:keydown={onKeydown} />
-
 {#if selectedContract}
-    <!-- Backdrop -->
+    <!-- Backdrop. tabindex="-1" keeps the close affordance (Enter/Space on the
+         button still fires) but removes it from the focusTrap Tab cycle; Escape
+         + panel X cover keyboard close. -->
     <button
         type="button"
         aria-label="Close detail panel"
+        tabindex="-1"
         class="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"
         onclick={closePanel}
         transition:fade={{ duration: 150 }}
     ></button>
 
-    <!-- Slide-out panel (right side) -->
+    <!-- Slide-out panel (right side). aria-label is dynamic from contract.name;
+         a proper cross-component aria-labelledby that targets the panel's <h2>
+         is a Phase 3 follow-up (prop-drill a titleId into OnChainDetailPanel). -->
     <div
+        bind:this={dialogEl}
         role="dialog"
         aria-modal="true"
-        aria-label="Distribution contract details"
+        aria-label={selectedContract?.name
+            ? `${selectedContract.name} — distribution details`
+            : "Distribution contract details"}
         tabindex="-1"
+        use:focusTrap={{
+            onEscape: closePanel,
+            initialFocus: () => dialogEl ?? null,
+        }}
         class="fixed top-0 right-0 z-50 h-full w-full sm:w-[28rem] shadow-2xl border-l-[0.5px] border-zen-border-subtle"
         transition:fly={{ x: 400, duration: 250 }}
     >
