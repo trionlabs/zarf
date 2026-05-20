@@ -91,7 +91,7 @@
 
             txHash = result.hash;
             success = true;
-        } catch (e: any) {
+        } catch (e: unknown) {
             console.error("Submission failed:", e);
             error = sanitizeError(e);
         } finally {

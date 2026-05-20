@@ -11,6 +11,7 @@
     import { buildFactoryDeployInputs } from "@zarf/core/domain/merkleResultAdapter";
     import { planDeploy, buildOptimisticContract } from "@zarf/core/domain/deployPlanner";
     import { parseTokenAmount } from "@zarf/core/utils/amount";
+    import { toMessage } from "@zarf/core/utils/error";
     import { walletStore } from "@zarf/ui/stores/walletStore.svelte";
     import { goto } from "$app/navigation";
     import { Check, Rocket, Copy } from "lucide-svelte";
@@ -197,9 +198,9 @@
                     console.warn("Optimistic cache update failed", err);
                 }
             }
-        } catch (e: any) {
+        } catch (e: unknown) {
             console.error("Deploy failed:", e);
-            error = e.message || "Deployment failed";
+            error = toMessage(e, "Deployment failed");
             currentStep = "error";
         } finally {
             isDeploying = false;

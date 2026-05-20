@@ -9,6 +9,7 @@
 
 import { fetchDistributionData } from '@zarf/core/services/distribution';
 import { IpfsFetchError } from '@zarf/core/utils/ipfsFetch';
+import { toMessage } from '@zarf/core/utils/error';
 import { discoverEpochs as discoverEpochsCore } from '@zarf/core/domain/epochDiscovery';
 
 import { claimStore, type EpochClaim } from '../stores/claimStore.svelte';
@@ -70,9 +71,9 @@ export async function discoverEpochs(
         claimStore.state.jwt = jwt;
         claimStore.setEpochs(found);
         claimStore.nextStep();
-    } catch (e: any) {
+    } catch (e: unknown) {
         console.error('Discovery failed:', e);
-        let msg = e.message || 'Failed to discover epochs.';
+        let msg = toMessage(e, 'Failed to discover epochs.');
         if (msg.includes('404')) msg = 'Contract distribution data not found.';
         if (e instanceof IpfsFetchError) {
             msg = e.code === 'INVALID_CID'

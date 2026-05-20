@@ -202,9 +202,9 @@ async function connect() {
             networkPassphrase: result.networkPassphrase,
         });
         return result;
-    } catch (err: any) {
+    } catch (err: unknown) {
         // If it's already connected error, we can ignore it and just sync state
-        if (err.name === 'ConnectorAlreadyConnectedError') {
+        if (err instanceof Error && err.name === 'ConnectorAlreadyConnectedError') {
             syncFromWallet();
             return;
         }
@@ -223,7 +223,7 @@ async function disconnect() {
         await stellarDisconnect();
         updateInternalState({ isConnected: false });
         // State update handled by watcher
-    } catch (err: any) { state.error = sanitizeError(err); } finally { state.isDisconnecting = false; }
+    } catch (err: unknown) { state.error = sanitizeError(err); } finally { state.isDisconnecting = false; }
 }
 
 async function switchChain() {
@@ -233,7 +233,7 @@ async function switchChain() {
     try {
         await stellarSwitchChain();
         // State update handled by watcher
-    } catch (err: any) { state.error = sanitizeError(err); } finally { state.isSwitchingNetwork = false; }
+    } catch (err: unknown) { state.error = sanitizeError(err); } finally { state.isSwitchingNetwork = false; }
 }
 
 function clearError() { state.error = null; }

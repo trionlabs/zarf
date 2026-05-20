@@ -10,6 +10,7 @@
     import { planScheduleSeconds } from "@zarf/core/domain/deployPlanner";
     import { pinClaimList } from "../../../services/pinService";
     import ZenButton from "@zarf/ui/components/ui/ZenButton.svelte";
+    import { toMessage } from "@zarf/core/utils/error";
 
     // Direct state access from Runes Class
     let distribution = $derived(deployStore.distribution);
@@ -36,10 +37,10 @@
             });
             const pinned = await pinClaimList(claimList);
             deployStore.setMetadataCid(pinned.cid);
-        } catch (e: any) {
+        } catch (e: unknown) {
             console.error("Pin error:", e);
             deployStore.setPinError(
-                e.message || "Failed to pin claim list to IPFS",
+                toMessage(e, "Failed to pin claim list to IPFS"),
             );
         }
     }
@@ -55,7 +56,7 @@
             // Map recipients to { email, amount } format expected by service
             // CRITICAL: Convert amount to token base units using token decimals.
             // This ensures the Merkle Root matches the on-chain values.
-            const entries = distribution.recipients.map((r: any) => ({
+            const entries = distribution.recipients.map((r) => ({
                 email: r.email || "",
                 // We pass BigInt directly to avoid precision loss
                 amount: parseTokenAmount(String(r.amount), tokenDecimals),
@@ -71,10 +72,10 @@
             );
             deployStore.setMerkleResult(result);
             await pinList(result);
-        } catch (e: any) {
+        } catch (e: unknown) {
             console.error("Merkle generation error:", e);
             deployStore.setMerkleError(
-                e.message || "Failed to generate Merkle Tree",
+                toMessage(e, "Failed to generate Merkle Tree"),
             );
         }
     }
