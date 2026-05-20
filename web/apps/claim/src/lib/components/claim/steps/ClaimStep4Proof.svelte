@@ -9,7 +9,6 @@
         RefreshCw,
         Wallet,
     } from "lucide-svelte";
-    import { recipientId } from "@zarf/core/contracts";
     import ZenButton from "@zarf/ui/components/ui/ZenButton.svelte";
 
     let progress = $state(0);
@@ -50,11 +49,13 @@
                 { fetchPublicLeaves, getProofForLeaf },
                 { getPublicKeyForJwt },
                 { generateClaimProof },
+                { recipientId },
             ] = await Promise.all([
                 import("@zarf/core/crypto/merkleTree"),
                 import("../../../utils/proofHelpers"),
                 import("../../../utils/googleJwk"),
                 import("@zarf/core/zk"),
+                import("@zarf/core/contracts"),
             ]);
 
             statusMessage = "Fetching Merkle Data...";

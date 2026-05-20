@@ -1,8 +1,13 @@
 <script lang="ts">
-    import { readVestingContract } from "@zarf/core/contracts";
     import { ArrowRight, Loader2, Inbox } from "lucide-svelte";
     import type { StellarContractId } from "@zarf/core/types";
-    import { isValidContractAddress } from "@zarf/core/utils/address";
+
+    // Format-only check; full StrKey CRC validation runs at the
+    // readVestingContract dynamic-import call below and inside the
+    // contract reader itself.
+    function isContractAddressShape(addr: string): boolean {
+        return /^C[A-Z2-7]{55}$/.test(addr);
+    }
     import {
         fetchContractMetadata,
         type OnChainVestingContract,
@@ -91,7 +96,7 @@
     async function handleSubmit() {
         const addr = address.trim();
 
-        if (!isValidContractAddress(addr)) {
+        if (!isContractAddressShape(addr)) {
             error = "Enter a valid Stellar vesting contract ID.";
             return;
         }
@@ -100,6 +105,7 @@
         error = null;
 
         try {
+            const { readVestingContract } = await import("@zarf/core/contracts");
             await readVestingContract(addr);
             onImport(address);
         } catch (e) {

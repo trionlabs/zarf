@@ -1,6 +1,5 @@
 <script lang="ts">
     import { claimStore } from "../../../stores/claimStore.svelte";
-    import { submitClaim } from "@zarf/core/contracts";
     import { getExplorerUrl } from "@zarf/core/contracts/explorer";
     import {
         Send,
@@ -75,6 +74,7 @@
         try {
             const rawInputs = proof.publicValues;
 
+            const { submitClaim } = await import("@zarf/core/contracts");
             const result = await submitClaim(
                 proof.proof,
                 rawInputs,

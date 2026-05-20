@@ -9,7 +9,6 @@
 
 import { fetchDistributionData } from '@zarf/core/services/distribution';
 import { IpfsFetchError } from '@zarf/core/utils/ipfsFetch';
-import { isEpochClaimed, readVestingContract } from '@zarf/core/contracts';
 import { discoverEpochs as discoverEpochsCore } from '@zarf/core/domain/epochDiscovery';
 
 import { claimStore, type EpochClaim } from '../stores/claimStore.svelte';
@@ -32,6 +31,7 @@ export async function discoverEpochs(
     claimStore.state.epochs = [];
 
     try {
+        const { isEpochClaimed, readVestingContract } = await import('@zarf/core/contracts');
         const metadata = await readVestingContract(contractAddress);
         claimStore.state.tokenSymbol = metadata.tokenSymbol;
         claimStore.state.tokenDecimals = metadata.tokenDecimals;

@@ -1,6 +1,5 @@
 <script lang="ts">
     import { onMount } from "svelte";
-    import { readVestingContract } from "@zarf/core/contracts";
     import { initiateGoogleLogin } from "@zarf/ui/utils/googleAuth";
     import ZenButton from "@zarf/ui/components/ui/ZenButton.svelte";
 
@@ -14,6 +13,7 @@
     // Fetch details on mount
     onMount(async () => {
         try {
+            const { readVestingContract } = await import("@zarf/core/contracts");
             const data = await readVestingContract(contractAddress);
             details = { name: data.name, tokenSymbol: data.tokenSymbol };
         } catch (e) {
