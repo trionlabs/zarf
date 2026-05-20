@@ -91,7 +91,12 @@
         interactive
         radius="3xl"
         onclick={() => onSelect?.(distribution)}
-        onkeydown={(e) => e.key === "Enter" && onSelect?.(distribution)}
+        onkeydown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onSelect?.(distribution);
+            }
+        }}
         role="button"
         tabindex={0}
         aria-label={`View distribution ${distribution.name}`}

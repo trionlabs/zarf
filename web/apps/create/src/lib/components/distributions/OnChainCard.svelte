@@ -62,9 +62,15 @@
         interactive
         radius="3xl"
         onclick={() => onSelect?.(contract)}
-        onkeydown={(e) => e.key === "Enter" && onSelect?.(contract)}
+        onkeydown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onSelect?.(contract);
+            }
+        }}
         role="button"
         tabindex={0}
+        aria-label={`View distribution ${contract.name || "Unnamed"}`}
         class="flex-1 relative overflow-hidden transition-all duration-300 hover:-translate-y-0.5"
     >
         <div
