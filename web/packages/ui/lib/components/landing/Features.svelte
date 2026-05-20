@@ -41,7 +41,7 @@
             >
                 <!-- Scene -->
                 <div class="relative aspect-[4/3] rounded-2xl overflow-hidden mb-6 bg-gradient-to-b from-base-content/[0.015] to-transparent">
-                    <svg class="absolute inset-0 w-full h-full" viewBox="0 0 400 300" preserveAspectRatio="xMidYMid meet">
+                    <svg aria-hidden="true" class="absolute inset-0 w-full h-full" viewBox="0 0 400 300" preserveAspectRatio="xMidYMid meet">
                         <!-- Outer expanding rings -->
                         {#each [140, 115, 90, 65] as r, i}
                             <circle
@@ -149,7 +149,7 @@
             >
                 <!-- Scene -->
                 <div class="relative aspect-[4/3] rounded-2xl overflow-hidden mb-6 bg-gradient-to-b from-base-content/[0.015] to-transparent">
-                    <svg class="absolute inset-0 w-full h-full" viewBox="0 0 400 300" preserveAspectRatio="xMidYMid meet">
+                    <svg aria-hidden="true" class="absolute inset-0 w-full h-full" viewBox="0 0 400 300" preserveAspectRatio="xMidYMid meet">
                         <!-- Large spiral path -->
                         <path
                             d="M 200 150
@@ -256,7 +256,7 @@
             >
                 <!-- Scene -->
                 <div class="relative aspect-[4/3] rounded-2xl overflow-hidden mb-6 bg-gradient-to-b from-base-content/[0.015] to-transparent">
-                    <svg class="absolute inset-0 w-full h-full" viewBox="0 0 400 300" preserveAspectRatio="xMidYMid meet">
+                    <svg aria-hidden="true" class="absolute inset-0 w-full h-full" viewBox="0 0 400 300" preserveAspectRatio="xMidYMid meet">
                         <!-- Origin node -->
                         <circle
                             cx="50" cy="150" r="35"
@@ -424,7 +424,7 @@
             >
                 <!-- Scene -->
                 <div class="relative aspect-[4/3] rounded-2xl overflow-hidden mb-6 bg-gradient-to-b from-base-content/[0.015] to-transparent">
-                    <svg class="absolute inset-0 w-full h-full" viewBox="0 0 400 300" preserveAspectRatio="xMidYMid meet">
+                    <svg aria-hidden="true" class="absolute inset-0 w-full h-full" viewBox="0 0 400 300" preserveAspectRatio="xMidYMid meet">
                         <!-- Vertical chain line -->
                         <line
                             x1="80" y1="30"
