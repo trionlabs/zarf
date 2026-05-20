@@ -8,9 +8,8 @@
  * a caller-supplied `returnFocus` target).
  *
  * The action does not render or own any markup — it operates on the
- * existing dialog node, so it composes with ZenModal, ClaimModal,
- * WalletSelectionModal and the distributions slide-over without
- * forcing a wrapper component.
+ * existing dialog node, so it composes with any dialog-shaped element
+ * without forcing a wrapper component.
  *
  * @example
  * <div role="dialog" use:focusTrap={{ onEscape: () => isOpen = false }}>
