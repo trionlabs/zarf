@@ -1,13 +1,22 @@
 /**
- * Generate a stable id for ARIA wiring (aria-labelledby, aria-controls,
- * aria-describedby, etc.). Counter is module-scoped so ids increase
- * monotonically across one render pass.
+ * Generate a unique id for ARIA wiring (aria-labelledby, aria-controls,
+ * aria-describedby, etc.) on the client.
  *
- * The counter resets per Node process so server-side ids stay
- * deterministic within a single SSR render. Hydration mismatches on
- * ARIA attribute values are non-fatal in browsers (unlike text-node
- * mismatches), so a small client/server drift is acceptable here —
- * we just need uniqueness within the page.
+ * NOT SSR-safe: the counter is module-global and increments on every call,
+ * so the same component rendered on server and client will not produce
+ * matching ids on a second render pass, and concurrent SSR renders share
+ * the same counter. Use this helper only:
+ *   - inside `{#if browser}` / `{#if conditionThatRunsClientOnly}` blocks, or
+ *   - in components whose entire markup is client-conditional (e.g. modal
+ *     bodies behind `{#if isOpen}` where `isOpen` is false during SSR).
+ *
+ * A proper SSR-safe id strategy (Svelte 5 `$props.id()` or a per-render
+ * context counter) is tracked as Phase 3 a11y completeness work.
+ *
+ * Prefix sanitization: HTML id attributes accept arbitrary strings but
+ * ARIA references break on whitespace, so we strip whitespace from the
+ * caller-supplied prefix and substitute a safe fallback if the result is
+ * empty. The token suffix is always numeric.
  *
  * @example
  * const titleId = uniqueId('dialog-title');
@@ -18,5 +27,6 @@ let counter = 0;
 
 export function uniqueId(prefix = 'zen'): string {
     counter += 1;
-    return `${prefix}-${counter}`;
+    const safePrefix = prefix.replace(/\s+/g, '-') || 'zen';
+    return `${safePrefix}-${counter}`;
 }
