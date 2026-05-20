@@ -298,3 +298,33 @@ textarea {
 .wave-container-mask {
   mask-image: radial-gradient(circle at center, black 30%, transparent 70%);
 }
+
+/*
+  Skip-to-content link. Visually hidden off-screen until it receives keyboard
+  focus, at which point it pops into the top-left of the viewport with a
+  high-contrast glass treatment. First-tabbable-element pattern: keyboard
+  users land on it as soon as they press Tab from the address bar.
+*/
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: -9999px;
+  z-index: 10000;
+  padding: 0.75rem 1rem;
+  background: var(--zen-bg);
+  color: var(--zen-fg);
+  border: 0.5px solid var(--zen-border-strong);
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  text-decoration: none;
+  box-shadow: var(--zen-shadow-lg, 0 4px 12px rgb(0 0 0 / 0.15));
+}
+
+.skip-link:focus,
+.skip-link:focus-visible {
+  left: 1rem;
+  top: 1rem;
+  outline: 2px solid var(--zen-fg);
+  outline-offset: 2px;
+}
