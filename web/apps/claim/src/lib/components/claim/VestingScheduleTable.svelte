@@ -57,7 +57,14 @@
     let activeEpochIndex = $derived(claimStore.state.selectedEpochIndex);
     let currentStep = $derived(claimStore.currentStep);
 
-    function handleStartClaim(index: number) {
+    // The inline panel below is rendered as a sibling <tr colspan="5">, not
+    // a modal — DOM, aria roles, and focus model are all table semantics.
+    // We still track the opener button so cancelling restores focus to it;
+    // without that, the close button removes itself from the DOM and focus
+    // falls to <body>, stranding keyboard and AT users mid-flow.
+    let openerEl: HTMLButtonElement | null = null;
+
+    function handleStartClaim(index: number, opener?: HTMLButtonElement) {
         // If already active, toggle off?
         if (activeEpochIndex === index - 1 && currentStep >= 3) {
             claimStore.state.currentStep = 2;
@@ -65,13 +72,21 @@
             return;
         }
 
+        openerEl = opener ?? null;
         claimStore.state.selectedEpochIndex = index - 1;
         claimStore.state.currentStep = 3; // Move to Wallet Step
     }
 
     function handleCancel() {
+        const restore = openerEl;
+        openerEl = null;
         claimStore.state.currentStep = 2;
         claimStore.state.selectedEpochIndex = null;
+        // Opener row stays mounted (only the inline panel row collapses),
+        // so synchronous focus is safe — no tick() needed.
+        if (restore && typeof document !== 'undefined' && document.contains(restore)) {
+            restore.focus();
+        }
     }
 </script>
 
@@ -182,11 +197,12 @@
                             >
                                 {#if period.status === "claimable"}
                                     <button
+                                        type="button"
                                         class="px-4 py-1 rounded-lg text-xs font-bold uppercase tracking-widest transition-colors {isActive
                                             ? 'text-zen-primary bg-transparent'
                                             : 'border border-zen-primary text-zen-primary hover:bg-zen-primary hover:text-zen-primary-content'}"
-                                        onclick={() =>
-                                            handleStartClaim(period.index)}
+                                        onclick={(e) =>
+                                            handleStartClaim(period.index, e.currentTarget)}
                                     >
                                         {isActive ? "Active" : "Claim"}
                                     </button>
@@ -221,7 +237,7 @@
                                             </div>
                                             <button
                                                 type="button"
-                                                aria-label="Close claim drawer"
+                                                aria-label="Cancel claim"
                                                 class="text-zen-fg-faint hover:text-zen-fg-muted transition-colors"
                                                 onclick={handleCancel}
                                             >
