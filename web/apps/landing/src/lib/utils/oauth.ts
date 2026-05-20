@@ -5,6 +5,7 @@
  * Full OAuth logic lives in the Claim app.
  */
 import type { OAuthState } from '@zarf/core';
+import { warn } from '@zarf/core/utils/log';
 export type { OAuthState };
 
 const ETH_ADDRESS_REGEX = /^0x[a-fA-F0-9]{40}$/;
@@ -19,13 +20,13 @@ function decodeOAuthState(stateParam: string | null): OAuthState | null {
         const decoded = JSON.parse(stateParam);
 
         if (decoded.address && !ETH_ADDRESS_REGEX.test(decoded.address)) {
-            console.warn('[OAuth] Invalid address in state, ignoring');
+            warn('[OAuth] Invalid address in state, ignoring');
             delete decoded.address;
         }
 
         return decoded as OAuthState;
     } catch (e) {
-        console.warn('[OAuth] Failed to parse state:', e);
+        warn('[OAuth] Failed to parse state:', e);
         return null;
     }
 }

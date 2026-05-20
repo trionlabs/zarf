@@ -12,6 +12,7 @@
     import { walletStore } from "@zarf/ui/stores/walletStore.svelte";
     import { sanitizeBlockchainError } from "@zarf/ui/utils/errorSanitizer";
     import { formatTokenAmount } from "@zarf/core/utils/amount";
+    import { err } from "@zarf/core/utils/log";
     import ZenButton from "@zarf/ui/components/ui/ZenButton.svelte";
 
     let { contractAddress } = $props<{ contractAddress: string }>();
@@ -51,8 +52,8 @@
         void handleSubmit();
     }
 
-    function sanitizeError(err: unknown): string {
-        return sanitizeBlockchainError(err, {
+    function sanitizeError(e: unknown): string {
+        return sanitizeBlockchainError(e, {
             customRules: [
                 { match: /InvalidPubkey|Contract, #4|is_valid_key_hash/i,
                   message: "Google's current signing key is not registered on-chain yet. Please run JWK rotation, then retry this claim." },
@@ -92,7 +93,7 @@
             txHash = result.hash;
             success = true;
         } catch (e: unknown) {
-            console.error("Submission failed:", e);
+            err("Submission failed:", e);
             error = sanitizeError(e);
         } finally {
             isSubmitting = false;

@@ -2,7 +2,7 @@ import { browser } from '$app/environment';
 import type { ZKProof, MerkleClaim, MerkleTreeData } from "@zarf/ui/types";
 import { toastStore } from "@zarf/ui/stores/toastStore.svelte";
 import { getActiveStellarNetworkId } from "@zarf/core/config/runtime";
-import { devTag } from "@zarf/core/utils/log";
+import { devTag, warn } from "@zarf/core/utils/log";
 
 import type { DistributionData } from "@zarf/core/services/distribution";
 import {
@@ -221,7 +221,7 @@ class ClaimFlowState {
             this.state.epochs[index].canClaim = false;
             this.saveSession(); // Persist update if applicable
         } else {
-            console.warn('[claimStore] Could not find epoch for commitment:', commitmentLower);
+            warn('[claimStore] Could not find epoch for commitment:', commitmentLower);
         }
     }
 
@@ -269,7 +269,7 @@ class ClaimFlowState {
             this.state.targetWallet = data.targetWallet || null;
             this.state.pin = null; // Ensure PIN is never recovered
         } catch (e) {
-            console.warn('Failed to recover claim session', e);
+            warn('Failed to recover claim session', e);
             sessionStorage.removeItem(this.sessionKey());
         }
     }

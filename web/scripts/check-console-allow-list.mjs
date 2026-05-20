@@ -22,11 +22,10 @@
 //       matched by file + exact trimmed line content. Line numbers
 //       are advisory because they drift on edits.
 //
-// Phase 6.2.a scope: dev/devTag conversion + drift gate. Direct
-// console.warn / console.error in app code remain allow-listed pending
-// the 6.2.b wrapper sweep that retires them. Each such entry carries
-// reason: 'phase-6.2.b' so the future tightening pass can find them
-// with a single grep.
+// Post-6.2.b: every direct console.* in frontend + frontend-shared
+// packages either uses the helpers, or is allow-listed below with a
+// specific non-helper reason (DEV-gated, JSDoc, bootstrap chatter,
+// crypto warning, backend worker, vite.config string-literal).
 
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { resolve, join, relative } from 'node:path';
@@ -129,10 +128,8 @@ const ALLOWLIST = {
         ],
     },
 
-    // JSDoc examples + duplicate real calls in googleAuth.
-    // Note: oauth-state parsing is duplicated in apps/landing/src/lib/utils/oauth.ts
-    // and packages/ui/lib/utils/googleAuth.ts — both warn lines below
-    // also appear there with the same content.
+    // JSDoc examples in googleAuth — the real warn calls have been
+    // converted to warn() in 6.2.b; only the JSDoc samples remain.
     'packages/ui/lib/utils/googleAuth.ts': {
         entries: [
             { content: "*     console.log(decoded.payload.email);",
@@ -141,12 +138,6 @@ const ALLOWLIST = {
               reason: 'JSDoc example, not a real call' },
             { content: "* console.log(decoded.header.kid);    // Key ID for verification",
               reason: 'JSDoc example, not a real call' },
-            { content: "console.warn('[OAuth] Invalid address in state, ignoring');",
-              reason: 'phase-6.2.b — wrapper conversion pending (duplicate of landing/oauth.ts)' },
-            { content: "console.warn('[OAuth] Failed to parse state:', e);",
-              reason: 'phase-6.2.b — wrapper conversion pending (duplicate of landing/oauth.ts)' },
-            { content: "console.warn('[Auth] Invalid contract address format, not preserving');",
-              reason: 'phase-6.2.b — wrapper conversion pending' },
         ],
     },
 
@@ -166,185 +157,17 @@ const ALLOWLIST = {
         ],
     },
 
-    // ──────────────────────────────────────────────────────────────────
-    // Phase 6.2.b allow-list (direct console.warn / console.error in
-    // app code + frontend-shared packages). The 6.2.b sweep converts
-    // these to warn() / err() wrappers and removes the entries from
-    // this list in the same commit.
-    // ──────────────────────────────────────────────────────────────────
-
-    'apps/claim/src/lib/components/claim/DistributionCard.svelte': {
-        entries: [
-            { content: 'console.error("Failed to load details", e);',
-              reason: 'phase-6.2.b — wrapper conversion pending' },
-        ],
-    },
-    'apps/claim/src/lib/components/claim/ImportContractInput.svelte': {
-        entries: [
-            { content: 'console.error("Failed to fetch vault metadata", e);',
-              reason: 'phase-6.2.b — wrapper conversion pending' },
-        ],
-    },
-    'apps/claim/src/lib/components/claim/steps/ClaimStep1Identify.svelte': {
-        entries: [
-            { content: 'console.error("Unlock failed:", e);',
-              reason: 'phase-6.2.b — wrapper conversion pending' },
-        ],
-    },
-    'apps/claim/src/lib/components/claim/steps/ClaimStep5Submit.svelte': {
-        entries: [
-            { content: 'console.error("Submission failed:", e);',
-              reason: 'phase-6.2.b — wrapper conversion pending' },
-        ],
-    },
-    'apps/claim/src/lib/services/claimActions.ts': {
-        entries: [
-            { content: "console.error('Discovery failed:', e);",
-              reason: 'phase-6.2.b — wrapper conversion pending' },
-        ],
-    },
-    'apps/claim/src/lib/services/emailFilter.ts': {
-        entries: [
-            { content: "console.warn(`[EmailFilter] Distribution not found: ${address}`);",
-              reason: 'phase-6.2.b — wrapper conversion pending' },
-            { content: "console.warn(`[EmailFilter] Skipping distribution with unreadable IPFS metadata:`, error.message);",
-              reason: 'phase-6.2.b — wrapper conversion pending' },
-            { content: "console.error(`[EmailFilter] Error checking distribution:`, error);",
-              reason: 'phase-6.2.b — wrapper conversion pending' },
-        ],
-    },
-    'apps/claim/src/lib/stores/claimStore.svelte.ts': {
-        entries: [
-            { content: "console.warn('[claimStore] Could not find epoch for commitment:', commitmentLower);",
-              reason: 'phase-6.2.b — wrapper conversion pending' },
-            { content: "console.warn('Failed to recover claim session', e);",
-              reason: 'phase-6.2.b — wrapper conversion pending' },
-        ],
-    },
-    'apps/claim/src/lib/utils/googleJwk.ts': {
-        entries: [
-            { content: "console.error('[GoogleJWK] Fetch error:', error);",
-              reason: 'phase-6.2.b — wrapper conversion pending' },
-        ],
-    },
-    'apps/claim/src/routes/+page.svelte': {
-        entries: [
-            { content: 'console.error("[Claim] Failed to filter distributions:", error);',
-              reason: 'phase-6.2.b — wrapper conversion pending' },
-            { content: 'console.warn("[Claim] Chain discovery failed", e);',
-              reason: 'phase-6.2.b — wrapper conversion pending' },
-            { content: 'console.error("[Claim] Auth failed:", err);',
-              reason: 'phase-6.2.b — wrapper conversion pending' },
-        ],
-    },
-    'apps/create/src/lib/components/wizard/deploy/DeployStep1.svelte': {
-        entries: [
-            { content: 'console.error("Pin error:", e);',
-              reason: 'phase-6.2.b — wrapper conversion pending' },
-            { content: 'console.error("Merkle generation error:", e);',
-              reason: 'phase-6.2.b — wrapper conversion pending' },
-        ],
-    },
-    'apps/create/src/lib/components/wizard/deploy/DeployStep3Connect.svelte': {
-        entries: [
-            { content: 'console.error("Balance check failed:", e);',
-              reason: 'phase-6.2.b — wrapper conversion pending' },
-            { content: 'console.error("Connection failed:", e);',
-              reason: 'phase-6.2.b — wrapper conversion pending' },
-        ],
-    },
-    'apps/create/src/lib/components/wizard/deploy/DeployStep4Deploy.svelte': {
-        entries: [
-            { content: 'console.warn("Optimistic cache update failed", err);',
-              reason: 'phase-6.2.b — wrapper conversion pending' },
-            { content: 'console.error("Deploy failed:", e);',
-              reason: 'phase-6.2.b — wrapper conversion pending' },
-        ],
-    },
-    'apps/create/src/lib/stores/deployStore.svelte.ts': {
-        entries: [
-            { content: 'console.warn("Failed to save deploy state", e);',
-              reason: 'phase-6.2.b — wrapper conversion pending' },
-            { content: 'console.warn("Failed to load deploy state", e);',
-              reason: 'phase-6.2.b — wrapper conversion pending' },
-        ],
-    },
-    'apps/create/src/lib/stores/wizardStore.svelte.ts': {
-        entries: [
-            { content: "console.warn('[WizardStore] Failed to persist:', error);",
-              reason: 'phase-6.2.b — wrapper conversion pending' },
-            { content: "console.warn('[WizardStore] Failed to restore, clearing storage:', error);",
-              reason: 'phase-6.2.b — wrapper conversion pending' },
-        ],
-    },
-    'apps/create/src/routes/distributions/+page.svelte': {
-        entries: [
-            { content: 'console.error("Discovery failed:", e);',
-              reason: 'phase-6.2.b — wrapper conversion pending' },
-        ],
-    },
+    // OAuth error logging on the landing page. The original code wraps
+    // a console.warn in `if (DEBUG)` (DEV-only). Converting to warn()
+    // would change behavior (always ships to prod console), which is a
+    // product question — not just a code-style swap — so it's
+    // intentionally deferred until product decides whether OAuth errors
+    // should hit the future telemetry hook. If/when promoted: drop the
+    // DEBUG wrapper, swap to warn(), remove this entry.
     'apps/landing/src/routes/+page.svelte': {
         entries: [
             { content: 'console.warn("[Landing] OAuth Error detected:", hash);',
-              reason: 'phase-6.2.b — wrapper conversion pending' },
-        ],
-    },
-    'apps/landing/src/lib/utils/oauth.ts': {
-        entries: [
-            { content: "console.warn('[OAuth] Invalid address in state, ignoring');",
-              reason: 'phase-6.2.b — wrapper conversion pending' },
-            { content: "console.warn('[OAuth] Failed to parse state:', e);",
-              reason: 'phase-6.2.b — wrapper conversion pending' },
-        ],
-    },
-    'packages/core/lib/domain/epochDiscovery.ts': {
-        entries: [
-            { content: "console.warn(`[Discovery] Status check failed for epoch ${index}`, err);",
-              reason: 'phase-6.2.b — wrapper conversion pending' },
-        ],
-    },
-    'packages/core/lib/services/distribution.ts': {
-        entries: [
-            { content: "console.error('[Distribution] Failed to fetch data:', error);",
-              reason: 'phase-6.2.b — wrapper conversion pending' },
-        ],
-    },
-    'packages/core/lib/services/distributionDiscovery.ts': {
-        entries: [
-            { content: "console.warn('[DiscoveryService] Indexer metadata read failed:', error);",
-              reason: 'phase-6.2.b — wrapper conversion pending' },
-        ],
-    },
-    'packages/core/lib/services/vestingDiscovery.ts': {
-        entries: [
-            { content: "console.warn('[VestingDiscovery] Indexer discovery failed:', error);",
-              reason: 'phase-6.2.b — wrapper conversion pending' },
-            { content: "console.warn('[VestingDiscovery] Indexer CID read failed:', error);",
-              reason: 'phase-6.2.b — wrapper conversion pending' },
-        ],
-    },
-    'packages/ui/lib/components/wallet/WalletConnectButton.svelte': {
-        entries: [
-            { content: 'console.warn("Clipboard API not available");',
-              reason: 'phase-6.2.b — wrapper conversion pending' },
-        ],
-    },
-    'packages/ui/lib/stores/authStore.svelte.ts': {
-        entries: [
-            { content: "console.warn('[AuthStore] Session expired, clearing...');",
-              reason: 'phase-6.2.b — wrapper conversion pending' },
-            { content: "console.log('[AuthStore] Session restored for:', payload.email);",
-              reason: 'phase-6.2.b — dev() conversion pending (out of 6.2.a claim-side scope)' },
-            { content: "console.error('[AuthStore] Failed to restore session:', e);",
-              reason: 'phase-6.2.b — wrapper conversion pending' },
-        ],
-    },
-    'packages/ui/lib/stores/themeStore.svelte.ts': {
-        entries: [
-            { content: "console.warn('[ThemeStore] Failed to persist theme:', error);",
-              reason: 'phase-6.2.b — wrapper conversion pending' },
-            { content: "console.warn('[ThemeStore] Failed to restore theme:', error);",
-              reason: 'phase-6.2.b — wrapper conversion pending' },
+              reason: 'DEV-gated via DEBUG constant — telemetry seam vs DEV-only is a product call, deferred' },
         ],
     },
 };

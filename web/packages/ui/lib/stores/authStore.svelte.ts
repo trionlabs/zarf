@@ -1,6 +1,7 @@
 import { browser } from '$app/environment';
 import { decodeJwt } from "../utils/googleAuth";
 import { STORAGE_KEYS } from "@zarf/core/constants/storage";
+import { dev, warn, err } from "@zarf/core/utils/log";
 
 /**
  * Authentication Store — Gmail / OIDC session.
@@ -75,17 +76,17 @@ function restoreGmailSession() {
             const now = Math.floor(Date.now() / 1000);
 
             if (payload.exp < now) {
-                console.warn('[AuthStore] Session expired, clearing...');
+                warn('[AuthStore] Session expired, clearing...');
                 clearGmailSession();
             } else {
                 gmailState.email = payload.email;
                 gmailState.jwt = jwt;
                 gmailState.expiresAt = payload.exp;
                 gmailState.isAuthenticated = true;
-                console.log('[AuthStore] Session restored for:', payload.email);
+                dev('[AuthStore] Session restored for:', payload.email);
             }
         } catch (e) {
-            console.error('[AuthStore] Failed to restore session:', e);
+            err('[AuthStore] Failed to restore session:', e);
             clearGmailSession();
         }
     }

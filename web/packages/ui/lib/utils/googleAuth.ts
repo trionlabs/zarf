@@ -8,6 +8,7 @@
  */
 
 import type { DecodedJWT, GooglePublicKey, JWTHeader, JWTPayload, OAuthState } from '../types';
+import { warn } from '@zarf/core/utils/log';
 
 // Format-only Stellar contract address shape check. Used here for defensive
 // OAuth-state pre-validation; full StrKey CRC validation lives in
@@ -95,13 +96,13 @@ export function decodeOAuthState(stateParam: string | null): OAuthState | null {
 
         // Validate address format if present
         if (decoded.address && !isContractAddressShape(decoded.address)) {
-            console.warn('[OAuth] Invalid address in state, ignoring');
+            warn('[OAuth] Invalid address in state, ignoring');
             delete decoded.address;
         }
 
         return decoded as OAuthState;
     } catch (e) {
-        console.warn('[OAuth] Failed to parse state:', e);
+        warn('[OAuth] Failed to parse state:', e);
         return null;
     }
 }
@@ -187,7 +188,7 @@ export function redirectToGoogle(contractAddress?: string): void {
         if (isContractAddressShape(contractAddress)) {
             oauthState.address = contractAddress;
         } else {
-            console.warn('[Auth] Invalid contract address format, not preserving');
+            warn('[Auth] Invalid contract address format, not preserving');
         }
     }
 

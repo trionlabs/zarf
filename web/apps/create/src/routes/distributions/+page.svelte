@@ -17,6 +17,7 @@
         discoverOwnerVestings,
         type OnChainVestingContract,
     } from "@zarf/core/services/distributionDiscovery";
+    import { err } from "@zarf/core/utils/log";
 
     // Components
     import PageHeader from "@zarf/ui/components/ui/PageHeader.svelte";
@@ -83,7 +84,7 @@
             onChainContracts = result.contracts;
         } catch (e) {
             if (requestId !== fetchRequestId) return;
-            console.error("Discovery failed:", e);
+            err("Discovery failed:", e);
             fetchError = "Could not fetch distributions from blockchain.";
         } finally {
             if (requestId === fetchRequestId) {

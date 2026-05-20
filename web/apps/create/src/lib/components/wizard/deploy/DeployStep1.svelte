@@ -11,6 +11,7 @@
     import { pinClaimList } from "../../../services/pinService";
     import ZenButton from "@zarf/ui/components/ui/ZenButton.svelte";
     import { toMessage } from "@zarf/core/utils/error";
+    import { err } from "@zarf/core/utils/log";
 
     // Direct state access from Runes Class
     let distribution = $derived(deployStore.distribution);
@@ -38,7 +39,7 @@
             const pinned = await pinClaimList(claimList);
             deployStore.setMetadataCid(pinned.cid);
         } catch (e: unknown) {
-            console.error("Pin error:", e);
+            err("Pin error:", e);
             deployStore.setPinError(
                 toMessage(e, "Failed to pin claim list to IPFS"),
             );
@@ -73,7 +74,7 @@
             deployStore.setMerkleResult(result);
             await pinList(result);
         } catch (e: unknown) {
-            console.error("Merkle generation error:", e);
+            err("Merkle generation error:", e);
             deployStore.setMerkleError(
                 toMessage(e, "Failed to generate Merkle Tree"),
             );

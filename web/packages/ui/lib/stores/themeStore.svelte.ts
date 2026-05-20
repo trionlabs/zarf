@@ -9,6 +9,7 @@
  */
 
 import { browser } from '@zarf/core/utils/ssr';
+import { warn } from '@zarf/core/utils/log';
 import type { Theme } from './types';
 
 const STORAGE_KEY = 'zarf_theme';
@@ -48,7 +49,7 @@ function persist(theme: Theme) {
         const daisyTheme = THEME_MAP[theme];
         document.documentElement.setAttribute('data-theme', daisyTheme);
     } catch (error) {
-        console.warn('[ThemeStore] Failed to persist theme:', error);
+        warn('[ThemeStore] Failed to persist theme:', error);
     }
 }
 
@@ -70,7 +71,7 @@ function restore() {
             persist(DEFAULT_THEME);
         }
     } catch (error) {
-        console.warn('[ThemeStore] Failed to restore theme:', error);
+        warn('[ThemeStore] Failed to restore theme:', error);
         persist(DEFAULT_THEME);
     }
 }

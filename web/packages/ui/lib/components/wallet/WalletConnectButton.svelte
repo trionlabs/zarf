@@ -14,6 +14,7 @@
     import { Copy, Check, ExternalLink, RefreshCw, LogOut, ChevronDown, Wallet } from "lucide-svelte";
     import ZenButton from "../ui/ZenButton.svelte";
     import ZenSpinner from "../ui/ZenSpinner.svelte";
+    import { warn } from "@zarf/core/utils/log";
 
     let mounted = $state(false);
     let copied = $state(false);
@@ -73,7 +74,7 @@
             copied = true;
             setTimeout(() => (copied = false), 2000);
         } catch (e) {
-            console.warn("Clipboard API not available");
+            warn("Clipboard API not available");
         }
     }
 </script>

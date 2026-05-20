@@ -19,6 +19,7 @@
     import ZenBadge from "@zarf/ui/components/ui/ZenBadge.svelte";
     import ZenSpinner from "@zarf/ui/components/ui/ZenSpinner.svelte";
     import { toMessage } from "@zarf/core/utils/error";
+    import { err } from "@zarf/core/utils/log";
 
     let distribution = $derived(deployStore.distribution);
 
@@ -75,7 +76,7 @@
             checkState.symbol = symbol;
             checkState.hasEnoughBalance = balance >= requiredAmount;
         } catch (e: unknown) {
-            console.error("Balance check failed:", e);
+            err("Balance check failed:", e);
             const msg = toMessage(e, "Failed to fetch token balance. Please try again.");
             if (msg.includes('NetworkError') || msg.includes('fetch')) {
                 checkState.error = "Network error connecting to Stellar RPC. Please check your internet connection and try again.";
@@ -91,7 +92,7 @@
         try {
             await walletStore.requestConnection();
         } catch (e) {
-            console.error("Connection failed:", e);
+            err("Connection failed:", e);
         }
     }
 

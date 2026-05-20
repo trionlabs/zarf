@@ -1,7 +1,7 @@
 <script lang="ts">
     import { onMount } from "svelte";
     import { initiateGoogleLogin } from "@zarf/ui/utils/googleAuth";
-    import { dev } from "@zarf/core/utils/log";
+    import { dev, err } from "@zarf/core/utils/log";
     import ZenButton from "@zarf/ui/components/ui/ZenButton.svelte";
 
     let { contractAddress, isAuthenticated } = $props<{
@@ -18,7 +18,7 @@
             const data = await readVestingContract(contractAddress);
             details = { name: data.name, tokenSymbol: data.tokenSymbol };
         } catch (e) {
-            console.error("Failed to load details", e);
+            err("Failed to load details", e);
         }
     });
 

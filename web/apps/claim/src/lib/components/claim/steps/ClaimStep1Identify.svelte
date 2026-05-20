@@ -11,6 +11,7 @@
     import ZenInput from "@zarf/ui/components/ui/ZenInput.svelte";
     import ZenButton from "@zarf/ui/components/ui/ZenButton.svelte";
     import { toMessage } from "@zarf/core/utils/error";
+    import { err } from "@zarf/core/utils/log";
 
     let { contractAddress } = $props<{ contractAddress: string }>();
 
@@ -58,7 +59,7 @@
             // Lives in services/claimActions so claimStore stays free of @zarf/core/contracts.
             await discoverEpochs(email, jwt!, pin, contractAddress);
         } catch (e: unknown) {
-            console.error("Unlock failed:", e);
+            err("Unlock failed:", e);
             error = toMessage(e, "Failed to verify identity.");
         } finally {
             isUnlocking = false;

@@ -10,6 +10,7 @@ import {
     fetchIndexerJson,
     indexerNetworkPath,
 } from '../utils/indexerClient';
+import { warn } from '../utils/log';
 
 export interface DiscoveredVesting {
     address: StellarContractId;
@@ -32,7 +33,7 @@ export async function discoverAllVestings(): Promise<DiscoveredVesting[]> {
         );
         return indexed.vestings;
     } catch (error) {
-        console.warn('[VestingDiscovery] Indexer discovery failed:', error);
+        warn('[VestingDiscovery] Indexer discovery failed:', error);
         return [];
     }
 }
@@ -46,7 +47,7 @@ export async function getCidForVesting(
         );
         return indexed.metadataCid;
     } catch (error) {
-        console.warn('[VestingDiscovery] Indexer CID read failed:', error);
+        warn('[VestingDiscovery] Indexer CID read failed:', error);
         return null;
     }
 }

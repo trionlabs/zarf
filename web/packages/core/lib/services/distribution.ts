@@ -10,6 +10,7 @@
 import type { StellarContractId } from '../types';
 import { getCidForVesting } from './vestingDiscovery';
 import { fetchIpfsJson } from '../utils/ipfsFetch';
+import { err } from '../utils/log';
 
 export interface EpochMetadata {
     /** BigInt as string (JSON restriction) */
@@ -142,7 +143,7 @@ export async function fetchDistributionData(address: string): Promise<Distributi
         const raw = await fetchIpfsJson(cid);
         return validateDistributionData(raw);
     } catch (error) {
-        console.error('[Distribution] Failed to fetch data:', error);
+        err('[Distribution] Failed to fetch data:', error);
         throw error;
     }
 }

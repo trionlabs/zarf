@@ -15,7 +15,7 @@
     import ZenButton from "@zarf/ui/components/ui/ZenButton.svelte";
     import { filterDistributionsByEmail } from "$lib/services/emailFilter";
     import { discoverAllVestings } from "@zarf/core/services/vestingDiscovery";
-    import { dev } from "@zarf/core/utils/log";
+    import { dev, warn, err } from "@zarf/core/utils/log";
 
     import { page } from "$app/state";
     import { goto } from "$app/navigation";
@@ -57,7 +57,7 @@
             const eligible = await filterDistributionsByEmail(addresses, email);
             filteredAddresses = eligible;
         } catch (error) {
-            console.error("[Claim] Failed to filter distributions:", error);
+            err("[Claim] Failed to filter distributions:", error);
             // Fall back to showing all on error
             filteredAddresses = addresses;
         } finally {
@@ -73,7 +73,7 @@
                 new Set(vestings.map((v) => v.address)),
             );
         } catch (e) {
-            console.warn("[Claim] Chain discovery failed", e);
+            warn("[Claim] Chain discovery failed", e);
         }
     });
 
@@ -105,8 +105,8 @@
                     // Just clear URL fragment for aesthetics & security
                     clearUrlFragment();
                 }
-            } catch (err) {
-                console.error("[Claim] Auth failed:", err);
+            } catch (e) {
+                err("[Claim] Auth failed:", e);
                 clearUrlFragment();
             } finally {
                 isAuthenticating = false;

@@ -13,6 +13,7 @@
         fetchContractMetadata,
         type OnChainVestingContract,
     } from "@zarf/core/services/distributionDiscovery";
+    import { err } from "@zarf/core/utils/log";
     import ZenCard from "@zarf/ui/components/ui/ZenCard.svelte";
     import AddressInput from "@zarf/ui/components/ui/AddressInput.svelte";
 
@@ -81,7 +82,7 @@
             })
             .catch((e) => {
                 if (currentVersion !== fetchVersion) return;
-                console.error("Failed to fetch vault metadata", e);
+                err("Failed to fetch vault metadata", e);
             })
             .finally(() => {
                 if (currentVersion !== fetchVersion) return;

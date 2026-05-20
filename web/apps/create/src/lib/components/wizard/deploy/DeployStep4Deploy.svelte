@@ -12,7 +12,7 @@
     import { planDeploy, buildOptimisticContract } from "@zarf/core/domain/deployPlanner";
     import { parseTokenAmount } from "@zarf/core/utils/amount";
     import { toMessage } from "@zarf/core/utils/error";
-    import { dev } from "@zarf/core/utils/log";
+    import { dev, warn, err } from "@zarf/core/utils/log";
     import { walletStore } from "@zarf/ui/stores/walletStore.svelte";
     import { goto } from "$app/navigation";
     import { Check, Rocket, Copy } from "lucide-svelte";
@@ -195,12 +195,12 @@
                             },
                         }),
                     );
-                } catch (err) {
-                    console.warn("Optimistic cache update failed", err);
+                } catch (e) {
+                    warn("Optimistic cache update failed", e);
                 }
             }
         } catch (e: unknown) {
-            console.error("Deploy failed:", e);
+            err("Deploy failed:", e);
             error = toMessage(e, "Deployment failed");
             currentStep = "error";
         } finally {
