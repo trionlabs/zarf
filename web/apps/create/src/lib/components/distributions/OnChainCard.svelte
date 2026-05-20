@@ -63,6 +63,11 @@
         radius="3xl"
         onclick={() => onSelect?.(contract)}
         onkeydown={(e) => {
+            // Only handle activation when the key originates on the card
+            // itself; nested elements (View button, explorer anchor) bubble
+            // their keydown, and preventDefault here would cancel their
+            // native Space/Enter activation.
+            if (e.target !== e.currentTarget) return;
             if (e.key === "Enter" || e.key === " ") {
                 e.preventDefault();
                 onSelect?.(contract);

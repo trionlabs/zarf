@@ -92,6 +92,11 @@
         radius="3xl"
         onclick={() => onSelect?.(distribution)}
         onkeydown={(e) => {
+            // Only handle activation when the key originates on the card
+            // itself; nested buttons (Deploy/Duplicate/Delete) bubble their
+            // keydown, and preventDefault here would cancel their native
+            // Space/Enter click dispatch.
+            if (e.target !== e.currentTarget) return;
             if (e.key === "Enter" || e.key === " ") {
                 e.preventDefault();
                 onSelect?.(distribution);
