@@ -94,6 +94,7 @@
         onkeydown={(e) => e.key === "Enter" && onSelect?.(distribution)}
         role="button"
         tabindex={0}
+        aria-label={`View distribution ${distribution.name}`}
         class="flex-1 relative overflow-hidden transition-all duration-300 hover:-translate-y-0.5"
     >
         <div

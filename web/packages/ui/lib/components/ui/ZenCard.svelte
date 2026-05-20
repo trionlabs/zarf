@@ -12,6 +12,9 @@
         onkeydown?: (e: KeyboardEvent) => void;
         role?: string;
         tabindex?: number;
+        "aria-label"?: string;
+        "aria-labelledby"?: string;
+        "aria-describedby"?: string;
     }
 
     let {

@@ -85,19 +85,19 @@
             <div class="flex items-center gap-3 text-xs">
                 {#if claimedCount > 0}
                     <span class="flex items-center gap-1 text-zen-success">
-                        <Check class="w-3 h-3" />
+                        <Check aria-hidden="true" class="w-3 h-3" />
                         {claimedCount} claimed
                     </span>
                 {/if}
                 {#if claimableCount > 0}
                     <span class="flex items-center gap-1 text-zen-primary">
-                        <Clock class="w-3 h-3" />
+                        <Clock aria-hidden="true" class="w-3 h-3" />
                         {claimableCount} ready
                     </span>
                 {/if}
                 {#if lockedCount > 0}
                     <span class="flex items-center gap-1 text-zen-fg-subtle">
-                        <Lock class="w-3 h-3" />
+                        <Lock aria-hidden="true" class="w-3 h-3" />
                         {lockedCount} locked
                     </span>
                 {/if}
@@ -109,6 +109,7 @@
             class="overflow-hidden rounded-xl border-[0.5px] border-zen-border-subtle bg-zen-bg shadow-sm"
         >
             <table
+                aria-label="Vesting unlock schedule"
                 class="w-full border-separate border-spacing-0"
             >
                 <thead>
@@ -157,21 +158,21 @@
                                     <span
                                         class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-zen-success/10 text-zen-success"
                                     >
-                                        <Check class="w-3 h-3" />
+                                        <Check aria-hidden="true" class="w-3 h-3" />
                                         Claimed
                                     </span>
                                 {:else if period.status === "claimable"}
                                     <span
                                         class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-zen-primary/10 text-zen-primary"
                                     >
-                                        <Clock class="w-3 h-3" />
+                                        <Clock aria-hidden="true" class="w-3 h-3" />
                                         Ready
                                     </span>
                                 {:else}
                                     <span
                                         class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-zen-fg/5 text-zen-fg-subtle"
                                     >
-                                        <Lock class="w-3 h-3" />
+                                        <Lock aria-hidden="true" class="w-3 h-3" />
                                         Locked
                                     </span>
                                 {/if}
