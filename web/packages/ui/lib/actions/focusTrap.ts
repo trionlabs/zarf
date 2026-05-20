@@ -82,18 +82,36 @@ export function focusTrap(
         const last = focusables[focusables.length - 1];
         const active = document.activeElement as HTMLElement | null;
 
-        if (event.shiftKey && (active === first || !node.contains(active))) {
+        // `active === node` covers the case where initial focus landed on the
+        // trap root itself (tabindex="-1" on the dialog element). Without it,
+        // node.contains(node) === true → Shift+Tab leaks focus to the element
+        // before the trap in DOM order on the very first reverse-tab.
+        const atRoot = active === node;
+
+        if (event.shiftKey && (atRoot || active === first || !node.contains(active))) {
             event.preventDefault();
             last.focus();
-        } else if (!event.shiftKey && (active === last || !node.contains(active))) {
+        } else if (!event.shiftKey && (atRoot || active === last || !node.contains(active))) {
             event.preventDefault();
             first.focus();
         }
     }
 
+    function isFocusable(el: HTMLElement | null): el is HTMLElement {
+        return (
+            !!el &&
+            el.isConnected &&
+            !(el as HTMLButtonElement | HTMLInputElement).disabled
+        );
+    }
+
     function focusInitial() {
         const explicit = resolveTarget(opts.initialFocus);
-        const target = explicit ?? getFocusables()[0] ?? node;
+        // Validate explicit targets: a closure may resolve to a detached or
+        // disabled node (e.g., late bind:this on a button that hasn't mounted
+        // yet). Fall through to the first focusable child, then to the trap
+        // root, rather than calling .focus() on garbage.
+        const target = isFocusable(explicit) ? explicit : getFocusables()[0] ?? node;
         target.focus();
     }
 
