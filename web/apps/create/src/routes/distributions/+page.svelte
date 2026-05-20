@@ -292,40 +292,47 @@
 </div>
 
 {#if selectedContract}
-    <!-- Backdrop. tabindex="-1" keeps the close affordance (Enter/Space on the
-         button still fires) but removes it from the focusTrap Tab cycle; Escape
-         + panel X cover keyboard close. -->
-    <button
-        type="button"
-        aria-label="Close detail panel"
-        tabindex="-1"
-        class="fixed inset-0 z-40 bg-zen-scrim/40 backdrop-blur-sm"
-        onclick={closePanel}
-        transition:fade={{ duration: 150 }}
-    ></button>
-
-    <!-- Slide-out panel (right side). aria-label is dynamic from contract.name;
-         a proper cross-component aria-labelledby that targets the panel's <h2>
-         is a Phase 3 follow-up (prop-drill a titleId into OnChainDetailPanel). -->
+    <!-- Wrapper hosts use:focusTrap so the backdrop and the dialog become
+         CHILDREN of the trap node, not siblings. Without this wrapper the
+         hideBackground walk-up (focusTrap.ts:applyBackgroundInert) would
+         mark the backdrop `inert` and silently disable click-to-close. -->
     <div
-        bind:this={dialogEl}
-        role="dialog"
-        aria-modal="true"
-        aria-label={selectedContract?.name
-            ? `${selectedContract.name} — distribution details`
-            : "Distribution contract details"}
-        tabindex="-1"
         use:focusTrap={{
             onEscape: closePanel,
             initialFocus: () => dialogEl ?? null,
             hideBackground: true,
         }}
-        class="fixed top-0 right-0 z-50 h-full w-full sm:w-[28rem] shadow-2xl border-l-[0.5px] border-zen-border-subtle"
-        transition:fly={{ x: 400, duration: 250 }}
     >
-        <OnChainDetailPanel
-            contract={selectedContract}
-            onClose={closePanel}
-        />
+        <!-- Backdrop. tabindex="-1" keeps the close affordance (Enter/Space on the
+             button still fires) but removes it from the focusTrap Tab cycle; Escape
+             + panel X cover keyboard close. -->
+        <button
+            type="button"
+            aria-label="Close detail panel"
+            tabindex="-1"
+            class="fixed inset-0 z-40 bg-zen-scrim/40 backdrop-blur-sm"
+            onclick={closePanel}
+            transition:fade={{ duration: 150 }}
+        ></button>
+
+        <!-- Slide-out panel (right side). aria-label is dynamic from contract.name;
+             a proper cross-component aria-labelledby that targets the panel's <h2>
+             is a Phase 3 follow-up (prop-drill a titleId into OnChainDetailPanel). -->
+        <div
+            bind:this={dialogEl}
+            role="dialog"
+            aria-modal="true"
+            aria-label={selectedContract?.name
+                ? `${selectedContract.name} — distribution details`
+                : "Distribution contract details"}
+            tabindex="-1"
+            class="fixed top-0 right-0 z-50 h-full w-full sm:w-[28rem] shadow-2xl border-l-[0.5px] border-zen-border-subtle"
+            transition:fly={{ x: 400, duration: 250 }}
+        >
+            <OnChainDetailPanel
+                contract={selectedContract}
+                onClose={closePanel}
+            />
+        </div>
     </div>
 {/if}
