@@ -11,6 +11,15 @@
     let copied = $state(false);
 
     onMount(() => {
+        // Nothing in src/ programmatically navigates here — deploy
+        // completion routes to /distributions. A direct visit with an
+        // empty deployStore would render the "Not available" fallback,
+        // which is broken UX for a "deployment complete" landing. Redirect
+        // out instead of rendering a half-state.
+        if (!deployStore.contractAddress) {
+            goto("/distributions");
+            return;
+        }
         // Index 3 = terminal "done" state (wizardStore bounds 0..3). The
         // pre-rename code set goToStep(2) which incorrectly tagged a
         // post-launch view with the deploy step's index — the exact bug
