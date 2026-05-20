@@ -220,10 +220,12 @@
                                                 {/each}
                                             </div>
                                             <button
+                                                type="button"
+                                                aria-label="Close claim drawer"
                                                 class="text-zen-fg-faint hover:text-zen-fg-muted transition-colors"
                                                 onclick={handleCancel}
                                             >
-                                                <X class="w-4 h-4" />
+                                                <X aria-hidden="true" class="w-4 h-4" />
                                             </button>
                                         </div>
 
