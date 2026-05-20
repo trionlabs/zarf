@@ -121,6 +121,8 @@
             </div>
         </div>
         <button
+            type="button"
+            aria-label="Close detail panel"
             class="p-2 rounded-full hover:bg-zen-fg/5 transition-colors"
             onclick={onClose}
         >
