@@ -1,5 +1,6 @@
 <script lang="ts">
     import { claimStore } from "../../../stores/claimStore.svelte";
+    import { discoverEpochs } from "../../../services/claimActions";
     import { authStore } from "@zarf/ui/stores/authStore.svelte";
     // We import from merkleTree which handles the Barretenberg WASM loading
     import { Lock, Mail, KeyRound, Loader2, ArrowRight, LogOut } from "lucide-svelte";
@@ -52,9 +53,9 @@
         error = null;
 
         try {
-            // New Pattern: Delegate discovery loop to the Store
-            // This handles Fetch JSON -> Derive Keys -> Check Local -> Check Chain
-            await claimStore.discoverEpochs(email, jwt!, pin, contractAddress);
+            // Discovery loop: Fetch JSON -> Derive Keys -> Check Local -> Check Chain.
+            // Lives in services/claimActions so claimStore stays free of @zarf/core/contracts.
+            await discoverEpochs(email, jwt!, pin, contractAddress);
         } catch (e: any) {
             console.error("Unlock failed:", e);
             error = e.message || "Failed to verify identity.";

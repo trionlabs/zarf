@@ -3,9 +3,7 @@ import type { ZKProof, MerkleClaim, MerkleTreeData } from "@zarf/ui/types";
 import { toastStore } from "@zarf/ui/stores/toastStore.svelte";
 import { getActiveStellarNetworkId } from "@zarf/core/config/runtime";
 
-import { fetchDistributionData, type DistributionData } from "@zarf/core/services/distribution";
-import { IpfsFetchError } from "@zarf/core/utils/ipfsFetch";
-import { isEpochClaimed, readVestingContract } from "@zarf/core/contracts";
+import type { DistributionData } from "@zarf/core/services/distribution";
 import {
     totalAllocation as totalAllocationOf,
     claimedAmount as claimedAmountOf,
@@ -16,7 +14,6 @@ import {
     findNextClaimableIdx,
     buildVestingPeriods,
 } from "@zarf/core/domain/claimFlow";
-import { discoverEpochs as discoverEpochsCore } from "@zarf/core/domain/epochDiscovery";
 
 /**
  * Claim Store - InMemory State for the Claim Flow (Discrete Vesting Edition)
@@ -288,75 +285,6 @@ class ClaimFlowState {
         return this.cryptoModulePromise;
     }
 
-    /**
-     * Off-chain epoch discovery via the recursive hash chain.
-     * The actual algorithm lives in @zarf/core/domain/epochDiscovery (pure,
-     * unit-tested). This method wires up Svelte concerns: WASM lazy-load,
-     * status messages, error toasts, and the post-success transition.
-     */
-    async discoverEpochs(email: string, jwt: string, pin: string, contractAddress: string) {
-        this.state.loading = true;
-        this.state.error = null;
-        this.state.statusMessage = "Loading distribution data...";
-        this.state.epochs = [];
-
-        try {
-            const metadata = await readVestingContract(contractAddress);
-            this.state.tokenSymbol = metadata.tokenSymbol;
-            this.state.tokenDecimals = metadata.tokenDecimals;
-
-            // Lazy-load the WASM-heavy crypto module (~7MB) only when needed.
-            const {
-                computeIdentityCommitment,
-                stringToBytes,
-                pedersenHashBytes,
-                pedersenHashField,
-            } = await this.preloadCrypto();
-
-            const result = await discoverEpochsCore(
-                { email, pin, contractAddress },
-                { computeIdentityCommitment, stringToBytes, pedersenHashBytes, pedersenHashField },
-                {
-                    fetchDistribution: fetchDistributionData,
-                    isEpochClaimed,
-                },
-            );
-
-            this.setSchedule(result.schedule);
-            // Adapt domain epochs → claim store's EpochClaim shape.
-            const found: EpochClaim[] = result.epochs.map((e) => ({
-                email,
-                amount: e.amount,
-                salt: e.salt,
-                identityCommitment: e.identityCommitment,
-                leafIndex: e.leafIndex,
-                leaf: 0n,
-                unlockTime: e.unlockTime,
-                isClaimed: e.isClaimed,
-                isLocked: e.isLocked,
-                canClaim: e.canClaim,
-            }));
-
-            this.setCredentials(email, "", pin);
-            this.state.jwt = jwt;
-            this.setEpochs(found);
-            this.nextStep();
-        } catch (e: any) {
-            console.error("Discovery failed:", e);
-            let msg = e.message || "Failed to discover epochs.";
-            if (msg.includes("404")) msg = "Contract distribution data not found.";
-            if (e instanceof IpfsFetchError) {
-                msg = e.code === "INVALID_CID"
-                    ? "This distribution is registered with invalid IPFS metadata. Ask the creator to redeploy it with a real IPFS CID."
-                    : "Could not load this distribution from IPFS. Please retry; the configured gateway may be unavailable.";
-            }
-            this.setError(msg);
-            throw new Error(msg);
-        } finally {
-            this.state.loading = false;
-            this.state.statusMessage = null;
-        }
-    }
 }
 
 export const claimStore = new ClaimFlowState();
