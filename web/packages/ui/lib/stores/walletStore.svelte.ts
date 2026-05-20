@@ -138,15 +138,22 @@ async function init() {
 
     // 1. Attempt Auto-Reconnect
     try { await stellarReconnect(); } catch (e) { } finally { state.isReconnecting = false; }
+    if (!isInitialized) return; // destroy() ran during reconnect
 
     // 2. Initial Sync
     syncFromWallet();
 
     // 3. Setup Watcher
     if (unwatchFn) unwatchFn();
-    unwatchFn = await watchWalletAccount((account: WalletAccount) => {
+    const unwatch = await watchWalletAccount((account: WalletAccount) => {
         updateInternalState({ ...account, address: account.address ?? undefined });
     });
+    if (!isInitialized) {
+        // destroy() ran during the dynamic import — stop the orphan watcher
+        unwatch();
+        return;
+    }
+    unwatchFn = unwatch;
 }
 
 /**
