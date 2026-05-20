@@ -299,7 +299,7 @@
         type="button"
         aria-label="Close detail panel"
         tabindex="-1"
-        class="fixed inset-0 z-40 bg-zen-fg/40 backdrop-blur-sm"
+        class="fixed inset-0 z-40 bg-zen-scrim/40 backdrop-blur-sm"
         onclick={closePanel}
         transition:fade={{ duration: 150 }}
     ></button>

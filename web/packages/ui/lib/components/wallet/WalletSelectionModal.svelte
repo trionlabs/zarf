@@ -44,7 +44,7 @@
          which the a11y linter cannot statically detect. -->
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <div
-        class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zen-fg/50 backdrop-blur-sm animate-zen-fade-in"
+        class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zen-scrim/50 backdrop-blur-sm animate-zen-fade-in"
         onclick={handleBackdropClick}
         use:focusTrap={{
             onEscape: handleClose,
