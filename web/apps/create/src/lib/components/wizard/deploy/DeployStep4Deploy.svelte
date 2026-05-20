@@ -10,7 +10,7 @@
     import { addOptimisticContract } from "@zarf/core/services/distributionDiscovery";
     import { buildFactoryDeployInputs } from "@zarf/core/domain/merkleResultAdapter";
     import { planDeploy, buildOptimisticContract } from "@zarf/core/domain/deployPlanner";
-    import { getContractExplorerUrl, getExplorerUrl } from "@zarf/core/contracts/explorer";
+    import { getExplorerUrl } from "@zarf/core/contracts/explorer";
     import { parseTokenAmount } from "@zarf/core/utils/amount";
     import { walletStore } from "@zarf/ui/stores/walletStore.svelte";
     import { goto } from "$app/navigation";
@@ -21,8 +21,6 @@
         Loader2,
         AlertCircle,
         Copy,
-        Download,
-        Calendar,
     } from "lucide-svelte";
     import type { TransactionHash } from "@zarf/core/types";
     import ZenButton from "@zarf/ui/components/ui/ZenButton.svelte";
@@ -30,6 +28,7 @@
     import ZenSpinner from "@zarf/ui/components/ui/ZenSpinner.svelte";
     import DeploymentSummary from "./DeploymentSummary.svelte";
     import DeploymentSuccessCard from "./DeploymentSuccessCard.svelte";
+    import DeploymentReport from "./DeploymentReport.svelte";
 
     // Local state from stores
     let distribution = $derived(deployStore.distribution);
@@ -226,58 +225,6 @@
             copied = true;
             setTimeout(() => copied = false, 2000);
         }
-    }
-
-    // Download deployment report
-    function downloadReport() {
-        if (!contractAddress || !distribution) return;
-
-        const timestamp = new Date().toISOString();
-
-        const report = `ZARF VESTING CONTRACT DEPLOYMENT REPORT
-========================================
-
-Contract Address: ${contractAddress}
-Network: ${networkName}
-
-Distribution Details
---------------------
-Name: ${distribution.name}
-Description: ${distribution.description || "N/A"}
-Total Amount: ${distribution.amount} ${wizardStore.tokenDetails.tokenSymbol || "tokens"}
-Recipients: ${merkleResult?.claims.length || 0}
-
-Token Details
--------------
-Symbol: ${wizardStore.tokenDetails.tokenSymbol || "N/A"}
-Address: ${wizardStore.tokenDetails.tokenAddress || "N/A"}
-Decimals: ${wizardStore.tokenDetails.tokenDecimals || 7}
-
-Vesting Schedule
-----------------
-Cliff Date: ${distribution.schedule.cliffEndDate || "None"}
-Duration: ${distribution.schedule.distributionDuration} ${distribution.schedule.durationUnit}s
-Unlock Frequency: Every 1 ${distribution.schedule.durationUnit}
-
-Transaction Hashes
-------------------
-Approval TX: ${approveTxHash || "N/A"}
-Create TX: ${createTxHash || "N/A"}
-
-Links
------
-Contract: ${getContractExplorerUrl(contractAddress)}
-
-Generated: ${timestamp}
-`;
-
-        const blob = new Blob([report], { type: "text/plain" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `zarf_${contractAddress.slice(0, 8)}_report.txt`;
-        a.click();
-        URL.revokeObjectURL(url);
     }
 
     // Count unique recipients (group claims by email/identity)
@@ -607,7 +554,7 @@ Generated: ${timestamp}
                         This will require only 2 wallet confirmations. Much
                         faster than before!
                     </p>
-                {:else if isDeployed && contractAddress}
+                {:else if isDeployed && contractAddress && distribution}
                     <!-- Success State - Action Buttons (Card is on right) -->
                     <div class="flex gap-3 mt-4">
                         <ZenButton
@@ -618,13 +565,15 @@ Generated: ${timestamp}
                             View Dashboard
                         </ZenButton>
 
-                        <ZenButton
-                            variant="secondary"
-                            onclick={downloadReport}
-                            title="Download Report"
-                        >
-                            {#snippet iconLeft()}<Download class="w-4 h-4" />{/snippet}
-                        </ZenButton>
+                        <DeploymentReport
+                            {contractAddress}
+                            {distribution}
+                            tokenDetails={wizardStore.tokenDetails}
+                            claimCount={merkleResult?.claims.length ?? 0}
+                            {networkName}
+                            {approveTxHash}
+                            {createTxHash}
+                        />
                     </div>
                 {:else if currentStep !== "idle" && currentStep !== "error"}
                     <!-- In Progress -->
