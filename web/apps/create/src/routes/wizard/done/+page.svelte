@@ -11,9 +11,13 @@
     let copied = $state(false);
 
     onMount(() => {
-        wizardStore.goToStep(2);
-        // Update with real address after hydration. Source of truth is deployStore;
-        // wizardStore no longer mirrors deployment results.
+        // Index 3 = terminal "done" state (wizardStore bounds 0..3). The
+        // pre-rename code set goToStep(2) which incorrectly tagged a
+        // post-launch view with the deploy step's index — the exact bug
+        // Phase 5 was scoped to fix.
+        wizardStore.goToStep(3);
+        // Source of truth for the contract address is deployStore; wizardStore
+        // no longer mirrors deployment results.
         contractAddress = deployStore.contractAddress ?? "";
     });
 

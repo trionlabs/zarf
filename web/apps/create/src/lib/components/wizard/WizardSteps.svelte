@@ -12,12 +12,16 @@
     let mounted = $state(false);
     let currentStepIndex = $state(0);
 
+    // The "done" view is a post-launch terminal state and intentionally
+    // outside the 3-step progress bar; the bar self-hides while it's shown.
+    const isDonePage = $derived($page.url.pathname.includes('/wizard/done'));
+
     // Determine effective step index based on URL
     const effectiveStepIndex = $derived.by(() => {
         const path = $page.url.pathname;
         if (path.includes('/step-0')) return 0;
         if (path.includes('/step-1')) return 1;
-        if (path.includes('/step-2') || path.includes('/step-3')) return 2;
+        if (path.includes('/step-2')) return 2;
         return currentStepIndex;
     });
 
@@ -37,6 +41,7 @@
     const currentStepLabel = $derived(steps[effectiveStepIndex]?.label || "");
 </script>
 
+{#if !isDonePage}
 <!-- Minimal Progress Bar -->
 <div class="w-full border-b border-zen-border-subtle bg-zen-bg">
     <div class="max-w-7xl mx-auto px-6 py-2 flex items-center gap-4">
@@ -54,3 +59,4 @@
         </div>
     </div>
 </div>
+{/if}
