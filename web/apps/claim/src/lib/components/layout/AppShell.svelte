@@ -21,7 +21,7 @@
     </ZarfNavbar>
 
     <!-- Main Content Area -->
-    <main class="min-h-[calc(100vh-4rem)]">
+    <main id="main" class="min-h-[calc(100vh-4rem)]">
         <div class="w-full max-w-7xl mx-auto p-8 lg:p-12">
             {@render children()}
         </div>

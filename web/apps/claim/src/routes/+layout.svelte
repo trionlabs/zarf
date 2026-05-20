@@ -23,6 +23,8 @@
     });
 </script>
 
+<a href="#main" class="skip-link">Skip to content</a>
+
 <!-- Subtle ripple background texture -->
 <div class="ripple-bg"></div>
 
