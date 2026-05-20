@@ -274,12 +274,12 @@ class ClaimFlowState {
     private cryptoModulePromise: Promise<typeof import("@zarf/core/crypto/merkleTree")> | null = null;
 
     /**
-     * Performance: Preload Heavy WASM Bundle
-     * Trigger this on hover/focus of entry buttons
+     * Warm the merkleTree dynamic import on hover/focus of entry buttons.
+     * Phase 1.1 split merkleTree into a lazy chunk; calling this primes
+     * the network/parse cost so the click path doesn't pay it.
      */
     preloadCrypto() {
         if (!this.cryptoModulePromise) {
-            console.log('[Performance] Preloading Crypto WASM...');
             this.cryptoModulePromise = import("@zarf/core/crypto/merkleTree");
         }
         return this.cryptoModulePromise;
