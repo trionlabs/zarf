@@ -175,9 +175,32 @@
     // Clean Markup: Extract template logic to $derived
     const showLockPeriodBar = $derived(!isInstant && daysToCliff > 0);
 
-    // Interactive State (Singleton Tooltip)
+    // Interactive State (Singleton Tooltip).
+    // One state per surface; four events feed each (mouseenter / mouseleave /
+    // focus / blur). Last-event-wins is acceptable here -- the edge case
+    // "focus on bar A while mouse hovers bar B then leaves" is rare for an
+    // informational timeline and the WCAG-blocking gap was keyboard access
+    // at all, not focus/hover priority resolution.
     let activeTooltipIndex = $state<number | null>(null);
-    let isHoveringLock = $state(false);
+    let isLockTooltipActive = $state(false);
+
+    // WCAG 1.4.13 "Content on Hover or Focus": tooltip must be dismissible
+    // without moving pointer or keyboard. Per-button keydown only fires when
+    // focused -- a mouse-only user hovering a bar would have no way to
+    // dismiss via Escape. A window-level listener while any tooltip is
+    // active covers both. The effect's tracked deps (activeTooltipIndex,
+    // isLockTooltipActive) ensure cleanup runs as soon as nothing is open.
+    $effect(() => {
+        if (activeTooltipIndex === null && !isLockTooltipActive) return;
+        function onKey(e: KeyboardEvent) {
+            if (e.key === "Escape") {
+                activeTooltipIndex = null;
+                isLockTooltipActive = false;
+            }
+        }
+        window.addEventListener("keydown", onKey);
+        return () => window.removeEventListener("keydown", onKey);
+    });
 </script>
 
 {#if hasValidDates}
@@ -310,19 +333,26 @@
 
                 <!-- Lock Period Bar -->
                 {#if showLockPeriodBar}
-                    <!-- svelte-ignore a11y_mouse_events_have_key_events -->
-                    <!-- svelte-ignore a11y_no_static_element_interactions -->
-                    <div
-                        class="h-full bg-zen-fg/[0.03] rounded-md flex items-center justify-center relative cursor-default transition-colors hover:bg-zen-fg/[0.05]"
+                    <button
+                        type="button"
+                        aria-label="Lock period"
+                        aria-describedby={isLockTooltipActive
+                            ? "vesting-lock-tooltip"
+                            : undefined}
+                        class="h-full bg-zen-fg/[0.03] rounded-md flex items-center justify-center relative cursor-default transition-colors hover:bg-zen-fg/[0.05] border-0 p-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-zen-fg/40 focus-visible:ring-offset-2 focus-visible:ring-offset-zen-bg"
                         style="width: {lockPeriodPercent}%; min-width: 40px;"
-                        onmouseenter={() => (isHoveringLock = true)}
-                        onmouseleave={() => (isHoveringLock = false)}
+                        onmouseenter={() => (isLockTooltipActive = true)}
+                        onmouseleave={() => (isLockTooltipActive = false)}
+                        onfocus={() => (isLockTooltipActive = true)}
+                        onblur={() => (isLockTooltipActive = false)}
                     >
-                        <Lock class="w-4 h-4 text-zen-fg/20" />
+                        <Lock aria-hidden="true" class="w-4 h-4 text-zen-fg/20" />
 
                         <!-- Lock Tooltip -->
-                        {#if isHoveringLock}
+                        {#if isLockTooltipActive}
                             <div
+                                id="vesting-lock-tooltip"
+                                role="tooltip"
                                 class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50 min-w-[140px]"
                             >
                                 <div
@@ -349,7 +379,7 @@
                                 ></div>
                             </div>
                         {/if}
-                    </div>
+                    </button>
                 {/if}
 
                 <!-- Vesting Bars -->
@@ -358,17 +388,28 @@
                         class="h-full flex-1 flex flex-col justify-end relative cursor-default min-w-[4px]"
                     >
                         <!-- Colored Bar (Hover Target) -->
-                        <!-- svelte-ignore a11y_mouse_events_have_key_events -->
-                        <!-- svelte-ignore a11y_no_static_element_interactions -->
-                        <div
-                            class="w-full bg-zen-fg/60 transition-all duration-200 rounded-t-sm hover:bg-zen-fg relative"
+                        <button
+                            type="button"
+                            aria-label={isInstant
+                                ? "Instant unlock"
+                                : marker.isGrouped
+                                  ? `Vesting events 1 through ${marker.event}`
+                                  : `Vesting unlock event ${marker.event}`}
+                            aria-describedby={activeTooltipIndex === i
+                                ? `vesting-tooltip-${i}`
+                                : undefined}
+                            class="w-full bg-zen-fg/60 transition-all duration-200 rounded-t-sm hover:bg-zen-fg relative border-0 p-0 cursor-default focus:outline-none focus-visible:ring-2 focus-visible:ring-zen-fg/40 focus-visible:ring-offset-2 focus-visible:ring-offset-zen-bg"
                             style="height: {marker.percent}%"
                             onmouseenter={() => (activeTooltipIndex = i)}
                             onmouseleave={() => (activeTooltipIndex = null)}
+                            onfocus={() => (activeTooltipIndex = i)}
+                            onblur={() => (activeTooltipIndex = null)}
                         >
                             {#if activeTooltipIndex === i}
                                 <!-- Hover Tooltip (Brutalist) -->
                                 <div
+                                    id="vesting-tooltip-{i}"
+                                    role="tooltip"
                                     class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50 min-w-[120px]"
                                 >
                                     <div
@@ -418,7 +459,7 @@
                                     ></div>
                                 </div>
                             {/if}
-                        </div>
+                        </button>
                     </div>
                 {/each}
             </div>
