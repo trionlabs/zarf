@@ -6,21 +6,18 @@
     const steps = [
         { label: "Token", path: "/wizard/step-0" },
         { label: "Create", path: "/wizard/step-1" },
-        { label: "Deploy", path: "/wizard/deploy" },
+        { label: "Deploy", path: "/wizard/step-2" },
     ];
 
     let mounted = $state(false);
     let currentStepIndex = $state(0);
-
-    // Check if we're on deploy page
-    const isDeployPage = $derived($page.url.pathname.includes('/deploy'));
 
     // Determine effective step index based on URL
     const effectiveStepIndex = $derived.by(() => {
         const path = $page.url.pathname;
         if (path.includes('/step-0')) return 0;
         if (path.includes('/step-1')) return 1;
-        if (path.includes('/deploy') || path.includes('/step-3')) return 2;
+        if (path.includes('/step-2') || path.includes('/step-3')) return 2;
         return currentStepIndex;
     });
 

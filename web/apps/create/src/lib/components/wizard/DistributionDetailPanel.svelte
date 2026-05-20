@@ -34,7 +34,7 @@
 
     function handleDeploy() {
         // Navigate to the actual deployment wizard for this distribution
-        goto(`/wizard/deploy?id=${distribution.id}`);
+        goto(`/wizard/step-2?id=${distribution.id}`);
     }
 
     // Format date for display

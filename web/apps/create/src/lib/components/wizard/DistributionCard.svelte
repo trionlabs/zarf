@@ -56,7 +56,7 @@
 
     function handleDeploy(e: Event) {
         e.stopPropagation();
-        goto(`/wizard/deploy?id=${distribution.id}`);
+        goto(`/wizard/step-2?id=${distribution.id}`);
     }
 
     function handleDelete(e: Event) {
