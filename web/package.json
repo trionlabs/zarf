@@ -24,7 +24,8 @@
 		"deploy:all": "pnpm deploy:landing && pnpm deploy:create && pnpm deploy:claim && pnpm deploy:pin-proxy && pnpm deploy:jwk-rotation && pnpm deploy:indexer",
 		"check:type-forks": "node scripts/check-type-forks.mjs",
 		"check:budget": "node scripts/check-bundle-budget.mjs",
-		"check:any": "node scripts/check-any-allow-list.mjs"
+		"check:any": "node scripts/check-any-allow-list.mjs",
+		"check:console": "node scripts/check-console-allow-list.mjs"
 	},
 	"pnpm": {
 		"overrides": {
