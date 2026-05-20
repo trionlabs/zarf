@@ -204,14 +204,28 @@
     onMount(() => {
         if (!browser) return;
         mounted = true; // Trigger SSR-safe theme check
-        initPoints();
-        animate();
 
-        const resizeObserver = new ResizeObserver(() => initPoints());
+        // Respect the user's reduced-motion preference. The canvas is a purely
+        // decorative reveal effect, so under `prefers-reduced-motion: reduce`
+        // we skip rAF entirely and leave the canvas blank. The CSS-driven
+        // wave-grid spotlight remains active because it is mask-position only,
+        // not transform/opacity animation.
+        const reduceMotion = window.matchMedia(
+            "(prefers-reduced-motion: reduce)",
+        ).matches;
+
+        if (!reduceMotion) {
+            initPoints();
+            animate();
+        }
+
+        const resizeObserver = new ResizeObserver(() => {
+            if (!reduceMotion) initPoints();
+        });
         resizeObserver.observe(container);
 
         return () => {
-            cancelAnimationFrame(animationId);
+            if (animationId) cancelAnimationFrame(animationId);
             resizeObserver.disconnect();
         };
     });
@@ -230,8 +244,13 @@
     ></div>
 
     <!-- 2. Data Points Canvas -->
+    <p class="sr-only">
+        Decorative background: hashed placeholders that reveal &ldquo;Private
+        Claim&rdquo; labels under the cursor. No interactive content.
+    </p>
     <canvas
         bind:this={canvas}
+        aria-hidden="true"
         class="absolute inset-0 w-full h-full pointer-events-none z-10"
     ></canvas>
 
