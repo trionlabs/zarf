@@ -57,6 +57,7 @@ async function initBarretenberg(): Promise<Barretenberg> {
             FrClass = null;
             throw new Error(
                 `Failed to initialize Barretenberg: ${error instanceof Error ? error.message : 'unknown error'}`,
+                { cause: error },
             );
         }
     })();

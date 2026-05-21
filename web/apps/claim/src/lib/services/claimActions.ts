@@ -79,7 +79,7 @@ export async function discoverEpochs(
                     : 'Could not load this distribution from IPFS. Please retry; the configured gateway may be unavailable.';
         }
         claimStore.setError(msg);
-        throw new Error(msg);
+        throw new Error(msg, { cause: e });
     } finally {
         claimStore.state.loading = false;
         claimStore.state.statusMessage = null;

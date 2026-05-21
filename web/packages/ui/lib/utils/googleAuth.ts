@@ -419,6 +419,7 @@ export function decodeJwt(jwt: string): DecodedJWT {
     } catch (error) {
         throw new Error(
             `Failed to decode JWT: ${error instanceof Error ? error.message : 'unknown error'}`,
+            { cause: error },
         );
     }
 }
@@ -461,6 +462,7 @@ export async function fetchGooglePublicKeys(): Promise<GooglePublicKey[]> {
     } catch (error) {
         throw new Error(
             `Failed to fetch Google public keys: ${error instanceof Error ? error.message : 'unknown error'}`,
+            { cause: error },
         );
     }
 }
