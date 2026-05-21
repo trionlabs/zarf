@@ -31,7 +31,7 @@
         class="
             flex items-stretch w-full
             rounded-xl overflow-hidden
-            border-[0.5px] transition-all duration-300
+            border-[0.5px] transition-all duration-[var(--zen-motion-emphasis)]
             bg-zen-bg
             {hasError
             ? 'border-zen-error/50'
@@ -60,7 +60,7 @@
                 text-zen-fg
                 placeholder:text-zen-fg-faint
                 focus:outline-none
-                transition-colors duration-200
+                transition-colors duration-[var(--zen-motion-base)]
             "
             bind:value
             oninput={onInput}
@@ -75,7 +75,7 @@
                 bg-zen-fg/[0.02] hover:bg-zen-fg/[0.05]
                 border-l-[0.5px] border-zen-border-subtle
                 text-zen-fg-muted hover:text-zen-fg
-                transition-all duration-200
+                transition-all duration-[var(--zen-motion-base)]
                 disabled:opacity-50 disabled:cursor-not-allowed
             "
             onclick={onAction}

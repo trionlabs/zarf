@@ -29,7 +29,7 @@
     const errorId = $derived(`${inputId}-error`);
 
     const baseInputClasses = `
-        w-full transition-all duration-200
+        w-full transition-all duration-[var(--zen-motion-base)]
         text-zen-fg placeholder:text-zen-fg-subtle
         disabled:opacity-50 disabled:cursor-not-allowed
         focus:outline-none

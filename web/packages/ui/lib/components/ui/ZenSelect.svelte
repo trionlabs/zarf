@@ -94,7 +94,7 @@
 
     const baseClasses = `
         inline-flex items-center justify-between
-        text-zen-fg transition-all duration-200
+        text-zen-fg transition-all duration-[var(--zen-motion-base)]
         disabled:opacity-50 disabled:cursor-not-allowed
         focus:outline-none cursor-pointer
     `;
