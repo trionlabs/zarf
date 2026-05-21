@@ -9,6 +9,7 @@
         Calendar,
     } from "lucide-svelte";
     import type { ComponentType } from "svelte";
+    import { formatAmount } from "@zarf/core/utils";
 
     // ——————————————————————————————————————————————————————————————————————————
     // Derived Stats
@@ -49,7 +50,7 @@
     // Total Amount (Saved + Editing)
     const totalAmount = $derived(savedAmount + wizardStore.editingPoolAmount);
     const distributionAmountDisplay = $derived(
-        totalAmount > 0 ? totalAmount.toLocaleString() : "—",
+        totalAmount > 0 ? formatAmount(totalAmount) : "—",
     );
 
     // Schedule Summary (combines saved + editing)

@@ -2,6 +2,7 @@
     import type { Distribution, TokenDetails } from "../../../stores/types";
     import { getContractExplorerUrl } from "@zarf/core/contracts/explorer";
     import { Check, Copy, ExternalLink, Calendar } from "lucide-svelte";
+    import { formatAmount } from "@zarf/core/utils";
 
     interface Props {
         contractAddress: string;
@@ -102,7 +103,7 @@
     >
         <div class="p-4 text-center">
             <div class="text-lg font-bold text-zen-fg">
-                {Number(distribution.amount).toLocaleString()}
+                {formatAmount(distribution.amount)}
             </div>
             <div
                 class="text-[10px] uppercase tracking-wider text-zen-fg-subtle mt-0.5"

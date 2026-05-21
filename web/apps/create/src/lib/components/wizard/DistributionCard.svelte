@@ -7,6 +7,7 @@
     import ZenCard from "@zarf/ui/components/ui/ZenCard.svelte";
     import ZenButton from "@zarf/ui/components/ui/ZenButton.svelte";
     import ZenBadge from "@zarf/ui/components/ui/ZenBadge.svelte";
+    import { formatAmount, formatDate } from "@zarf/core/utils";
 
     let {
         distribution,
@@ -44,15 +45,6 @@
     const style = $derived(
         variantStyles[variant as keyof typeof variantStyles],
     );
-
-    function formatDate(dateString: string | undefined): string {
-        if (!dateString) return "Not set";
-        return new Date(dateString).toLocaleDateString("en-US", {
-            month: "short",
-            day: "numeric",
-            year: "numeric",
-        });
-    }
 
     function handleDeploy(e: Event) {
         e.stopPropagation();
@@ -166,9 +158,9 @@
                         >
                             <Calendar class="w-3 h-3 shrink-0" />
                             <span class="truncate"
-                                >Cliff: {formatDate(
-                                    distribution.schedule.cliffEndDate,
-                                )}</span
+                                >Cliff: {distribution.schedule.cliffEndDate
+                                    ? formatDate(distribution.schedule.cliffEndDate)
+                                    : "Not set"}</span
                             >
                         </div>
                     {/if}
@@ -189,7 +181,7 @@
                     <div
                         class="text-xl md:text-2xl font-black text-zen-fg tracking-tight leading-none"
                     >
-                        {Number(distribution.amount).toLocaleString()}
+                        {formatAmount(distribution.amount)}
                     </div>
                 </div>
 

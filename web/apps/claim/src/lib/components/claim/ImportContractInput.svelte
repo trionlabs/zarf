@@ -14,6 +14,7 @@
         type OnChainVestingContract,
     } from "@zarf/core/services/distributionDiscovery";
     import { err } from "@zarf/core/utils/log";
+    import { formatDate as formatDateUS } from "@zarf/core/utils";
     import ZenCard from "@zarf/ui/components/ui/ZenCard.svelte";
     import AddressInput from "@zarf/ui/components/ui/AddressInput.svelte";
 
@@ -38,11 +39,7 @@
 
     function formatDate(timestamp: bigint) {
         if (timestamp === 0n) return "Not Started";
-        return new Date(Number(timestamp) * 1000).toLocaleDateString("en-US", {
-            year: "numeric",
-            month: "short",
-            day: "numeric",
-        });
+        return formatDateUS(Number(timestamp) * 1000);
     }
 
     // Fetch metadata when vaultAddresses changes (reactive to filtering)

@@ -13,6 +13,7 @@
         ChevronRight,
     } from "lucide-svelte";
     import type { Distribution } from "../../stores/types";
+    import { formatAmount, formatDate } from "@zarf/core/utils";
 
     let {
         distribution,
@@ -37,15 +38,6 @@
         goto(`/wizard/step-2?id=${distribution.id}`);
     }
 
-    // Format date for display
-    function formatDate(dateString: string): string {
-        if (!dateString) return "Not set";
-        return new Date(dateString).toLocaleDateString("en-US", {
-            year: "numeric",
-            month: "short",
-            day: "numeric",
-        });
-    }
 </script>
 
 <div class="h-full flex flex-col bg-zen-bg">
@@ -112,7 +104,7 @@
                 >
             </div>
             <p class="text-2xl font-mono font-bold text-zen-primary">
-                {Number(distribution.amount).toLocaleString()}
+                {formatAmount(distribution.amount)}
                 <span class="text-sm font-normal opacity-60"
                     >{wizardStore.tokenDetails.tokenSymbol}</span
                 >
@@ -133,7 +125,9 @@
                         >Cliff Date</span
                     >
                     <p class="text-sm font-medium">
-                        {formatDate(distribution.schedule.cliffEndDate)}
+                        {distribution.schedule.cliffEndDate
+                            ? formatDate(distribution.schedule.cliffEndDate)
+                            : "Not set"}
                     </p>
                 </div>
                 <div class="p-3 rounded-lg bg-zen-fg/5 space-y-1">
@@ -172,7 +166,7 @@
                                 recipient.address?.slice(0, 10) + "..."}
                         </span>
                         <span class="font-mono text-xs text-zen-fg-subtle">
-                            {recipient.amount.toLocaleString()}
+                            {formatAmount(recipient.amount)}
                         </span>
                     </div>
                 {/each}

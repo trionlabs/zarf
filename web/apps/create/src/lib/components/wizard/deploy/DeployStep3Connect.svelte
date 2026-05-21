@@ -21,6 +21,7 @@
     import ZenSpinner from "@zarf/ui/components/ui/ZenSpinner.svelte";
     import { toMessage } from "@zarf/core/utils/error";
     import { err } from "@zarf/core/utils/log";
+    import { formatAmount } from "@zarf/core/utils/format";
 
     let distribution = $derived(deployStore.distribution);
 
@@ -313,9 +314,7 @@
                                         ? 'text-zen-success'
                                         : 'text-zen-error'}"
                                 >
-                                    {Number(
-                                        distribution?.amount ?? 0,
-                                    ).toLocaleString()}
+                                    {formatAmount(distribution?.amount ?? 0)}
                                     <span
                                         class="text-lg text-zen-fg-faint ml-1 font-sans font-normal"
                                         >{checkState.symbol}</span

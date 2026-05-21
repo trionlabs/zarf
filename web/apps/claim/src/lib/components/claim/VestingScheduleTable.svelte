@@ -1,6 +1,7 @@
 <script lang="ts">
     import { claimStore } from "../../stores/claimStore.svelte";
     import { formatTokenAmount } from "@zarf/core/utils/amount";
+    import { formatDate as formatDateUS } from "@zarf/core/utils";
     import type { VestingPeriod } from "@zarf/core/utils";
     import {
         Check,
@@ -21,13 +22,8 @@
     const format = (val: bigint) =>
         formatTokenAmount(val, claimStore.tokenDecimals, 2);
 
-    // Format dates
-    const formatDate = (ts: number) =>
-        new Date(ts * 1000).toLocaleDateString(undefined, {
-            month: "short",
-            day: "numeric",
-            year: "numeric",
-        });
+    // Format dates — unix-seconds timestamp → "Apr 5, 2026"
+    const formatDate = (ts: number) => formatDateUS(ts * 1000);
 
     let periods = $derived(claimStore.periods);
 
