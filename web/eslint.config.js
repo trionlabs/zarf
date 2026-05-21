@@ -77,6 +77,36 @@ export default ts.config(
         },
     },
     {
+        // Console-allow scope — mirrors check-console-allow-list.mjs's
+        // WHOLE_FILE entries (helper impl, Web Worker, ZK bridge, SES
+        // bootstrap, backend CF workers, build/CLI scripts, vite configs
+        // referencing 'console.*' as esbuild.pure string literals).
+        // ESLint per-file disable avoids inline /* eslint-disable */
+        // pragmas; the grep drift gate still pins the call surface so
+        // a new direct console.* outside the allow-list breaks CI.
+        //
+        // Script bodies also legitimately carry intermediate vars that
+        // don't warrant the same hygiene as app code — `no-unused-vars`
+        // disabled for that scope only.
+        files: [
+            'packages/core/lib/utils/log.ts',
+            'packages/core/lib/utils/domPreserve.ts',
+            'packages/core/lib/zk/index.ts',
+            'packages/core/lib/zk/proof.worker.ts',
+            'packages/core/scripts/**',
+            'apps/claim/src/hooks.client.ts',
+            'apps/create/src/hooks.client.ts',
+            'apps/indexer/src/**',
+            'apps/jwk-rotation/src/**',
+            'apps/*/vite.config.ts',
+            'scripts/**',
+        ],
+        rules: {
+            'no-console': 'off',
+            '@typescript-eslint/no-unused-vars': 'off',
+        },
+    },
+    {
         // Migration-scope rules: real signal worth tracking but too many
         // existing sites to fail CI on today. Downgraded from `error` to
         // `warn` for the baseline; ratchet to `error` in follow-up
