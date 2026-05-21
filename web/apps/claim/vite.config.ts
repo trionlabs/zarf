@@ -34,6 +34,30 @@ const productionStub = (): Plugin => {
 	};
 };
 
+// pino@9.x's browser.js does `module.exports = pino` with no named
+// `pino` export. @aztec/bb.js's browser-side log module does
+// `import { pino } from 'pino'`, which resolves to undefined after
+// Vite's CJS-to-ESM interop and crashes Barretenberg init with
+// `does not provide an export named 'pino'`. Intercept the bare `pino`
+// import and serve a virtual module that re-exports the factory under
+// both `default` and a named `pino` export.
+const pinoNamedShim = (): Plugin => ({
+	name: 'pino-named-shim',
+	enforce: 'pre',
+	resolveId(id) {
+		if (id === 'pino') return '\0virtual:pino-named-shim';
+		return null;
+	},
+	load(id) {
+		if (id !== '\0virtual:pino-named-shim') return null;
+		return [
+			"import pinoFactory from 'pino/browser.js';",
+			'export default pinoFactory;',
+			'export const pino = pinoFactory;',
+		].join('\n');
+	},
+});
+
 export default defineConfig({
 	esbuild: {
 		drop: ['debugger'],
@@ -41,6 +65,7 @@ export default defineConfig({
 	},
 	plugins: [
 		productionStub(),
+		pinoNamedShim(),
 		tailwindcss(),
 		sveltekit(),
 		wasm(),
@@ -113,6 +138,7 @@ export default defineConfig({
 	worker: {
 		format: 'es',
 		plugins: () => [
+			pinoNamedShim(),
 			wasm(),
 			topLevelAwait(),
 			nodePolyfills({
