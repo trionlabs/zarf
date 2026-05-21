@@ -77,10 +77,11 @@
             </div>
         </div>
         <button
-            class="p-2 rounded-full hover:bg-zen-fg/5 transition-colors xl:hidden"
+            class="inline-flex items-center justify-center min-w-11 min-h-11 rounded-full hover:bg-zen-fg/5 transition-colors xl:hidden"
             onclick={onClose}
+            aria-label="Close details panel"
         >
-            <X class="w-4 h-4" />
+            <X class="w-4 h-4" aria-hidden="true" />
         </button>
     </header>
 

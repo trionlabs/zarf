@@ -81,7 +81,7 @@
                     {contractAddress || "Not available"}
                 </span>
                 <button
-                    class="p-2 rounded-full hover:bg-zen-fg/5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    class="inline-flex items-center justify-center min-w-11 min-h-11 rounded-full hover:bg-zen-fg/5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                     disabled={!contractAddress}
                     aria-label="Copy contract address"
                     onclick={copyToClipboard}

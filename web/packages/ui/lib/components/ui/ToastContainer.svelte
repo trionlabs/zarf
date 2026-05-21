@@ -45,9 +45,18 @@
                 </span>
             </div>
 
+            <!--
+                Dismiss target sits at 32x32. WCAG 2.5.5 (AAA) asks for 44x44,
+                but 2.5.8 (AA) accepts <24x24 only when surrounded by 24px of
+                clearance from other targets. The toast has exactly one target
+                (this dismiss button) so the spacing exception trivially holds;
+                32x32 keeps the toast vertical rhythm intact while comfortably
+                clearing both AA thresholds.
+            -->
             <button
                 class="
-                    shrink-0 p-1 -mr-1 -mt-1
+                    shrink-0 inline-flex items-center justify-center
+                    min-w-8 min-h-8 -mr-1 -mt-1
                     rounded-md opacity-60 hover:opacity-100
                     hover:bg-[var(--zen-fg)]/5
                     transition-opacity
@@ -55,7 +64,7 @@
                 onclick={() => toastStore.remove(toast.id)}
                 aria-label="Close"
             >
-                <X class="w-4 h-4" />
+                <X class="w-4 h-4" aria-hidden="true" />
             </button>
         </div>
     {/each}
