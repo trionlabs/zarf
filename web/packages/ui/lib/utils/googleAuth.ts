@@ -137,12 +137,18 @@ export function initiateGoogleLogin(
 ): void {
     assertBrowser();
 
+    // If the caller didn't provide a nonce, generate one and persist
+    // it via sessionStorage so the OAuth callback can pair-check it
+    // (see consumeStoredNonce + validateGoogleClaims). Caller-supplied
+    // nonces are NOT auto-stored — the caller owns the storage path.
+    const effectiveNonce = nonce ?? generateAndStoreNonce();
+
     const params = new URLSearchParams({
         client_id: clientId,
         redirect_uri: redirectUri,
         response_type: 'id_token',
         scope: 'openid email profile',
-        nonce: nonce || crypto.randomUUID(),
+        nonce: effectiveNonce,
     });
 
     if (state) {
@@ -286,7 +292,51 @@ export function clearUrlFragment(): void {
 const GOOGLE_ISSUERS = new Set(['https://accounts.google.com', 'accounts.google.com']);
 
 /**
- * Asserts a decoded Google JWT's `iss` and `aud` claims.
+ * sessionStorage key for the per-request OAuth nonce. Survives the
+ * Google redirect roundtrip within the same tab; cleared on tab close
+ * and consumed (single-use) by the callback site.
+ */
+const OAUTH_NONCE_STORAGE_KEY = '__zarf_oauth_nonce';
+
+/**
+ * Generate a cryptographic nonce, persist it for the OAuth callback to
+ * validate against the returned `id_token.nonce` claim, and return the
+ * raw nonce for inclusion in the OAuth request URL.
+ *
+ * Stored in sessionStorage — survives the redirect to Google and back
+ * (same tab, same origin), is single-use, and is cleared on tab close.
+ * The pairing is what prevents id_token replay: a token captured from
+ * a different login attempt won't match the stored nonce.
+ */
+function generateAndStoreNonce(): string {
+    assertBrowser();
+    const nonce = crypto.randomUUID();
+    sessionStorage.setItem(OAUTH_NONCE_STORAGE_KEY, nonce);
+    return nonce;
+}
+
+/**
+ * Read + remove the stored OAuth nonce in one shot. Caller passes the
+ * returned value to {@link validateGoogleClaims} so the JWT's `nonce`
+ * claim is verified against what the OAuth request opened with.
+ *
+ * Returns `null` if no nonce is stored (no pending OAuth flow, or the
+ * nonce was already consumed). The callback site should treat `null`
+ * as "no pending flow to validate" — typically that means the user
+ * navigated to the callback URL directly, not via an OAuth redirect.
+ *
+ * SSR-safe: returns `null` outside the browser.
+ */
+export function consumeStoredNonce(): string | null {
+    if (typeof window === 'undefined') return null;
+    const nonce = sessionStorage.getItem(OAUTH_NONCE_STORAGE_KEY);
+    if (nonce) sessionStorage.removeItem(OAUTH_NONCE_STORAGE_KEY);
+    return nonce;
+}
+
+/**
+ * Asserts a decoded Google JWT's `iss`, `aud`, and (optionally) `nonce`
+ * claims.
  *
  * Pairs with {@link decodeJwt} — decode produces the payload, validate
  * gates it against the expected issuer + audience before any caller
@@ -295,20 +345,35 @@ const GOOGLE_ISSUERS = new Set(['https://accounts.google.com', 'accounts.google.
  * session restore from storage). Throwing here aborts the trust path
  * and is caught by the caller's existing error handler.
  *
+ * `expectedNonce`: when non-null, the payload's `nonce` claim must
+ * match exactly. Pass {@link consumeStoredNonce}'s return value at
+ * fresh-OAuth-callback sites; pass `null`/undefined at session-restore
+ * sites where the original validation already happened and no live
+ * OAuth handshake is in flight.
+ *
  * Does NOT verify the JWT signature — that still happens in the Noir
  * circuit. This function only checks the structured claims an attacker
  * with a forged-but-unsigned token could lie about, which is enough
- * to reject the trivial "wrong-Google-app JWT" attack class.
+ * to reject the trivial "wrong-Google-app JWT" + replay attack classes.
  *
  * @throws {Error} If iss is not a Google issuer
  * @throws {Error} If aud does not match the configured client ID
+ * @throws {Error} If expectedNonce is non-null and payload.nonce mismatches
  */
-export function validateGoogleClaims(payload: JWTPayload, opts: { clientId: string }): void {
+export function validateGoogleClaims(
+    payload: JWTPayload,
+    opts: { clientId: string; expectedNonce?: string | null },
+): void {
     if (!GOOGLE_ISSUERS.has(payload.iss)) {
         throw new Error(`Invalid JWT issuer: ${payload.iss}`);
     }
     if (payload.aud !== opts.clientId) {
         throw new Error('JWT audience does not match expected client ID');
+    }
+    if (opts.expectedNonce != null) {
+        if (payload.nonce !== opts.expectedNonce) {
+            throw new Error('JWT nonce does not match the stored OAuth nonce');
+        }
     }
 }
 

@@ -8,6 +8,7 @@
         clearUrlFragment,
         decodeJwt,
         validateGoogleClaims,
+        consumeStoredNonce,
     } from '@zarf/ui/utils/googleAuth';
     import ImportContractInput from '$lib/components/claim/ImportContractInput.svelte';
     import LoginPrompt from '$lib/components/claim/LoginPrompt.svelte';
@@ -88,8 +89,13 @@
                 // Gate the token's claims against the configured Google
                 // client — rejects forged or wrong-app JWTs at the trust
                 // boundary before any caller reads payload.email.
+                // expectedNonce closes the OAuth replay window: a token
+                // captured from a different login attempt won't match
+                // the stored nonce. null is tolerated (e.g. a direct
+                // visit to the callback URL with no pending flow).
                 validateGoogleClaims(payload, {
                     clientId: import.meta.env.VITE_GOOGLE_CLIENT_ID ?? '',
+                    expectedNonce: consumeStoredNonce(),
                 });
 
                 // Store in AuthStore (Session only)
