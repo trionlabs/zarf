@@ -2,7 +2,7 @@
  * Theme Store - Application Theme Management
  * 
  * Manages binary dark/light theme selection.
- * Maps to DaisyUI themes: light='wireframe', dark='glass-porcelain'
+ * Maps to data-theme tokens: light='paper-porcelain', dark='glass-porcelain'
  * Persists to localStorage and applies to document root.
  * 
  * @module stores/themeStore
