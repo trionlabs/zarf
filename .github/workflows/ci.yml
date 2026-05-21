@@ -91,10 +91,24 @@ jobs:
           pnpm --dir web --filter @zarf/jwk-rotation typecheck
 
       # Drift gates — no build artifacts required.
-      # check:budget is intentionally NOT here; it reads
-      # .svelte-kit/output/client and needs a build step prefix.
       - name: Check explicit any allow-list
         run: pnpm --dir web check:any
 
       - name: Check direct console.* allow-list
         run: pnpm --dir web check:console
+
+      # Build apps so check:budget has manifests + immutable assets to
+      # measure. Builds run sequentially because the three apps share
+      # the same pnpm store and vite worker pool; parallelizing here
+      # has not shown meaningful wall-clock savings in local timing.
+      - name: Build landing app
+        run: pnpm --dir web build:landing
+
+      - name: Build claim app
+        run: pnpm --dir web build:claim
+
+      - name: Build create app
+        run: pnpm --dir web build:create
+
+      - name: Check bundle budget (initialGz + totalGz per app)
+        run: pnpm --dir web check:budget
