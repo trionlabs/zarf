@@ -73,6 +73,39 @@
         name="description"
         content="Create private token distributions and payroll with built-in vesting and privacy-preserving claims using Zero-Knowledge proofs."
     />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Zarf" />
+    <meta property="og:url" content="https://zarf.to/" />
+    <meta
+        property="og:title"
+        content="Zarf — Privacy-Preserving Token Distribution"
+    />
+    <meta
+        property="og:description"
+        content="Create private token distributions and payroll with built-in vesting and privacy-preserving claims using Zero-Knowledge proofs."
+    />
+    <meta property="og:image" content="https://zarf.to/og.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta
+        property="og:image:alt"
+        content="Zarf — E-Mail First Confidential Token Distributions"
+    />
+
+    <!-- Twitter card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:url" content="https://zarf.to/" />
+    <meta
+        name="twitter:title"
+        content="Zarf — Privacy-Preserving Token Distribution"
+    />
+    <meta
+        name="twitter:description"
+        content="Create private token distributions and payroll with built-in vesting and privacy-preserving claims using Zero-Knowledge proofs."
+    />
+    <meta name="twitter:image" content="https://zarf.to/og.png" />
 </svelte:head>
 
 <svelte:window bind:scrollY={scrollPosition} />
