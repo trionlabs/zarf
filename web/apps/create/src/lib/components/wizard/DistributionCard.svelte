@@ -119,6 +119,7 @@
                         class="w-8 h-8 !p-0"
                         onclick={handleDuplicate}
                         title="Duplicate"
+                        aria-label={`Duplicate distribution ${distribution.name}`}
                     >
                         <Copy class="w-4 h-4" />
                     </ZenButton>
@@ -128,6 +129,7 @@
                         class="w-8 h-8 !p-0"
                         onclick={handleDelete}
                         title="Delete"
+                        aria-label={`Delete distribution ${distribution.name}`}
                     >
                         <Trash2 class="w-4 h-4" />
                     </ZenButton>
@@ -247,6 +249,7 @@
                                 class="w-10 h-10 !p-0 shrink-0"
                                 onclick={handleDuplicate}
                                 title="Duplicate"
+                                aria-label={`Duplicate distribution ${distribution.name}`}
                             >
                                 <Copy class="w-5 h-5" />
                             </ZenButton>
@@ -256,6 +259,7 @@
                                 class="w-10 h-10 !p-0 shrink-0"
                                 onclick={handleDelete}
                                 title="Delete"
+                                aria-label={`Delete distribution ${distribution.name}`}
                             >
                                 <Trash2 class="w-5 h-5" />
                             </ZenButton>
