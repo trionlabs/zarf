@@ -162,13 +162,11 @@ const ALLOWLIST = {
         ],
     },
 
-    // Crypto security warning — must always ship regardless of env.
+    // JSDoc examples only — the Math.random fallback (and its "Warning:
+    // Using non-secure RNG" warn) was deleted in the K1 security audit
+    // fix; modern Web Crypto is the sole path.
     'packages/core/lib/crypto/merkleTree.ts': {
         entries: [
-            {
-                content: "console.warn('Warning: Using non-secure RNG for salt generation');",
-                reason: 'crypto security warning — must always ship',
-            },
             {
                 content: '* console.log(tree.root); // Root hash',
                 reason: 'JSDoc example, not a real call',
