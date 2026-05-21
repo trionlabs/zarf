@@ -49,16 +49,19 @@
             }
 
             const oauthState = extractStateFromUrl();
-            const addressQuery = oauthState?.address
-                ? `?address=${oauthState.address}`
-                : "";
 
-            // Redirect back to claim page with generic error param
+            // Redirect back to claim page with generic error param.
             // We strip the specific error hash to avoid raw error exposure,
             // but add clean query param for Claim app to handle.
-            window.location.replace(
-                `https://claim.zarf.to${addressQuery}&error=auth_failed`,
-            );
+            // URL + searchParams handles the empty-address case correctly;
+            // the previous template literal emitted `claim.zarf.to&error=…`
+            // (missing query separator) when no address was preserved.
+            const redirect = new URL("https://claim.zarf.to");
+            if (oauthState?.address) {
+                redirect.searchParams.set("address", oauthState.address);
+            }
+            redirect.searchParams.set("error", "auth_failed");
+            window.location.replace(redirect.toString());
             return;
         }
     });

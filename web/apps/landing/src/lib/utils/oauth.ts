@@ -8,7 +8,13 @@ import type { OAuthState } from '@zarf/core';
 import { warn } from '@zarf/core/utils/log';
 export type { OAuthState };
 
-const ETH_ADDRESS_REGEX = /^0x[a-fA-F0-9]{40}$/;
+// Format-only Stellar contract address shape check. Mirrors the shared
+// decoder at packages/ui/lib/utils/googleAuth.ts:18 so the landing-only
+// callback applies the same validation as the claim-side flow. Full
+// StrKey CRC validation lives in @zarf/core/utils/address and runs at
+// claim-time; importing it here would pull @stellar/stellar-sdk into
+// the landing eager graph.
+const CONTRACT_ADDRESS_REGEX = /^C[A-Z2-7]{55}$/;
 
 /**
  * Decodes OAuth state from URL parameter.
@@ -19,7 +25,7 @@ function decodeOAuthState(stateParam: string | null): OAuthState | null {
     try {
         const decoded = JSON.parse(stateParam);
 
-        if (decoded.address && !ETH_ADDRESS_REGEX.test(decoded.address)) {
+        if (decoded.address && !CONTRACT_ADDRESS_REGEX.test(decoded.address)) {
             warn('[OAuth] Invalid address in state, ignoring');
             delete decoded.address;
         }
