@@ -279,7 +279,7 @@
                 <div
                     class="absolute inset-0 flex flex-col justify-between pointer-events-none opacity-30"
                 >
-                    {#each [0, 25, 50, 75, 100] as _}
+                    {#each [0, 25, 50, 75, 100] as pct (pct)}
                         <div class="w-full h-px bg-zen-fg/5"></div>
                     {/each}
                 </div>
@@ -334,7 +334,7 @@
                 {/if}
 
                 <!-- Vesting Bars -->
-                {#each unlockMarkers as marker, i}
+                {#each unlockMarkers as marker, i (i)}
                     <div
                         class="h-full flex-1 flex flex-col justify-end relative cursor-default min-w-[4px]"
                     >

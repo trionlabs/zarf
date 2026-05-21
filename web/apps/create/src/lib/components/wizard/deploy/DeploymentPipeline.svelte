@@ -73,7 +73,7 @@
         <div class="absolute left-6 top-8 bottom-8 w-0.5 bg-zen-border"></div>
 
         <div class="space-y-4">
-            {#each steps as step}
+            {#each steps as step, i (i)}
                 {@const status = getStepStatus(step.id)}
                 {@const txHash = step.id === 'approve' ? approveTxHash : createTxHash}
 

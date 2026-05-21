@@ -197,7 +197,7 @@
                                             class="flex items-center justify-between px-6 py-3 border-b-[0.5px] border-zen-border-subtle"
                                         >
                                             <div class="flex gap-1.5">
-                                                {#each [3, 4, 5] as step}
+                                                {#each [3, 4, 5] as step (step)}
                                                     <div
                                                         class="h-1 w-6 rounded-full transition-all duration-500 {currentStep >=
                                                         step

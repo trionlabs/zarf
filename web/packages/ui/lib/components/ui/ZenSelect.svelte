@@ -195,7 +195,7 @@
                 ? `option-${highlightedIndex}`
                 : undefined}
         >
-            {#each options as option, i}
+            {#each options as option, i (option.value)}
                 <button
                     id="option-{i}"
                     type="button"

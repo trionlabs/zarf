@@ -101,7 +101,7 @@
                 <div class="relative order-2 md:order-1">
                     <!-- Step Indicator (inline, part of content) -->
                     <div class="flex items-center gap-2.5 mb-8">
-                        {#each STEPS as _, i}
+                        {#each STEPS as _, i (i)}
                             <button
                                 onclick={() => goToStep(i)}
                                 class="group flex items-center gap-1.5 transition-all duration-300"
@@ -128,7 +128,7 @@
 
                     <!-- Stacked Text Content -->
                     <div class="relative h-[240px] md:h-[280px]">
-                        {#each STEPS as step, i}
+                        {#each STEPS as step, i (step.title)}
                             <div
                                 class="absolute inset-0 transition-all duration-500 ease-out"
                                 style="
@@ -169,7 +169,7 @@
 
                         <!-- Stacked Scenes -->
                         <div class="relative w-full h-full">
-                            {#each STEPS as _, i}
+                            {#each STEPS as _, i (i)}
                                 <div
                                     class="absolute inset-0 bg-base-100/80 backdrop-blur-sm rounded-2xl border border-base-content/[0.06] overflow-hidden transition-all duration-500 ease-out"
                                     style="
@@ -190,7 +190,7 @@
                                             class="absolute inset-0 flex flex-col items-center justify-center p-6"
                                         >
                                             <div class="space-y-2.5 w-full max-w-[200px]">
-                                                {#each [0, 1, 2] as k}
+                                                {#each [0, 1, 2] as k (k)}
                                                     <div
                                                         class="flex items-center gap-2.5 p-2.5 bg-base-content/[0.02] rounded-lg border border-base-content/[0.04] transition-all duration-500"
                                                         style="

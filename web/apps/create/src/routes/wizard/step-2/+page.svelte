@@ -109,7 +109,7 @@
 
         <!-- Stepper (Minimal) -->
         <div class="flex items-center gap-2 mb-6">
-            {#each [{ id: 1, label: 'Prepare' }, { id: 2, label: 'Backup' }, { id: 3, label: 'Approvals' }, { id: 4, label: 'Deploy' }] as step, i}
+            {#each [{ id: 1, label: 'Prepare' }, { id: 2, label: 'Backup' }, { id: 3, label: 'Approvals' }, { id: 4, label: 'Deploy' }] as step, i (step.id)}
                 {@const isActive = currentStep === step.id}
                 {@const isPast = currentStep > step.id}
 

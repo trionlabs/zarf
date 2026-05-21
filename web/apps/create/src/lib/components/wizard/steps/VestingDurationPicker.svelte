@@ -43,7 +43,7 @@
 
         <!-- Quick Unit Selectors -->
         <div class="flex items-center gap-2">
-            {#each DURATION_UNITS as unit}
+            {#each DURATION_UNITS as unit, i (i)}
                 <ZenButton
                     variant={durationUnit === unit.value ? 'primary' : 'ghost'}
                     size="sm"

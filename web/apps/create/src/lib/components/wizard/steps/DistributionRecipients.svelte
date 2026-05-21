@@ -334,7 +334,7 @@
                         {validationErrors.length} Warnings
                     </div>
                     <div class="max-h-32 overflow-y-auto space-y-2 pr-2">
-                        {#each validationErrors as err}
+                        {#each validationErrors as err, i (i)}
                             <div class="text-xs opacity-90 pl-2 border-l-2 border-zen-warning/30">
                                 {err}
                             </div>
@@ -370,7 +370,7 @@
             <!-- Scrollable List -->
             <div class="flex-1 overflow-y-auto scrollbar-hide bg-zen-bg">
                 <div class="divide-y divide-zen-border">
-                    {#each recipients as row, i}
+                    {#each recipients as row, i (i)}
                         <div
                             class="flex items-center justify-between px-5 py-3 hover:bg-zen-fg/[0.02] transition-colors border-b border-zen-fg/[0.02] last:border-0
                             {duplicateEmails.has(row.email || '')

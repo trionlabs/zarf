@@ -40,7 +40,7 @@
         </div>
 
         <div class="grid md:grid-cols-3 gap-8">
-            {#each cases as item}
+            {#each cases as item (item.label)}
                 <div
                     class="group relative p-8 rounded-[2rem] border border-base-content/10 bg-base-100/50 hover:bg-base-100 hover:border-primary/20 transition-all duration-500 hover:-translate-y-1 flex flex-col"
                 >
@@ -64,7 +64,7 @@
 
                     <!-- Points -->
                     <div class="space-y-4 mb-8 flex-1">
-                        {#each item.points as point}
+                        {#each item.points as point (point)}
                             <div class="flex items-start gap-3 opacity-80">
                                 <Check class="w-4 h-4 text-primary mt-1 shrink-0" />
                                 <span class="text-sm">{point}</span>

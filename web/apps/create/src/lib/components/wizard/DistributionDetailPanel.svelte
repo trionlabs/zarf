@@ -145,7 +145,7 @@
             </div>
 
             <div class="space-y-2">
-                {#each distribution.recipients.slice(0, 5) as recipient, i}
+                {#each distribution.recipients.slice(0, 5) as recipient, i (i)}
                     <div
                         class="flex items-center justify-between p-2 rounded-lg bg-zen-fg/[0.03] text-sm"
                     >
@@ -179,7 +179,7 @@
                     Compliance
                 </h3>
                 <div class="flex flex-wrap gap-2">
-                    {#each distribution.regulatoryRules as rule}
+                    {#each distribution.regulatoryRules as rule, i (i)}
                         <span
                             class="px-2 py-0.5 text-xs font-medium rounded-full border border-zen-border text-zen-fg-muted"
                             >{rule}</span

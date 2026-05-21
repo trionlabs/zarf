@@ -132,7 +132,7 @@
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             {#if (isFetchingVault || isFiltering) && vaultContracts.length === 0}
-                {#each Array(4) as _}
+                {#each Array(4) as _, i (i)}
                     <div
                         class="h-32 w-full animate-pulse bg-zen-bg/50 rounded-3xl border border-zen-border-subtle"
                     ></div>
@@ -152,7 +152,7 @@
                     </div>
                 </div>
             {:else}
-                {#each vaultContracts as contract}
+                {#each vaultContracts as contract (contract)}
                     <ZenCard
                         interactive
                         variant="elevated"

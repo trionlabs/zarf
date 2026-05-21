@@ -51,7 +51,7 @@
                         preserveAspectRatio="xMidYMid meet"
                     >
                         <!-- Outer expanding rings -->
-                        {#each [140, 115, 90, 65] as r, i}
+                        {#each [140, 115, 90, 65] as r, i (r)}
                             <circle
                                 cx="200"
                                 cy="150"
@@ -103,7 +103,7 @@
                         />
 
                         <!-- Orbital particles -->
-                        {#each Array(12) as _, i}
+                        {#each Array(12) as _, i (i)}
                             {@const angle = i * 30}
                             {@const baseR = 45}
                             {@const expandR = 130}
@@ -206,7 +206,7 @@
                         />
 
                         <!-- Milestone markers -->
-                        {#each [{ x: 225, y: 140, label: 'cliff', delay: 300 }, { x: 125, y: 80, label: '1y', delay: 500 }, { x: 330, y: 200, label: '2y', delay: 700 }, { x: 40, y: 100, label: '3y', delay: 900 }, { x: 120, y: 290, label: '4y', delay: 1100 }] as mark}
+                        {#each [{ x: 225, y: 140, label: 'cliff', delay: 300 }, { x: 125, y: 80, label: '1y', delay: 500 }, { x: 330, y: 200, label: '2y', delay: 700 }, { x: 40, y: 100, label: '3y', delay: 900 }, { x: 120, y: 290, label: '4y', delay: 1100 }] as mark (mark.label)}
                             <g
                                 class="transition-all ease-out"
                                 style="
@@ -373,7 +373,7 @@
                         />
 
                         <!-- Traveling pulses with glow -->
-                        {#each [0, 0.33, 0.66] as offset, i}
+                        {#each [0, 0.33, 0.66] as offset, i (offset)}
                             <circle
                                 r={12 - i * 3}
                                 class="fill-base-content"
@@ -508,7 +508,7 @@
                         />
 
                         <!-- Verification blocks -->
-                        {#each [{ y: 60, width: 260 }, { y: 120, width: 220 }, { y: 180, width: 280 }, { y: 240, width: 200 }] as block, i}
+                        {#each [{ y: 60, width: 260 }, { y: 120, width: 220 }, { y: 180, width: 280 }, { y: 240, width: 200 }] as block, i (block.y)}
                             <!-- Connection dot -->
                             <circle
                                 cx="80"
@@ -593,7 +593,7 @@
                         {/each}
 
                         <!-- Hash connections -->
-                        {#each [90, 150, 210] as y, i}
+                        {#each [90, 150, 210] as y, i (y)}
                             <path
                                 d="M 90 {y} Q 105 {y + 15}, 120 {y + 30}"
                                 fill="none"

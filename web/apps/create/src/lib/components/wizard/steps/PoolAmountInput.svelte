@@ -106,7 +106,7 @@
                 >Quick</span
             >
             <div class="flex items-center gap-1">
-                {#each PERCENTAGE_PRESETS as pct}
+                {#each PERCENTAGE_PRESETS as pct (pct)}
                     <button
                         type="button"
                         class="px-3 py-1.5 text-xs font-medium rounded-full transition-all {getPresetClass(

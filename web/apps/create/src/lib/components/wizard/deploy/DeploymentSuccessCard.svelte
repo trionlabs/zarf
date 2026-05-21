@@ -51,7 +51,7 @@
         <div class="flex items-start gap-4">
             <!-- Identicon Grid -->
             <div class="w-14 h-14 rounded-xl overflow-hidden grid grid-cols-4 grid-rows-4 shrink-0">
-                {#each getIdenticonColors(contractAddress) as color, i}
+                {#each getIdenticonColors(contractAddress) as color, i (i)}
                     <div style="background-color: {color}"></div>
                 {/each}
             </div>
@@ -130,7 +130,7 @@
     <div class="p-4 border-b border-zen-border-subtle">
         <div class="text-[10px] uppercase tracking-wider text-zen-fg-subtle mb-3">Recipients</div>
         <div class="space-y-2">
-            {#each visibleRecipients as recipient}
+            {#each visibleRecipients as recipient, i (i)}
                 <div class="flex items-center justify-between text-sm">
                     <span class="text-zen-fg-muted truncate max-w-[140px]">
                         {recipient.email}
