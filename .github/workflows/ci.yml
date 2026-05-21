@@ -112,3 +112,11 @@ jobs:
 
       - name: Check bundle budget (initialGz + totalGz per app)
         run: pnpm --dir web check:budget
+
+      # Boot `vite dev` for all three apps and curl the SSR routes.
+      # Catches module-evaluation crashes (e.g. a top-level
+      # stellar-sdk + buffer import that 500s during SSR but passes
+      # both build and svelte-check). Fixed-port script so the CI log
+      # makes failures easy to attribute.
+      - name: Smoke SSR routes (vite dev)
+        run: pnpm --dir web smoke:routes

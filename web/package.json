@@ -25,7 +25,8 @@
 		"check:type-forks": "node scripts/check-type-forks.mjs",
 		"check:budget": "node scripts/check-bundle-budget.mjs",
 		"check:any": "node scripts/check-any-allow-list.mjs",
-		"check:console": "node scripts/check-console-allow-list.mjs"
+		"check:console": "node scripts/check-console-allow-list.mjs",
+		"smoke:routes": "bash scripts/smoke-routes.sh"
 	},
 	"pnpm": {
 		"overrides": {
