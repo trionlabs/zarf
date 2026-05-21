@@ -15,11 +15,11 @@
     <div class="mx-auto px-6 max-w-6xl">
         <!-- Header -->
         <div class="text-center mb-20">
-            <p class="text-base-content/30 text-xs font-medium tracking-[0.2em] uppercase mb-4">Features</p>
+            <p class="text-zen-fg-muted text-xs font-medium tracking-[0.2em] uppercase mb-4">Features</p>
             <h2 class="text-4xl md:text-5xl font-semibold tracking-tight text-base-content mb-5">
                 Privacy-First Distribution
             </h2>
-            <p class="text-base-content/40 text-lg md:text-xl max-w-lg mx-auto">
+            <p class="text-zen-fg-muted text-lg md:text-xl max-w-lg mx-auto">
                 ZK powered, Web3 mindset, Web2 experience
             </p>
         </div>
@@ -129,7 +129,7 @@
                     <h3 class="text-xl lg:text-2xl font-semibold text-base-content mb-2">
                         Privacy powered with ZK
                     </h3>
-                    <p class="text-base-content/40 text-sm lg:text-base leading-relaxed">
+                    <p class="text-zen-fg-muted text-sm lg:text-base leading-relaxed">
                         Distribute tokens without exposing recipient identities on-chain.
                     </p>
                 </div>
@@ -236,7 +236,7 @@
                     <h3 class="text-xl lg:text-2xl font-semibold text-base-content mb-2">
                         On-chain & Programmable
                     </h3>
-                    <p class="text-base-content/40 text-sm lg:text-base leading-relaxed">
+                    <p class="text-zen-fg-muted text-sm lg:text-base leading-relaxed">
                         Configure cliff periods and linear release schedules in smart contracts.
                     </p>
                 </div>
@@ -404,7 +404,7 @@
                     <h3 class="text-xl lg:text-2xl font-semibold text-base-content mb-2">
                         E-mail First Claiming
                     </h3>
-                    <p class="text-base-content/40 text-sm lg:text-base leading-relaxed">
+                    <p class="text-zen-fg-muted text-sm lg:text-base leading-relaxed">
                         No wallet needed to start. Recipients claim with just an email link.
                     </p>
                 </div>
@@ -563,7 +563,7 @@
                     <h3 class="text-xl lg:text-2xl font-semibold text-base-content mb-2">
                         Verifiable & Auditable
                     </h3>
-                    <p class="text-base-content/40 text-sm lg:text-base leading-relaxed">
+                    <p class="text-zen-fg-muted text-sm lg:text-base leading-relaxed">
                         Distribution data stored on IPFS. Every transaction cryptographically verified.
                     </p>
                 </div>

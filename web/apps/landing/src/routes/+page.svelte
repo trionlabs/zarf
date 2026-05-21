@@ -188,7 +188,7 @@
         <section class="py-24 relative overflow-hidden">
             <div class="container mx-auto px-6 max-w-2xl text-center">
                 <p
-                    class="text-xs font-medium tracking-[0.2em] uppercase text-base-content/40 mb-4"
+                    class="text-xs font-medium tracking-[0.2em] uppercase text-zen-fg-muted mb-4"
                 >
                     Stay Updated
                 </p>
@@ -198,7 +198,7 @@
                     Join the Waitlist
                 </h2>
                 <p
-                    class="text-base text-base-content/50 mb-10 max-w-md mx-auto leading-relaxed"
+                    class="text-base text-zen-fg-muted mb-10 max-w-md mx-auto leading-relaxed"
                 >
                     Be the first to know when zarf.to launches. Follow us for
                     exclusive updates and early access.
@@ -261,13 +261,13 @@
                 class="flex flex-col md:flex-row justify-between items-center gap-5"
             >
                 <div
-                    class="flex items-center gap-2 text-base-content/40 hover:text-base-content/60 transition-colors duration-300"
+                    class="flex items-center gap-2 text-zen-fg-muted hover:text-base-content/60 transition-colors duration-300"
                 >
-                    <ZarfLogo size="sm" class="opacity-40" />
+                    <ZarfLogo size="sm" />
                 </div>
 
                 <div
-                    class="flex gap-6 text-xs font-medium text-base-content/40"
+                    class="flex gap-6 text-xs font-medium text-zen-fg-muted"
                 >
                     <a
                         href="https://x.com/trionlabs"
@@ -288,13 +288,13 @@
                         </svg>
                         X
                     </a>
-                    <span class="text-base-content/25 cursor-not-allowed"
+                    <span class="text-zen-fg-muted cursor-not-allowed"
                         >GitHub</span
                     >
                 </div>
 
                 <div
-                    class="text-xs text-base-content/30 flex items-center gap-1.5"
+                    class="text-xs text-zen-fg-muted flex items-center gap-1.5"
                 >
                     <span>© 2026</span>
                     <span class="text-base-content/20">·</span>
@@ -303,7 +303,7 @@
                         href="https://trionlabs.dev"
                         target="_blank"
                         rel="noopener noreferrer"
-                        class="text-base-content/40 hover:text-base-content/60 transition-colors duration-300"
+                        class="text-zen-fg-muted hover:text-base-content/60 transition-colors duration-300"
                         >trionlabs.dev</a
                     >
                 </div>
