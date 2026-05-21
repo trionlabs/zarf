@@ -1,24 +1,22 @@
 <script lang="ts">
-    import { page } from "$app/stores";
-    import { goto } from "$app/navigation";
-    import { onMount } from "svelte";
-    import { wizardStore } from "$lib/stores/wizardStore.svelte";
-    import { deployStore } from "$lib/stores/deployStore.svelte";
-    import ZenButton from "@zarf/ui/components/ui/ZenButton.svelte";
-    import ZenSpinner from "@zarf/ui/components/ui/ZenSpinner.svelte";
-    import type { Distribution } from "$lib/stores/types";
-    import { Check } from "lucide-svelte";
+    import { page } from '$app/stores';
+    import { goto } from '$app/navigation';
+    import { onMount } from 'svelte';
+    import { wizardStore } from '$lib/stores/wizardStore.svelte';
+    import { deployStore } from '$lib/stores/deployStore.svelte';
+    import ZenButton from '@zarf/ui/components/ui/ZenButton.svelte';
+    import ZenSpinner from '@zarf/ui/components/ui/ZenSpinner.svelte';
+    import type { Distribution } from '$lib/stores/types';
+    import { Check } from 'lucide-svelte';
 
-    import DeployStep1 from "$lib/components/wizard/deploy/DeployStep1.svelte";
-    import DeployStep2Backup from "$lib/components/wizard/deploy/DeployStep2Backup.svelte";
-    import DeployStep3Connect from "$lib/components/wizard/deploy/DeployStep3Connect.svelte";
-    import DeployStep4Deploy from "$lib/components/wizard/deploy/DeployStep4Deploy.svelte";
+    import DeployStep1 from '$lib/components/wizard/deploy/DeployStep1.svelte';
+    import DeployStep2Backup from '$lib/components/wizard/deploy/DeployStep2Backup.svelte';
+    import DeployStep3Connect from '$lib/components/wizard/deploy/DeployStep3Connect.svelte';
+    import DeployStep4Deploy from '$lib/components/wizard/deploy/DeployStep4Deploy.svelte';
 
     // Route state
-    const distributionId = $derived($page.url.searchParams.get("id"));
-    const distribution = $derived(
-        wizardStore.distributions.find((d) => d.id === distributionId),
-    );
+    const distributionId = $derived($page.url.searchParams.get('id'));
+    const distribution = $derived(wizardStore.distributions.find((d) => d.id === distributionId));
 
     // Deploy Store State (Direct Access)
     const currentStep = $derived(deployStore.currentStep);
@@ -36,7 +34,7 @@
     const showStep4 = $derived(currentStep === 4);
 
     const showContinue = $derived(currentStep < 4);
-    const backButtonText = $derived(currentStep === 1 ? "Cancel" : "Back");
+    const backButtonText = $derived(currentStep === 1 ? 'Cancel' : 'Back');
 
     const isStep1 = $derived(currentStep >= 1);
     const isStep2 = $derived(currentStep >= 2);
@@ -55,9 +53,9 @@
     $effect(() => {
         if (distribution && deployStore.distribution?.id !== distributionId) {
             // Guard: don't re-init if deployed
-            if (distribution.state === "launched") {
-                alert("This distribution is already deployed.");
-                goto("/distributions");
+            if (distribution.state === 'launched') {
+                alert('This distribution is already deployed.');
+                goto('/distributions');
                 return;
             }
             deployStore.initDistribution(distribution);
@@ -66,13 +64,13 @@
 
     onMount(() => {
         if (!distributionId) {
-            goto("/distributions");
+            goto('/distributions');
         }
     });
 
     function goBack() {
         if (currentStep === 1) {
-            goto("/distributions");
+            goto('/distributions');
         } else {
             deployStore.prevStep();
         }
@@ -100,7 +98,9 @@
         <div class="flex items-center justify-between mb-4">
             <div>
                 <h1 class="text-xl font-bold text-zen-fg">Deploy Distribution</h1>
-                <p class="text-sm text-zen-fg-muted">{distribution?.name || "Finalize and launch"}</p>
+                <p class="text-sm text-zen-fg-muted">
+                    {distribution?.name || 'Finalize and launch'}
+                </p>
             </div>
             <div class="px-3 py-1 rounded-full bg-zen-fg/5 text-xs font-mono text-zen-fg-faint">
                 ID: {distributionId?.slice(0, 8)}
@@ -109,7 +109,7 @@
 
         <!-- Stepper (Minimal) -->
         <div class="flex items-center gap-2 mb-6">
-            {#each [{ id: 1, label: "Prepare" }, { id: 2, label: "Backup" }, { id: 3, label: "Approvals" }, { id: 4, label: "Deploy" }] as step, i}
+            {#each [{ id: 1, label: 'Prepare' }, { id: 2, label: 'Backup' }, { id: 3, label: 'Approvals' }, { id: 4, label: 'Deploy' }] as step, i}
                 {@const isActive = currentStep === step.id}
                 {@const isPast = currentStep > step.id}
 
@@ -125,9 +125,7 @@
                         {#if isPast}
                             <Check class="w-3.5 h-3.5" />
                         {:else}
-                            <span class="text-xs font-mono opacity-60"
-                                >{step.id}</span
-                            >
+                            <span class="text-xs font-mono opacity-60">{step.id}</span>
                         {/if}
                         <span>{step.label}</span>
                     </div>
@@ -163,7 +161,8 @@
             class="flex items-center justify-between pt-6 mt-auto border-t-[0.5px] border-zen-border-subtle"
         >
             <ZenButton variant="ghost" onclick={goBack}>
-                <span class="mr-1">←</span> {backButtonText}
+                <span class="mr-1">←</span>
+                {backButtonText}
             </ZenButton>
 
             {#if showContinue}

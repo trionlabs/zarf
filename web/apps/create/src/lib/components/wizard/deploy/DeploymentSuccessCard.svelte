@@ -1,8 +1,8 @@
 <script lang="ts">
-    import type { Distribution, TokenDetails } from "../../../stores/types";
-    import { getContractExplorerUrl } from "@zarf/core/contracts/explorer";
-    import { Check, Copy, ExternalLink, Calendar } from "lucide-svelte";
-    import { formatAmount } from "@zarf/core/utils";
+    import type { Distribution, TokenDetails } from '../../../stores/types';
+    import { getContractExplorerUrl } from '@zarf/core/contracts/explorer';
+    import { Check, Copy, ExternalLink, Calendar } from 'lucide-svelte';
+    import { formatAmount } from '@zarf/core/utils';
 
     interface Props {
         contractAddress: string;
@@ -50,9 +50,7 @@
     <div class="p-5 border-b border-zen-border-subtle">
         <div class="flex items-start gap-4">
             <!-- Identicon Grid -->
-            <div
-                class="w-14 h-14 rounded-xl overflow-hidden grid grid-cols-4 grid-rows-4 shrink-0"
-            >
+            <div class="w-14 h-14 rounded-xl overflow-hidden grid grid-cols-4 grid-rows-4 shrink-0">
                 {#each getIdenticonColors(contractAddress) as color, i}
                     <div style="background-color: {color}"></div>
                 {/each}
@@ -64,18 +62,14 @@
                 </h3>
                 <div class="flex items-center gap-2 mt-1">
                     <code class="text-xs font-mono text-zen-fg-muted truncate">
-                        {contractAddress.slice(0, 10)}...{contractAddress.slice(
-                            -8,
-                        )}
+                        {contractAddress.slice(0, 10)}...{contractAddress.slice(-8)}
                     </code>
                     <button
                         type="button"
                         onclick={copyAddress}
                         class="p-1 text-zen-fg-subtle hover:text-zen-fg transition-colors"
-                        title={copied ? "Copied!" : "Copy"}
-                        aria-label={copied
-                            ? "Address copied"
-                            : "Copy contract address"}
+                        title={copied ? 'Copied!' : 'Copy'}
+                        aria-label={copied ? 'Address copied' : 'Copy contract address'}
                     >
                         {#if copied}
                             <Check class="w-3 h-3" />
@@ -105,20 +99,16 @@
             <div class="text-lg font-bold text-zen-fg">
                 {formatAmount(distribution.amount)}
             </div>
-            <div
-                class="text-[10px] uppercase tracking-wider text-zen-fg-subtle mt-0.5"
-            >
-                {tokenDetails.tokenSymbol || "Tokens"}
+            <div class="text-[10px] uppercase tracking-wider text-zen-fg-subtle mt-0.5">
+                {tokenDetails.tokenSymbol || 'Tokens'}
             </div>
         </div>
         <div class="p-4 text-center">
             <div class="text-lg font-bold text-zen-fg">
                 {recipientCount}
             </div>
-            <div
-                class="text-[10px] uppercase tracking-wider text-zen-fg-subtle mt-0.5"
-            >
-                {recipientCount === 1 ? "Recipient" : "Recipients"}
+            <div class="text-[10px] uppercase tracking-wider text-zen-fg-subtle mt-0.5">
+                {recipientCount === 1 ? 'Recipient' : 'Recipients'}
             </div>
             {#if batchCount !== recipientCount}
                 <div class="text-[9px] text-zen-fg-subtle mt-0.5">
@@ -130,9 +120,7 @@
             <div class="text-lg font-bold text-zen-fg">
                 {distribution.schedule.distributionDuration}
             </div>
-            <div
-                class="text-[10px] uppercase tracking-wider text-zen-fg-subtle mt-0.5"
-            >
+            <div class="text-[10px] uppercase tracking-wider text-zen-fg-subtle mt-0.5">
                 {distribution.schedule.durationUnit}s
             </div>
         </div>
@@ -140,11 +128,7 @@
 
     <!-- Recipient Preview -->
     <div class="p-4 border-b border-zen-border-subtle">
-        <div
-            class="text-[10px] uppercase tracking-wider text-zen-fg-subtle mb-3"
-        >
-            Recipients
-        </div>
+        <div class="text-[10px] uppercase tracking-wider text-zen-fg-subtle mb-3">Recipients</div>
         <div class="space-y-2">
             {#each visibleRecipients as recipient}
                 <div class="flex items-center justify-between text-sm">
@@ -153,7 +137,7 @@
                     </span>
                     <span class="font-mono text-zen-fg text-xs">
                         {recipient.amount.toLocaleString('en-US')}
-                        {tokenDetails.tokenSymbol || ""}
+                        {tokenDetails.tokenSymbol || ''}
                     </span>
                 </div>
             {/each}
@@ -174,14 +158,12 @@
             </div>
             <span class="font-medium text-zen-fg">
                 {distribution.schedule.cliffEndDate
-                    ? new Date(
-                          distribution.schedule.cliffEndDate,
-                      ).toLocaleDateString("en-US", {
-                          month: "short",
-                          day: "numeric",
-                          year: "numeric",
+                    ? new Date(distribution.schedule.cliffEndDate).toLocaleDateString('en-US', {
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric',
                       })
-                    : "No cliff"}
+                    : 'No cliff'}
             </span>
         </div>
     </div>

@@ -1,12 +1,12 @@
 <script lang="ts">
-    import type { ComponentType } from "svelte";
+    import type { ComponentType } from 'svelte';
 
     let {
         icon: Icon,
         title,
         description,
-        color = "bg-zen-fg/5",
-        iconColor = "text-zen-fg/20",
+        color = 'bg-zen-fg/5',
+        iconColor = 'text-zen-fg/20',
         action,
     }: {
         icon: ComponentType;
@@ -21,9 +21,7 @@
 <div
     class="flex flex-col items-center justify-center py-16 text-center animate-in fade-in zoom-in duration-300"
 >
-    <div
-        class="w-16 h-16 rounded-full flex items-center justify-center mb-4 {color}"
-    >
+    <div class="w-16 h-16 rounded-full flex items-center justify-center mb-4 {color}">
         <Icon class="w-8 h-8 {iconColor}" />
     </div>
     <h2 class="font-medium text-lg mb-2">

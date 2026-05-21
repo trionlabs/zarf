@@ -1,30 +1,42 @@
 import { describe, expect, it } from 'vitest';
 import {
-    totalAllocation, claimedAmount, unlockedAmount, claimableAmount,
-    isCliffPassed, cliffEndDate,
-    findNextClaimableIdx, buildClaimedMap,
+    totalAllocation,
+    claimedAmount,
+    unlockedAmount,
+    claimableAmount,
+    isCliffPassed,
+    cliffEndDate,
+    findNextClaimableIdx,
+    buildClaimedMap,
 } from './claimFlow';
 
 const e = (amount: bigint, opts: { claimed?: boolean; locked?: boolean } = {}) => ({
-    amount, isClaimed: opts.claimed ?? false, isLocked: opts.locked ?? false,
+    amount,
+    isClaimed: opts.claimed ?? false,
+    isLocked: opts.locked ?? false,
 });
 
 describe('amount totals', () => {
     it('total / claimed / unlocked / claimable agree on a representative mix', () => {
         const epochs = [
-            e(100n, { claimed: true,  locked: false }),
+            e(100n, { claimed: true, locked: false }),
             e(200n, { claimed: false, locked: false }),
-            e(400n, { claimed: false, locked: true  }),
+            e(400n, { claimed: false, locked: true }),
         ];
         expect(totalAllocation(epochs)).toBe(700n);
         expect(claimedAmount(epochs)).toBe(100n);
-        expect(unlockedAmount(epochs)).toBe(300n);   // not-locked: 100 + 200
-        expect(claimableAmount(epochs)).toBe(200n);  // not-locked AND not-claimed
+        expect(unlockedAmount(epochs)).toBe(300n); // not-locked: 100 + 200
+        expect(claimableAmount(epochs)).toBe(200n); // not-locked AND not-claimed
     });
 });
 
 describe('cliff math', () => {
-    const schedule = { vestingStart: 1_700_000_000, cliffDuration: 86400, vestingDuration: 0, vestingPeriod: 0 };
+    const schedule = {
+        vestingStart: 1_700_000_000,
+        cliffDuration: 86400,
+        vestingDuration: 0,
+        vestingPeriod: 0,
+    };
     const cliffMs = (1_700_000_000 + 86400) * 1000;
 
     it('isCliffPassed returns null on missing schedule (NOT true — was a UX bug)', () => {
@@ -47,16 +59,17 @@ describe('cliff math', () => {
 describe('findNextClaimableIdx', () => {
     it('returns the first index that is unlocked AND unclaimed; null if none', () => {
         expect(findNextClaimableIdx([])).toBeNull();
-        expect(findNextClaimableIdx([
-            e(1n, { locked: true }),
-            e(1n, { claimed: true }),
-        ])).toBeNull();
-        expect(findNextClaimableIdx([
-            e(1n, { claimed: true }),
-            e(1n, { locked: true }),
-            e(1n),                    // ← this one
-            e(1n),
-        ])).toBe(2);
+        expect(
+            findNextClaimableIdx([e(1n, { locked: true }), e(1n, { claimed: true })]),
+        ).toBeNull();
+        expect(
+            findNextClaimableIdx([
+                e(1n, { claimed: true }),
+                e(1n, { locked: true }),
+                e(1n), // ← this one
+                e(1n),
+            ]),
+        ).toBe(2);
     });
 });
 

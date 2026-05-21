@@ -111,7 +111,9 @@ export async function reconnectWallet(): Promise<void> {
 }
 
 export async function switchChain(): Promise<void> {
-    throw new Error('Network changes are handled in Freighter. Select the configured Stellar network there.');
+    throw new Error(
+        'Network changes are handled in Freighter. Select the configured Stellar network there.',
+    );
 }
 
 export async function getNativeBalance(address: StellarAddress): Promise<StellarBalance> {
@@ -183,10 +185,7 @@ function stopWatcher(): void {
     watcher = null;
 }
 
-export async function signTransaction(
-    xdr: string,
-    address: StellarAddress,
-): Promise<string> {
+export async function signTransaction(xdr: string, address: StellarAddress): Promise<string> {
     const cfg = getStellarConfig();
     const fr = await loadFreighter();
     const result = await fr.signTransaction(xdr, {

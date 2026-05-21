@@ -1,30 +1,26 @@
 <script lang="ts">
-    import { page } from "$app/state";
-    import { AlertTriangle, Home } from "lucide-svelte";
+    import { page } from '$app/state';
+    import { AlertTriangle, Home } from 'lucide-svelte';
 
     const status = $derived(page.status);
     const isNotFound = $derived(status === 404);
-    const title = $derived(isNotFound ? "Page not found" : "Something went wrong");
+    const title = $derived(isNotFound ? 'Page not found' : 'Something went wrong');
     const help = $derived(
         isNotFound
             ? "The page you're looking for doesn't exist or has moved."
-            : "An unexpected error occurred. Try refreshing — if it persists, head back home.",
+            : 'An unexpected error occurred. Try refreshing — if it persists, head back home.',
     );
-    const message = $derived(page.error?.message ?? "");
+    const message = $derived(page.error?.message ?? '');
 </script>
 
 <svelte:head>
     <title>{status} · {title}</title>
 </svelte:head>
 
-<section
-    class="flex flex-col items-center justify-center min-h-[60vh] gap-6 text-center px-6"
->
+<section class="flex flex-col items-center justify-center min-h-[60vh] gap-6 text-center px-6">
     <div class="flex items-center gap-3 text-zen-fg-muted">
         <AlertTriangle class="w-5 h-5" aria-hidden="true" />
-        <span class="text-xs font-mono uppercase tracking-widest"
-            >Error {status}</span
-        >
+        <span class="text-xs font-mono uppercase tracking-widest">Error {status}</span>
     </div>
 
     <h1 class="text-3xl font-semibold text-zen-fg">{title}</h1>

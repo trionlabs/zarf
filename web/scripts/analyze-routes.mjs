@@ -44,8 +44,9 @@ function findChunk(key) {
     // against `file` basename. Manifest keys themselves are full source paths,
     // not the "_HASH.js" form, so we scan values.
     return Object.values(manifest).find(
-        (v) => v.file === `_app/immutable/chunks/${key.replace(/^_/, '')}` ||
-               '_' + basename(v.file) === key,
+        (v) =>
+            v.file === `_app/immutable/chunks/${key.replace(/^_/, '')}` ||
+            '_' + basename(v.file) === key,
     );
 }
 
@@ -86,7 +87,8 @@ function closure(rootEntries) {
 }
 
 function totalSizes(files) {
-    let raw = 0, gz = 0;
+    let raw = 0,
+        gz = 0;
     for (const f of files) {
         const { raw: r, gz: g } = sizesFor(f);
         raw += r;
@@ -166,16 +168,22 @@ const allFiles = readdirSync(resolve(IMMUTABLE_ROOT, 'chunks')).filter((f) => f.
 const eagerEverywhere = new Set();
 for (const r of rowSummaries) for (const f of r.eagerFiles) eagerEverywhere.add(f);
 
-const eagerEverywhereChunks = [...eagerEverywhere].map((p) => basename(p)).filter((f) => allFiles.includes(f));
+const eagerEverywhereChunks = [...eagerEverywhere]
+    .map((p) => basename(p))
+    .filter((f) => allFiles.includes(f));
 const possiblyLazy = allFiles.filter((f) => !eagerEverywhereChunks.includes(f));
 
-console.log(`- Chunks loaded by AT LEAST ONE route (eager somewhere): ${eagerEverywhereChunks.length}`);
+console.log(
+    `- Chunks loaded by AT LEAST ONE route (eager somewhere): ${eagerEverywhereChunks.length}`,
+);
 console.log(`- Chunks NOT eager on any route (lazy-only): ${possiblyLazy.length}`);
 
 console.log('\nLazy-only chunks (loaded via dynamicImports or never from initial paint):');
 console.log('chunk | raw KB | gz KB | name');
 console.log('---|---:|---:|---');
-for (const f of possiblyLazy.sort((a, b) => sizesFor(`_app/immutable/chunks/${b}`).gz - sizesFor(`_app/immutable/chunks/${a}`).gz)) {
+for (const f of possiblyLazy.sort(
+    (a, b) => sizesFor(`_app/immutable/chunks/${b}`).gz - sizesFor(`_app/immutable/chunks/${a}`).gz,
+)) {
     const filePath = `_app/immutable/chunks/${f}`;
     const { raw, gz } = sizesFor(filePath);
     const n = nameFor(filePath);

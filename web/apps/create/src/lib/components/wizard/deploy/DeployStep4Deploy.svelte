@@ -1,29 +1,29 @@
 <script lang="ts">
-    import { deployStore } from "../../../stores/deployStore.svelte";
-    import { wizardStore } from "../../../stores/wizardStore.svelte";
+    import { deployStore } from '../../../stores/deployStore.svelte';
+    import { wizardStore } from '../../../stores/wizardStore.svelte';
     import {
         FactoryDeployService,
         getFactoryAddress,
         isFactoryAvailable,
         type FactoryDeployProgress,
-    } from "../../../services/factoryDeploy";
-    import { addOptimisticContract } from "@zarf/core/services/distributionDiscovery";
-    import { buildFactoryDeployInputs } from "@zarf/core/domain/merkleResultAdapter";
-    import { planDeploy, buildOptimisticContract } from "@zarf/core/domain/deployPlanner";
-    import { parseTokenAmount } from "@zarf/core/utils/amount";
-    import { toMessage } from "@zarf/core/utils/error";
-    import { dev, warn, err } from "@zarf/core/utils/log";
-    import { walletStore } from "@zarf/ui/stores/walletStore.svelte";
-    import { goto } from "$app/navigation";
-    import { Check, Rocket, Copy } from "lucide-svelte";
-    import type { TransactionHash } from "@zarf/core/types";
-    import ZenButton from "@zarf/ui/components/ui/ZenButton.svelte";
-    import ZenAlert from "@zarf/ui/components/ui/ZenAlert.svelte";
-    import ZenSpinner from "@zarf/ui/components/ui/ZenSpinner.svelte";
-    import DeploymentSummary from "./DeploymentSummary.svelte";
-    import DeploymentSuccessCard from "./DeploymentSuccessCard.svelte";
-    import DeploymentReport from "./DeploymentReport.svelte";
-    import DeploymentPipeline from "./DeploymentPipeline.svelte";
+    } from '../../../services/factoryDeploy';
+    import { addOptimisticContract } from '@zarf/core/services/distributionDiscovery';
+    import { buildFactoryDeployInputs } from '@zarf/core/domain/merkleResultAdapter';
+    import { planDeploy, buildOptimisticContract } from '@zarf/core/domain/deployPlanner';
+    import { parseTokenAmount } from '@zarf/core/utils/amount';
+    import { toMessage } from '@zarf/core/utils/error';
+    import { dev, warn, err } from '@zarf/core/utils/log';
+    import { walletStore } from '@zarf/ui/stores/walletStore.svelte';
+    import { goto } from '$app/navigation';
+    import { Check, Rocket, Copy } from 'lucide-svelte';
+    import type { TransactionHash } from '@zarf/core/types';
+    import ZenButton from '@zarf/ui/components/ui/ZenButton.svelte';
+    import ZenAlert from '@zarf/ui/components/ui/ZenAlert.svelte';
+    import ZenSpinner from '@zarf/ui/components/ui/ZenSpinner.svelte';
+    import DeploymentSummary from './DeploymentSummary.svelte';
+    import DeploymentSuccessCard from './DeploymentSuccessCard.svelte';
+    import DeploymentReport from './DeploymentReport.svelte';
+    import DeploymentPipeline from './DeploymentPipeline.svelte';
 
     // Local state from stores
     let distribution = $derived(deployStore.distribution);
@@ -38,10 +38,8 @@
 
     // Local deployment state
     let isDeploying = $state(false);
-    let currentStep = $state<
-        "idle" | "approve" | "create" | "complete" | "error"
-    >("idle");
-    let currentMessage = $state("");
+    let currentStep = $state<'idle' | 'approve' | 'create' | 'complete' | 'error'>('idle');
+    let currentMessage = $state('');
     let error = $state<string | null>(null);
 
     // Use persisted state from store
@@ -55,35 +53,34 @@
 
     // Clean Markup: Extract template logic to $derived
     const showFactoryWarning = $derived(!factoryAvailable);
-    const showNotDeployedIdle = $derived(!isDeployed && currentStep === "idle");
+    const showNotDeployedIdle = $derived(!isDeployed && currentStep === 'idle');
 
     function resetDeployState() {
-        if (confirm("Are you sure you want to reset the deployment state?")) {
+        if (confirm('Are you sure you want to reset the deployment state?')) {
             deployStore.reset(true);
             isDeploying = false;
-            currentStep = "idle";
+            currentStep = 'idle';
             error = null;
-            currentMessage = "";
+            currentMessage = '';
         }
     }
 
     async function handleDeploy() {
-        if (!distribution || !merkleResult || !walletAddress)
-            return;
+        if (!distribution || !merkleResult || !walletAddress) return;
 
         if (isWrongNetwork) {
-            error = "Switch Freighter to the configured Stellar network before deploying.";
+            error = 'Switch Freighter to the configured Stellar network before deploying.';
             return;
         }
 
         const currentFactoryAddress = getFactoryAddress();
         if (!currentFactoryAddress) {
-            error = "Stellar factory contract is not configured.";
+            error = 'Stellar factory contract is not configured.';
             return;
         }
 
         isDeploying = true;
-        currentStep = "idle";
+        currentStep = 'idle';
         error = null;
         // Do not reset hashes here, they are managed by store persistence
         // approveTxHash = null;
@@ -96,18 +93,13 @@
         // (past-date override + integrity check). Pure-TS — testable.
         let config: ReturnType<typeof planDeploy>;
         try {
-            const factoryInputs = buildFactoryDeployInputs(
-                merkleResult.claims,
-                merkleResult.root,
-            );
+            const factoryInputs = buildFactoryDeployInputs(merkleResult.claims, merkleResult.root);
 
             // Pinning is done in Step 1 (Prepare). If the CID is missing
             // here, the user shouldn't have been allowed past that step.
             const metadataCid = deployStore.metadataCid;
             if (!metadataCid) {
-                throw new Error(
-                    "Claim list CID missing — go back to Step 1 to re-pin",
-                );
+                throw new Error('Claim list CID missing — go back to Step 1 to re-pin');
             }
 
             const plannedAt = deployStore.schedulePlanAtMs
@@ -120,7 +112,7 @@
                     tokenAddress: wizardStore.tokenDetails.tokenAddress!,
                     owner: walletAddress!,
                     name: distribution.name,
-                    description: distribution.description || "",
+                    description: distribution.description || '',
                     schedule: distribution.schedule,
                     totalAmount: parseTokenAmount(String(distribution.amount), tokenDecimals),
                     merkleRoot: factoryInputs.merkleRoot,
@@ -133,45 +125,42 @@
         } catch (e) {
             error = `Pre-deploy step failed: ${(e as Error).message}`;
             isDeploying = false;
-            currentStep = "error";
+            currentStep = 'error';
             return;
         }
         if (config.immediateUnlock) {
-            dev("Past date detected: configured for immediate unlock");
+            dev('Past date detected: configured for immediate unlock');
         }
 
-        const service = new FactoryDeployService(
-            config,
-            (progress: FactoryDeployProgress) => {
-                currentStep = progress.step;
-                currentMessage = progress.message;
+        const service = new FactoryDeployService(config, (progress: FactoryDeployProgress) => {
+            currentStep = progress.step;
+            currentMessage = progress.message;
 
-                if (progress.txHash) {
-                    if (progress.step === "approve") {
-                        deployStore.setApproveTx(progress.txHash);
-                    } else if (progress.step === "create") {
-                        submittedCreateTxHash = progress.txHash;
-                        deployStore.setCreateTx(progress.txHash);
-                    }
+            if (progress.txHash) {
+                if (progress.step === 'approve') {
+                    deployStore.setApproveTx(progress.txHash);
+                } else if (progress.step === 'create') {
+                    submittedCreateTxHash = progress.txHash;
+                    deployStore.setCreateTx(progress.txHash);
                 }
+            }
 
-                if (progress.step === "error") {
-                    error = progress.message;
-                }
-            },
-        );
+            if (progress.step === 'error') {
+                error = progress.message;
+            }
+        });
 
         try {
             const vestingAddress = await service.deploy();
 
             if (vestingAddress) {
-                currentStep = "complete";
+                currentStep = 'complete';
                 deployStore.setDeployed(vestingAddress);
 
                 // Persist to Global Store
                 wizardStore.moveDistributionToLaunched(
                     distribution.id,
-                    submittedCreateTxHash || createTxHash || "",
+                    submittedCreateTxHash || createTxHash || '',
                 );
 
                 // Optimistic UI Update — show in dashboard before next RPC fetch
@@ -181,7 +170,7 @@
                         buildOptimisticContract({
                             address: vestingAddress,
                             name: distribution.name,
-                            description: distribution.description || "",
+                            description: distribution.description || '',
                             tokenAddress: wizardStore.tokenDetails.tokenAddress!,
                             tokenSymbol: wizardStore.tokenDetails.tokenSymbol,
                             tokenDecimals: wizardStore.tokenDetails.tokenDecimals,
@@ -196,20 +185,20 @@
                         }),
                     );
                 } catch (e) {
-                    warn("Optimistic cache update failed", e);
+                    warn('Optimistic cache update failed', e);
                 }
             }
         } catch (e: unknown) {
-            err("Deploy failed:", e);
-            error = toMessage(e, "Deployment failed");
-            currentStep = "error";
+            err('Deploy failed:', e);
+            error = toMessage(e, 'Deployment failed');
+            currentStep = 'error';
         } finally {
             isDeploying = false;
         }
     }
 
     function goToDashboard() {
-        goto("/distributions");
+        goto('/distributions');
     }
 
     // Copy to clipboard
@@ -218,7 +207,7 @@
         if (contractAddress) {
             navigator.clipboard.writeText(contractAddress);
             copied = true;
-            setTimeout(() => copied = false, 2000);
+            setTimeout(() => (copied = false), 2000);
         }
     }
 
@@ -230,7 +219,8 @@
             // Use email or identityCommitment as unique key
             const key = c.email || c.identityCommitment || String(c.leafIndex);
             const displayName = c.email || `Recipient ${c.identityCommitment?.slice(0, 8)}...`;
-            const amount = Number(c.amount) / Math.pow(10, wizardStore.tokenDetails.tokenDecimals || 7);
+            const amount =
+                Number(c.amount) / Math.pow(10, wizardStore.tokenDetails.tokenDecimals || 7);
             if (grouped.has(key)) {
                 grouped.get(key)!.amount += amount;
             } else {
@@ -249,10 +239,9 @@
 
     function retry() {
         error = null;
-        currentStep = "idle";
+        currentStep = 'idle';
         handleDeploy();
     }
-
 </script>
 
 <div class="p-4 w-full max-w-6xl">
@@ -263,13 +252,13 @@
             <div class="text-left">
                 {#if isDeployed}
                     <div class="mb-4 flex items-center gap-3">
-                        <div class="w-10 h-10 rounded-full bg-zen-fg flex items-center justify-center">
+                        <div
+                            class="w-10 h-10 rounded-full bg-zen-fg flex items-center justify-center"
+                        >
                             <Check class="w-5 h-5 text-zen-bg" />
                         </div>
                         <div>
-                            <h2 class="text-xl font-bold text-zen-fg">
-                                Deployment Complete
-                            </h2>
+                            <h2 class="text-xl font-bold text-zen-fg">Deployment Complete</h2>
                             <p class="text-sm text-zen-fg-muted">
                                 Contract deployed and funded successfully
                             </p>
@@ -294,8 +283,7 @@
                 {:else}
                     <h2 class="text-3xl font-bold mb-2">Deploy Distribution</h2>
                     <p class="text-zen-fg-muted">
-                        Review the details below and execute the transactions to
-                        deploy.
+                        Review the details below and execute the transactions to deploy.
                     </p>
                     <div
                         class="inline-flex items-center gap-2 mt-3 px-3 py-1.5 bg-zen-bg-elevated text-zen-fg-muted text-xs font-medium rounded-full border-[0.5px] border-zen-border-subtle"
@@ -353,20 +341,13 @@
                         {/if}
                     </ZenButton>
 
-                    <p
-                        class="text-xs text-zen-fg-subtle text-center max-w-md"
-                    >
-                        This will require only 2 wallet confirmations. Much
-                        faster than before!
+                    <p class="text-xs text-zen-fg-subtle text-center max-w-md">
+                        This will require only 2 wallet confirmations. Much faster than before!
                     </p>
                 {:else if isDeployed && contractAddress && distribution}
                     <!-- Success State - Action Buttons (Card is on right) -->
                     <div class="flex gap-3 mt-4">
-                        <ZenButton
-                            variant="primary"
-                            class="flex-1"
-                            onclick={goToDashboard}
-                        >
+                        <ZenButton variant="primary" class="flex-1" onclick={goToDashboard}>
                             View Dashboard
                         </ZenButton>
 
@@ -380,14 +361,12 @@
                             {createTxHash}
                         />
                     </div>
-                {:else if currentStep !== "idle" && currentStep !== "error"}
+                {:else if currentStep !== 'idle' && currentStep !== 'error'}
                     <!-- In Progress -->
                     <div class="flex flex-col items-center gap-4 text-center">
                         <ZenSpinner size="md" />
                         <div class="space-y-1">
-                            <p class="text-zen-fg-muted">
-                                Deployment in progress...
-                            </p>
+                            <p class="text-zen-fg-muted">Deployment in progress...</p>
                             <p class="text-xs text-zen-fg-subtle">
                                 Please confirm transactions in your wallet.
                             </p>
@@ -401,7 +380,9 @@
 
                         <!-- Show contract address if already known -->
                         {#if contractAddress}
-                            <div class="mt-2 p-3 bg-zen-bg-elevated border-[0.5px] border-zen-border-subtle rounded-lg">
+                            <div
+                                class="mt-2 p-3 bg-zen-bg-elevated border-[0.5px] border-zen-border-subtle rounded-lg"
+                            >
                                 <p class="text-xs text-zen-fg-subtle font-medium mb-1">
                                     Contract Address
                                 </p>
@@ -412,7 +393,7 @@
                                     <button
                                         onclick={copyAddress}
                                         class="p-1 text-zen-fg-subtle hover:text-zen-fg transition-colors"
-                                        title={copied ? "Copied!" : "Copy"}
+                                        title={copied ? 'Copied!' : 'Copy'}
                                     >
                                         {#if copied}
                                             <Check class="w-3 h-3" />

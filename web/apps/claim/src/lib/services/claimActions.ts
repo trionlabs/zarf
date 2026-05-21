@@ -38,12 +38,8 @@ export async function discoverEpochs(
         claimStore.state.tokenSymbol = metadata.tokenSymbol;
         claimStore.state.tokenDecimals = metadata.tokenDecimals;
 
-        const {
-            computeIdentityCommitment,
-            stringToBytes,
-            pedersenHashBytes,
-            pedersenHashField,
-        } = await claimStore.preloadCrypto();
+        const { computeIdentityCommitment, stringToBytes, pedersenHashBytes, pedersenHashField } =
+            await claimStore.preloadCrypto();
 
         const result = await discoverEpochsCore(
             { email, pin, contractAddress },
@@ -77,9 +73,10 @@ export async function discoverEpochs(
         let msg = toMessage(e, 'Failed to discover epochs.');
         if (msg.includes('404')) msg = 'Contract distribution data not found.';
         if (e instanceof IpfsFetchError) {
-            msg = e.code === 'INVALID_CID'
-                ? 'This distribution is registered with invalid IPFS metadata. Ask the creator to redeploy it with a real IPFS CID.'
-                : 'Could not load this distribution from IPFS. Please retry; the configured gateway may be unavailable.';
+            msg =
+                e.code === 'INVALID_CID'
+                    ? 'This distribution is registered with invalid IPFS metadata. Ask the creator to redeploy it with a real IPFS CID.'
+                    : 'Could not load this distribution from IPFS. Please retry; the configured gateway may be unavailable.';
         }
         claimStore.setError(msg);
         throw new Error(msg);

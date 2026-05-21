@@ -1,45 +1,47 @@
 <!doctype html>
 <html lang="en" data-theme="glass-porcelain">
+    <head>
+        <meta charset="utf-8" />
+        <link rel="icon" href="%sveltekit.assets%/favicon.svg" />
+        <link rel="apple-touch-icon" href="%sveltekit.assets%/apple-touch-icon.png" />
+        <link rel="manifest" href="%sveltekit.assets%/manifest.json" />
+        <meta
+            name="viewport"
+            content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content"
+        />
+        <meta name="theme-color" content="#F8F8FA" media="(prefers-color-scheme: light)" />
+        <meta name="theme-color" content="#121212" media="(prefers-color-scheme: dark)" />
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link
+            href="https://fonts.googleapis.com/css2?family=Saira:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap"
+            rel="stylesheet"
+        />
 
-<head>
-	<meta charset="utf-8" />
-	<link rel="icon" href="%sveltekit.assets%/favicon.svg" />
-	<link rel="apple-touch-icon" href="%sveltekit.assets%/apple-touch-icon.png" />
-	<link rel="manifest" href="%sveltekit.assets%/manifest.json" />
-	<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content" />
-	<meta name="theme-color" content="#F8F8FA" media="(prefers-color-scheme: light)" />
-	<meta name="theme-color" content="#121212" media="(prefers-color-scheme: dark)" />
-	<link rel="preconnect" href="https://fonts.googleapis.com">
-	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-	<link
-		href="https://fonts.googleapis.com/css2?family=Saira:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap"
-		rel="stylesheet">
+        <!-- Blocking script to prevent theme flash during hydration -->
+        <script>
+            (function () {
+                try {
+                    var stored = localStorage.getItem('zarf_theme');
+                    var theme = 'dark'; // Updated match for ThemeStore
 
-	<!-- Blocking script to prevent theme flash during hydration -->
-	<script>
-		(function () {
-			try {
-				var stored = localStorage.getItem('zarf_theme');
-				var theme = 'dark'; // Updated match for ThemeStore
+                    if (stored === 'light' || stored === 'dark') {
+                        theme = stored;
+                    } else {
+                        localStorage.setItem('zarf_theme', 'dark');
+                    }
 
-				if (stored === 'light' || stored === 'dark') {
-					theme = stored;
-				} else {
-					localStorage.setItem('zarf_theme', 'dark');
-				}
+                    // Map theme name to the data-theme attribute consumed by Tailwind v4 @theme registration
+                    var themeName = theme === 'light' ? 'paper-porcelain' : 'glass-porcelain';
+                    document.documentElement.setAttribute('data-theme', themeName);
+                } catch (e) {}
+            })();
+        </script>
 
-				// Map theme name to the data-theme attribute consumed by Tailwind v4 @theme registration
-				var themeName = theme === 'light' ? 'paper-porcelain' : 'glass-porcelain';
-				document.documentElement.setAttribute('data-theme', themeName);
-			} catch (e) { }
-		})();
-	</script>
+        %sveltekit.head%
+    </head>
 
-	%sveltekit.head%
-</head>
-
-<body data-sveltekit-preload-data="hover">
-	<div style="display: contents">%sveltekit.body%</div>
-</body>
-
+    <body data-sveltekit-preload-data="hover">
+        <div style="display: contents">%sveltekit.body%</div>
+    </body>
 </html>

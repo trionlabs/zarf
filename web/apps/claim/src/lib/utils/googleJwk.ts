@@ -3,7 +3,7 @@
  * Fetches and caches Google's public keys for JWT verification
  */
 
-import { devTag, err } from "@zarf/core/utils/log";
+import { devTag, err } from '@zarf/core/utils/log';
 
 const log = devTag('GoogleJWK');
 
@@ -35,7 +35,7 @@ export async function fetchGoogleJwks(): Promise<GoogleJwkSet> {
     const now = Date.now();
 
     // Return cached if still valid
-    if (cachedJwks && (now - cacheTimestamp) < CACHE_DURATION) {
+    if (cachedJwks && now - cacheTimestamp < CACHE_DURATION) {
         log('Using cached keys');
         return cachedJwks;
     }
@@ -77,7 +77,7 @@ export async function getPublicKeyForJwt(jwt: string): Promise<GoogleJwk> {
     log(`Looking for key with kid: ${kid}`);
 
     const jwks = await fetchGoogleJwks();
-    const key = jwks.keys.find(k => k.kid === kid);
+    const key = jwks.keys.find((k) => k.kid === kid);
 
     if (!key) {
         throw new Error(`No matching Google public key found for kid: ${kid}`);

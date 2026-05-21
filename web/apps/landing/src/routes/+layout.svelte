@@ -1,7 +1,7 @@
 <script lang="ts">
-    import "../app.css";
-    import { onMount } from "svelte";
-    import { themeStore } from "@zarf/ui/stores/themeStore.svelte";
+    import '../app.css';
+    import { onMount } from 'svelte';
+    import { themeStore } from '@zarf/ui/stores/themeStore.svelte';
 
     // Initialize theme on mount (sets data-theme attribute)
     onMount(() => {

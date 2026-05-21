@@ -71,10 +71,7 @@ export default ts.config(
         // Sanitization regex intentionally targets ASCII control chars
         // (NULL through US, ESC). The rule exists to catch typo'd
         // escapes; these files use it deliberately.
-        files: [
-            'apps/indexer/src/index.ts',
-            'packages/core/lib/services/distributionDiscovery.ts',
-        ],
+        files: ['apps/indexer/src/index.ts', 'packages/core/lib/services/distributionDiscovery.ts'],
         rules: {
             'no-control-regex': 'off',
         },

@@ -12,13 +12,13 @@
      * - Calendar-aligned unlock dates (e.g. 5th of every month)
      */
 
-    import { Lock } from "lucide-svelte";
+    import { Lock } from 'lucide-svelte';
     import {
         calculateEndDate,
         calculateUnlockEvents,
         generateUnlockMarkers,
         type DurationUnit,
-    } from "@zarf/core/utils/vesting";
+    } from '@zarf/core/utils/vesting';
 
     interface Props {
         cliffEndDate?: string;
@@ -30,57 +30,42 @@
     }
 
     let {
-        cliffEndDate = "",
-        cliffTime = "12:00",
+        cliffEndDate = '',
+        cliffTime = '12:00',
         duration = 12,
-        durationUnit = "months",
+        durationUnit = 'months',
         totalTokens = 0,
-        tokenSymbol = "TOKENS",
+        tokenSymbol = 'TOKENS',
     }: Props = $props();
 
     // Core date calculations
     const today = new Date();
 
     const cliffDate = $derived(
-        cliffEndDate ? new Date(cliffEndDate + "T" + cliffTime + ":00Z") : null,
+        cliffEndDate ? new Date(cliffEndDate + 'T' + cliffTime + ':00Z') : null,
     );
 
     // END DATE
-    const endDate = $derived(
-        calculateEndDate(cliffDate, duration, durationUnit),
-    );
+    const endDate = $derived(calculateEndDate(cliffDate, duration, durationUnit));
 
     // Days calculations (for display/graph proportions)
     const daysToCliff = $derived(
-        cliffDate
-            ? Math.ceil(
-                  (cliffDate.getTime() - today.getTime()) /
-                      (24 * 60 * 60 * 1000),
-              )
-            : 0,
+        cliffDate ? Math.ceil((cliffDate.getTime() - today.getTime()) / (24 * 60 * 60 * 1000)) : 0,
     );
 
     const totalDaysFromNow = $derived(
-        endDate
-            ? Math.ceil(
-                  (endDate.getTime() - today.getTime()) / (24 * 60 * 60 * 1000),
-              )
-            : 0,
+        endDate ? Math.ceil((endDate.getTime() - today.getTime()) / (24 * 60 * 60 * 1000)) : 0,
     );
 
     // Is this an instant unlock?
     const isInstant = $derived(duration === 0);
 
     // UNLOCK EVENTS
-    const unlockEvents = $derived(
-        calculateUnlockEvents(cliffDate, endDate, duration),
-    );
+    const unlockEvents = $derived(calculateUnlockEvents(cliffDate, endDate, duration));
 
     // Token amounts
     const tokensPerUnlock = $derived(
-        unlockEvents > 0 && totalTokens > 0
-            ? Math.floor(totalTokens / unlockEvents)
-            : 0,
+        unlockEvents > 0 && totalTokens > 0 ? Math.floor(totalTokens / unlockEvents) : 0,
     );
 
     // Format helpers
@@ -91,48 +76,46 @@
     };
 
     const formatDateLong = (date: Date | null) => {
-        if (!date) return "—";
-        const dateStr = date.toLocaleDateString("en-US", {
-            weekday: "short",
-            month: "short",
-            day: "numeric",
-            year: "numeric",
+        if (!date) return '—';
+        const dateStr = date.toLocaleDateString('en-US', {
+            weekday: 'short',
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
         });
 
-        if (durationUnit === "hours" || durationUnit === "minutes") {
-            return `${dateStr} @ ${date.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false })}`;
+        if (durationUnit === 'hours' || durationUnit === 'minutes') {
+            return `${dateStr} @ ${date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })}`;
         }
         return dateStr;
     };
 
     const formatDateShort = (date: Date | null) => {
-        if (!date) return "—";
+        if (!date) return '—';
 
-        if (durationUnit === "hours" || durationUnit === "minutes") {
-            return date.toLocaleString("en-US", {
-                month: "short",
-                day: "numeric",
-                hour: "2-digit",
-                minute: "2-digit",
+        if (durationUnit === 'hours' || durationUnit === 'minutes') {
+            return date.toLocaleString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
                 hour12: false,
             });
         }
 
-        return date.toLocaleDateString("en-US", {
-            month: "short",
-            day: "numeric",
-            year: "numeric",
+        return date.toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
         });
     };
 
     const formatTime = (time: string) => {
-        return time + " UTC";
+        return time + ' UTC';
     };
 
     // Chart calculations
-    const hasValidDates = $derived(
-        cliffDate !== null && !isNaN(cliffDate.getTime()),
-    );
+    const hasValidDates = $derived(cliffDate !== null && !isNaN(cliffDate.getTime()));
 
     // Smart lock period sizing (min 10%, max 35%)
     const lockPeriodPercent = $derived.by(() => {
@@ -157,18 +140,18 @@
     // Frequency label
     const frequencyLabel = $derived.by(() => {
         switch (durationUnit) {
-            case "minutes":
-                return "Every Minute";
-            case "hours":
-                return "Hourly";
-            case "weeks":
-                return "Weekly";
-            case "months":
-                return "Monthly";
-            case "quarters":
-                return "Quarterly";
+            case 'minutes':
+                return 'Every Minute';
+            case 'hours':
+                return 'Hourly';
+            case 'weeks':
+                return 'Weekly';
+            case 'months':
+                return 'Monthly';
+            case 'quarters':
+                return 'Quarterly';
             default:
-                return "Yearly";
+                return 'Yearly';
         }
     });
 
@@ -193,13 +176,13 @@
     $effect(() => {
         if (activeTooltipIndex === null && !isLockTooltipActive) return;
         function onKey(e: KeyboardEvent) {
-            if (e.key === "Escape") {
+            if (e.key === 'Escape') {
                 activeTooltipIndex = null;
                 isLockTooltipActive = false;
             }
         }
-        window.addEventListener("keydown", onKey);
-        return () => window.removeEventListener("keydown", onKey);
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
     });
 </script>
 
@@ -210,35 +193,26 @@
             <!-- Primary Stats Row -->
             <div class="grid grid-cols-2 gap-6">
                 <div>
-                    <p
-                        class="text-[10px] text-zen-fg-muted uppercase tracking-widest mb-1"
-                    >
+                    <p class="text-[10px] text-zen-fg-muted uppercase tracking-widest mb-1">
                         Lock Period
                     </p>
                     <p class="text-2xl font-light tabular-nums">
-                        {daysToCliff}<span
-                            class="text-sm text-zen-fg-subtle ml-1">days</span
-                        >
+                        {daysToCliff}<span class="text-sm text-zen-fg-subtle ml-1">days</span>
                     </p>
                     <p class="text-xs text-zen-fg-subtle mt-0.5">
                         until {formatDateShort(cliffDate)}
                     </p>
                 </div>
                 <div>
-                    <p
-                        class="text-[10px] text-zen-fg-muted uppercase tracking-widest mb-1"
-                    >
+                    <p class="text-[10px] text-zen-fg-muted uppercase tracking-widest mb-1">
                         Vesting Duration
                     </p>
                     {#if isInstant}
                         <p class="text-2xl font-light text-zen-warning">Instant</p>
-                        <p class="text-xs text-zen-fg-subtle mt-0.5">
-                            100% at cliff end
-                        </p>
+                        <p class="text-xs text-zen-fg-subtle mt-0.5">100% at cliff end</p>
                     {:else}
                         <p class="text-2xl font-light tabular-nums">
-                            {duration}<span
-                                class="text-sm text-zen-fg-subtle ml-1"
+                            {duration}<span class="text-sm text-zen-fg-subtle ml-1"
                                 >{durationUnit}</span
                             >
                         </p>
@@ -251,47 +225,30 @@
 
             <!-- Token Amounts (if provided) -->
             {#if totalTokens > 0}
-                <div
-                    class="flex items-center gap-8 py-3 px-4 bg-zen-fg/[0.02] rounded-lg"
-                >
+                <div class="flex items-center gap-8 py-3 px-4 bg-zen-fg/[0.02] rounded-lg">
                     <div>
-                        <p
-                            class="text-[10px] text-zen-fg-muted uppercase tracking-widest"
-                        >
-                            Total
-                        </p>
+                        <p class="text-[10px] text-zen-fg-muted uppercase tracking-widest">Total</p>
                         <p class="text-lg font-medium tabular-nums">
                             {formatNumber(totalTokens)}
-                            <span class="text-xs text-zen-fg-subtle"
-                                >{tokenSymbol}</span
-                            >
+                            <span class="text-xs text-zen-fg-subtle">{tokenSymbol}</span>
                         </p>
                     </div>
                     <div class="text-zen-fg/20">→</div>
                     <div>
-                        <p
-                            class="text-[10px] text-zen-fg-muted uppercase tracking-widest"
-                        >
+                        <p class="text-[10px] text-zen-fg-muted uppercase tracking-widest">
                             Per Unlock
                         </p>
                         <p class="text-lg font-medium tabular-nums">
                             {formatNumber(tokensPerUnlock)}
-                            <span class="text-xs text-zen-fg-subtle"
-                                >{tokenSymbol}</span
-                            >
+                            <span class="text-xs text-zen-fg-subtle">{tokenSymbol}</span>
                         </p>
                     </div>
                     <div class="ml-auto text-right">
-                        <p
-                            class="text-[10px] text-zen-fg-muted uppercase tracking-widest"
-                        >
+                        <p class="text-[10px] text-zen-fg-muted uppercase tracking-widest">
                             Events
                         </p>
                         <p class="text-lg font-medium tabular-nums">
-                            {unlockEvents}<span
-                                class="text-xs text-zen-fg-subtle ml-1"
-                                >×</span
-                            >
+                            {unlockEvents}<span class="text-xs text-zen-fg-subtle ml-1">×</span>
                         </p>
                     </div>
                 </div>
@@ -301,16 +258,12 @@
         <!-- Bar Graph -->
         <div class="space-y-3">
             <div class="flex items-center justify-between">
-                <h4
-                    class="text-[10px] font-semibold uppercase tracking-widest text-zen-fg-muted"
-                >
+                <h4 class="text-[10px] font-semibold uppercase tracking-widest text-zen-fg-muted">
                     Unlock Schedule
                 </h4>
                 <div class="flex gap-4 text-[10px] text-zen-fg-subtle">
                     <span class="flex items-center gap-1.5">
-                        <div
-                            class="w-2 h-2 bg-zen-fg/10 rounded-sm"
-                        ></div>
+                        <div class="w-2 h-2 bg-zen-fg/10 rounded-sm"></div>
                         Locked
                     </span>
                     <span class="flex items-center gap-1.5">
@@ -336,9 +289,7 @@
                     <button
                         type="button"
                         aria-label="Lock period"
-                        aria-describedby={isLockTooltipActive
-                            ? "vesting-lock-tooltip"
-                            : undefined}
+                        aria-describedby={isLockTooltipActive ? 'vesting-lock-tooltip' : undefined}
                         class="h-full bg-zen-fg/[0.03] rounded-md flex items-center justify-center relative cursor-default transition-colors hover:bg-zen-fg/[0.05] border-0 p-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-zen-fg/40 focus-visible:ring-offset-2 focus-visible:ring-offset-zen-bg"
                         style="width: {lockPeriodPercent}%; min-width: 40px;"
                         onmouseenter={() => (isLockTooltipActive = true)}
@@ -391,7 +342,7 @@
                         <button
                             type="button"
                             aria-label={isInstant
-                                ? "Instant unlock"
+                                ? 'Instant unlock'
                                 : marker.isGrouped
                                   ? `Vesting events 1 through ${marker.event}`
                                   : `Vesting unlock event ${marker.event}`}
@@ -433,12 +384,8 @@
                                                 {marker.percent}%
                                             </div>
                                             {#if totalTokens > 0}
-                                                <div
-                                                    class="text-zen-fg/60 font-medium"
-                                                >
-                                                    {formatNumber(
-                                                        marker.tokens,
-                                                    )}
+                                                <div class="text-zen-fg/60 font-medium">
+                                                    {formatNumber(marker.tokens)}
                                                     {tokenSymbol}
                                                 </div>
                                             {/if}
@@ -446,9 +393,7 @@
                                                 <div
                                                     class="text-zen-fg-subtle text-[10px] pt-1 font-medium"
                                                 >
-                                                    {formatDateLong(
-                                                        marker.date,
-                                                    )}
+                                                    {formatDateLong(marker.date)}
                                                 </div>
                                             {/if}
                                         </div>
@@ -484,7 +429,7 @@
                 {/if}
                 <div class="text-right">
                     <div class="font-medium">
-                        {isInstant ? "100% Unlocked" : "Fully Vested"}
+                        {isInstant ? '100% Unlocked' : 'Fully Vested'}
                     </div>
                     <div class="text-[9px] text-zen-fg/20">
                         {formatDateShort(endDate)}
@@ -495,16 +440,12 @@
     </div>
 {:else}
     <!-- Empty State -->
-    <div
-        class="h-48 flex flex-col items-center justify-center text-center opacity-30"
-    >
+    <div class="h-48 flex flex-col items-center justify-center text-center opacity-30">
         <div
             class="w-12 h-12 border border-current rounded-full flex items-center justify-center mb-3"
         >
             <span class="text-xl">?</span>
         </div>
-        <p class="text-xs font-medium uppercase tracking-widest">
-            Configure Schedule
-        </p>
+        <p class="text-xs font-medium uppercase tracking-widest">Configure Schedule</p>
     </div>
 {/if}

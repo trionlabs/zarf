@@ -61,18 +61,19 @@ export function toHex(value: string | number | bigint): string {
 export function toHexFromBytes(str: string): string {
     const encoder = new TextEncoder();
     const bytes = encoder.encode(str);
-    return '0x' + Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
+    return (
+        '0x' +
+        Array.from(bytes)
+            .map((b) => b.toString(16).padStart(2, '0'))
+            .join('')
+    );
 }
 
 /**
  * Pad a merkle proof's siblings/indices arrays out to TREE_DEPTH with `0x0`
  * entries, then normalize every entry through `toHex`.
  */
-export function padMerkleProof(
-    siblings: string[],
-    indices: string[],
-    depth: number = TREE_DEPTH,
-) {
+export function padMerkleProof(siblings: string[], indices: string[], depth: number = TREE_DEPTH) {
     if (siblings.length !== indices.length) {
         throw new Error(
             `padMerkleProof: siblings/indices length mismatch (${siblings.length}/${indices.length})`,
@@ -122,10 +123,7 @@ export function padEmail(email: string, length: number = MAX_EMAIL_LENGTH) {
  * here changes the witness and therefore the proof, so it's the highest-
  * value place to lock down with characterization tests.
  */
-export function buildCircuitInputs(
-    claimData: ClaimData,
-    jwtInputs: NoirJwtResult,
-) {
+export function buildCircuitInputs(claimData: ClaimData, jwtInputs: NoirJwtResult) {
     const { email, salt, amount, merkleProof, merkleRoot, recipient, unlockTime } = claimData;
     const { siblings, indices } = padMerkleProof(merkleProof.siblings, merkleProof.indices);
     const expected_email = padEmail(email);

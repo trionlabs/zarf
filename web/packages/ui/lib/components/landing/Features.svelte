@@ -15,7 +15,9 @@
     <div class="mx-auto px-6 max-w-6xl">
         <!-- Header -->
         <div class="text-center mb-20">
-            <p class="text-zen-fg-muted text-xs font-medium tracking-[0.2em] uppercase mb-4">Features</p>
+            <p class="text-zen-fg-muted text-xs font-medium tracking-[0.2em] uppercase mb-4">
+                Features
+            </p>
             <h2 class="text-4xl md:text-5xl font-semibold tracking-tight text-base-content mb-5">
                 Privacy-First Distribution
             </h2>
@@ -26,7 +28,6 @@
 
         <!-- 2x2 Grid -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-5 lg:gap-6">
-
             <!-- ═══════════════════════════════════════════════════════════════ -->
             <!-- Card 1: ZK Privacy - "The Veil" -->
             <!-- ═══════════════════════════════════════════════════════════════ -->
@@ -35,17 +36,26 @@
                        hover:border-base-content/[0.12] hover:bg-base-200/60
                        shadow-sm hover:shadow-lg hover:shadow-base-content/[0.03]
                        transition-all duration-500 ease-out hover:-translate-y-0.5"
-                onmouseenter={() => zkHovered = true}
-                onmouseleave={() => zkHovered = false}
+                onmouseenter={() => (zkHovered = true)}
+                onmouseleave={() => (zkHovered = false)}
                 role="article"
             >
                 <!-- Scene -->
-                <div class="relative aspect-[4/3] rounded-2xl overflow-hidden mb-6 bg-gradient-to-b from-base-content/[0.015] to-transparent">
-                    <svg aria-hidden="true" class="absolute inset-0 w-full h-full" viewBox="0 0 400 300" preserveAspectRatio="xMidYMid meet">
+                <div
+                    class="relative aspect-[4/3] rounded-2xl overflow-hidden mb-6 bg-gradient-to-b from-base-content/[0.015] to-transparent"
+                >
+                    <svg
+                        aria-hidden="true"
+                        class="absolute inset-0 w-full h-full"
+                        viewBox="0 0 400 300"
+                        preserveAspectRatio="xMidYMid meet"
+                    >
                         <!-- Outer expanding rings -->
                         {#each [140, 115, 90, 65] as r, i}
                             <circle
-                                cx="200" cy="150" r={r}
+                                cx="200"
+                                cy="150"
+                                {r}
                                 fill="none"
                                 class="stroke-base-content transition-all ease-out"
                                 style="
@@ -61,7 +71,9 @@
 
                         <!-- Primary circle -->
                         <circle
-                            cx="200" cy="150" r="45"
+                            cx="200"
+                            cy="150"
+                            r="45"
                             fill="none"
                             class="stroke-base-content transition-all ease-out"
                             style="
@@ -75,7 +87,9 @@
 
                         <!-- Inner glow -->
                         <circle
-                            cx="200" cy="150" r="30"
+                            cx="200"
+                            cy="150"
+                            r="30"
                             fill="none"
                             class="stroke-base-content transition-all ease-out"
                             style="
@@ -94,10 +108,11 @@
                             {@const baseR = 45}
                             {@const expandR = 130}
                             {@const r = zkHovered ? expandR : baseR}
-                            {@const x = 200 + Math.cos((angle - 90) * Math.PI / 180) * r}
-                            {@const y = 150 + Math.sin((angle - 90) * Math.PI / 180) * r}
+                            {@const x = 200 + Math.cos(((angle - 90) * Math.PI) / 180) * r}
+                            {@const y = 150 + Math.sin(((angle - 90) * Math.PI) / 180) * r}
                             <circle
-                                cx={x} cy={y}
+                                cx={x}
+                                cy={y}
                                 r={zkHovered ? 3 : 1.5}
                                 class="fill-base-content transition-all ease-out"
                                 style="
@@ -110,15 +125,26 @@
 
                         <!-- Center core with pulse -->
                         <circle
-                            cx="200" cy="150"
+                            cx="200"
+                            cy="150"
                             r={zkHovered ? 8 : 5}
                             class="fill-base-content transition-all duration-500"
                             style="opacity: {zkHovered ? 0.6 : 0.2};"
                         />
                         {#if zkHovered}
                             <circle cx="200" cy="150" r="8" class="fill-base-content opacity-30">
-                                <animate attributeName="r" values="8;20;8" dur="2s" repeatCount="indefinite" />
-                                <animate attributeName="opacity" values="0.3;0;0.3" dur="2s" repeatCount="indefinite" />
+                                <animate
+                                    attributeName="r"
+                                    values="8;20;8"
+                                    dur="2s"
+                                    repeatCount="indefinite"
+                                />
+                                <animate
+                                    attributeName="opacity"
+                                    values="0.3;0;0.3"
+                                    dur="2s"
+                                    repeatCount="indefinite"
+                                />
                             </circle>
                         {/if}
                     </svg>
@@ -143,13 +169,20 @@
                        hover:border-base-content/[0.12] hover:bg-base-200/60
                        shadow-sm hover:shadow-lg hover:shadow-base-content/[0.03]
                        transition-all duration-500 ease-out hover:-translate-y-0.5"
-                onmouseenter={() => vestingHovered = true}
-                onmouseleave={() => vestingHovered = false}
+                onmouseenter={() => (vestingHovered = true)}
+                onmouseleave={() => (vestingHovered = false)}
                 role="article"
             >
                 <!-- Scene -->
-                <div class="relative aspect-[4/3] rounded-2xl overflow-hidden mb-6 bg-gradient-to-b from-base-content/[0.015] to-transparent">
-                    <svg aria-hidden="true" class="absolute inset-0 w-full h-full" viewBox="0 0 400 300" preserveAspectRatio="xMidYMid meet">
+                <div
+                    class="relative aspect-[4/3] rounded-2xl overflow-hidden mb-6 bg-gradient-to-b from-base-content/[0.015] to-transparent"
+                >
+                    <svg
+                        aria-hidden="true"
+                        class="absolute inset-0 w-full h-full"
+                        viewBox="0 0 400 300"
+                        preserveAspectRatio="xMidYMid meet"
+                    >
                         <!-- Large spiral path -->
                         <path
                             d="M 200 150
@@ -173,13 +206,7 @@
                         />
 
                         <!-- Milestone markers -->
-                        {#each [
-                            { x: 225, y: 140, label: "cliff", delay: 300 },
-                            { x: 125, y: 80, label: "1y", delay: 500 },
-                            { x: 330, y: 200, label: "2y", delay: 700 },
-                            { x: 40, y: 100, label: "3y", delay: 900 },
-                            { x: 120, y: 290, label: "4y", delay: 1100 },
-                        ] as mark}
+                        {#each [{ x: 225, y: 140, label: 'cliff', delay: 300 }, { x: 125, y: 80, label: '1y', delay: 500 }, { x: 330, y: 200, label: '2y', delay: 700 }, { x: 40, y: 100, label: '3y', delay: 900 }, { x: 120, y: 290, label: '4y', delay: 1100 }] as mark}
                             <g
                                 class="transition-all ease-out"
                                 style="
@@ -189,20 +216,27 @@
                                 "
                             >
                                 <circle
-                                    cx={mark.x} cy={mark.y} r="5"
+                                    cx={mark.x}
+                                    cy={mark.y}
+                                    r="5"
                                     class="fill-base-content"
                                     style="opacity: 0.45;"
                                 />
                                 <text
-                                    x={mark.x + 10} y={mark.y + 4}
+                                    x={mark.x + 10}
+                                    y={mark.y + 4}
                                     class="fill-base-content font-mono"
-                                    style="font-size: 11px; opacity: 0.4;"
-                                >{mark.label}</text>
+                                    style="font-size: 11px; opacity: 0.4;">{mark.label}</text
+                                >
                             </g>
                         {/each}
 
                         <!-- Traveling light with glow trail -->
-                        <circle r="12" class="fill-base-content" style="opacity: {vestingHovered ? 0.1 : 0};">
+                        <circle
+                            r="12"
+                            class="fill-base-content"
+                            style="opacity: {vestingHovered ? 0.1 : 0};"
+                        >
                             {#if vestingHovered}
                                 <animateMotion
                                     dur="5s"
@@ -211,7 +245,11 @@
                                 />
                             {/if}
                         </circle>
-                        <circle r="6" class="fill-base-content" style="opacity: {vestingHovered ? 0.6 : 0};">
+                        <circle
+                            r="6"
+                            class="fill-base-content"
+                            style="opacity: {vestingHovered ? 0.6 : 0};"
+                        >
                             {#if vestingHovered}
                                 <animateMotion
                                     dur="5s"
@@ -223,7 +261,8 @@
 
                         <!-- Origin point -->
                         <circle
-                            cx="200" cy="150"
+                            cx="200"
+                            cy="150"
                             r={vestingHovered ? 6 : 4}
                             class="fill-base-content transition-all duration-500"
                             style="opacity: {vestingHovered ? 0.55 : 0.15};"
@@ -250,16 +289,25 @@
                        hover:border-base-content/[0.12] hover:bg-base-200/60
                        shadow-sm hover:shadow-lg hover:shadow-base-content/[0.03]
                        transition-all duration-500 ease-out hover:-translate-y-0.5"
-                onmouseenter={() => claimHovered = true}
-                onmouseleave={() => claimHovered = false}
+                onmouseenter={() => (claimHovered = true)}
+                onmouseleave={() => (claimHovered = false)}
                 role="article"
             >
                 <!-- Scene -->
-                <div class="relative aspect-[4/3] rounded-2xl overflow-hidden mb-6 bg-gradient-to-b from-base-content/[0.015] to-transparent">
-                    <svg aria-hidden="true" class="absolute inset-0 w-full h-full" viewBox="0 0 400 300" preserveAspectRatio="xMidYMid meet">
+                <div
+                    class="relative aspect-[4/3] rounded-2xl overflow-hidden mb-6 bg-gradient-to-b from-base-content/[0.015] to-transparent"
+                >
+                    <svg
+                        aria-hidden="true"
+                        class="absolute inset-0 w-full h-full"
+                        viewBox="0 0 400 300"
+                        preserveAspectRatio="xMidYMid meet"
+                    >
                         <!-- Origin node -->
                         <circle
-                            cx="50" cy="150" r="35"
+                            cx="50"
+                            cy="150"
+                            r="35"
                             fill="none"
                             class="stroke-base-content transition-all ease-out"
                             style="
@@ -271,16 +319,19 @@
                             "
                         />
                         <circle
-                            cx="50" cy="150" r="10"
+                            cx="50"
+                            cy="150"
+                            r="10"
                             class="fill-base-content transition-all duration-600"
                             style="opacity: {claimHovered ? 0.5 : 0.15};"
                         />
                         <text
-                            x="50" y="157"
+                            x="50"
+                            y="157"
                             text-anchor="middle"
                             class="fill-base-content transition-all duration-500"
-                            style="font-size: 22px; opacity: {claimHovered ? 0.5 : 0.2};"
-                        >@</text>
+                            style="font-size: 22px; opacity: {claimHovered ? 0.5 : 0.2};">@</text
+                        >
 
                         <!-- Main flow curve -->
                         <path
@@ -363,7 +414,9 @@
 
                         <!-- Destination node -->
                         <circle
-                            cx="350" cy="150" r="35"
+                            cx="350"
+                            cy="150"
+                            r="35"
                             fill="none"
                             class="stroke-base-content transition-all ease-out"
                             style="
@@ -376,7 +429,9 @@
                             "
                         />
                         <circle
-                            cx="350" cy="150" r="10"
+                            cx="350"
+                            cy="150"
+                            r="10"
                             class="fill-base-content transition-all ease-out"
                             style="
                                 opacity: {claimHovered ? 0.5 : 0.08};
@@ -386,7 +441,11 @@
                         />
                         <!-- Minimal wallet hint -->
                         <rect
-                            x="342" y="145" width="16" height="10" rx="2"
+                            x="342"
+                            y="145"
+                            width="16"
+                            height="10"
+                            rx="2"
                             fill="none"
                             class="stroke-base-content transition-all ease-out"
                             style="
@@ -418,17 +477,26 @@
                        hover:border-base-content/[0.12] hover:bg-base-200/60
                        shadow-sm hover:shadow-lg hover:shadow-base-content/[0.03]
                        transition-all duration-500 ease-out hover:-translate-y-0.5"
-                onmouseenter={() => dataHovered = true}
-                onmouseleave={() => dataHovered = false}
+                onmouseenter={() => (dataHovered = true)}
+                onmouseleave={() => (dataHovered = false)}
                 role="article"
             >
                 <!-- Scene -->
-                <div class="relative aspect-[4/3] rounded-2xl overflow-hidden mb-6 bg-gradient-to-b from-base-content/[0.015] to-transparent">
-                    <svg aria-hidden="true" class="absolute inset-0 w-full h-full" viewBox="0 0 400 300" preserveAspectRatio="xMidYMid meet">
+                <div
+                    class="relative aspect-[4/3] rounded-2xl overflow-hidden mb-6 bg-gradient-to-b from-base-content/[0.015] to-transparent"
+                >
+                    <svg
+                        aria-hidden="true"
+                        class="absolute inset-0 w-full h-full"
+                        viewBox="0 0 400 300"
+                        preserveAspectRatio="xMidYMid meet"
+                    >
                         <!-- Vertical chain line -->
                         <line
-                            x1="80" y1="30"
-                            x2="80" y2="270"
+                            x1="80"
+                            y1="30"
+                            x2="80"
+                            y2="270"
                             class="stroke-base-content transition-all ease-out"
                             style="
                                 stroke-width: 0.75;
@@ -440,15 +508,11 @@
                         />
 
                         <!-- Verification blocks -->
-                        {#each [
-                            { y: 60, width: 260 },
-                            { y: 120, width: 220 },
-                            { y: 180, width: 280 },
-                            { y: 240, width: 200 },
-                        ] as block, i}
+                        {#each [{ y: 60, width: 260 }, { y: 120, width: 220 }, { y: 180, width: 280 }, { y: 240, width: 200 }] as block, i}
                             <!-- Connection dot -->
                             <circle
-                                cx="80" cy={block.y}
+                                cx="80"
+                                cy={block.y}
                                 r={dataHovered ? 6 : 4}
                                 class="fill-base-content transition-all ease-out"
                                 style="
@@ -460,8 +524,10 @@
 
                             <!-- Horizontal connector -->
                             <line
-                                x1="86" y1={block.y}
-                                x2="120" y2={block.y}
+                                x1="86"
+                                y1={block.y}
+                                x2="120"
+                                y2={block.y}
                                 class="stroke-base-content transition-all ease-out"
                                 style="
                                     stroke-width: 0.5;
@@ -475,8 +541,10 @@
 
                             <!-- Block -->
                             <rect
-                                x="120" y={block.y - 15}
-                                width={block.width} height="30"
+                                x="120"
+                                y={block.y - 15}
+                                width={block.width}
+                                height="30"
                                 rx="8"
                                 fill="none"
                                 class="stroke-base-content transition-all ease-out"
@@ -509,8 +577,10 @@
 
                             <!-- Data placeholder -->
                             <line
-                                x1="135" y1={block.y}
-                                x2={135 + block.width - 60} y2={block.y}
+                                x1="135"
+                                y1={block.y}
+                                x2={135 + block.width - 60}
+                                y2={block.y}
                                 class="stroke-base-content transition-all ease-out"
                                 style="
                                     stroke-width: 2;
@@ -549,11 +619,22 @@
                                 transition-delay: {dataHovered ? 1000 : 0}ms;
                             "
                         >
-                            <rect x="290" y="255" width="80" height="24" rx="12"
-                                  class="fill-base-content" style="opacity: 0.05;" />
-                            <text x="330" y="271" text-anchor="middle"
-                                  class="fill-base-content font-mono"
-                                  style="font-size: 10px; opacity: 0.35;">verified ✓</text>
+                            <rect
+                                x="290"
+                                y="255"
+                                width="80"
+                                height="24"
+                                rx="12"
+                                class="fill-base-content"
+                                style="opacity: 0.05;"
+                            />
+                            <text
+                                x="330"
+                                y="271"
+                                text-anchor="middle"
+                                class="fill-base-content font-mono"
+                                style="font-size: 10px; opacity: 0.35;">verified ✓</text
+                            >
                         </g>
                     </svg>
                 </div>
@@ -564,7 +645,8 @@
                         Verifiable & Auditable
                     </h3>
                     <p class="text-zen-fg-muted text-sm lg:text-base leading-relaxed">
-                        Distribution data stored on IPFS. Every transaction cryptographically verified.
+                        Distribution data stored on IPFS. Every transaction cryptographically
+                        verified.
                     </p>
                 </div>
             </div>

@@ -1,35 +1,31 @@
 <script lang="ts">
-    import { page } from "$app/state";
-    import { AlertTriangle, Home } from "lucide-svelte";
-    import ZarfLogo from "@zarf/ui/components/brand/ZarfLogo.svelte";
+    import { page } from '$app/state';
+    import { AlertTriangle, Home } from 'lucide-svelte';
+    import ZarfLogo from '@zarf/ui/components/brand/ZarfLogo.svelte';
 
     const status = $derived(page.status);
     const isNotFound = $derived(status === 404);
-    const title = $derived(isNotFound ? "Page not found" : "Something went wrong");
+    const title = $derived(isNotFound ? 'Page not found' : 'Something went wrong');
     const help = $derived(
         isNotFound
             ? "The page you're looking for doesn't exist or has moved."
-            : "An unexpected error occurred. Try refreshing — if it persists, head back to zarf.to.",
+            : 'An unexpected error occurred. Try refreshing — if it persists, head back to zarf.to.',
     );
-    const message = $derived(page.error?.message ?? "");
+    const message = $derived(page.error?.message ?? '');
 </script>
 
 <svelte:head>
     <title>{status} · {title}</title>
 </svelte:head>
 
-<section
-    class="flex flex-col items-center justify-center min-h-screen gap-6 text-center px-6"
->
+<section class="flex flex-col items-center justify-center min-h-screen gap-6 text-center px-6">
     <a href="/" class="opacity-80 hover:opacity-100 transition-opacity">
         <ZarfLogo />
     </a>
 
     <div class="flex items-center gap-3 text-zen-fg-muted mt-4">
         <AlertTriangle class="w-5 h-5" aria-hidden="true" />
-        <span class="text-xs font-mono uppercase tracking-widest"
-            >Error {status}</span
-        >
+        <span class="text-xs font-mono uppercase tracking-widest">Error {status}</span>
     </div>
 
     <h1 class="text-3xl font-semibold text-zen-fg">{title}</h1>

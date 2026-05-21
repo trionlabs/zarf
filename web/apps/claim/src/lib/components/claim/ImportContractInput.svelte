@@ -1,6 +1,6 @@
 <script lang="ts">
-    import { ArrowRight, Loader2, Inbox } from "lucide-svelte";
-    import type { StellarContractId } from "@zarf/core/types";
+    import { ArrowRight, Loader2, Inbox } from 'lucide-svelte';
+    import type { StellarContractId } from '@zarf/core/types';
 
     // Format-only client check. Full StrKey CRC validation runs server-side
     // at the indexer when readVestingContract() below fires; the indexer's
@@ -12,25 +12,27 @@
     import {
         fetchContractMetadata,
         type OnChainVestingContract,
-    } from "@zarf/core/services/distributionDiscovery";
-    import { err } from "@zarf/core/utils/log";
-    import { formatDate as formatDateUS } from "@zarf/core/utils";
-    import ZenCard from "@zarf/ui/components/ui/ZenCard.svelte";
-    import AddressInput from "@zarf/ui/components/ui/AddressInput.svelte";
+    } from '@zarf/core/services/distributionDiscovery';
+    import { err } from '@zarf/core/utils/log';
+    import { formatDate as formatDateUS } from '@zarf/core/utils';
+    import ZenCard from '@zarf/ui/components/ui/ZenCard.svelte';
+    import AddressInput from '@zarf/ui/components/ui/AddressInput.svelte';
 
-    let { onImport, vaultAddresses = [], isFiltering = false } = $props<{
+    let {
+        onImport,
+        vaultAddresses = [],
+        isFiltering = false,
+    } = $props<{
         onImport: (addr: string) => void;
         vaultAddresses: StellarContractId[];
         isFiltering?: boolean;
     }>();
 
-    let address = $state("");
+    let address = $state('');
     let error = $state<string | null>(null);
     let isLoading = $state(false);
 
-    let vaultContracts = $state<
-        (OnChainVestingContract & { launchDate?: string })[]
-    >([]);
+    let vaultContracts = $state<(OnChainVestingContract & { launchDate?: string })[]>([]);
     let isFetchingVault = $state(false);
 
     // Version counter to prevent stale updates from race conditions
@@ -38,7 +40,7 @@
     let fetchVersion = 0;
 
     function formatDate(timestamp: bigint) {
-        if (timestamp === 0n) return "Not Started";
+        if (timestamp === 0n) return 'Not Started';
         return formatDateUS(Number(timestamp) * 1000);
     }
 
@@ -73,13 +75,12 @@
                 if (currentVersion !== fetchVersion) return;
 
                 vaultContracts = results.filter(
-                    (c): c is OnChainVestingContract & { launchDate: string } =>
-                        c !== null,
+                    (c): c is OnChainVestingContract & { launchDate: string } => c !== null,
                 );
             })
             .catch((e) => {
                 if (currentVersion !== fetchVersion) return;
-                err("Failed to fetch vault metadata", e);
+                err('Failed to fetch vault metadata', e);
             })
             .finally(() => {
                 if (currentVersion !== fetchVersion) return;
@@ -96,7 +97,7 @@
         const addr = address.trim();
 
         if (!isContractAddressShape(addr)) {
-            error = "Enter a valid Stellar vesting contract ID.";
+            error = 'Enter a valid Stellar vesting contract ID.';
             return;
         }
 
@@ -104,11 +105,11 @@
         error = null;
 
         try {
-            const { readVestingContract } = await import("@zarf/core/contracts");
+            const { readVestingContract } = await import('@zarf/core/contracts');
             await readVestingContract(addr);
             onImport(address);
         } catch (e) {
-            error = "Could not find a valid Zarf Vesting contract";
+            error = 'Could not find a valid Zarf Vesting contract';
         } finally {
             isLoading = false;
         }
@@ -120,9 +121,8 @@
     <div class="space-y-4">
         <div class="flex items-center justify-between px-1">
             <div class="p-0">
-                <span
-                    class="font-medium text-zen-fg-muted text-xs uppercase tracking-widest"
-                    >{isFiltering ? "Finding Your Distributions" : "Your Distributions"}</span
+                <span class="font-medium text-zen-fg-muted text-xs uppercase tracking-widest"
+                    >{isFiltering ? 'Finding Your Distributions' : 'Your Distributions'}</span
                 >
             </div>
             {#if isFetchingVault || isFiltering}
@@ -172,8 +172,7 @@
                                     {contract.name}
                                 </h3>
                                 <div class="flex items-center gap-2">
-                                    <span
-                                        class="text-xs font-mono opacity-40"
+                                    <span class="text-xs font-mono opacity-40"
                                         >{contract.tokenSymbol}</span
                                     >
                                     <span
@@ -187,8 +186,7 @@
                             <p
                                 class="text-xs text-zen-fg-muted font-light line-clamp-2 mb-4 leading-relaxed"
                             >
-                                {contract.description ||
-                                    "No description provided."}
+                                {contract.description || 'No description provided.'}
                             </p>
 
                             <div
@@ -197,10 +195,7 @@
                                 <code
                                     class="text-xs text-zen-fg-faint font-mono group-hover:text-zen-primary/40 transition-colors"
                                 >
-                                    {contract.address.slice(
-                                        0,
-                                        10,
-                                    )}...{contract.address.slice(-8)}
+                                    {contract.address.slice(0, 10)}...{contract.address.slice(-8)}
                                 </code>
                                 <div
                                     class="flex items-center gap-1 text-xs text-zen-primary opacity-50 group-hover:opacity-100 transition-all font-bold uppercase tracking-widest"
@@ -227,16 +222,14 @@
 
     <!-- Manual Import -->
     <div class="max-w-xl mx-auto w-full pt-2">
-        <label class="sr-only" for="contract-input"
-            >Manual Contract Address</label
-        >
+        <label class="sr-only" for="contract-input">Manual Contract Address</label>
         <AddressInput
             bind:value={address}
             placeholder="Enter Stellar contract ID C..."
             {error}
             {isLoading}
             onAction={handleSubmit}
-            onInput={() => error = null}
+            onInput={() => (error = null)}
             actionLabel="Verify"
         />
     </div>

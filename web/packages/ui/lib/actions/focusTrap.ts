@@ -106,11 +106,7 @@ export function focusTrap(
     }
 
     function isFocusable(el: HTMLElement | null): el is HTMLElement {
-        return (
-            !!el &&
-            el.isConnected &&
-            !(el as HTMLButtonElement | HTMLInputElement).disabled
-        );
+        return !!el && el.isConnected && !(el as HTMLButtonElement | HTMLInputElement).disabled;
     }
 
     function focusInitial() {
@@ -119,7 +115,7 @@ export function focusTrap(
         // disabled node (e.g., late bind:this on a button that hasn't mounted
         // yet). Fall through to the first focusable child, then to the trap
         // root, rather than calling .focus() on garbage.
-        const target = isFocusable(explicit) ? explicit : getFocusables()[0] ?? node;
+        const target = isFocusable(explicit) ? explicit : (getFocusables()[0] ?? node);
         target.focus();
     }
 
@@ -136,7 +132,12 @@ export function focusTrap(
             for (const sibling of Array.from(parent.children)) {
                 if (sibling === current) continue;
                 if (!(sibling instanceof HTMLElement)) continue;
-                if (sibling.tagName === 'SCRIPT' || sibling.tagName === 'STYLE' || sibling.tagName === 'LINK') continue;
+                if (
+                    sibling.tagName === 'SCRIPT' ||
+                    sibling.tagName === 'STYLE' ||
+                    sibling.tagName === 'LINK'
+                )
+                    continue;
                 inertHistory.push({ el: sibling, original: sibling.inert });
                 sibling.inert = true;
             }

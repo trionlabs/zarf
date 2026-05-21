@@ -1,10 +1,10 @@
 <script lang="ts">
-    import { onMount } from "svelte";
-    import { ArrowRight, ChevronDown } from "lucide-svelte";
-    import { browser } from "@zarf/core/utils/ssr";
-    import { themeStore } from "../../stores/themeStore.svelte";
-    import Tooltip from "../../components/ui/Tooltip.svelte";
-    import ZenButton from "../../components/ui/ZenButton.svelte";
+    import { onMount } from 'svelte';
+    import { ArrowRight, ChevronDown } from 'lucide-svelte';
+    import { browser } from '@zarf/core/utils/ssr';
+    import { themeStore } from '../../stores/themeStore.svelte';
+    import Tooltip from '../../components/ui/Tooltip.svelte';
+    import ZenButton from '../../components/ui/ZenButton.svelte';
 
     // --- State & Config ---
     let canvas: HTMLCanvasElement;
@@ -19,7 +19,7 @@
     const GRID_SPACING = 100;
     const REVEAL_RADIUS = 200;
     // Two reveal words as requested
-    const HIDDEN_DATA = ["Private Claim"];
+    const HIDDEN_DATA = ['Private Claim'];
 
     let mouse = { x: -999, y: -999 };
 
@@ -38,15 +38,13 @@
     // Derived: Theme check (SSR-safe) - only check after mounted
     let isDark = $derived.by(() => {
         if (!mounted) return true; // Default for SSR
-        return themeStore.current === "dark";
+        return themeStore.current === 'dark';
     });
 
     // --- Helpers ---
     function generateHash(): string {
         const hex = Math.random().toString(16).substring(2, 10);
-        return (
-            "0x" + hex.substring(0, 2) + "...." + hex.substring(hex.length - 2)
-        );
+        return '0x' + hex.substring(0, 2) + '....' + hex.substring(hex.length - 2);
     }
 
     function initPoints() {
@@ -59,7 +57,7 @@
         canvas.width = width * dpr;
         canvas.height = height * dpr;
 
-        ctx = canvas.getContext("2d");
+        ctx = canvas.getContext('2d');
         if (ctx) ctx.scale(dpr, dpr);
 
         points = [];
@@ -99,11 +97,11 @@
 
         // Styling based on Theme (using derived isDark)
         // Light: cool grey-purple, Dark: silver-grey
-        const textColor = isDark ? "200, 200, 200" : "60, 55, 70";
-        const accentColor = isDark ? "180, 180, 190" : "90, 80, 120";
+        const textColor = isDark ? '200, 200, 200' : '60, 55, 70';
+        const accentColor = isDark ? '180, 180, 190' : '90, 80, 120';
 
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
 
         const revealedPoints: Point[] = [];
         const basePoints: Point[] = [];
@@ -184,8 +182,8 @@
             mouse.y = clientY - rect.top;
 
             // Spotlight CSS Variables
-            container.style.setProperty("--mouse-x", `${mouse.x}px`);
-            container.style.setProperty("--mouse-y", `${mouse.y}px`);
+            container.style.setProperty('--mouse-x', `${mouse.x}px`);
+            container.style.setProperty('--mouse-y', `${mouse.y}px`);
 
             framePending = false;
         });
@@ -195,8 +193,8 @@
         mouse.x = -999;
         mouse.y = -999;
         if (container) {
-            container.style.setProperty("--mouse-x", "-999px");
-            container.style.setProperty("--mouse-y", "-999px");
+            container.style.setProperty('--mouse-x', '-999px');
+            container.style.setProperty('--mouse-y', '-999px');
         }
     }
 
@@ -210,9 +208,7 @@
         // we skip rAF entirely and leave the canvas blank. The CSS-driven
         // wave-grid spotlight remains active because it is mask-position only,
         // not transform/opacity animation.
-        const reduceMotion = window.matchMedia(
-            "(prefers-reduced-motion: reduce)",
-        ).matches;
+        const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
         if (!reduceMotion) {
             initPoints();
@@ -239,14 +235,12 @@
     class="relative w-full min-h-[90vh] flex flex-col items-center justify-center overflow-hidden bg-transparent selection:bg-primary/20 hero-container"
 >
     <!-- 1. Wave Grid (Spotlight) -->
-    <div
-        class="absolute inset-0 pointer-events-none z-0 wave-grid-spotlight"
-    ></div>
+    <div class="absolute inset-0 pointer-events-none z-0 wave-grid-spotlight"></div>
 
     <!-- 2. Data Points Canvas -->
     <p class="sr-only">
-        Decorative background: hashed placeholders that reveal &ldquo;Private
-        Claim&rdquo; labels under the cursor. No interactive content.
+        Decorative background: hashed placeholders that reveal &ldquo;Private Claim&rdquo; labels
+        under the cursor. No interactive content.
     </p>
     <canvas
         bind:this={canvas}
@@ -267,9 +261,7 @@
     ></div>
 
     <!-- Content Block -->
-    <div
-        class="relative z-30 text-center max-w-4xl px-6 flex flex-col items-center gap-5 md:gap-6"
-    >
+    <div class="relative z-30 text-center max-w-4xl px-6 flex flex-col items-center gap-5 md:gap-6">
         <!-- Feature Badge -->
         <div
             class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-zen-fg/10 bg-zen-fg/5 backdrop-blur-md text-[11px] font-medium tracking-[0.15em] uppercase text-zen-fg/60
@@ -299,9 +291,7 @@
                 : 'opacity-0 translate-y-5'}"
             style="transition-delay: 600ms;"
         >
-            Distribute tokens to emails with ZK proofs.<br
-                class="hidden sm:block"
-            />
+            Distribute tokens to emails with ZK proofs.<br class="hidden sm:block" />
             No wallet exposure. No identity leaks.
         </p>
 

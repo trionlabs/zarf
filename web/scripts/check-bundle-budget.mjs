@@ -26,9 +26,9 @@ import { resolve, basename, join } from 'node:path';
 const KB = 1024;
 
 const BUDGETS = {
-    landing: { initialGz:  77 * KB, totalGz:   100 * KB },
-    claim:   { initialGz: 123 * KB, totalGz: 13250 * KB },
-    create:  { initialGz: 456 * KB, totalGz:  6350 * KB },
+    landing: { initialGz: 77 * KB, totalGz: 100 * KB },
+    claim: { initialGz: 123 * KB, totalGz: 13250 * KB },
+    create: { initialGz: 456 * KB, totalGz: 6350 * KB },
 };
 
 const WEB_ROOT = resolve(import.meta.dirname, '..');
@@ -45,7 +45,9 @@ function appPaths(app) {
 function loadManifest(app) {
     const { manifestPath } = appPaths(app);
     if (!existsSync(manifestPath)) {
-        throw new Error(`Missing manifest for ${app}: ${manifestPath}\nRun \`pnpm build:${app}\` first.`);
+        throw new Error(
+            `Missing manifest for ${app}: ${manifestPath}\nRun \`pnpm build:${app}\` first.`,
+        );
     }
     return JSON.parse(readFileSync(manifestPath, 'utf-8'));
 }
@@ -106,7 +108,9 @@ function worstRouteInitial(app) {
 function totalShipGz(app) {
     const { immutableRoot } = appPaths(app);
     if (!existsSync(immutableRoot)) {
-        throw new Error(`Missing immutable assets for ${app}: ${immutableRoot}\nRun \`pnpm build:${app}\` first.`);
+        throw new Error(
+            `Missing immutable assets for ${app}: ${immutableRoot}\nRun \`pnpm build:${app}\` first.`,
+        );
     }
     function walk(dir) {
         const out = [];
@@ -162,26 +166,32 @@ function row(cells) {
 console.log(row(header));
 console.log(row(widths.map((w) => '-'.repeat(w))));
 for (const r of rows) {
-    console.log(row([
-        r.app,
-        `initial (${r.initialNode})`,
-        fmtKB(r.initialMeasured) + ' KB',
-        fmtKB(r.initialBudget) + ' KB',
-        pct(r.initialMeasured, r.initialBudget),
-        r.initialOk ? 'ok' : 'FAIL',
-    ]));
-    console.log(row([
-        '',
-        'total ship',
-        fmtKB(r.totalMeasured) + ' KB',
-        fmtKB(r.totalBudget) + ' KB',
-        pct(r.totalMeasured, r.totalBudget),
-        r.totalOk ? 'ok' : 'FAIL',
-    ]));
+    console.log(
+        row([
+            r.app,
+            `initial (${r.initialNode})`,
+            fmtKB(r.initialMeasured) + ' KB',
+            fmtKB(r.initialBudget) + ' KB',
+            pct(r.initialMeasured, r.initialBudget),
+            r.initialOk ? 'ok' : 'FAIL',
+        ]),
+    );
+    console.log(
+        row([
+            '',
+            'total ship',
+            fmtKB(r.totalMeasured) + ' KB',
+            fmtKB(r.totalBudget) + ' KB',
+            pct(r.totalMeasured, r.totalBudget),
+            r.totalOk ? 'ok' : 'FAIL',
+        ]),
+    );
 }
 
 if (failed) {
-    console.error('\nBudget regression. Either revert the offending change or, if the increase is intentional and authorized, update the budget in web/scripts/check-bundle-budget.mjs and explain in the PR description.');
+    console.error(
+        '\nBudget regression. Either revert the offending change or, if the increase is intentional and authorized, update the budget in web/scripts/check-bundle-budget.mjs and explain in the PR description.',
+    );
     process.exit(1);
 }
 console.log('\nAll budgets within limits.');

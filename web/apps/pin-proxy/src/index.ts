@@ -37,82 +37,82 @@ interface PinataResponse {
     Timestamp: string;
 }
 
-const PINATA_PIN_URL = "https://api.pinata.cloud/pinning/pinJSONToIPFS";
+const PINATA_PIN_URL = 'https://api.pinata.cloud/pinning/pinJSONToIPFS';
 const IPFS_READ_GATEWAYS = [
-    "https://gateway.pinata.cloud/ipfs",
-    "https://ipfs.io/ipfs",
-    "https://dweb.link/ipfs",
+    'https://gateway.pinata.cloud/ipfs',
+    'https://ipfs.io/ipfs',
+    'https://dweb.link/ipfs',
 ];
 
 export default {
     async fetch(request: Request, env: Env): Promise<Response> {
         const url = new URL(request.url);
-        const origin = request.headers.get("Origin");
+        const origin = request.headers.get('Origin');
         const corsHeaders = buildCorsHeaders(origin, env);
 
-        if (request.method === "OPTIONS") {
+        if (request.method === 'OPTIONS') {
             return new Response(null, { status: 204, headers: corsHeaders });
         }
 
-        if (url.pathname === "/health" && request.method === "GET") {
+        if (url.pathname === '/health' && request.method === 'GET') {
             return json({ ok: true }, 200, corsHeaders);
         }
 
-        if (url.pathname === "/pin" && request.method === "POST") {
+        if (url.pathname === '/pin' && request.method === 'POST') {
             return handlePin(request, env, corsHeaders);
         }
 
-        if (url.pathname.startsWith("/ipfs/") && request.method === "GET") {
+        if (url.pathname.startsWith('/ipfs/') && request.method === 'GET') {
             return handleIpfsRead(url, corsHeaders);
         }
 
-        return json({ error: "not_found" }, 404, corsHeaders);
+        return json({ error: 'not_found' }, 404, corsHeaders);
     },
 };
 
 async function handlePin(
     request: Request,
     env: Env,
-    corsHeaders: Record<string, string>
+    corsHeaders: Record<string, string>,
 ): Promise<Response> {
     const maxBytes = Number(env.MAX_BODY_BYTES) || 1_048_576;
-    const contentLength = Number(request.headers.get("Content-Length") || "0");
+    const contentLength = Number(request.headers.get('Content-Length') || '0');
     if (contentLength > maxBytes) {
-        return json({ error: "payload_too_large", maxBytes }, 413, corsHeaders);
+        return json({ error: 'payload_too_large', maxBytes }, 413, corsHeaders);
     }
 
-    const contentType = request.headers.get("Content-Type") || "";
-    if (!contentType.includes("application/json")) {
-        return json({ error: "unsupported_media_type" }, 415, corsHeaders);
+    const contentType = request.headers.get('Content-Type') || '';
+    if (!contentType.includes('application/json')) {
+        return json({ error: 'unsupported_media_type' }, 415, corsHeaders);
     }
 
     let body: ClaimList;
     try {
         const raw = await request.text();
         if (new TextEncoder().encode(raw).length > maxBytes) {
-            return json({ error: "payload_too_large", maxBytes }, 413, corsHeaders);
+            return json({ error: 'payload_too_large', maxBytes }, 413, corsHeaders);
         }
         body = JSON.parse(raw);
     } catch {
-        return json({ error: "invalid_json" }, 400, corsHeaders);
+        return json({ error: 'invalid_json' }, 400, corsHeaders);
     }
 
     const validationError = validateClaimList(body);
     if (validationError) {
-        return json({ error: "invalid_claim_list", reason: validationError }, 400, corsHeaders);
+        return json({ error: 'invalid_claim_list', reason: validationError }, 400, corsHeaders);
     }
 
     if (!env.PINATA_JWT) {
-        return json({ error: "pinata_not_configured" }, 500, corsHeaders);
+        return json({ error: 'pinata_not_configured' }, 500, corsHeaders);
     }
 
     let pinataRes: Response;
     try {
         pinataRes = await fetch(PINATA_PIN_URL, {
-            method: "POST",
+            method: 'POST',
             headers: {
                 Authorization: `Bearer ${env.PINATA_JWT}`,
-                "Content-Type": "application/json",
+                'Content-Type': 'application/json',
             },
             body: JSON.stringify({
                 pinataContent: body,
@@ -122,36 +122,29 @@ async function handlePin(
             }),
         });
     } catch {
-        return json({ error: "pinata_unreachable" }, 502, corsHeaders);
+        return json({ error: 'pinata_unreachable' }, 502, corsHeaders);
     }
 
     if (!pinataRes.ok) {
         const detail = await safeText(pinataRes);
-        return json(
-            { error: "pinata_error", status: pinataRes.status, detail },
-            502,
-            corsHeaders
-        );
+        return json({ error: 'pinata_error', status: pinataRes.status, detail }, 502, corsHeaders);
     }
 
     const data = (await pinataRes.json()) as PinataResponse;
     return json({ cid: data.IpfsHash, size: data.PinSize }, 200, corsHeaders);
 }
 
-async function handleIpfsRead(
-    url: URL,
-    corsHeaders: Record<string, string>
-): Promise<Response> {
-    const cid = validateCid(url.pathname.slice("/ipfs/".length));
+async function handleIpfsRead(url: URL, corsHeaders: Record<string, string>): Promise<Response> {
+    const cid = validateCid(url.pathname.slice('/ipfs/'.length));
     if (!cid) {
-        return json({ error: "invalid_cid" }, 400, corsHeaders);
+        return json({ error: 'invalid_cid' }, 400, corsHeaders);
     }
 
     const errors: string[] = [];
     for (const gateway of IPFS_READ_GATEWAYS) {
         try {
             const upstream = await fetch(`${gateway}/${cid}`, {
-                headers: { Accept: "application/json" },
+                headers: { Accept: 'application/json' },
             });
             if (!upstream.ok) {
                 errors.push(`${gateway}: HTTP ${upstream.status}`);
@@ -159,36 +152,29 @@ async function handleIpfsRead(
             }
 
             const headers = new Headers(corsHeaders);
-            headers.set(
-                "Content-Type",
-                upstream.headers.get("Content-Type") || "application/json"
-            );
-            headers.set("Cache-Control", "public, max-age=300");
+            headers.set('Content-Type', upstream.headers.get('Content-Type') || 'application/json');
+            headers.set('Cache-Control', 'public, max-age=300');
             return new Response(upstream.body, { status: 200, headers });
         } catch (error) {
             errors.push(`${gateway}: ${(error as Error).message}`);
         }
     }
 
-    return json(
-        { error: "ipfs_gateway_error", detail: errors.join("; ") },
-        502,
-        corsHeaders
-    );
+    return json({ error: 'ipfs_gateway_error', detail: errors.join('; ') }, 502, corsHeaders);
 }
 
 function validateClaimList(body: unknown): string | null {
-    if (!body || typeof body !== "object") return "not_an_object";
+    if (!body || typeof body !== 'object') return 'not_an_object';
     const obj = body as Record<string, unknown>;
 
-    if (typeof obj.merkleRoot !== "string" || !obj.merkleRoot.startsWith("0x")) {
-        return "missing_or_invalid_merkleRoot";
+    if (typeof obj.merkleRoot !== 'string' || !obj.merkleRoot.startsWith('0x')) {
+        return 'missing_or_invalid_merkleRoot';
     }
     if (!Array.isArray(obj.leaves) || obj.leaves.length === 0) {
-        return "missing_or_empty_leaves";
+        return 'missing_or_empty_leaves';
     }
-    if (!obj.schedule || typeof obj.schedule !== "object") {
-        return "missing_schedule";
+    if (!obj.schedule || typeof obj.schedule !== 'object') {
+        return 'missing_schedule';
     }
     return null;
 }
@@ -201,41 +187,35 @@ function validateCid(raw: string): string | null {
         return null;
     }
 
-    const cid = decoded.startsWith("ipfs://")
-        ? decoded.slice("ipfs://".length)
-        : decoded;
+    const cid = decoded.startsWith('ipfs://') ? decoded.slice('ipfs://'.length) : decoded;
     const cidV0 = /^Qm[1-9A-HJ-NP-Za-km-z]{44}$/;
     const cidV1Base32 = /^b[a-z2-7]{40,}$/i;
-    if (cid.includes("/") || cid.includes("?") || cid.includes("#")) return null;
+    if (cid.includes('/') || cid.includes('?') || cid.includes('#')) return null;
     return cidV0.test(cid) || cidV1Base32.test(cid) ? cid : null;
 }
 
 function buildCorsHeaders(origin: string | null, env: Env): Record<string, string> {
-    const allowed = (env.ALLOWED_ORIGINS || "")
-        .split(",")
+    const allowed = (env.ALLOWED_ORIGINS || '')
+        .split(',')
         .map((o) => o.trim())
         .filter(Boolean);
 
-    const allowOrigin = origin && allowed.includes(origin) ? origin : allowed[0] || "*";
+    const allowOrigin = origin && allowed.includes(origin) ? origin : allowed[0] || '*';
 
     return {
-        "Access-Control-Allow-Origin": allowOrigin,
-        "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type",
-        "Access-Control-Max-Age": "86400",
-        Vary: "Origin",
+        'Access-Control-Allow-Origin': allowOrigin,
+        'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type',
+        'Access-Control-Max-Age': '86400',
+        Vary: 'Origin',
     };
 }
 
-function json(
-    body: unknown,
-    status: number,
-    extraHeaders: Record<string, string> = {}
-): Response {
+function json(body: unknown, status: number, extraHeaders: Record<string, string> = {}): Response {
     return new Response(JSON.stringify(body), {
         status,
         headers: {
-            "Content-Type": "application/json",
+            'Content-Type': 'application/json',
             ...extraHeaders,
         },
     });
@@ -245,6 +225,6 @@ async function safeText(res: Response): Promise<string> {
     try {
         return (await res.text()).slice(0, 500);
     } catch {
-        return "";
+        return '';
     }
 }

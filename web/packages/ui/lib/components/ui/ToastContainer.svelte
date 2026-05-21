@@ -1,30 +1,30 @@
 <script lang="ts">
-    import { onDestroy } from "svelte";
-    import { toastStore, type Toast, type ToastType } from "../../stores/toastStore.svelte";
-    import { fly } from "svelte/transition";
-    import { CheckCircle, AlertCircle, Info, AlertTriangle, X } from "lucide-svelte";
+    import { onDestroy } from 'svelte';
+    import { toastStore, type Toast, type ToastType } from '../../stores/toastStore.svelte';
+    import { fly } from 'svelte/transition';
+    import { CheckCircle, AlertCircle, Info, AlertTriangle, X } from 'lucide-svelte';
 
     // Icon Mapping
     const icons = {
         success: CheckCircle,
         error: AlertCircle,
         info: Info,
-        warning: AlertTriangle
+        warning: AlertTriangle,
     };
 
     const colors = {
-        success: "border-zen-success/20 bg-zen-success-muted text-zen-success",
-        error: "border-zen-error/20 bg-zen-error-muted text-zen-error",
-        info: "border-zen-info/20 bg-zen-info-muted text-zen-info",
-        warning: "border-zen-warning/20 bg-zen-warning-muted text-zen-warning"
+        success: 'border-zen-success/20 bg-zen-success-muted text-zen-success',
+        error: 'border-zen-error/20 bg-zen-error-muted text-zen-error',
+        info: 'border-zen-info/20 bg-zen-info-muted text-zen-info',
+        warning: 'border-zen-warning/20 bg-zen-warning-muted text-zen-warning',
     };
 
     // Per WAI-ARIA: role="alert" implies aria-live="assertive" (interrupts
     // screen reader speech). Use it only for errors. Non-critical toasts
     // use role="status" (implicit aria-live="polite"), which announces at
     // the next idle moment without interrupting.
-    function roleFor(type: ToastType): "alert" | "status" {
-        return type === "error" ? "alert" : "status";
+    function roleFor(type: ToastType): 'alert' | 'status' {
+        return type === 'error' ? 'alert' : 'status';
     }
 
     /*
@@ -89,7 +89,7 @@
     // removed externally (e.g., via the dismiss button). Runs whenever
     // toastStore.toasts mutates.
     $effect(() => {
-        const liveIds = new Set(toastStore.toasts.map(t => t.id));
+        const liveIds = new Set(toastStore.toasts.map((t) => t.id));
         for (const toast of toastStore.toasts) {
             if (!timers.has(toast.id)) {
                 startTimer(toast.id, toast.duration ?? 4000);
@@ -115,36 +115,36 @@
 </script>
 
 {#if toastStore.toasts.length > 0}
-<div class="fixed bottom-4 left-1/2 -translate-x-1/2 z-[100] flex flex-col gap-3 p-4">
-    {#each toastStore.toasts as toast (toast.id)}
-        {@const Icon = icons[toast.type]}
+    <div class="fixed bottom-4 left-1/2 -translate-x-1/2 z-[100] flex flex-col gap-3 p-4">
+        {#each toastStore.toasts as toast (toast.id)}
+            {@const Icon = icons[toast.type]}
 
-        <div
-            class="
+            <div
+                class="
                 flex items-start gap-3 p-4
                 max-w-sm w-full
                 rounded-xl border-[0.5px]
                 shadow-lg backdrop-blur-md
                 {colors[toast.type]}
             "
-            transition:fly={{ y: 20, duration: 300 }}
-            role={roleFor(toast.type)}
-            onmouseenter={() => pauseTimer(toast.id)}
-            onmouseleave={() => resumeTimer(toast.id)}
-            onfocusin={() => pauseTimer(toast.id)}
-            onfocusout={() => resumeTimer(toast.id)}
-        >
-            <div class="mt-0.5 shrink-0">
-                <Icon class="w-5 h-5" aria-hidden="true" />
-            </div>
+                transition:fly={{ y: 20, duration: 300 }}
+                role={roleFor(toast.type)}
+                onmouseenter={() => pauseTimer(toast.id)}
+                onmouseleave={() => resumeTimer(toast.id)}
+                onfocusin={() => pauseTimer(toast.id)}
+                onfocusout={() => resumeTimer(toast.id)}
+            >
+                <div class="mt-0.5 shrink-0">
+                    <Icon class="w-5 h-5" aria-hidden="true" />
+                </div>
 
-            <div class="flex-1 min-w-0">
-                <span class="text-sm font-medium leading-tight block break-words">
-                    {toast.message}
-                </span>
-            </div>
+                <div class="flex-1 min-w-0">
+                    <span class="text-sm font-medium leading-tight block break-words">
+                        {toast.message}
+                    </span>
+                </div>
 
-            <!--
+                <!--
                 Dismiss target sits at 32x32. WCAG 2.5.5 (AAA) asks for 44x44,
                 but 2.5.8 (AA) accepts <24x24 only when surrounded by 24px of
                 clearance from other targets. The toast has exactly one target
@@ -152,20 +152,20 @@
                 32x32 keeps the toast vertical rhythm intact while comfortably
                 clearing both AA thresholds.
             -->
-            <button
-                class="
+                <button
+                    class="
                     shrink-0 inline-flex items-center justify-center
                     min-w-8 min-h-8 -mr-1 -mt-1
                     rounded-md opacity-60 hover:opacity-100
                     hover:bg-[var(--zen-fg)]/5
                     transition-opacity
                 "
-                onclick={() => toastStore.remove(toast.id)}
-                aria-label="Close"
-            >
-                <X class="w-4 h-4" aria-hidden="true" />
-            </button>
-        </div>
-    {/each}
-</div>
+                    onclick={() => toastStore.remove(toast.id)}
+                    aria-label="Close"
+                >
+                    <X class="w-4 h-4" aria-hidden="true" />
+                </button>
+            </div>
+        {/each}
+    </div>
 {/if}

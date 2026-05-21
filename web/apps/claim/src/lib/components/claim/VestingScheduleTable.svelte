@@ -1,26 +1,18 @@
 <script lang="ts">
-    import { claimStore } from "../../stores/claimStore.svelte";
-    import { formatTokenAmount } from "@zarf/core/utils/amount";
-    import { formatDate as formatDateUS } from "@zarf/core/utils";
-    import type { VestingPeriod } from "@zarf/core/utils";
-    import {
-        Check,
-        Clock,
-        Lock,
-        ChevronDown,
-        ChevronUp,
-        X,
-    } from "lucide-svelte";
-    import { slide, fade } from "svelte/transition";
-    import ClaimStep3Wallet from "./steps/ClaimStep3Wallet.svelte";
-    import ClaimStep4Proof from "./steps/ClaimStep4Proof.svelte";
-    import ClaimStep5Submit from "./steps/ClaimStep5Submit.svelte";
+    import { claimStore } from '../../stores/claimStore.svelte';
+    import { formatTokenAmount } from '@zarf/core/utils/amount';
+    import { formatDate as formatDateUS } from '@zarf/core/utils';
+    import type { VestingPeriod } from '@zarf/core/utils';
+    import { Check, Clock, Lock, ChevronDown, ChevronUp, X } from 'lucide-svelte';
+    import { slide, fade } from 'svelte/transition';
+    import ClaimStep3Wallet from './steps/ClaimStep3Wallet.svelte';
+    import ClaimStep4Proof from './steps/ClaimStep4Proof.svelte';
+    import ClaimStep5Submit from './steps/ClaimStep5Submit.svelte';
 
     let { contractAddress } = $props<{ contractAddress: string }>();
 
     // Format token amounts
-    const format = (val: bigint) =>
-        formatTokenAmount(val, claimStore.tokenDecimals, 2);
+    const format = (val: bigint) => formatTokenAmount(val, claimStore.tokenDecimals, 2);
 
     // Format dates — unix-seconds timestamp → "Apr 5, 2026"
     const formatDate = (ts: number) => formatDateUS(ts * 1000);
@@ -29,8 +21,7 @@
 
     let isExpanded = $state(false);
     let displayPeriods = $derived.by(() => {
-        const source =
-            isExpanded || periods.length <= 11 ? periods : periods.slice(0, 10);
+        const source = isExpanded || periods.length <= 11 ? periods : periods.slice(0, 10);
         return source.map((p: VestingPeriod) => ({
             ...p,
             formattedDate: formatDate(p.unlockDate.getTime() / 1000),
@@ -40,14 +31,12 @@
 
     let hasMore = $derived(periods.length > 4);
     let claimedCount = $derived(
-        periods.filter((p: VestingPeriod) => p.status === "claimed").length,
+        periods.filter((p: VestingPeriod) => p.status === 'claimed').length,
     );
     let claimableCount = $derived(
-        periods.filter((p: VestingPeriod) => p.status === "claimable").length,
+        periods.filter((p: VestingPeriod) => p.status === 'claimable').length,
     );
-    let lockedCount = $derived(
-        periods.filter((p: VestingPeriod) => p.status === "locked").length,
-    );
+    let lockedCount = $derived(periods.filter((p: VestingPeriod) => p.status === 'locked').length);
 
     // Active Claim Row
     let activeEpochIndex = $derived(claimStore.state.selectedEpochIndex);
@@ -90,9 +79,7 @@
     <div class="space-y-4">
         <!-- Section Header -->
         <div class="flex items-center justify-between">
-            <h3 class="text-sm font-medium text-zen-fg-muted">
-                Unlock Schedule
-            </h3>
+            <h3 class="text-sm font-medium text-zen-fg-muted">Unlock Schedule</h3>
             <div class="flex items-center gap-3 text-xs">
                 {#if claimedCount > 0}
                     <span class="flex items-center gap-1 text-zen-success">
@@ -124,9 +111,7 @@
                 class="w-full border-separate border-spacing-0"
             >
                 <thead>
-                    <tr
-                        class="bg-zen-fg/5 text-xs uppercase tracking-wider text-zen-fg-subtle"
-                    >
+                    <tr class="bg-zen-fg/5 text-xs uppercase tracking-wider text-zen-fg-subtle">
                         <th scope="col" class="font-medium p-4 text-left">Period</th>
                         <th scope="col" class="font-medium p-4 text-left">Unlock Date</th>
                         <th scope="col" class="font-medium p-4 text-right">Amount</th>
@@ -136,8 +121,7 @@
                 </thead>
                 <tbody>
                     {#each displayPeriods as period (period.index)}
-                        {@const isActive =
-                            activeEpochIndex === period.index - 1}
+                        {@const isActive = activeEpochIndex === period.index - 1}
 
                         <tr
                             class="group transition-colors {isActive
@@ -158,21 +142,17 @@
                                 class="p-4 text-right font-mono text-xs border-t-[0.5px] border-zen-border-subtle"
                             >
                                 {period.formattedAmount}
-                                <span class="text-zen-fg-faint ml-1"
-                                    >{claimStore.tokenSymbol}</span
-                                >
+                                <span class="text-zen-fg-faint ml-1">{claimStore.tokenSymbol}</span>
                             </td>
-                            <td
-                                class="p-4 text-center border-t-[0.5px] border-zen-border-subtle"
-                            >
-                                {#if period.status === "claimed"}
+                            <td class="p-4 text-center border-t-[0.5px] border-zen-border-subtle">
+                                {#if period.status === 'claimed'}
                                     <span
                                         class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-zen-success/10 text-zen-success"
                                     >
                                         <Check aria-hidden="true" class="w-3 h-3" />
                                         Claimed
                                     </span>
-                                {:else if period.status === "claimable"}
+                                {:else if period.status === 'claimable'}
                                     <span
                                         class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-zen-primary/10 text-zen-primary"
                                     >
@@ -188,10 +168,8 @@
                                     </span>
                                 {/if}
                             </td>
-                            <td
-                                class="p-4 text-right border-t-[0.5px] border-zen-border-subtle"
-                            >
-                                {#if period.status === "claimable"}
+                            <td class="p-4 text-right border-t-[0.5px] border-zen-border-subtle">
+                                {#if period.status === 'claimable'}
                                     <button
                                         type="button"
                                         class="px-4 py-1 rounded-lg text-xs font-bold uppercase tracking-widest transition-colors {isActive
@@ -200,7 +178,7 @@
                                         onclick={(e) =>
                                             handleStartClaim(period.index, e.currentTarget)}
                                     >
-                                        {isActive ? "Active" : "Claim"}
+                                        {isActive ? 'Active' : 'Claim'}
                                     </button>
                                 {/if}
                             </td>
@@ -209,10 +187,7 @@
                         <!-- Drawer Row -->
                         {#if isActive && currentStep >= 3}
                             <tr class="bg-zen-bg relative overflow-hidden">
-                                <td
-                                    colspan="5"
-                                    class="p-0 border-t-[0.5px] border-zen-primary/10"
-                                >
+                                <td colspan="5" class="p-0 border-t-[0.5px] border-zen-primary/10">
                                     <div
                                         in:slide={{ duration: 400 }}
                                         class="relative bg-gradient-to-b from-zen-primary/[0.02] to-transparent"
@@ -253,20 +228,12 @@
                                                     <ClaimStep3Wallet />
                                                 </div>
                                             {:else if currentStep === 4}
-                                                <div
-                                                    in:fade={{ duration: 300 }}
-                                                >
-                                                    <ClaimStep4Proof
-                                                        {contractAddress}
-                                                    />
+                                                <div in:fade={{ duration: 300 }}>
+                                                    <ClaimStep4Proof {contractAddress} />
                                                 </div>
                                             {:else if currentStep === 5}
-                                                <div
-                                                    in:fade={{ duration: 300 }}
-                                                >
-                                                    <ClaimStep5Submit
-                                                        {contractAddress}
-                                                    />
+                                                <div in:fade={{ duration: 300 }}>
+                                                    <ClaimStep5Submit {contractAddress} />
                                                 </div>
                                             {/if}
                                         </div>

@@ -1,9 +1,9 @@
-import type { VestingSchedule, DurationUnit, UnlockMarker } from "../types";
+import type { VestingSchedule, DurationUnit, UnlockMarker } from '../types';
 
 // Re-export for convenience
 export type { DurationUnit };
 
-export type PeriodStatus = "claimed" | "claimable" | "locked";
+export type PeriodStatus = 'claimed' | 'claimable' | 'locked';
 
 export type VestingPeriod = {
     index: number;
@@ -30,29 +30,29 @@ export function addMonths(date: Date, months: number): void {
 export function calculateEndDate(
     cliffDate: Date | null,
     duration: number,
-    durationUnit: DurationUnit
+    durationUnit: DurationUnit,
 ): Date | null {
     if (!cliffDate) return null;
     if (duration <= 0) return new Date(cliffDate);
 
     const d = new Date(cliffDate);
     switch (durationUnit) {
-        case "minutes":
+        case 'minutes':
             d.setMinutes(d.getMinutes() + duration);
             break;
-        case "hours":
+        case 'hours':
             d.setHours(d.getHours() + duration);
             break;
-        case "weeks":
+        case 'weeks':
             d.setDate(d.getDate() + duration * 7);
             break;
-        case "months":
+        case 'months':
             addMonths(d, duration);
             break;
-        case "quarters":
+        case 'quarters':
             addMonths(d, duration * 3);
             break;
-        case "years":
+        case 'years':
             d.setFullYear(d.getFullYear() + duration);
             break;
     }
@@ -65,7 +65,7 @@ export function calculateEndDate(
 export function calculateUnlockEvents(
     cliffDate: Date | null,
     endDate: Date | null,
-    duration: number
+    duration: number,
 ): number {
     if (!cliffDate || !endDate) return 0;
     if (duration === 0) return 1;
@@ -82,19 +82,21 @@ export function generateUnlockMarkers(
     durationUnit: DurationUnit,
     totalTokens: number,
     lockPeriodPercent: number,
-    maxBars: number = 24
+    maxBars: number = 24,
 ): UnlockMarker[] {
     if (!cliffDate || !endDate) return [];
 
     if (cliffDate.getTime() === endDate.getTime() || unlockEvents <= 0) {
-        return [{
-            x: 100,
-            percent: 100,
-            tokens: totalTokens,
-            date: cliffDate,
-            event: 1,
-            isGrouped: false,
-        }];
+        return [
+            {
+                x: 100,
+                percent: 100,
+                tokens: totalTokens,
+                date: cliffDate,
+                event: 1,
+                isGrouped: false,
+            },
+        ];
     }
 
     const markers: UnlockMarker[] = [];
@@ -110,27 +112,27 @@ export function generateUnlockMarkers(
         const unlockDate = new Date(cliffDate.getTime());
 
         switch (durationUnit) {
-            case "minutes":
+            case 'minutes':
                 unlockDate.setMinutes(unlockDate.getMinutes() + actualEvent);
                 break;
-            case "hours":
+            case 'hours':
                 unlockDate.setHours(unlockDate.getHours() + actualEvent);
                 break;
-            case "weeks":
+            case 'weeks':
                 unlockDate.setDate(unlockDate.getDate() + actualEvent * 7);
                 break;
-            case "months":
+            case 'months':
                 addMonths(unlockDate, actualEvent);
                 break;
-            case "quarters":
+            case 'quarters':
                 addMonths(unlockDate, actualEvent * 3);
                 break;
-            case "years":
+            case 'years':
                 unlockDate.setFullYear(unlockDate.getFullYear() + actualEvent);
                 break;
         }
 
-        const x = lockPeriodPercent + (vestingWidth * percentCompletion);
+        const x = lockPeriodPercent + vestingWidth * percentCompletion;
 
         markers.push({
             x,
@@ -150,17 +152,17 @@ export function generateUnlockMarkers(
 export function durationToSeconds(duration: number, unit: DurationUnit): bigint {
     const DAY = 24n * 60n * 60n;
     switch (unit) {
-        case "minutes":
+        case 'minutes':
             return BigInt(duration) * 60n;
-        case "hours":
+        case 'hours':
             return BigInt(duration) * 60n * 60n;
-        case "weeks":
+        case 'weeks':
             return BigInt(duration) * 7n * DAY;
-        case "months":
+        case 'months':
             return BigInt(duration) * 30n * DAY;
-        case "quarters":
+        case 'quarters':
             return BigInt(duration) * 90n * DAY;
-        case "years":
+        case 'years':
             return BigInt(duration) * 365n * DAY;
     }
 }
@@ -170,7 +172,7 @@ export function durationToSeconds(duration: number, unit: DurationUnit): bigint 
  * @param cliffEndDate Date string in YYYY-MM-DD format
  * @param cliffTime Optional time string in HH:MM format (UTC). Defaults to "00:00"
  */
-export function cliffDateToSeconds(cliffEndDate: string, cliffTime: string = "00:00"): bigint {
+export function cliffDateToSeconds(cliffEndDate: string, cliffTime: string = '00:00'): bigint {
     if (!cliffEndDate) return 0n;
     // Combine date and time into ISO format for proper UTC parsing
     const isoString = `${cliffEndDate}T${cliffTime}:00Z`;
@@ -185,17 +187,17 @@ export function cliffDateToSeconds(cliffEndDate: string, cliffTime: string = "00
 export function unitToPeriodSeconds(unit: DurationUnit): bigint {
     const DAY = 24n * 60n * 60n;
     switch (unit) {
-        case "minutes":
+        case 'minutes':
             return 60n;
-        case "hours":
+        case 'hours':
             return 60n * 60n;
-        case "weeks":
+        case 'weeks':
             return 7n * DAY;
-        case "months":
+        case 'months':
             return 30n * DAY;
-        case "quarters":
+        case 'quarters':
             return 90n * DAY;
-        case "years":
+        case 'years':
             return 365n * DAY;
         default:
             throw new Error(`Unsupported duration unit: ${unit}`);
@@ -212,7 +214,7 @@ export function unitToPeriodSeconds(unit: DurationUnit): bigint {
 export function calculateVestingPeriods(
     schedule: VestingSchedule | null,
     totalAllocation: bigint,
-    claimedEpochs: Record<number, boolean> = {}
+    claimedEpochs: Record<number, boolean> = {},
 ): VestingPeriod[] {
     if (!schedule || totalAllocation === 0n) {
         return [];
@@ -222,14 +224,16 @@ export function calculateVestingPeriods(
     const now = Date.now() / 1000;
 
     // Avoid division by zero if period is 0 (should act as single unlock)
-    const periodDuration = schedule.vestingPeriod === 0 ? schedule.vestingDuration : schedule.vestingPeriod;
+    const periodDuration =
+        schedule.vestingPeriod === 0 ? schedule.vestingDuration : schedule.vestingPeriod;
 
     // Calculate total number of unlocks
-    // If vestingPeriod is 0, it means linear streaming or single unlock at end? 
+    // If vestingPeriod is 0, it means linear streaming or single unlock at end?
     // Assuming standard discrete vesting steps:
-    const totalPeriods = Number(schedule.vestingPeriod) > 0
-        ? Math.floor(Number(schedule.vestingDuration) / Number(schedule.vestingPeriod))
-        : 1;
+    const totalPeriods =
+        Number(schedule.vestingPeriod) > 0
+            ? Math.floor(Number(schedule.vestingDuration) / Number(schedule.vestingPeriod))
+            : 1;
 
     const amountPerPeriod = totalAllocation / BigInt(totalPeriods);
 
@@ -253,12 +257,12 @@ export function calculateVestingPeriods(
         if (isPast) {
             // Check if this specific epoch index is marked as claimed
             if (claimedEpochs[i]) {
-                status = "claimed";
+                status = 'claimed';
             } else {
-                status = "claimable";
+                status = 'claimable';
             }
         } else {
-            status = "locked";
+            status = 'locked';
         }
 
         result.push({

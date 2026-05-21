@@ -1,6 +1,6 @@
 <script lang="ts">
-    import { onMount } from "svelte";
-    import ZarfLogo from "@zarf/ui/components/brand/ZarfLogo.svelte";
+    import { onMount } from 'svelte';
+    import ZarfLogo from '@zarf/ui/components/brand/ZarfLogo.svelte';
 
     let mounted = $state(false);
     let container: HTMLDivElement;
@@ -10,7 +10,7 @@
 
     onMount(() => {
         mounted = true;
-        if (container) container.setAttribute("data-theme", "dark");
+        if (container) container.setAttribute('data-theme', 'dark');
     });
 </script>
 
@@ -30,9 +30,7 @@
     ></div>
 
     <!-- SPOTLIGHT EFFECT (Full Screen) -->
-    <div
-        class="fixed inset-0 pointer-events-none z-10 wave-grid-spotlight opacity-80"
-    ></div>
+    <div class="fixed inset-0 pointer-events-none z-10 wave-grid-spotlight opacity-80"></div>
 
     <!-- CONTENT CONTAINER (Fixed 1600x900) -->
     <div
@@ -45,17 +43,13 @@
                 ? 'opacity-100 translate-y-0'
                 : 'opacity-0 -translate-y-2'} transition-all duration-1000"
         >
-            <div
-                class="flex items-center gap-3 opacity-100 origin-top-left scale-[2.5]"
-            >
+            <div class="flex items-center gap-3 opacity-100 origin-top-left scale-[2.5]">
                 <ZarfLogo size="lg" />
             </div>
         </div>
 
         <!-- 2. MAIN CONTENT (Restored to "Like the Attachment") -->
-        <div
-            class="absolute top-1/2 left-20 right-20 -translate-y-1/2 z-30 pointer-events-none"
-        >
+        <div class="absolute top-1/2 left-20 right-20 -translate-y-1/2 z-30 pointer-events-none">
             <div class="max-w-4xl">
                 <!-- Overline -->
                 <h2
@@ -101,15 +95,9 @@
                 : 'opacity-0 translate-y-2'} transition-all duration-1000 delay-500"
         >
             <div class="flex flex-col gap-2">
-                <span class="text-xs font-mono text-white/40 tracking-wider">
-                    BUILT ON
-                </span>
+                <span class="text-xs font-mono text-white/40 tracking-wider"> BUILT ON </span>
                 <div class="flex items-center gap-3">
-                    <img
-                        src="/stellar-logo.svg"
-                        alt="Stellar"
-                        class="h-16 w-auto opacity-90"
-                    />
+                    <img src="/stellar-logo.svg" alt="Stellar" class="h-16 w-auto opacity-90" />
                 </div>
             </div>
         </div>

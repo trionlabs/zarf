@@ -1,7 +1,7 @@
 <script lang="ts">
-    import { claimStore } from "../../stores/claimStore.svelte";
-    import { Clock } from "lucide-svelte";
-    import { formatDate as formatDateUS } from "@zarf/core/utils";
+    import { claimStore } from '../../stores/claimStore.svelte';
+    import { Clock } from 'lucide-svelte';
+    import { formatDate as formatDateUS } from '@zarf/core/utils';
 
     // Derived values for display
     let percent = $derived.by(() => {
@@ -11,12 +11,10 @@
     });
 
     // Formatting dates — unix-seconds timestamp → "Apr 5" (no year)
-    const formatDate = (ts: number) => formatDateUS(ts * 1000, "monthDay");
+    const formatDate = (ts: number) => formatDateUS(ts * 1000, 'monthDay');
 
     let start = $derived(
-        claimStore.vestingSchedule
-            ? formatDate(claimStore.vestingSchedule.vestingStart)
-            : "Start",
+        claimStore.vestingSchedule ? formatDate(claimStore.vestingSchedule.vestingStart) : 'Start',
     );
     let cliffEnd = $derived(
         claimStore.vestingSchedule
@@ -24,7 +22,7 @@
                   claimStore.vestingSchedule.vestingStart +
                       claimStore.vestingSchedule.cliffDuration,
               )
-            : "Cliff",
+            : 'Cliff',
     );
     let end = $derived(
         claimStore.vestingSchedule
@@ -33,14 +31,13 @@
                       claimStore.vestingSchedule.cliffDuration +
                       claimStore.vestingSchedule.vestingDuration,
               )
-            : "End",
+            : 'End',
     );
 
     // Calculation for marker positions
     let totalDuration = $derived(
         claimStore.vestingSchedule
-            ? claimStore.vestingSchedule.cliffDuration +
-                  claimStore.vestingSchedule.vestingDuration
+            ? claimStore.vestingSchedule.cliffDuration + claimStore.vestingSchedule.vestingDuration
             : 100,
     );
     let cliffPercent = $derived(
@@ -55,8 +52,7 @@
         const now = Date.now() / 1000;
         const startTs = claimStore.vestingSchedule.vestingStart;
         const total =
-            claimStore.vestingSchedule.cliffDuration +
-            claimStore.vestingSchedule.vestingDuration;
+            claimStore.vestingSchedule.cliffDuration + claimStore.vestingSchedule.vestingDuration;
         const passed = now - startTs;
         const p = (passed / total) * 100;
         return Math.min(100, Math.max(0, p));
@@ -97,9 +93,7 @@
     >
         <span>Start</span>
         {#if cliffPercent > 15 && cliffPercent < 85}
-            <span
-                class="absolute"
-                style="left: {cliffPercent}%; transform: translateX(-50%);"
+            <span class="absolute" style="left: {cliffPercent}%; transform: translateX(-50%);"
                 >Cliff End ({cliffPercent.toFixed(0)}%)</span
             >
         {/if}
@@ -107,15 +101,10 @@
     </div>
 
     <!-- Timeline Container -->
-    <div
-        class="relative h-3 bg-zen-fg/10 rounded-full w-full overflow-hidden"
-    >
+    <div class="relative h-3 bg-zen-fg/10 rounded-full w-full overflow-hidden">
         <!-- Cliff Marker Line -->
         {#if cliffPercent > 0}
-            <div
-                class="absolute h-full w-px bg-zen-fg/10"
-                style="left: {cliffPercent}%"
-            ></div>
+            <div class="absolute h-full w-px bg-zen-fg/10" style="left: {cliffPercent}%"></div>
         {/if}
 
         <!-- Time Passed Bar (subtle) -->
@@ -127,9 +116,7 @@
         <!-- Vested Bar (primary gradient) -->
         <div
             class="absolute h-full bg-gradient-to-r from-zen-primary/60 to-zen-primary rounded-full transition-all duration-1000 ease-out"
-            style="left: {cliffPercent}%; width: {(percent *
-                (100 - cliffPercent)) /
-                100}%"
+            style="left: {cliffPercent}%; width: {(percent * (100 - cliffPercent)) / 100}%"
         ></div>
 
         <!-- Current Position Indicator -->
@@ -140,14 +127,10 @@
     </div>
 
     <!-- Date Labels -->
-    <div
-        class="relative flex justify-between text-xs font-light text-zen-fg-muted"
-    >
+    <div class="relative flex justify-between text-xs font-light text-zen-fg-muted">
         <span>{start}</span>
         {#if cliffPercent > 15 && cliffPercent < 85}
-            <span
-                class="absolute"
-                style="left: {cliffPercent}%; transform: translateX(-50%);"
+            <span class="absolute" style="left: {cliffPercent}%; transform: translateX(-50%);"
                 >{cliffEnd}</span
             >
         {/if}

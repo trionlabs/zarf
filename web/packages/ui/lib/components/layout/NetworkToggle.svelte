@@ -1,6 +1,6 @@
 <script lang="ts">
-    import { networkStore } from "../../stores/networkStore.svelte";
-    import type { StellarNetworkId } from "@zarf/core/config/runtime";
+    import { networkStore } from '../../stores/networkStore.svelte';
+    import type { StellarNetworkId } from '@zarf/core/config/runtime';
 
     let pendingId = $state<StellarNetworkId | null>(null);
     const visibleOptions = $derived(networkStore.options);

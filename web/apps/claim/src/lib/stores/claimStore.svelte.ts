@@ -1,10 +1,10 @@
 import { browser } from '$app/environment';
-import type { ZKProof, MerkleClaim, MerkleTreeData } from "@zarf/ui/types";
-import { toastStore } from "@zarf/ui/stores/toastStore.svelte";
-import { getActiveStellarNetworkId } from "@zarf/core/config/runtime";
-import { devTag, warn } from "@zarf/core/utils/log";
+import type { ZKProof, MerkleClaim, MerkleTreeData } from '@zarf/ui/types';
+import { toastStore } from '@zarf/ui/stores/toastStore.svelte';
+import { getActiveStellarNetworkId } from '@zarf/core/config/runtime';
+import { devTag, warn } from '@zarf/core/utils/log';
 
-import type { DistributionData } from "@zarf/core/services/distribution";
+import type { DistributionData } from '@zarf/core/services/distribution';
 import {
     totalAllocation as totalAllocationOf,
     claimedAmount as claimedAmountOf,
@@ -14,14 +14,14 @@ import {
     cliffEndDate as cliffEndDateOf,
     findNextClaimableIdx,
     buildVestingPeriods,
-} from "@zarf/core/domain/claimFlow";
+} from '@zarf/core/domain/claimFlow';
 
 /**
  * Claim Store - InMemory State for the Claim Flow (Discrete Vesting Edition)
- * 
+ *
  * SECURITY CRITICAL:
  * This store handles the User's MASTER SALT and Epoch Secrets.
- * It is effectively an "InMemory" store. 
+ * It is effectively an "InMemory" store.
  * We explicitly DO NOT persist derived secrets to storage.
  */
 
@@ -34,7 +34,7 @@ export interface EpochClaim extends MerkleClaim {
     isLocked: boolean;
     canClaim: boolean;
     email: string;
-    salt: string;    // Epoch Secret (PIN_Index)
+    salt: string; // Epoch Secret (PIN_Index)
     amount: bigint;
     unlockTime: number;
     identityCommitment: string;
@@ -48,7 +48,7 @@ class ClaimFlowState {
         masterSalt: null as string | null,
         epochs: [] as EpochClaim[],
         vestingSchedule: null as DistributionData['schedule'] | null,
-        tokenSymbol: "XLM" as string,
+        tokenSymbol: 'XLM' as string,
         tokenDecimals: 7 as number,
         currentStep: 1 as ClaimStep,
         targetWallet: null as string | null,
@@ -57,14 +57,14 @@ class ClaimFlowState {
         statusMessage: null as string | null,
 
         // Form inputs (persisted or transient)
-        email: "" as string | null,
-        jwt: "" as string | null, // Added for ZK Proof
-        pin: "" as string | null,
+        email: '' as string | null,
+        jwt: '' as string | null, // Added for ZK Proof
+        pin: '' as string | null,
 
         // Transaction state
         proof: null as ZKProof | null,
         txHash: null as string | null,
-        selectedEpochIndex: null as number | null
+        selectedEpochIndex: null as number | null,
     });
 
     constructor() {
@@ -75,12 +75,24 @@ class ClaimFlowState {
     // Getters (Derived from State)
     // ==========================================
 
-    get totalAllocation()  { return totalAllocationOf(this.state.epochs); }
-    get claimedAmount()    { return claimedAmountOf(this.state.epochs); }
-    get unlockedAmount()   { return unlockedAmountOf(this.state.epochs); }
-    get vestedAmount()     { return this.unlockedAmount; }
-    get claimableAmount()  { return claimableAmountOf(this.state.epochs); }
-    get isEligible()       { return this.state.epochs.length > 0; }
+    get totalAllocation() {
+        return totalAllocationOf(this.state.epochs);
+    }
+    get claimedAmount() {
+        return claimedAmountOf(this.state.epochs);
+    }
+    get unlockedAmount() {
+        return unlockedAmountOf(this.state.epochs);
+    }
+    get vestedAmount() {
+        return this.unlockedAmount;
+    }
+    get claimableAmount() {
+        return claimableAmountOf(this.state.epochs);
+    }
+    get isEligible() {
+        return this.state.epochs.length > 0;
+    }
 
     /**
      * Has the cliff passed? Returns `true | false | null` — `null` means
@@ -88,33 +100,67 @@ class ClaimFlowState {
      * (Previously this returned `true` on null schedule, which momentarily
      * showed a CTA before data loaded.)
      */
-    get isCliffPassed() { return isCliffPassedOf(this.state.vestingSchedule); }
-    get cliffEndDate()  { return cliffEndDateOf(this.state.vestingSchedule); }
+    get isCliffPassed() {
+        return isCliffPassedOf(this.state.vestingSchedule);
+    }
+    get cliffEndDate() {
+        return cliffEndDateOf(this.state.vestingSchedule);
+    }
 
     // UI Helpers (Direct Accessors)
-    get currentStep() { return this.state.currentStep; }
-    get isLoading() { return this.state.loading; }
-    get error() { return this.state.error; }
-    get statusMessage() { return this.state.statusMessage; }
-    get masterSalt() { return this.state.masterSalt; }
-    get epochs() { return this.state.epochs; }
-    get email() { return this.state.email; }
-    get pin() { return this.state.pin; }
-    get jwt() { return this.state.jwt; } // Added
-    get targetWallet() { return this.state.targetWallet; } // Added
-    get vestingSchedule() { return this.state.vestingSchedule; }
-    get tokenSymbol() { return this.state.tokenSymbol; }
-    get tokenDecimals() { return this.state.tokenDecimals; }
+    get currentStep() {
+        return this.state.currentStep;
+    }
+    get isLoading() {
+        return this.state.loading;
+    }
+    get error() {
+        return this.state.error;
+    }
+    get statusMessage() {
+        return this.state.statusMessage;
+    }
+    get masterSalt() {
+        return this.state.masterSalt;
+    }
+    get epochs() {
+        return this.state.epochs;
+    }
+    get email() {
+        return this.state.email;
+    }
+    get pin() {
+        return this.state.pin;
+    }
+    get jwt() {
+        return this.state.jwt;
+    } // Added
+    get targetWallet() {
+        return this.state.targetWallet;
+    } // Added
+    get vestingSchedule() {
+        return this.state.vestingSchedule;
+    }
+    get tokenSymbol() {
+        return this.state.tokenSymbol;
+    }
+    get tokenDecimals() {
+        return this.state.tokenDecimals;
+    }
 
     get periods() {
         return buildVestingPeriods(this.state.vestingSchedule, this.state.epochs);
     }
 
     get selectedEpoch() {
-        return this.state.selectedEpochIndex !== null ? this.state.epochs[this.state.selectedEpochIndex] : null;
+        return this.state.selectedEpochIndex !== null
+            ? this.state.epochs[this.state.selectedEpochIndex]
+            : null;
     }
 
-    get proof() { return this.state.proof; }
+    get proof() {
+        return this.state.proof;
+    }
 
     // ==========================================
     // Actions
@@ -177,14 +223,14 @@ class ClaimFlowState {
         this.state.currentStep = 1;
         this.state.epochs = [];
         this.state.masterSalt = null;
-        this.state.pin = "";
-        this.state.email = "";
+        this.state.pin = '';
+        this.state.email = '';
         this.state.error = null;
         this.state.loading = false;
         this.state.selectedEpochIndex = null;
         this.state.proof = null;
         this.state.txHash = null;
-        this.state.tokenSymbol = "XLM";
+        this.state.tokenSymbol = 'XLM';
         this.state.tokenDecimals = 7;
 
         // Optionally clear session
@@ -212,7 +258,9 @@ class ClaimFlowState {
 
     markAsClaimed(commitment: string) {
         const commitmentLower = commitment.toLowerCase();
-        const index = this.state.epochs.findIndex(e => e.identityCommitment.toLowerCase() === commitmentLower);
+        const index = this.state.epochs.findIndex(
+            (e) => e.identityCommitment.toLowerCase() === commitmentLower,
+        );
 
         log('Mark as Claimed:', commitmentLower, 'Found Index:', index);
 
@@ -248,7 +296,7 @@ class ClaimFlowState {
         const data = {
             step: this.state.currentStep,
             email: this.state.email,
-            targetWallet: this.state.targetWallet
+            targetWallet: this.state.targetWallet,
             // PIN is never persisted for security (ADR-025)
         };
 
@@ -274,7 +322,8 @@ class ClaimFlowState {
         }
     }
 
-    private cryptoModulePromise: Promise<typeof import("@zarf/core/crypto/merkleTree")> | null = null;
+    private cryptoModulePromise: Promise<typeof import('@zarf/core/crypto/merkleTree')> | null =
+        null;
 
     /**
      * Warm the merkleTree dynamic import on hover/focus of entry buttons.
@@ -283,11 +332,10 @@ class ClaimFlowState {
      */
     preloadCrypto() {
         if (!this.cryptoModulePromise) {
-            this.cryptoModulePromise = import("@zarf/core/crypto/merkleTree");
+            this.cryptoModulePromise = import('@zarf/core/crypto/merkleTree');
         }
         return this.cryptoModulePromise;
     }
-
 }
 
 export const claimStore = new ClaimFlowState();

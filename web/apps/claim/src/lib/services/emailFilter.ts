@@ -36,7 +36,7 @@ export const computeUserEmailHash = hashEmail;
  */
 export async function isEmailInDistribution(
     address: string,
-    userEmailHash: string
+    userEmailHash: string,
 ): Promise<boolean> {
     try {
         const data = await fetchDistribution(address);
@@ -52,14 +52,15 @@ export async function isEmailInDistribution(
 
         // Normalize hashes for comparison (ensure consistent 0x prefix and lowercase)
         const normalizedUserHash = userEmailHash.toLowerCase();
-        const normalizedDistHashes = data.emailHashes.map((h) =>
-            h.toLowerCase()
-        );
+        const normalizedDistHashes = data.emailHashes.map((h) => h.toLowerCase());
 
         return normalizedDistHashes.includes(normalizedUserHash);
     } catch (error) {
         if (error instanceof IpfsFetchError) {
-            warn(`[EmailFilter] Skipping distribution with unreadable IPFS metadata:`, error.message);
+            warn(
+                `[EmailFilter] Skipping distribution with unreadable IPFS metadata:`,
+                error.message,
+            );
             return false;
         }
 
@@ -85,7 +86,7 @@ async function fetchDistribution(address: string): Promise<DistributionWithHashe
  */
 export async function filterDistributionsByEmail(
     addresses: StellarContractId[],
-    email: string
+    email: string,
 ): Promise<StellarContractId[]> {
     // No email = no distributions (security: don't leak distribution list)
     if (!email) {
@@ -104,11 +105,9 @@ export async function filterDistributionsByEmail(
         addresses.map(async (addr) => {
             const isEligible = await isEmailInDistribution(addr, userEmailHash);
             return { address: addr, eligible: isEligible };
-        })
+        }),
     );
 
     // Return only eligible addresses
-    return results
-        .filter((r) => r.eligible)
-        .map((r) => r.address);
+    return results.filter((r) => r.eligible).map((r) => r.address);
 }

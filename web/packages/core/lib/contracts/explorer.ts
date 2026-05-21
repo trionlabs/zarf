@@ -5,11 +5,7 @@
 // without dragging the SDK into their static graph.
 
 import { getStellarConfig } from '../config/runtime';
-import type {
-    StellarAddress,
-    StellarContractId,
-    TransactionHash,
-} from '../types';
+import type { StellarAddress, StellarContractId, TransactionHash } from '../types';
 
 function explorerBase(): string {
     const base = getStellarConfig().explorerBaseUrl;

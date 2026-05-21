@@ -1,7 +1,7 @@
 <script lang="ts">
-    import type { Distribution, TokenDetails } from "../../../stores/types";
-    import ZenCard from "@zarf/ui/components/ui/ZenCard.svelte";
-    import ZenBadge from "@zarf/ui/components/ui/ZenBadge.svelte";
+    import type { Distribution, TokenDetails } from '../../../stores/types';
+    import ZenCard from '@zarf/ui/components/ui/ZenCard.svelte';
+    import ZenBadge from '@zarf/ui/components/ui/ZenBadge.svelte';
 
     interface Props {
         distribution: Distribution;
@@ -18,9 +18,7 @@
         <div
             class="p-4 bg-zen-bg-elevated border-b border-zen-border-subtle flex justify-between items-center"
         >
-            <h3
-                class="font-bold text-sm uppercase tracking-wider text-zen-fg-subtle"
-            >
+            <h3 class="font-bold text-sm uppercase tracking-wider text-zen-fg-subtle">
                 Deployment Summary
             </h3>
             <ZenBadge variant="default" size="sm">
@@ -30,24 +28,18 @@
         <div class="p-6 grid grid-cols-1 gap-6">
             <!-- Token Info -->
             <div>
-                <div
-                    class="text-xs font-semibold uppercase text-zen-fg-subtle mb-1"
-                >
-                    Asset
-                </div>
+                <div class="text-xs font-semibold uppercase text-zen-fg-subtle mb-1">Asset</div>
                 <div class="flex items-center gap-2">
                     <div
                         class="w-8 h-8 rounded-full bg-zen-primary-muted flex items-center justify-center text-zen-primary font-bold text-xs"
                     >
-                        {tokenDetails.tokenSymbol?.charAt(0) ?? "?"}
+                        {tokenDetails.tokenSymbol?.charAt(0) ?? '?'}
                     </div>
                     <div>
                         <div class="font-bold text-lg">
                             {tokenDetails.tokenSymbol}
                         </div>
-                        <div
-                            class="text-xs font-mono text-zen-fg-subtle truncate w-32"
-                        >
+                        <div class="text-xs font-mono text-zen-fg-subtle truncate w-32">
                             {tokenDetails.tokenAddress}
                         </div>
                     </div>
@@ -56,20 +48,18 @@
 
             <!-- Total Amount -->
             <div>
-                <div
-                    class="text-xs font-semibold uppercase text-zen-fg-subtle mb-1"
-                >
+                <div class="text-xs font-semibold uppercase text-zen-fg-subtle mb-1">
                     Total Allocation
                 </div>
                 <div class="font-mono text-xl font-bold">
                     {Number(distribution.amount).toLocaleString('en-US')}
-                    <span
-                        class="text-sm font-normal text-zen-fg-subtle"
+                    <span class="text-sm font-normal text-zen-fg-subtle"
                         >{tokenDetails.tokenSymbol}</span
                     >
                 </div>
                 <div class="text-xs text-zen-fg-subtle">
-                    {recipientCount} {recipientCount === 1 ? "Recipient" : "Recipients"}
+                    {recipientCount}
+                    {recipientCount === 1 ? 'Recipient' : 'Recipients'}
                     {#if batchCount !== recipientCount}
                         ({batchCount} batches)
                     {/if}
@@ -78,37 +68,29 @@
 
             <!-- Schedule -->
             <div class="border-t border-zen-border-subtle pt-4 mt-2">
-                <div
-                    class="text-xs font-semibold uppercase text-zen-fg-subtle mb-3"
-                >
+                <div class="text-xs font-semibold uppercase text-zen-fg-subtle mb-3">
                     Vesting Schedule ({distribution.schedule.durationUnit})
                 </div>
                 <div class="grid grid-cols-1 gap-4">
                     <div class="flex justify-between">
-                        <div class="text-[10px] text-zen-fg-subtle uppercase">
-                            Cliff Date
-                        </div>
+                        <div class="text-[10px] text-zen-fg-subtle uppercase">Cliff Date</div>
                         <div class="font-medium text-sm">
                             {distribution.schedule.cliffEndDate
-                                ? new Date(
-                                      distribution.schedule.cliffEndDate,
-                                  ).toLocaleDateString('en-US')
-                                : "None"}
+                                ? new Date(distribution.schedule.cliffEndDate).toLocaleDateString(
+                                      'en-US',
+                                  )
+                                : 'None'}
                         </div>
                     </div>
                     <div class="flex justify-between">
-                        <div class="text-[10px] text-zen-fg-subtle uppercase">
-                            Duration
-                        </div>
+                        <div class="text-[10px] text-zen-fg-subtle uppercase">Duration</div>
                         <div class="font-medium text-sm">
                             {distribution.schedule.distributionDuration}
                             {distribution.schedule.durationUnit}s
                         </div>
                     </div>
                     <div class="flex justify-between">
-                        <div class="text-[10px] text-zen-fg-subtle uppercase">
-                            Unlock Frequency
-                        </div>
+                        <div class="text-[10px] text-zen-fg-subtle uppercase">Unlock Frequency</div>
                         <div class="font-medium text-sm">
                             Every 1 {distribution.schedule.durationUnit}
                         </div>

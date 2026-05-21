@@ -1,6 +1,6 @@
 <script lang="ts">
-    import ZarfNavbar from "./ZarfNavbar.svelte";
-    import type { Snippet } from "svelte";
+    import ZarfNavbar from './ZarfNavbar.svelte';
+    import type { Snippet } from 'svelte';
 
     interface Props {
         nav?: Snippet;
@@ -31,18 +31,13 @@
         showWallet = false,
         showWalletBadge = false,
         showNetworkToggle = true,
-        rootClass = "",
-        containerClass = "w-full p-6 lg:p-8",
+        rootClass = '',
+        containerClass = 'w-full p-6 lg:p-8',
     }: Props = $props();
 </script>
 
 <div class="min-h-screen font-sans {rootClass}">
-    <ZarfNavbar
-        {showEmail}
-        {showWallet}
-        {showWalletBadge}
-        {showNetworkToggle}
-    >
+    <ZarfNavbar {showEmail} {showWallet} {showWalletBadge} {showNetworkToggle}>
         {#if nav}{@render nav()}{/if}
     </ZarfNavbar>
 

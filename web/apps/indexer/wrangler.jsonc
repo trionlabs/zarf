@@ -12,17 +12,17 @@
         "VESTING_TTL_SECONDS": "120",
         "IPFS_TTL_SECONDS": "86400",
         "READ_TTL_SECONDS": "30",
-        "LEDGER_TTL_SECONDS": "5"
+        "LEDGER_TTL_SECONDS": "5",
     },
     "observability": {
-        "enabled": true
+        "enabled": true,
     },
     "routes": [
         {
             "pattern": "indexer.zarf.to",
-            "custom_domain": true
-        }
-    ]
+            "custom_domain": true,
+        },
+    ],
     // Required per network:
     //   wrangler deploy --var STELLAR_TESTNET_RPC_URL:"https://..."
     //   wrangler deploy --var STELLAR_TESTNET_FACTORY_ADDRESS:"C..."

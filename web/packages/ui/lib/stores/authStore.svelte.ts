@@ -1,7 +1,7 @@
 import { browser } from '$app/environment';
-import { decodeJwt } from "../utils/googleAuth";
-import { STORAGE_KEYS } from "@zarf/core/constants/storage";
-import { dev, warn, err } from "@zarf/core/utils/log";
+import { decodeJwt } from '../utils/googleAuth';
+import { STORAGE_KEYS } from '@zarf/core/constants/storage';
+import { dev, warn, err } from '@zarf/core/utils/log';
 
 /**
  * Authentication Store — Gmail / OIDC session.
@@ -22,7 +22,7 @@ const initialGmailState: GmailSession = {
     isAuthenticated: false,
     email: null,
     jwt: null,
-    expiresAt: null
+    expiresAt: null,
 };
 
 // ============================================================================
@@ -100,12 +100,16 @@ function restoreGmailSession() {
 // ============================================================================
 
 export const authStore = {
-    get gmail() { return gmailState; },
+    get gmail() {
+        return gmailState;
+    },
 
     // Hydration-Safe Getter: Ensures we never show "Authenticated" during SSR/Hydration mismatch
-    get isAuthenticated() { return gmailState.isAuthenticated && isHydrated; },
+    get isAuthenticated() {
+        return gmailState.isAuthenticated && isHydrated;
+    },
 
     setGmailSession,
     clearGmailSession,
-    restoreGmailSession
+    restoreGmailSession,
 };

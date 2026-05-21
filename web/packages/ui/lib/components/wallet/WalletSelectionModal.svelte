@@ -9,14 +9,14 @@
   - Prompts Freighter access
 -->
 <script lang="ts">
-    import { walletStore } from "../../stores/walletStore.svelte";
-    import { X, Wallet } from "lucide-svelte";
-    import ZenButton from "../ui/ZenButton.svelte";
-    import { focusTrap } from "../../actions/focusTrap";
-    import { uniqueId } from "../../utils/uniqueId";
+    import { walletStore } from '../../stores/walletStore.svelte';
+    import { X, Wallet } from 'lucide-svelte';
+    import ZenButton from '../ui/ZenButton.svelte';
+    import { focusTrap } from '../../actions/focusTrap';
+    import { uniqueId } from '../../utils/uniqueId';
 
-    const titleId = uniqueId("wallet-modal-title");
-    const descId = uniqueId("wallet-modal-desc");
+    const titleId = uniqueId('wallet-modal-title');
+    const descId = uniqueId('wallet-modal-desc');
     let freighterBtn: HTMLButtonElement | undefined = $state();
 
     async function handleConnect() {
@@ -68,7 +68,9 @@
             "
         >
             <!-- Header -->
-            <div class="flex items-center justify-between p-5 border-b-[0.5px] border-zen-border-subtle">
+            <div
+                class="flex items-center justify-between p-5 border-b-[0.5px] border-zen-border-subtle"
+            >
                 <h3 id={titleId} class="text-lg font-semibold text-zen-fg">Connect Wallet</h3>
                 <button
                     class="p-1.5 rounded-lg text-zen-fg-muted hover:text-zen-fg hover:bg-zen-fg/5 transition-colors"
@@ -127,9 +129,7 @@
 
             <!-- Footer -->
             <div class="p-5 border-t-[0.5px] border-zen-border-subtle">
-                <ZenButton variant="ghost" class="w-full" onclick={handleClose}>
-                    Cancel
-                </ZenButton>
+                <ZenButton variant="ghost" class="w-full" onclick={handleClose}>Cancel</ZenButton>
             </div>
         </div>
     </div>

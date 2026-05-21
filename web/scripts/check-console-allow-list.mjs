@@ -84,16 +84,26 @@ const ALLOWLIST = {
     // sites pinned per-line so a 6th call must justify itself.
     'packages/core/lib/zk/index.ts': {
         entries: [
-            { content: "console.error('[ZK Prover Error]', message);",
-              reason: 'forwards worker error to host console — intentional direct call' },
-            { content: "catch (e) { console.error('[ZK Prover] onProgress threw:', e); }",
-              reason: 'catch around user-supplied callback — intentional' },
-            { content: "console.log('[ZK Prover]', message);",
-              reason: 'progress passthrough from worker — intentional direct call' },
-            { content: "console.error('[ZK Prover Worker Error]', e);",
-              reason: 'unhandled worker error — intentional' },
-            { content: "console.error('Failed to initialize ZK Worker:', e);",
-              reason: 'worker init failure — intentional, surfaces in prod logs' },
+            {
+                content: "console.error('[ZK Prover Error]', message);",
+                reason: 'forwards worker error to host console — intentional direct call',
+            },
+            {
+                content: "console.error('[ZK Prover] onProgress threw:', e);",
+                reason: 'catch around user-supplied callback — intentional direct call',
+            },
+            {
+                content: "console.log('[ZK Prover]', message);",
+                reason: 'progress passthrough from worker — intentional direct call',
+            },
+            {
+                content: "console.error('[ZK Prover Worker Error]', e);",
+                reason: 'unhandled worker error — intentional',
+            },
+            {
+                content: "console.error('Failed to initialize ZK Worker:', e);",
+                reason: 'worker init failure — intentional, surfaces in prod logs',
+            },
         ],
     },
 
@@ -110,42 +120,63 @@ const ALLOWLIST = {
     // prod logs to confirm SES + Buffer polyfill activation.
     'apps/claim/src/hooks.client.ts': {
         entries: [
-            { content: "console.log('[hooks.client] SES compatibility shim active');",
-              reason: 'bootstrap confirmation visible in prod logs' },
-            { content: "console.log('[hooks.client] Buffer polyfill installed');",
-              reason: 'bootstrap confirmation visible in prod logs' },
+            {
+                content: "console.log('[hooks.client] SES compatibility shim active');",
+                reason: 'bootstrap confirmation visible in prod logs',
+            },
+            {
+                content: "console.log('[hooks.client] Buffer polyfill installed');",
+                reason: 'bootstrap confirmation visible in prod logs',
+            },
         ],
     },
     'apps/create/src/hooks.client.ts': {
         entries: [
-            { content: "console.log('[hooks.client] SES compatibility shim active');",
-              reason: 'bootstrap confirmation visible in prod logs' },
-            { content: "console.log('[hooks.client] Buffer polyfill installed');",
-              reason: 'bootstrap confirmation visible in prod logs' },
+            {
+                content: "console.log('[hooks.client] SES compatibility shim active');",
+                reason: 'bootstrap confirmation visible in prod logs',
+            },
+            {
+                content: "console.log('[hooks.client] Buffer polyfill installed');",
+                reason: 'bootstrap confirmation visible in prod logs',
+            },
         ],
     },
 
     // SES install path — intentional shim-install confirmation.
     'packages/core/lib/utils/domPreserve.ts': {
         entries: [
-            { content: "console.log('[DOM Preserve] SES compatibility shim installed');",
-              reason: 'SES install marker — ships intentionally' },
-            { content: "console.warn('[DOM Preserve] app.html shim not detected, installing runtime fallback');",
-              reason: 'fallback-install warning — ships intentionally' },
-            { content: "console.log('[DOM Preserve] SES compatibility shim verified');",
-              reason: 'SES verify marker — ships intentionally' },
+            {
+                content: "console.log('[DOM Preserve] SES compatibility shim installed');",
+                reason: 'SES install marker — ships intentionally',
+            },
+            {
+                content:
+                    "console.warn('[DOM Preserve] app.html shim not detected, installing runtime fallback');",
+                reason: 'fallback-install warning — ships intentionally',
+            },
+            {
+                content: "console.log('[DOM Preserve] SES compatibility shim verified');",
+                reason: 'SES verify marker — ships intentionally',
+            },
         ],
     },
 
     // Crypto security warning — must always ship regardless of env.
     'packages/core/lib/crypto/merkleTree.ts': {
         entries: [
-            { content: "console.warn('Warning: Using non-secure RNG for salt generation');",
-              reason: 'crypto security warning — must always ship' },
-            { content: "* console.log(tree.root); // Root hash",
-              reason: 'JSDoc example, not a real call' },
-            { content: "* console.log(tree.minDepth); // Minimal tree depth",
-              reason: 'JSDoc example, not a real call' },
+            {
+                content: "console.warn('Warning: Using non-secure RNG for salt generation');",
+                reason: 'crypto security warning — must always ship',
+            },
+            {
+                content: '* console.log(tree.root); // Root hash',
+                reason: 'JSDoc example, not a real call',
+            },
+            {
+                content: '* console.log(tree.minDepth); // Minimal tree depth',
+                reason: 'JSDoc example, not a real call',
+            },
         ],
     },
 
@@ -153,12 +184,18 @@ const ALLOWLIST = {
     // converted to warn() in 6.2.b; only the JSDoc samples remain.
     'packages/ui/lib/utils/googleAuth.ts': {
         entries: [
-            { content: "*     console.log(decoded.payload.email);",
-              reason: 'JSDoc example, not a real call' },
-            { content: "* console.log(decoded.payload.email); // user@example.com",
-              reason: 'JSDoc example, not a real call' },
-            { content: "* console.log(decoded.header.kid);    // Key ID for verification",
-              reason: 'JSDoc example, not a real call' },
+            {
+                content: '*     console.log(decoded.payload.email);',
+                reason: 'JSDoc example, not a real call',
+            },
+            {
+                content: '* console.log(decoded.payload.email); // user@example.com',
+                reason: 'JSDoc example, not a real call',
+            },
+            {
+                content: '* console.log(decoded.header.kid);    // Key ID for verification',
+                reason: 'JSDoc example, not a real call',
+            },
         ],
     },
 
@@ -167,14 +204,19 @@ const ALLOWLIST = {
     // that the any-list also exempts — there's a tsconfig fix tracked there.
     'packages/ui/lib/stores/walletStore.svelte.ts': {
         entries: [
-            { content: "if ((import.meta as any).env.DEV) console.warn('Failed to fetch balance', e);",
-              reason: 'already DEV-gated at call site; the cast itself is allow-listed in check-any' },
+            {
+                content:
+                    "if ((import.meta as any).env.DEV) console.warn('Failed to fetch balance', e);",
+                reason: 'already DEV-gated at call site; the cast itself is allow-listed in check-any',
+            },
         ],
     },
     'packages/ui/lib/utils/errorSanitizer.ts': {
         entries: [
-            { content: "console.error('[sanitizeBlockchainError] unmatched:', err);",
-              reason: 'inside `if (import.meta.env.DEV)` block — already gated' },
+            {
+                content: "console.error('[sanitizeBlockchainError] unmatched:', err);",
+                reason: 'inside `if (import.meta.env.DEV)` block — already gated',
+            },
         ],
     },
 
@@ -187,8 +229,10 @@ const ALLOWLIST = {
     // DEBUG wrapper, swap to warn(), remove this entry.
     'apps/landing/src/routes/+page.svelte': {
         entries: [
-            { content: 'console.warn("[Landing] OAuth Error detected:", hash);',
-              reason: 'DEV-gated via DEBUG constant — telemetry seam vs DEV-only is a product call, deferred' },
+            {
+                content: "console.warn('[Landing] OAuth Error detected:', hash);",
+                reason: 'DEV-gated via DEBUG constant — telemetry seam vs DEV-only is a product call, deferred',
+            },
         ],
     },
 };
@@ -260,9 +304,9 @@ if (offenders.length > 0) {
     }
     console.error(
         '\nUse the dev/devTag/warn/err helpers from @zarf/core/utils/log, ' +
-        'or add an entry to ALLOWLIST in web/scripts/check-console-allow-list.mjs ' +
-        'with a specific reason. Direct console.* outside the helper is ' +
-        'forbidden so future telemetry has a single insertion point.'
+            'or add an entry to ALLOWLIST in web/scripts/check-console-allow-list.mjs ' +
+            'with a specific reason. Direct console.* outside the helper is ' +
+            'forbidden so future telemetry has a single insertion point.',
     );
     process.exit(1);
 }

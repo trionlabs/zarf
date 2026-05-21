@@ -27,11 +27,11 @@ let FrClass: any = null;
 /**
  * Initialize Barretenberg for Pedersen hashing.
  * Uses singleton pattern to prevent multiple WASM loads.
- * 
+ *
  * @returns Initialized Barretenberg instance
- * 
+ *
  * @throws {Error} If WASM loading fails
- * 
+ *
  * @internal
  */
 async function initBarretenberg(): Promise<Barretenberg> {
@@ -56,7 +56,7 @@ async function initBarretenberg(): Promise<Barretenberg> {
             initPromise = null;
             FrClass = null;
             throw new Error(
-                `Failed to initialize Barretenberg: ${error instanceof Error ? error.message : 'unknown error'}`
+                `Failed to initialize Barretenberg: ${error instanceof Error ? error.message : 'unknown error'}`,
             );
         }
     })();
@@ -71,11 +71,11 @@ async function initBarretenberg(): Promise<Barretenberg> {
 /**
  * Convert string to padded byte array.
  * Matches circuit's MAX_EMAIL_LENGTH requirement.
- * 
+ *
  * @param str - Input string (email)
  * @param maxLength - Target length (default: 64)
  * @returns Padded byte array
- * 
+ *
  * @example
  * ```typescript
  * const bytes = stringToBytes('alice@example.com', 64);
@@ -96,12 +96,12 @@ export function stringToBytes(str: string, maxLength: number = MAX_EMAIL_LENGTH)
  * Compute Pedersen hash of byte array.
  * Each byte becomes a separate field element.
  * Matches Noir's `pedersen_hash` function.
- * 
+ *
  * @param bytes - Byte array to hash
  * @returns Hash as bigint
- * 
+ *
  * @throws {Error} If Barretenberg initialization fails
- * 
+ *
  * @example
  * ```typescript
  * const emailBytes = stringToBytes('alice@example.com');
@@ -124,13 +124,13 @@ export async function pedersenHashBytes(bytes: Uint8Array): Promise<bigint> {
 /**
  * Compute Pedersen hash of two field elements.
  * Used for Merkle tree internal node hashing.
- * 
+ *
  * @param left - Left child hash
  * @param right - Right child hash
  * @returns Parent hash as bigint
- * 
+ *
  * @throws {Error} If Barretenberg initialization fails
- * 
+ *
  * @example
  * ```typescript
  * const parent = await pedersenHashPair(leftLeaf, rightLeaf);
@@ -147,7 +147,7 @@ export async function pedersenHashPair(left: bigint, right: bigint): Promise<big
 /**
  * Compute Pedersen hash of a single field element.
  * Used for Recursive Hash Chain secrets.
- * 
+ *
  * @param field - Field element to hash
  * @returns Hash as bigint
  */
@@ -159,9 +159,9 @@ export async function pedersenHashField(field: bigint): Promise<bigint> {
 
 /**
  * Compute leaf hash from email, amount, and salt.
- * 
+ *
  * Formula: leaf = pedersen(email_hash, amount, unlock_time)
- * 
+ *
  * @param email - User's email (will be normalized)
  * @param amount - Claim amount
  * @param code - 8-char secure code (Epoch Secret)
@@ -172,7 +172,7 @@ export async function computeLeaf(
     email: string,
     amount: bigint,
     code: string | bigint, // Updated to support Hash Chain (BigInt)
-    unlockTime: number
+    unlockTime: number,
 ): Promise<bigint> {
     const bb = await initBarretenberg();
 
@@ -181,7 +181,11 @@ export async function computeLeaf(
 
     // 2. Leaf = Pedersen(IdentityCommitment, Amount, UnlockTime)
     // UnlockTime is cast to Field
-    const fields = [new FrClass(identityCommitment), new FrClass(amount), new FrClass(BigInt(unlockTime))];
+    const fields = [
+        new FrClass(identityCommitment),
+        new FrClass(amount),
+        new FrClass(BigInt(unlockTime)),
+    ];
     const leafHash = await bb.pedersenHash(fields, 0);
 
     return BigInt(leafHash.toString());
@@ -190,9 +194,9 @@ export async function computeLeaf(
 /**
  * Compute leaf hash directly from Identity Commitment.
  * Used for reconstructing leaves from distribution file (where code/salt is not known directly).
- * 
+ *
  * Formula: leaf = pedersen(identity_commitment, amount, unlock_time)
- * 
+ *
  * @param identityCommitmentHex - Identity Commitment as hex string or bigint string
  * @param amount - Claim amount
  * @param unlockTime - Unix timestamp
@@ -200,14 +204,18 @@ export async function computeLeaf(
 export async function computeLeafFromCommitment(
     identityCommitmentHex: string,
     amount: bigint,
-    unlockTime: number
+    unlockTime: number,
 ): Promise<bigint> {
     const bb = await initBarretenberg();
 
     const identityCommitment = BigInt(identityCommitmentHex);
 
     // Leaf = Pedersen(IdentityCommitment, Amount, UnlockTime)
-    const fields = [new FrClass(identityCommitment), new FrClass(amount), new FrClass(BigInt(unlockTime))];
+    const fields = [
+        new FrClass(identityCommitment),
+        new FrClass(amount),
+        new FrClass(BigInt(unlockTime)),
+    ];
     const leafHash = await bb.pedersenHash(fields, 0);
 
     return BigInt(leafHash.toString());
@@ -215,14 +223,17 @@ export async function computeLeafFromCommitment(
 
 /**
  * Compute Identity Commitment for a user.
- * 
+ *
  * Formula: Identity = Pedersen(email, Pedersen(code))
- * 
+ *
  * @param email - User's email
  * @param code - 8-char secure code (String) OR Hash Chain Secret (BigInt)
  * @returns Identity Commitment as bigint
  */
-export async function computeIdentityCommitment(email: string, code: string | bigint): Promise<bigint> {
+export async function computeIdentityCommitment(
+    email: string,
+    code: string | bigint,
+): Promise<bigint> {
     const bb = await initBarretenberg();
 
     // 1. Hash the email (as bytes)
@@ -246,7 +257,11 @@ export async function computeIdentityCommitment(email: string, code: string | bi
         // "ABC" -> 0x414243
         const encoder = new TextEncoder();
         const codeBytes = encoder.encode(code);
-        const codeHex = '0x' + Array.from(codeBytes).map(b => b.toString(16).padStart(2, '0')).join('');
+        const codeHex =
+            '0x' +
+            Array.from(codeBytes)
+                .map((b) => b.toString(16).padStart(2, '0'))
+                .join('');
         const codeField = BigInt(codeHex);
 
         const codeHashResult = await bb.pedersenHash([new FrClass(codeField)], 0);
@@ -261,9 +276,9 @@ export async function computeIdentityCommitment(email: string, code: string | bi
 
 /**
  * Generate a random salt within BN254 field modulus.
- * 
+ *
  * @returns Random salt as hex string
- * 
+ *
  * @example
  * const code = generateSecureCode();
  * // "Xk9mP2qL"
@@ -271,7 +286,7 @@ export async function computeIdentityCommitment(email: string, code: string | bi
  */
 /**
  * Generate a random salt within BN254 field modulus.
- * 
+ *
  * @returns Random 8-character alphanumeric code
  */
 export function generateSecureCode(): string {
@@ -291,7 +306,6 @@ export function generateSecureCode(): string {
         }
     }
 
-
     let result = '';
     for (let i = 0; i < length; i++) {
         result += chars[randomValues[i] % chars.length];
@@ -307,19 +321,19 @@ let emptyHashes: bigint[] | null = null;
 
 /**
  * Precompute empty subtree hashes for each level.
- * 
+ *
  * - emptyHashes[0] = 0 (empty leaf)
  * - emptyHashes[1] = H(0, 0)
  * - emptyHashes[2] = H(emptyHashes[1], emptyHashes[1])
  * - ...
  * - emptyHashes[TREE_DEPTH] = root of empty tree
- * 
+ *
  * Cached after first computation.
- * 
+ *
  * @returns Array of empty hashes (length: TREE_DEPTH + 1)
- * 
+ *
  * @throws {Error} If hashing fails
- * 
+ *
  * @internal
  */
 async function getEmptyHashes(): Promise<bigint[]> {
@@ -349,16 +363,16 @@ async function getEmptyHashes(): Promise<bigint[]> {
 
 /**
  * Build sparse Merkle tree from leaf hashes.
- * 
+ *
  * - Pads leaves to next power of 2
  * - Builds minimal tree layers
  * - Extends to TREE_DEPTH using empty subtrees
- * 
+ *
  * @param leaves - Array of leaf hashes (bigint)
  * @returns Merkle tree structure with root and layers
- * 
+ *
  * @throws {Error} If no leaves provided or hashing fails
- * 
+ *
  * @example
  * ```typescript
  * const leaves = [leaf1, leaf2, leaf3];
@@ -367,9 +381,7 @@ async function getEmptyHashes(): Promise<bigint[]> {
  * console.log(tree.minDepth); // Minimal tree depth
  * ```
  */
-export async function buildMerkleTree(
-    leaves: bigint[]
-): Promise<{
+export async function buildMerkleTree(leaves: bigint[]): Promise<{
     root: bigint;
     layers: bigint[][];
     minDepth: number;
@@ -428,16 +440,16 @@ export async function buildMerkleTree(
 /**
  * Get Merkle proof for a leaf at given index.
  * Returns sibling hashes and path indices matching circuit format.
- * 
+ *
  * @param tree - Merkle tree structure from buildMerkleTree
  * @param leafIndex - Index of the leaf (0-based)
  * @returns Merkle proof with siblings and indices
- * 
+ *
  * @example
  * ```typescript
  * const tree = await buildMerkleTree(leaves);
  * const proof = getMerkleProof(tree, 2); // Proof for 3rd leaf
- * 
+ *
  * // proof.siblings: ['0x...', '0x...', ...]
  * // proof.indices: [0, 1, 0, ...]  (0=left, 1=right)
  * ```
@@ -448,7 +460,7 @@ export function getMerkleProof(
         minDepth: number;
         emptyHashes: bigint[];
     },
-    leafIndex: number
+    leafIndex: number,
 ): MerkleProof {
     const { layers, minDepth, emptyHashes } = tree;
     const siblings: string[] = [];
@@ -481,14 +493,14 @@ export function getMerkleProof(
 
 /**
  * Verify a Merkle proof against a root.
- * 
+ *
  * @param leaf - Leaf hash to verify
  * @param proof - Merkle proof (siblings + indices)
  * @param root - Expected root hash
  * @returns True if proof is valid
- * 
+ *
  * @throws {Error} If hashing fails
- * 
+ *
  * @example
  * ```typescript
  * const isValid = await verifyMerkleProof(leafHash, proof, tree.root);
@@ -500,7 +512,7 @@ export function getMerkleProof(
 export async function verifyMerkleProof(
     leaf: bigint,
     proof: MerkleProof,
-    root: bigint
+    root: bigint,
 ): Promise<boolean> {
     const { siblings, indices } = proof;
     let current = leaf;
@@ -527,27 +539,27 @@ export async function verifyMerkleProof(
 
 /**
  * Process whitelist entries into Merkle tree with claims.
- * 
+ *
  * This is the main entry point for whitelist generation:
  * 1. Generates random salt for each entry
  * 2. Computes leaf hashes
  * 3. Builds Merkle tree
  * 4. Returns root, tree, and claim data
- * 
+ *
  * @param entries - Whitelist entries (email, amount)
  * @returns Complete Merkle tree data with claims
- * 
+ *
  * @throws {Error} If entries array is empty or hashing fails
- * 
+ *
  * @example
  * ```typescript
  * const entries = [
  *   { email: 'alice@example.com', amount: 1000 },
  *   { email: 'bob@example.com', amount: 2000 }
  * ];
- * 
+ *
  * const result = await processWhitelist(entries);
- * 
+ *
  * // Save to localStorage
  * localStorage.setItem('whitelist', JSON.stringify({
  *   root: result.root.toString(),
@@ -560,16 +572,16 @@ export async function verifyMerkleProof(
  */
 /**
  * Process whitelist entries into Merkle tree with claims (Discrete Vesting).
- * 
+ *
  * Generates N leaves per user based on the vesting schedule.
- * 
+ *
  * @param entries - Whitelist entries (email, totalAmount)
  * @param schedule - Vesting schedule configuration
  * @returns Complete Merkle tree data with claims
  */
 export async function processWhitelist(
     entries: { email: string; amount: bigint; pin?: string }[],
-    schedule: Schedule
+    schedule: Schedule,
 ): Promise<MerkleTreeData> {
     if (entries.length === 0) {
         throw new Error('Cannot process empty whitelist');
@@ -587,12 +599,24 @@ export async function processWhitelist(
     // Calculate Period Length in Seconds
     let periodSeconds = 0;
     switch (schedule.durationUnit) {
-        case 'minutes': periodSeconds = 60; break;
-        case 'hours': periodSeconds = 3600; break;
-        case 'weeks': periodSeconds = 7 * 24 * 3600; break;
-        case 'months': periodSeconds = 30 * 24 * 3600; break;
-        case 'quarters': periodSeconds = 90 * 24 * 3600; break;
-        case 'years': periodSeconds = 365 * 24 * 3600; break;
+        case 'minutes':
+            periodSeconds = 60;
+            break;
+        case 'hours':
+            periodSeconds = 3600;
+            break;
+        case 'weeks':
+            periodSeconds = 7 * 24 * 3600;
+            break;
+        case 'months':
+            periodSeconds = 30 * 24 * 3600;
+            break;
+        case 'quarters':
+            periodSeconds = 90 * 24 * 3600;
+            break;
+        case 'years':
+            periodSeconds = 365 * 24 * 3600;
+            break;
     }
 
     const bb = await initBarretenberg(); // Need BB for manual hashing in loop
@@ -620,7 +644,7 @@ export async function processWhitelist(
 
             // Unlock time: CliffEnd + (EpochIndex * Period)
             // Epoch 0 unlocks AT cliff end.
-            const unlockTime = Math.floor(cliffEnd + (epoch * periodSeconds));
+            const unlockTime = Math.floor(cliffEnd + epoch * periodSeconds);
 
             // Hash Chain Logic:
             // Epoch 0: Secret = Hash(PIN) (Calculated before loop or currentSecret initial value)
@@ -648,7 +672,7 @@ export async function processWhitelist(
                 identityCommitment,
                 leafIndex: leaves.length, // Global index
                 leaf,
-                unlockTime
+                unlockTime,
             });
 
             leaves.push(leaf);

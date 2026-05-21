@@ -1,6 +1,6 @@
 /**
  * Shared TypeScript types for Zarf web application
- * 
+ *
  * This file contains all core type definitions used across utilities and stores.
  * Keep this file focused on data structures, not UI component props.
  */
@@ -36,8 +36,7 @@ export interface MerkleTreeData {
     claims: MerkleClaim[];
 }
 
-
-export type DurationUnit = "minutes" | "hours" | "weeks" | "months" | "quarters" | "years";
+export type DurationUnit = 'minutes' | 'hours' | 'weeks' | 'months' | 'quarters' | 'years';
 
 export interface UnlockMarker {
     x: number;
@@ -53,7 +52,7 @@ export interface UnlockMarker {
  */
 export interface Schedule {
     cliffEndDate: string; // ISO date string (YYYY-MM-DD)
-    cliffTime: string;    // Time string (HH:MM) in UTC
+    cliffTime: string; // Time string (HH:MM) in UTC
     distributionDuration: number;
     durationUnit: DurationUnit;
 }
@@ -64,8 +63,8 @@ export interface Schedule {
 export interface MerkleClaim {
     email: string;
     amount: bigint;
-    salt: string;        // Hex string (Holds the Hash Chain Secret for the circuit)
-    pin?: string;        // The original plain text PIN (Master Salt) - Used for export
+    salt: string; // Hex string (Holds the Hash Chain Secret for the circuit)
+    pin?: string; // The original plain text PIN (Master Salt) - Used for export
     identityCommitment: string; // Pedersen(email, secret) - Public Identifier
     leaf: bigint;
     leafIndex: number;
@@ -76,8 +75,8 @@ export interface MerkleClaim {
  * Merkle proof for verification
  */
 export interface MerkleProof {
-    siblings: string[];  // Hex strings
-    indices: number[];   // Path indices (0 = left, 1 = right)
+    siblings: string[]; // Hex strings
+    indices: number[]; // Path indices (0 = left, 1 = right)
 }
 
 // ============================================================================
@@ -91,11 +90,11 @@ export interface JWTPayload {
     email: string;
     name?: string;
     picture?: string;
-    iss: string;        // Issuer (accounts.google.com)
-    aud: string;        // Audience (client ID)
-    exp: number;        // Expiration timestamp
-    iat: number;        // Issued at timestamp
-    sub: string;        // Subject (user ID)
+    iss: string; // Issuer (accounts.google.com)
+    aud: string; // Audience (client ID)
+    exp: number; // Expiration timestamp
+    iat: number; // Issued at timestamp
+    sub: string; // Subject (user ID)
     email_verified?: boolean;
 }
 
@@ -103,21 +102,21 @@ export interface JWTPayload {
  * Decoded JWT header
  */
 export interface JWTHeader {
-    kid: string;        // Key ID
-    alg: string;        // Algorithm (RS256)
-    typ: string;        // Type (JWT)
+    kid: string; // Key ID
+    alg: string; // Algorithm (RS256)
+    typ: string; // Type (JWT)
 }
 
 /**
  * Google's public key for JWT verification
  */
 export interface GooglePublicKey {
-    kid: string;        // Key ID (matches JWT header)
-    n: string;          // Modulus (base64url)
-    e: string;          // Exponent (base64url)
-    alg: string;        // Algorithm
-    kty: string;        // Key type (RSA)
-    use: string;        // Usage (sig)
+    kid: string; // Key ID (matches JWT header)
+    n: string; // Modulus (base64url)
+    e: string; // Exponent (base64url)
+    alg: string; // Algorithm
+    kty: string; // Key type (RSA)
+    use: string; // Usage (sig)
 }
 
 /**
@@ -145,21 +144,21 @@ export interface OAuthState {
  * Public inputs for ZK proof verification
  */
 export interface ZKPublicInputs {
-    identityCommitment: string;      // Pedersen(email, secret) - Public Identifier
-    merkleRoot: string;     // Merkle root (hex)
-    recipient: string;      // Recipient field element used by the Stellar circuit
-    amount: bigint;         // Claimed amount
+    identityCommitment: string; // Pedersen(email, secret) - Public Identifier
+    merkleRoot: string; // Merkle root (hex)
+    recipient: string; // Recipient field element used by the Stellar circuit
+    amount: bigint; // Claimed amount
 }
 
 /**
  * Complete ZK proof with metadata
  */
 export interface ZKProof {
-    proof: string;                    // Hex-encoded proof bytes
-    publicInputs: ZKPublicInputs;     // Public inputs object (Convenience)
-    publicValues: string[];           // Raw public inputs array (REQUIRED for Contract)
+    proof: string; // Hex-encoded proof bytes
+    publicInputs: ZKPublicInputs; // Public inputs object (Convenience)
+    publicValues: string[]; // Raw public inputs array (REQUIRED for Contract)
     // Convenience duplicates (same as publicInputs)
-    identityCommitment: string;       // REPLACED emailHash
+    identityCommitment: string; // REPLACED emailHash
     merkleRoot: string;
     recipient: string;
     amount: bigint;
@@ -169,13 +168,13 @@ export interface ZKProof {
  * Claim data for ZK proof generation
  */
 export interface ZKClaimData {
-    email: string;              // User's email
-    salt: string;               // Random salt (hex field element)
-    amount: bigint;             // Claimed amount
-    merkleProof: MerkleProof;   // Merkle proof siblings & indices
-    merkleRoot: bigint;         // Merkle root
-    recipient: string;          // Stellar recipient field element
-    unlockTime: bigint;         // ADR-023: Discrete Vesting unlock timestamp
+    email: string; // User's email
+    salt: string; // Random salt (hex field element)
+    amount: bigint; // Claimed amount
+    merkleProof: MerkleProof; // Merkle proof siblings & indices
+    merkleRoot: bigint; // Merkle root
+    recipient: string; // Stellar recipient field element
+    unlockTime: bigint; // ADR-023: Discrete Vesting unlock timestamp
 }
 
 // ============================================================================
@@ -213,7 +212,7 @@ export interface VestingInfo {
     totalAmount: bigint;
     claimedAmount: bigint;
     merkleRoot: string;
-    cliffEndDate: number;       // Unix timestamp
+    cliffEndDate: number; // Unix timestamp
     distributionDuration: number; // Months
 }
 

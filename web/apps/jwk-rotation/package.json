@@ -1,22 +1,22 @@
 {
-    "name": "@zarf/jwk-rotation",
-    "version": "0.0.1",
-    "private": true,
-    "type": "module",
-    "scripts": {
-        "dev": "wrangler dev",
-        "deploy": "wrangler deploy",
-        "tail": "wrangler tail",
-        "typecheck": "tsc --noEmit"
-    },
-    "dependencies": {
-        "@noble/hashes": "^1.8.0",
-        "@stellar/stellar-sdk": "^15.0.1",
-        "buffer": "^6.0.3"
-    },
-    "devDependencies": {
-        "@cloudflare/workers-types": "^4.20251218.0",
-        "typescript": "^5.9.3",
-        "wrangler": "^4.61.0"
-    }
+  "name": "@zarf/jwk-rotation",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "tail": "wrangler tail",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@noble/hashes": "^1.8.0",
+    "@stellar/stellar-sdk": "^15.0.1",
+    "buffer": "^6.0.3"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20251218.0",
+    "typescript": "^5.9.3",
+    "wrangler": "^4.61.0"
+  }
 }

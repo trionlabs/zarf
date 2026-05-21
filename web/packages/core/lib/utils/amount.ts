@@ -32,5 +32,7 @@ export function formatTokenAmount(value: bigint, decimals: number, maxFractionDi
         .slice(0, maxFractionDigits)
         .replace(/0+$/, '');
 
-    return fractionText ? `${whole.toLocaleString('en-US')}.${fractionText}` : whole.toLocaleString('en-US');
+    return fractionText
+        ? `${whole.toLocaleString('en-US')}.${fractionText}`
+        : whole.toLocaleString('en-US');
 }

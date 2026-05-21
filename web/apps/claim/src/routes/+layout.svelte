@@ -1,15 +1,15 @@
 <script lang="ts">
-    import "../app.css";
-    import AppShell from "@zarf/ui/components/layout/AppShell.svelte";
-    import { page } from "$app/state";
-    import { walletStore } from "@zarf/ui/stores/walletStore.svelte";
-    import { networkStore } from "@zarf/ui/stores/networkStore.svelte";
-    import { authStore } from "@zarf/ui/stores/authStore.svelte";
-    import { themeStore } from "@zarf/ui/stores/themeStore.svelte";
-    import { onMount } from "svelte";
-    import { browser } from "$app/environment";
-    import WalletSelectionModal from "@zarf/ui/components/wallet/WalletSelectionModal.svelte";
-    import ToastContainer from "@zarf/ui/components/ui/ToastContainer.svelte";
+    import '../app.css';
+    import AppShell from '@zarf/ui/components/layout/AppShell.svelte';
+    import { page } from '$app/state';
+    import { walletStore } from '@zarf/ui/stores/walletStore.svelte';
+    import { networkStore } from '@zarf/ui/stores/networkStore.svelte';
+    import { authStore } from '@zarf/ui/stores/authStore.svelte';
+    import { themeStore } from '@zarf/ui/stores/themeStore.svelte';
+    import { onMount } from 'svelte';
+    import { browser } from '$app/environment';
+    import WalletSelectionModal from '@zarf/ui/components/wallet/WalletSelectionModal.svelte';
+    import ToastContainer from '@zarf/ui/components/ui/ToastContainer.svelte';
 
     let { children } = $props();
 
@@ -41,7 +41,8 @@
     {#snippet nav()}
         <a
             href="/"
-            class="text-xs font-medium transition-colors hover:text-zen-fg {page.url.pathname === '/'
+            class="text-xs font-medium transition-colors hover:text-zen-fg {page.url.pathname ===
+            '/'
                 ? 'text-zen-fg'
                 : 'text-zen-fg-muted'}"
         >

@@ -1,12 +1,12 @@
 <script lang="ts">
-    import { wizardStore } from "../../stores/wizardStore.svelte";
-    import { isValidContractAddressShape as isValidContractAddress } from "@zarf/core/utils/addressShape";
-    import { Check, X } from "lucide-svelte";
+    import { wizardStore } from '../../stores/wizardStore.svelte';
+    import { isValidContractAddressShape as isValidContractAddress } from '@zarf/core/utils/addressShape';
+    import { Check, X } from 'lucide-svelte';
 
     // Validation rules for Step 0 (Token Entry)
     const validations = $derived([
         {
-            label: "Contract address",
+            label: 'Contract address',
             valid:
                 wizardStore.tokenDetails.tokenAddress !== null &&
                 isValidContractAddress(wizardStore.tokenDetails.tokenAddress),
@@ -15,7 +15,7 @@
                 wizardStore.tokenDetails.tokenAddress.length > 0,
         },
         {
-            label: "Token verified",
+            label: 'Token verified',
             valid: wizardStore.tokenDetails.tokenName !== null,
             touched:
                 wizardStore.tokenDetails.tokenAddress !== null &&
@@ -27,26 +27,17 @@
     const validCount = $derived(validations.filter((v) => v.valid).length);
 
     // Helper to get icon container classes
-    function getIconClasses(item: {
-        valid: boolean;
-        touched: boolean;
-    }): string {
-        if (item.valid) return "bg-zen-success/20 text-zen-success";
-        if (item.touched) return "bg-zen-error/20 text-zen-error";
-        return "bg-zen-fg/10";
+    function getIconClasses(item: { valid: boolean; touched: boolean }): string {
+        if (item.valid) return 'bg-zen-success/20 text-zen-success';
+        if (item.touched) return 'bg-zen-error/20 text-zen-error';
+        return 'bg-zen-fg/10';
     }
 </script>
 
 <div class="space-y-4">
     <div class="flex items-center justify-between">
-        <h3 class="text-[10px] font-bold uppercase tracking-[0.2em] opacity-40">
-            Validation
-        </h3>
-        <span
-            class="text-[10px] font-medium {allValid
-                ? 'text-zen-success'
-                : 'text-zen-warning'}"
-        >
+        <h3 class="text-[10px] font-bold uppercase tracking-[0.2em] opacity-40">Validation</h3>
+        <span class="text-[10px] font-medium {allValid ? 'text-zen-success' : 'text-zen-warning'}">
             {validCount}/{validations.length}
         </span>
     </div>
@@ -75,11 +66,7 @@
                 </div>
 
                 <!-- Label -->
-                <span
-                    class="text-xs transition-all {item.valid
-                        ? 'line-through opacity-50'
-                        : ''}"
-                >
+                <span class="text-xs transition-all {item.valid ? 'line-through opacity-50' : ''}">
                     {item.label}
                 </span>
             </div>
@@ -91,9 +78,7 @@
         <div
             class="mt-4 py-2 px-3 rounded-lg bg-zen-success/10 border border-zen-success/20 text-center"
         >
-            <span class="text-xs font-medium text-zen-success"
-                >Ready to proceed</span
-            >
+            <span class="text-xs font-medium text-zen-success">Ready to proceed</span>
         </div>
     {/if}
 </div>

@@ -1,8 +1,8 @@
 <script lang="ts">
-    import { onMount } from "svelte";
-    import { initiateGoogleLogin } from "@zarf/ui/utils/googleAuth";
-    import { dev, err } from "@zarf/core/utils/log";
-    import ZenButton from "@zarf/ui/components/ui/ZenButton.svelte";
+    import { onMount } from 'svelte';
+    import { initiateGoogleLogin } from '@zarf/ui/utils/googleAuth';
+    import { dev, err } from '@zarf/core/utils/log';
+    import ZenButton from '@zarf/ui/components/ui/ZenButton.svelte';
 
     let { contractAddress, isAuthenticated } = $props<{
         contractAddress: string;
@@ -14,19 +14,19 @@
     // Fetch details on mount
     onMount(async () => {
         try {
-            const { readVestingContract } = await import("@zarf/core/contracts");
+            const { readVestingContract } = await import('@zarf/core/contracts');
             const data = await readVestingContract(contractAddress);
             details = { name: data.name, tokenSymbol: data.tokenSymbol };
         } catch (e) {
-            err("Failed to load details", e);
+            err('Failed to load details', e);
         }
     });
 
     function handleLogin() {
-        const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || "";
+        const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
         // Use just origin (like POC) - /claim path not registered in Google Console
-        const REDIRECT_URI = window.location.origin + "/";
-        dev("Initiating Google Login with Redirect URI:", REDIRECT_URI);
+        const REDIRECT_URI = window.location.origin + '/';
+        dev('Initiating Google Login with Redirect URI:', REDIRECT_URI);
 
         // Pass contract address as state to preserve context
         const state = JSON.stringify({ address: contractAddress });
@@ -44,14 +44,12 @@
                 <div
                     class="w-14 h-14 rounded-full bg-zen-primary/5 flex items-center justify-center text-zen-primary font-bold shadow-[var(--zen-shadow-inner)] ring-1 ring-zen-border-subtle text-xl shrink-0"
                 >
-                    {details.tokenSymbol.charAt(0) || "T"}
+                    {details.tokenSymbol.charAt(0) || 'T'}
                 </div>
 
                 <div class="flex-1 min-w-0">
                     <div class="flex items-center gap-3 flex-wrap">
-                        <h2
-                            class="font-bold text-lg text-zen-fg tracking-tight"
-                        >
+                        <h2 class="font-bold text-lg text-zen-fg tracking-tight">
                             {details.name}
                         </h2>
                         <span
@@ -71,17 +69,15 @@
                                 stroke-width="2"
                                 stroke-linecap="round"
                                 stroke-linejoin="round"
-                                ><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"
-                                ></path><polyline points="22 4 12 14.01 9 11.01"
+                                ><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline
+                                    points="22 4 12 14.01 9 11.01"
                                 ></polyline></svg
                             >
                             Verified
                         </div>
                     </div>
                     <div class="flex items-center gap-2 mt-1.5">
-                        <div
-                            class="text-xs uppercase tracking-wider font-bold opacity-30"
-                        >
+                        <div class="text-xs uppercase tracking-wider font-bold opacity-30">
                             Contract
                         </div>
                         <div
@@ -107,9 +103,7 @@
     <!-- Content Area (Blurred State) -->
     <div class="p-8 space-y-6 relative h-full">
         <!-- Fake Content to Represent "Hidden Data" -->
-        <div
-            class="space-y-6 opacity-20 pointer-events-none select-none blur-[2px]"
-        >
+        <div class="space-y-6 opacity-20 pointer-events-none select-none blur-[2px]">
             <div class="flex justify-between items-center">
                 <div class="space-y-2">
                     <div class="h-4 w-24 bg-zen-fg rounded"></div>
@@ -129,16 +123,12 @@
             <div
                 class="absolute inset-0 z-10 flex flex-col items-center justify-center bg-zen-bg/40 backdrop-blur-md p-8 text-center"
             >
-                <div
-                    class="max-w-md w-full space-y-8 animate-in zoom-in fade-in duration-300"
-                >
+                <div class="max-w-md w-full space-y-8 animate-in zoom-in fade-in duration-300">
                     <div class="space-y-2">
-                        <h3 class="font-bold text-xl tracking-tight">
-                            Verify Identity
-                        </h3>
+                        <h3 class="font-bold text-xl tracking-tight">Verify Identity</h3>
                         <p class="text-zen-fg-muted leading-relaxed">
-                            To check for your allocations in this distribution,
-                            you must verify ownership of your email address.
+                            To check for your allocations in this distribution, you must verify
+                            ownership of your email address.
                         </p>
                     </div>
 
@@ -157,19 +147,15 @@
                                 stroke-width="2"
                                 stroke-linecap="round"
                                 stroke-linejoin="round"
-                                ><path
-                                    d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"
-                                ></path></svg
+                                ><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg
                             >
                         </div>
                         <div>
-                            <span
-                                class="font-bold block text-zen-fg mb-0.5"
-                                >Privacy Preserved</span
+                            <span class="font-bold block text-zen-fg mb-0.5">Privacy Preserved</span
                             >
                             <span class="leading-relaxed opacity-80">
-                                Your email is verified off-chain using ZK
-                                Proofs. It is <u>never</u> revealed to the blockchain.
+                                Your email is verified off-chain using ZK Proofs. It is <u>never</u> revealed
+                                to the blockchain.
                             </span>
                         </div>
                     </div>
@@ -210,9 +196,7 @@
             <div
                 class="absolute inset-0 z-10 flex flex-col items-center justify-center bg-zen-bg/95"
             >
-                <div
-                    class="text-center animate-in zoom-in fade-in duration-300"
-                >
+                <div class="text-center animate-in zoom-in fade-in duration-300">
                     <div
                         class="w-16 h-16 bg-zen-success/10 text-zen-success rounded-full flex items-center justify-center mx-auto mb-4 ring-1 ring-zen-success/20"
                     >
@@ -247,8 +231,8 @@
                             stroke-width="2"
                             stroke-linecap="round"
                             stroke-linejoin="round"
-                            ><line x1="5" y1="12" x2="19" y2="12"
-                            ></line><polyline points="12 5 19 12 12 19"
+                            ><line x1="5" y1="12" x2="19" y2="12"></line><polyline
+                                points="12 5 19 12 12 19"
                             ></polyline></svg
                         >
                     </a>
