@@ -17,12 +17,9 @@ class ToastState {
         const id = crypto.randomUUID();
         const toast: Toast = { id, message, type, duration };
         this.toasts.push(toast);
-
-        if (duration > 0) {
-            setTimeout(() => {
-                this.remove(id);
-            }, duration);
-        }
+        // Auto-dismiss is scheduled by ToastContainer so that hover/focus
+        // can pause the countdown (WCAG 2.2.1 Timing Adjustable). The
+        // store keeps `duration` on the toast as the source of truth.
     }
 
     remove(id: string) {
