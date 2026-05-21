@@ -34,7 +34,7 @@ const CONSOLE_PATTERN = /\bconsole\.(log|warn|error|info|debug|trace)\b/;
 
 const WEB_ROOT = resolve(import.meta.dirname, '..');
 const SCAN_ROOTS = ['apps', 'packages'];
-const SKIP_DIRS = new Set(['node_modules', '.svelte-kit', 'dist', 'build', '.turbo']);
+const SKIP_DIRS = new Set(['node_modules', '.svelte-kit', 'dist', 'build', '.turbo', '.wrangler']);
 const SCAN_EXTS = new Set(['.ts', '.tsx', '.svelte', '.svelte.ts', '.mjs', '.js']);
 
 const WHOLE_FILE = 'whole-file';
