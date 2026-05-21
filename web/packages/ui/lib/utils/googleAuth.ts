@@ -278,11 +278,46 @@ export function clearUrlFragment(): void {
 // ============================================================================
 
 /**
+ * Google OIDC accepts both bare and full-URL issuers in the wild; the
+ * spec lists `https://accounts.google.com` but tokens issued via newer
+ * flows sometimes carry the bare form. Accepting both matches what the
+ * google-auth-library and Firebase SDKs do.
+ */
+const GOOGLE_ISSUERS = new Set(['https://accounts.google.com', 'accounts.google.com']);
+
+/**
+ * Asserts a decoded Google JWT's `iss` and `aud` claims.
+ *
+ * Pairs with {@link decodeJwt} — decode produces the payload, validate
+ * gates it against the expected issuer + audience before any caller
+ * trusts the email / sub / exp fields. Callers should validate at the
+ * earliest point a token enters the trust boundary (OAuth callback,
+ * session restore from storage). Throwing here aborts the trust path
+ * and is caught by the caller's existing error handler.
+ *
+ * Does NOT verify the JWT signature — that still happens in the Noir
+ * circuit. This function only checks the structured claims an attacker
+ * with a forged-but-unsigned token could lie about, which is enough
+ * to reject the trivial "wrong-Google-app JWT" attack class.
+ *
+ * @throws {Error} If iss is not a Google issuer
+ * @throws {Error} If aud does not match the configured client ID
+ */
+export function validateGoogleClaims(payload: JWTPayload, opts: { clientId: string }): void {
+    if (!GOOGLE_ISSUERS.has(payload.iss)) {
+        throw new Error(`Invalid JWT issuer: ${payload.iss}`);
+    }
+    if (payload.aud !== opts.clientId) {
+        throw new Error('JWT audience does not match expected client ID');
+    }
+}
+
+/**
  * Decodes a JWT without verification.
  *
  * WARNING: This does NOT verify the signature. Verification happens in the
- * ZK circuit (Noir) using the public key. This function is only for extracting
- * claims for display purposes.
+ * ZK circuit (Noir) using the public key. Callers MUST pair decodeJwt with
+ * {@link validateGoogleClaims} before trusting any claim (email, sub, exp).
  *
  * @param jwt - The JWT string (format: header.payload.signature)
  * @returns Decoded header and payload
@@ -293,7 +328,8 @@ export function clearUrlFragment(): void {
  * ```typescript
  * const token = extractTokenFromUrl();
  * const decoded = decodeJwt(token);
- * console.log(decoded.payload.email); // user@example.com
+ * validateGoogleClaims(decoded.payload, { clientId: VITE_GOOGLE_CLIENT_ID });
+ * console.log(decoded.payload.email); // user@example.com — now trusted
  * console.log(decoded.header.kid);    // Key ID for verification
  * ```
  */

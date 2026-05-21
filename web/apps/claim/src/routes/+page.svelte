@@ -7,6 +7,7 @@
         extractStateFromUrl,
         clearUrlFragment,
         decodeJwt,
+        validateGoogleClaims,
     } from '@zarf/ui/utils/googleAuth';
     import ImportContractInput from '$lib/components/claim/ImportContractInput.svelte';
     import LoginPrompt from '$lib/components/claim/LoginPrompt.svelte';
@@ -83,6 +84,13 @@
             try {
                 // Decode to get email for display/validation
                 const { payload } = decodeJwt(idToken);
+
+                // Gate the token's claims against the configured Google
+                // client — rejects forged or wrong-app JWTs at the trust
+                // boundary before any caller reads payload.email.
+                validateGoogleClaims(payload, {
+                    clientId: import.meta.env.VITE_GOOGLE_CLIENT_ID ?? '',
+                });
 
                 // Store in AuthStore (Session only)
                 authStore.setGmailSession({

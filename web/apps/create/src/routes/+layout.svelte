@@ -22,7 +22,7 @@
             themeStore.restore();
             networkStore.restore();
             walletStore.init();
-            authStore.restoreGmailSession();
+            authStore.restoreGmailSession(import.meta.env.VITE_GOOGLE_CLIENT_ID ?? '');
         }
         return () => walletStore.destroy();
     });

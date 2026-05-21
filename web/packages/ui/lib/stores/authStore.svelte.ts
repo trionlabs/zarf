@@ -1,5 +1,5 @@
 import { browser } from '$app/environment';
-import { decodeJwt } from '../utils/googleAuth';
+import { decodeJwt, validateGoogleClaims } from '../utils/googleAuth';
 import { STORAGE_KEYS } from '@zarf/core/constants/storage';
 import { dev, warn, err } from '@zarf/core/utils/log';
 
@@ -65,14 +65,20 @@ function clearGmailSession() {
 /**
  * Restores session from storage and validates JWT integrity.
  * Always marks isHydrated = true at the end, regardless of session state.
+ *
+ * @param clientId - Expected `aud` for the stored Google OIDC token.
+ *                   Required so the store rejects sessions from a
+ *                   different Google client (forged or stale). Missing
+ *                   or wrong clientId fails closed via clearGmailSession.
  */
-function restoreGmailSession() {
+function restoreGmailSession(clientId: string) {
     if (!browser) return;
 
     const jwt = sessionStorage.getItem(STORAGE_KEYS.GMAIL_JWT);
     if (jwt) {
         try {
             const { payload } = decodeJwt(jwt);
+            validateGoogleClaims(payload, { clientId });
             const now = Math.floor(Date.now() / 1000);
 
             if (payload.exp < now) {
