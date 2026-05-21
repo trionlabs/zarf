@@ -140,11 +140,13 @@
                 href="https://x.com/trionlabs"
                 target="_blank"
                 rel="noopener noreferrer"
+                aria-label="Follow Zarf on X"
                 class="inline-block"
             >
                 <ZenButton
                     variant="ghost"
                     size="sm"
+                    aria-label="Follow Zarf on X"
                     class="rounded-full bg-base-content/5 text-base-content/70 border border-base-content/8 hover:text-base-content hover:bg-base-content/10 !ring-0 px-4 py-1.5"
                 >
                     {#snippet iconLeft()}
@@ -271,6 +273,7 @@
                         href="https://x.com/trionlabs"
                         target="_blank"
                         rel="noopener noreferrer"
+                        aria-label="Zarf on X"
                         class="hover:text-base-content/70 transition-colors duration-300 flex items-center gap-1.5"
                     >
                         <svg

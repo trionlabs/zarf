@@ -148,12 +148,12 @@
                                     pointer-events: {activeIndex === i ? 'auto' : 'none'};
                                 "
                             >
-                                <h3 class="text-2xl md:text-3xl lg:text-4xl font-semibold mb-3 tracking-tight text-base-content">
+                                <h2 class="text-2xl md:text-3xl lg:text-4xl font-semibold mb-3 tracking-tight text-base-content">
                                     {step.title}
-                                </h3>
-                                <h4 class="text-base md:text-lg text-base-content/45 mb-4 font-normal">
+                                </h2>
+                                <h3 class="text-base md:text-lg text-base-content/45 mb-4 font-normal">
                                     {step.subtitle}
-                                </h4>
+                                </h3>
                                 <p class="text-sm md:text-base leading-relaxed text-base-content/40 max-w-md">
                                     {step.desc}
                                 </p>

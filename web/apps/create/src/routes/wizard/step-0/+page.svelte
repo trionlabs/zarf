@@ -265,7 +265,7 @@
                     </ZenCard>
                 </div>
             {:else if !tokenAddress}
-                <p class="text-zen-fg-faint text-sm font-light">
+                <p class="text-zen-fg-muted text-sm font-light">
                     Supports Stellar
                 </p>
             {/if}
