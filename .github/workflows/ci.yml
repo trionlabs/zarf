@@ -89,3 +89,12 @@ jobs:
           pnpm --dir web --filter @zarf/indexer typecheck
           pnpm --dir web --filter @zarf/pin-proxy typecheck
           pnpm --dir web --filter @zarf/jwk-rotation typecheck
+
+      # Drift gates — no build artifacts required.
+      # check:budget is intentionally NOT here; it reads
+      # .svelte-kit/output/client and needs a build step prefix.
+      - name: Check explicit any allow-list
+        run: pnpm --dir web check:any
+
+      - name: Check direct console.* allow-list
+        run: pnpm --dir web check:console
