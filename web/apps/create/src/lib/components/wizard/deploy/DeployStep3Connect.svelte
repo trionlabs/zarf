@@ -2,7 +2,8 @@
     import { walletStore } from "@zarf/ui/stores/walletStore.svelte";
     import { deployStore } from "../../../stores/deployStore.svelte";
     import { wizardStore } from "../../../stores/wizardStore.svelte";
-    import { getTokenBalance, readTokenContract } from "@zarf/core/contracts";
+    // Contracts module dynamic-imported inside checkTokenBalance so the
+    // stellar-sdk + buffer closure doesn't load at SSR module evaluation.
     import { formatTokenAmount, parseTokenAmount } from "@zarf/core/utils/amount";
     import {
         Wallet,
@@ -63,6 +64,9 @@
             const tokenAddress = wizardStore.tokenDetails.tokenAddress;
             if (!tokenAddress) throw new Error("No token address configured");
 
+            const { getTokenBalance, readTokenContract } = await import(
+                "@zarf/core/contracts"
+            );
             const metadata = await readTokenContract(tokenAddress);
             const decimals =
                 metadata.decimals ?? wizardStore.tokenDetails.tokenDecimals ?? 7;

@@ -15,7 +15,7 @@
         fetchTokenMetadata,
         type TokenMetadata,
     } from "$lib/services/tokenMetadata";
-    import { isValidContractAddress } from "@zarf/core/utils/address";
+    import { isValidContractAddressShape as isValidContractAddress } from "@zarf/core/utils/addressShape";
     import { fade, fly } from "svelte/transition";
     import ZenButton from "@zarf/ui/components/ui/ZenButton.svelte";
     import ZenCard from "@zarf/ui/components/ui/ZenCard.svelte";

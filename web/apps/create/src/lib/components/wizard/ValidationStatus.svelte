@@ -1,6 +1,6 @@
 <script lang="ts">
     import { wizardStore } from "../../stores/wizardStore.svelte";
-    import { isValidContractAddress } from "@zarf/core/utils/address";
+    import { isValidContractAddressShape as isValidContractAddress } from "@zarf/core/utils/addressShape";
     import { Check, X } from "lucide-svelte";
 
     // Validation rules for Step 0 (Token Entry)

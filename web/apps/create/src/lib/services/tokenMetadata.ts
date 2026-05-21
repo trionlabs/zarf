@@ -1,10 +1,15 @@
 /**
  * Stellar token metadata service.
+ *
+ * The shape-only validator from addressShape keeps SSR module
+ * evaluation free of @stellar/stellar-sdk, and the contracts module
+ * is dynamic-imported inside fetchTokenMetadata so the StellarSdk +
+ * buffer polyfill closure only loads in the browser when the user
+ * actually triggers a token lookup.
  */
 
-import { readTokenContract } from '@zarf/core/contracts';
 import type { StellarContractId } from '@zarf/core/types';
-import { isValidContractAddress } from '@zarf/core/utils/address';
+import { isValidContractAddressShape } from '@zarf/core/utils/addressShape';
 
 export interface TokenMetadata {
     name: string | null;
@@ -23,7 +28,7 @@ export interface FetchTokenMetadataResult {
 export async function fetchTokenMetadata(
     tokenAddress: StellarContractId,
 ): Promise<FetchTokenMetadataResult> {
-    if (!isValidContractAddress(tokenAddress)) {
+    if (!isValidContractAddressShape(tokenAddress)) {
         return {
             success: false,
             data: null,
@@ -32,6 +37,7 @@ export async function fetchTokenMetadata(
     }
 
     try {
+        const { readTokenContract } = await import('@zarf/core/contracts');
         const metadata = await readTokenContract(tokenAddress);
         if (metadata.decimals === null || (!metadata.name && !metadata.symbol)) {
             return {
