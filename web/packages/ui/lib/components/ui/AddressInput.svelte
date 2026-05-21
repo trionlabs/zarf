@@ -50,6 +50,9 @@
         <input
             type="text"
             {placeholder}
+            autocomplete="off"
+            autocapitalize="none"
+            spellcheck="false"
             class="
                 flex-1 px-4 py-3.5
                 bg-transparent

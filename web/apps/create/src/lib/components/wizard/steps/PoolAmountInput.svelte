@@ -107,6 +107,8 @@
             oninput={handleAmountInput}
             placeholder="0"
             aria-label="Distribution Pool Amount"
+            inputmode="decimal"
+            autocomplete="off"
             class="w-80 bg-transparent border-none !text-5xl font-medium tracking-tighter leading-none text-right placeholder:text-zen-fg/10 text-zen-fg focus:outline-none focus:ring-0 transition-all"
         />
         <span class="text-zen-fg/50 text-lg font-medium">

@@ -147,6 +147,8 @@
                 bind:value={tokenAddress}
                 oninput={handleAddressInput}
                 spellcheck="false"
+                autocomplete="off"
+                autocapitalize="none"
             />
 
             <!-- Paste Button (Visible when empty) -->
