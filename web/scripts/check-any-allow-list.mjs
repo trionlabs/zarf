@@ -27,7 +27,7 @@ const ANY_PATTERN = /:\s*any\b|<any>|\bas any\b/;
 const WEB_ROOT = resolve(import.meta.dirname, '..');
 const SCAN_ROOTS = ['apps', 'packages'];
 const SKIP_DIRS = new Set(['node_modules', '.svelte-kit', 'dist', 'build', '.turbo']);
-const SCAN_EXTS = new Set(['.ts', '.tsx', '.svelte', '.svelte.ts', '.mjs']);
+const SCAN_EXTS = new Set(['.ts', '.tsx', '.svelte', '.svelte.ts', '.mjs', '.js']);
 
 // Allow-list: { file (relative to web/), entries: [{ content, reason }] }.
 // `content` matches the trimmed line exactly. Reason is for reviewers

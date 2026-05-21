@@ -35,7 +35,7 @@ const CONSOLE_PATTERN = /\bconsole\.(log|warn|error|info|debug|trace)\b/;
 const WEB_ROOT = resolve(import.meta.dirname, '..');
 const SCAN_ROOTS = ['apps', 'packages'];
 const SKIP_DIRS = new Set(['node_modules', '.svelte-kit', 'dist', 'build', '.turbo']);
-const SCAN_EXTS = new Set(['.ts', '.tsx', '.svelte', '.svelte.ts', '.mjs']);
+const SCAN_EXTS = new Set(['.ts', '.tsx', '.svelte', '.svelte.ts', '.mjs', '.js']);
 
 const WHOLE_FILE = 'whole-file';
 
@@ -80,9 +80,30 @@ const ALLOWLIST = {
         entries: WHOLE_FILE,
         reason: 'Web Worker — separate log channel, intentional direct calls',
     },
+    // ZK prover host bridge — mirrors worker-side log shape. 5 stable
+    // sites pinned per-line so a 6th call must justify itself.
     'packages/core/lib/zk/index.ts': {
+        entries: [
+            { content: "console.error('[ZK Prover Error]', message);",
+              reason: 'forwards worker error to host console — intentional direct call' },
+            { content: "catch (e) { console.error('[ZK Prover] onProgress threw:', e); }",
+              reason: 'catch around user-supplied callback — intentional' },
+            { content: "console.log('[ZK Prover]', message);",
+              reason: 'progress passthrough from worker — intentional direct call' },
+            { content: "console.error('[ZK Prover Worker Error]', e);",
+              reason: 'unhandled worker error — intentional' },
+            { content: "console.error('Failed to initialize ZK Worker:', e);",
+              reason: 'worker init failure — intentional, surfaces in prod logs' },
+        ],
+    },
+
+    // Build script — CLI feedback during `pnpm build`. The DEV helper
+    // and warn/err wrappers are runtime-only (import.meta.env.DEV is
+    // undefined in build-time Node scripts). Stays on direct console.*
+    // until a build-script log helper lands.
+    'packages/core/scripts/copy-wasm.js': {
         entries: WHOLE_FILE,
-        reason: 'ZK prover host bridge — mirrors worker-side log shape',
+        reason: 'build script — CLI progress + error feedback, no runtime gate available',
     },
 
     // App bootstrap shim chatter — operators rely on these lines in
