@@ -5,6 +5,15 @@ import wasm from 'vite-plugin-wasm';
 import topLevelAwait from 'vite-plugin-top-level-await';
 import { nodePolyfills } from 'vite-plugin-node-polyfills';
 import { visualizer } from 'rollup-plugin-visualizer';
+import { createRequire } from 'node:module';
+
+const requireFromHere = createRequire(import.meta.url);
+// Pre-resolve pino's browser entry against this app's node_modules so
+// the virtual shim below can reference an absolute path. The bare
+// `pino/browser.js` specifier used to work in `vite dev` but Rollup's
+// production build resolves imports relative to the importing module,
+// and a virtual module has no on-disk location to walk from.
+const PINO_BROWSER_PATH = requireFromHere.resolve('pino/browser.js');
 
 // Stub large browser-only libraries during SSR.
 const productionStub = (): Plugin => {
@@ -38,7 +47,11 @@ const productionStub = (): Plugin => {
 // Vite's CJS-to-ESM interop and crashes Barretenberg init with
 // `does not provide an export named 'pino'`. Intercept the bare `pino`
 // import and serve a virtual module that re-exports the factory under
-// both `default` and a named `pino` export.
+// both `default` and a named `pino` export. The inner import is
+// baked from PINO_BROWSER_PATH (absolute, resolved at config eval
+// time) so Rollup's production pass can resolve it — a bare
+// `pino/browser.js` specifier works for `vite dev` but Rollup walks
+// relative to the importing module and the virtual id has none.
 const pinoNamedShim = (): Plugin => ({
 	name: 'pino-named-shim',
 	enforce: 'pre',
@@ -49,7 +62,7 @@ const pinoNamedShim = (): Plugin => ({
 	load(id) {
 		if (id !== '\0virtual:pino-named-shim') return null;
 		return [
-			"import pinoFactory from 'pino/browser.js';",
+			`import pinoFactory from ${JSON.stringify(PINO_BROWSER_PATH)};`,
 			'export default pinoFactory;',
 			'export const pino = pinoFactory;',
 		].join('\n');
@@ -163,7 +176,13 @@ export default defineConfig({
 		global: 'globalThis',
 	},
 	ssr: {
-		// Externalize buffer to use Node.js native Buffer during SSR
+		// `external: ['buffer']` is a production-SSR belt: it tells the
+		// Rollup SSR pass to use Node's native Buffer instead of the
+		// npm buffer polyfill. It does NOT fix `vite dev` SSR — the dev
+		// module runner will still try to evaluate `buffer/index.js`
+		// and crash on its top-level require() if reachable. The real
+		// fix is keeping the npm buffer package out of the SSR module
+		// graph (see addressShape + dynamic contracts).
 		external: ['buffer'],
 		// Force bundle these to allow stubbing their large browser-only libs.
 		noExternal: [
