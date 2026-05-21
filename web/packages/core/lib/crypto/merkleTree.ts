@@ -274,45 +274,6 @@ export async function computeIdentityCommitment(
     return BigInt(identity.toString());
 }
 
-/**
- * Generate a random salt within BN254 field modulus.
- *
- * @returns Random salt as hex string
- *
- * @example
- * const code = generateSecureCode();
- * // "Xk9mP2qL"
- * ```
- */
-/**
- * Generate a random salt within BN254 field modulus.
- *
- * @returns Random 8-character alphanumeric code
- */
-export function generateSecureCode(): string {
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789'; // Base58-like (no I, l, O, 0)
-    const length = 8;
-    const randomValues = new Uint8Array(length);
-
-    // Use Web Crypto API (Browser & Modern environments) for CSP compliance and security
-    if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
-        crypto.getRandomValues(randomValues);
-    } else {
-        // Fallback for environments without Web Crypto
-        // Using Math.random is NOT cryptographically secure but prevents build errors.
-        console.warn('Warning: Using non-secure RNG for salt generation');
-        for (let i = 0; i < length; i++) {
-            randomValues[i] = Math.floor(Math.random() * 256);
-        }
-    }
-
-    let result = '';
-    for (let i = 0; i < length; i++) {
-        result += chars[randomValues[i] % chars.length];
-    }
-    return result;
-}
-
 // ============================================================================
 // Empty Tree Cache
 // ============================================================================
