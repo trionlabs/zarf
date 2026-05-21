@@ -33,7 +33,7 @@
     </ZarfNavbar>
 
     <!-- Main Content Area -->
-    <main id="main" class="w-full">
+    <main id="main" tabindex="-1" class="w-full">
         <!-- Inner Container with subtle inset feel (Zen Pro) -->
         <div class="h-full">
             <div class="w-full p-6 lg:p-8">

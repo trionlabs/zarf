@@ -12,6 +12,6 @@
 <a href="#main" class="skip-link">Skip to content</a>
 
 <!-- Grain overlay is handled in +page.svelte with custom settings -->
-<main id="main">
+<main id="main" tabindex="-1">
     <slot />
 </main>
