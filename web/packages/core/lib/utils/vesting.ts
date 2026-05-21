@@ -107,7 +107,7 @@ export function generateUnlockMarkers(
         const actualEvent = Math.min(eventNum, unlockEvents);
         const percentCompletion = actualEvent / unlockEvents;
 
-        let unlockDate = new Date(cliffDate.getTime());
+        const unlockDate = new Date(cliffDate.getTime());
 
         switch (durationUnit) {
             case "minutes":

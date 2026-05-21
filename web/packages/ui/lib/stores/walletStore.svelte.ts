@@ -55,7 +55,7 @@ const initialState: WalletState = {
     isModalOpen: false // Added
 };
 
-let state = $state<WalletState>(structuredClone(initialState));
+const state = $state<WalletState>(structuredClone(initialState));
 let unwatchFn: (() => void) | null = null;
 let isInitialized = false;
 
@@ -137,7 +137,9 @@ async function init() {
     state.isReconnecting = true;
 
     // 1. Attempt Auto-Reconnect
-    try { await stellarReconnect(); } catch (e) { } finally { state.isReconnecting = false; }
+    // Reconnect failure is expected on first visit / cleared session;
+    // swallow and proceed with a disconnected initial state.
+    try { await stellarReconnect(); } catch { /* no-op */ } finally { state.isReconnecting = false; }
     if (!isInitialized) return; // destroy() ran during reconnect
 
     // 2. Initial Sync
