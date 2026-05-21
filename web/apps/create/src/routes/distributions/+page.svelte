@@ -112,6 +112,14 @@
     }
 </script>
 
+<svelte:head>
+    <title>My Distributions — Zarf Create</title>
+    <meta
+        name="description"
+        content="Manage your privacy-preserving token distributions deployed on Stellar."
+    />
+</svelte:head>
+
 <div
     class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 h-full flex flex-col gap-8"
 >

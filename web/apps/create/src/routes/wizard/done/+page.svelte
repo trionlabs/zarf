@@ -43,6 +43,14 @@
     }
 </script>
 
+<svelte:head>
+    <title>Distribution Deployed — Zarf Create</title>
+    <meta
+        name="description"
+        content="Your privacy-preserving token distribution has been deployed on Stellar."
+    />
+</svelte:head>
+
 <div
     class="h-full flex flex-col justify-center items-center max-w-3xl mx-auto py-12 text-center"
 >

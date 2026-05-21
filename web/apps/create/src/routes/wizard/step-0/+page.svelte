@@ -129,6 +129,14 @@
     }
 </script>
 
+<svelte:head>
+    <title>Token Details — Create Distribution — Zarf</title>
+    <meta
+        name="description"
+        content="Step 1 of 3: enter the Stellar token contract for your distribution."
+    />
+</svelte:head>
+
 <div
     class="min-h-[50vh] flex flex-col items-center justify-center p-4 relative overflow-hidden"
 >

@@ -156,6 +156,14 @@
     const creationSteps = CREATION_STEPS;
 </script>
 
+<svelte:head>
+    <title>Recipients & Schedule — Create Distribution — Zarf</title>
+    <meta
+        name="description"
+        content="Step 2 of 3: add recipients and configure the vesting schedule."
+    />
+</svelte:head>
+
 <div class="flex flex-col lg:flex-row gap-8 items-start p-2">
     <!-- LEFT COLUMN: Form Wizard -->
     <div class="flex-1 w-full lg:max-w-xl flex flex-col min-h-[400px]">

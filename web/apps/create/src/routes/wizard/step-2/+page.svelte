@@ -83,6 +83,14 @@
     }
 </script>
 
+<svelte:head>
+    <title>Review & Deploy — Create Distribution — Zarf</title>
+    <meta
+        name="description"
+        content="Step 3 of 3: review the distribution and deploy to Stellar."
+    />
+</svelte:head>
+
 <div
     class="h-full flex flex-col relative max-w-5xl w-full px-4 md:px-0 transition-all duration-300 ml-0"
 >

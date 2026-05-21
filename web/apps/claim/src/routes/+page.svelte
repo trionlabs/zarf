@@ -140,6 +140,14 @@
     });
 </script>
 
+<svelte:head>
+    <title>Claim Tokens — Zarf</title>
+    <meta
+        name="description"
+        content="Sign in with email to discover and claim your privacy-preserving token distributions on Stellar."
+    />
+</svelte:head>
+
 <div
     class="h-full flex flex-col relative max-w-5xl w-full px-4 md:px-0 transition-all duration-300"
 >
