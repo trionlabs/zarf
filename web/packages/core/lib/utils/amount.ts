@@ -23,7 +23,7 @@ export function formatTokenAmount(value: bigint, decimals: number, maxFractionDi
     const fraction = value % divisor;
 
     if (fraction === 0n || maxFractionDigits === 0) {
-        return whole.toLocaleString();
+        return whole.toLocaleString('en-US');
     }
 
     const fractionText = fraction
@@ -32,5 +32,5 @@ export function formatTokenAmount(value: bigint, decimals: number, maxFractionDi
         .slice(0, maxFractionDigits)
         .replace(/0+$/, '');
 
-    return fractionText ? `${whole.toLocaleString()}.${fractionText}` : whole.toLocaleString();
+    return fractionText ? `${whole.toLocaleString('en-US')}.${fractionText}` : whole.toLocaleString('en-US');
 }

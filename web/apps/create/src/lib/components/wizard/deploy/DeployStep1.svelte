@@ -137,7 +137,7 @@
                         >Token Amount</span
                     >
                     <span class="font-mono font-bold text-lg"
-                        >{Number(distribution.amount).toLocaleString()}</span
+                        >{Number(distribution.amount).toLocaleString('en-US')}</span
                     >
                 </div>
                 <div>

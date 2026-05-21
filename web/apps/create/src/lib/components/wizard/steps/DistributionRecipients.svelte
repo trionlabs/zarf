@@ -76,7 +76,7 @@
             return (num / 1000000).toFixed(1).replace(/\.0$/, "") + "M";
         if (num >= 1000)
             return (num / 1000).toFixed(1).replace(/\.0$/, "") + "K";
-        return num.toLocaleString();
+        return num.toLocaleString('en-US');
     }
 
     async function handleFileUpload(event: Event) {
@@ -462,7 +462,7 @@
                             <span
                                 class="text-sm font-medium text-zen-fg tabular-nums"
                             >
-                                {row.amount.toLocaleString()}
+                                {row.amount.toLocaleString('en-US')}
                             </span>
                         </div>
                     {/each}
@@ -477,7 +477,7 @@
                     >Total Rows: {recipients.length}</span
                 >
                 <span class="text-xs font-medium text-zen-fg/70"
-                    >Sum: {csvTotal.toLocaleString()} {tokenSymbol}</span
+                    >Sum: {csvTotal.toLocaleString('en-US')} {tokenSymbol}</span
                 >
             </div>
         </div>

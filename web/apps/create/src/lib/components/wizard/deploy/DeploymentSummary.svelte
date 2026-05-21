@@ -62,7 +62,7 @@
                     Total Allocation
                 </div>
                 <div class="font-mono text-xl font-bold">
-                    {Number(distribution.amount).toLocaleString()}
+                    {Number(distribution.amount).toLocaleString('en-US')}
                     <span
                         class="text-sm font-normal text-zen-fg-subtle"
                         >{tokenDetails.tokenSymbol}</span
@@ -92,7 +92,7 @@
                             {distribution.schedule.cliffEndDate
                                 ? new Date(
                                       distribution.schedule.cliffEndDate,
-                                  ).toLocaleDateString()
+                                  ).toLocaleDateString('en-US')
                                 : "None"}
                         </div>
                     </div>

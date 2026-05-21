@@ -159,7 +159,7 @@
             </div>
         </div>
         <p class="text-xs text-zen-fg-muted pl-20">
-            Total Supply: {totalSupply.toLocaleString()}
+            Total Supply: {totalSupply.toLocaleString('en-US')}
             {tokenSymbol}
         </p>
     {/if}

@@ -152,7 +152,7 @@
                         {recipient.email}
                     </span>
                     <span class="font-mono text-zen-fg text-xs">
-                        {recipient.amount.toLocaleString()}
+                        {recipient.amount.toLocaleString('en-US')}
                         {tokenDetails.tokenSymbol || ""}
                     </span>
                 </div>
