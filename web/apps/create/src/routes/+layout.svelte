@@ -8,7 +8,7 @@
     import { onMount } from "svelte";
     import { browser } from "$app/environment";
     import { page } from "$app/state";
-    import AppShell from "$lib/components/layout/AppShell.svelte";
+    import AppShell from "@zarf/ui/components/layout/AppShell.svelte";
     import { LayoutGrid, PlusCircle, X } from "lucide-svelte";
     import WalletSelectionModal from "@zarf/ui/components/wallet/WalletSelectionModal.svelte";
     import ZenAlert from "@zarf/ui/components/ui/ZenAlert.svelte";
@@ -50,7 +50,32 @@
 
 <WalletSelectionModal />
 
-<AppShell>
+<AppShell
+    showWallet
+    rootClass="selection:bg-zen-primary-muted selection:text-zen-fg"
+>
+    {#snippet nav()}
+        <a
+            href="/wizard/step-0"
+            class="text-xs font-medium transition-colors hover:text-zen-fg {page.url.pathname.startsWith(
+                '/wizard',
+            )
+                ? 'text-zen-fg'
+                : 'text-zen-fg-muted'}"
+        >
+            Create
+        </a>
+        <a
+            href="/distributions"
+            class="text-xs font-medium transition-colors hover:text-zen-fg {page.url.pathname.startsWith(
+                '/distributions',
+            )
+                ? 'text-zen-fg'
+                : 'text-zen-fg-muted'}"
+        >
+            Distributions
+        </a>
+    {/snippet}
     {@render children()}
 </AppShell>
 
