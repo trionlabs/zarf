@@ -51,6 +51,8 @@
     />
 </svelte:head>
 
+<h1 class="sr-only">Distribution Deployed</h1>
+
 <div
     class="h-full flex flex-col justify-center items-center max-w-3xl mx-auto py-12 text-center"
 >

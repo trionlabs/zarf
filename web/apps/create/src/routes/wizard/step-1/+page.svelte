@@ -164,6 +164,8 @@
     />
 </svelte:head>
 
+<h1 class="sr-only">Create Distribution — Step 2: Recipients and Schedule</h1>
+
 <div class="flex flex-col lg:flex-row gap-8 items-start p-2">
     <!-- LEFT COLUMN: Form Wizard -->
     <div class="flex-1 w-full lg:max-w-xl flex flex-col min-h-[400px]">

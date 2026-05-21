@@ -137,6 +137,8 @@
     />
 </svelte:head>
 
+<h1 class="sr-only">Create Distribution — Step 1: Token Details</h1>
+
 <div
     class="min-h-[50vh] flex flex-col items-center justify-center p-4 relative overflow-hidden"
 >
