@@ -15,6 +15,11 @@ const requireFromHere = createRequire(import.meta.url);
 // `pino/browser.js` specifier used to work in `vite dev` but Rollup's
 // production build resolves imports relative to the importing module,
 // and a virtual module has no on-disk location to walk from.
+//
+// pino is a TRANSITIVE dependency via @aztec/bb.js; nothing in this
+// repo lists it directly. If bb.js ever drops pino or pnpm hoisting
+// changes, this resolve() throws at config eval — promote pino to a
+// direct dependency in this app's package.json then.
 const PINO_BROWSER_PATH = requireFromHere.resolve('pino/browser.js');
 
 // Stub large browser-only libraries during SSR.
