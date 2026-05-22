@@ -79,7 +79,7 @@
     } as const;
 
     const baseClasses = `
-        transition-all duration-200
+        transition-all duration-[var(--zen-motion-base)]
         text-zen-fg placeholder:text-zen-fg/20
         disabled:opacity-50 disabled:cursor-not-allowed
         focus:outline-none bg-transparent

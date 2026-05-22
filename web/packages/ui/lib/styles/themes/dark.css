@@ -133,6 +133,10 @@
     --zen-highlight-bg: oklch(20% 0.005 260);
     --zen-highlight-fg: oklch(78% 0.008 260);
 
+    /* Dialog/slide-over scrim - pure black further deepens the #121212
+     canvas behind the modal, capturing focus rather than diluting it. */
+    --zen-scrim: oklch(0% 0 0);
+
     /* Dark mode shadows - deeper, with subtle warm tint */
     --zen-shadow-xs: 0 1px 2px 0 oklch(0% 0 0 / 0.3);
 

@@ -15,13 +15,13 @@
     <div class="mx-auto px-6 max-w-6xl">
         <!-- Header -->
         <div class="text-center mb-20">
-            <p class="text-base-content/30 text-xs font-medium tracking-[0.2em] uppercase mb-4">
+            <p class="text-zen-fg-muted text-xs font-medium tracking-[0.2em] uppercase mb-4">
                 Features
             </p>
             <h2 class="text-4xl md:text-5xl font-semibold tracking-tight text-base-content mb-5">
                 Privacy-First Distribution
             </h2>
-            <p class="text-base-content/40 text-lg md:text-xl max-w-lg mx-auto">
+            <p class="text-zen-fg-muted text-lg md:text-xl max-w-lg mx-auto">
                 ZK powered, Web3 mindset, Web2 experience
             </p>
         </div>
@@ -45,12 +45,13 @@
                     class="relative aspect-[4/3] rounded-2xl overflow-hidden mb-6 bg-gradient-to-b from-base-content/[0.015] to-transparent"
                 >
                     <svg
+                        aria-hidden="true"
                         class="absolute inset-0 w-full h-full"
                         viewBox="0 0 400 300"
                         preserveAspectRatio="xMidYMid meet"
                     >
                         <!-- Outer expanding rings -->
-                        {#each [140, 115, 90, 65] as r, i}
+                        {#each [140, 115, 90, 65] as r, i (r)}
                             <circle
                                 cx="200"
                                 cy="150"
@@ -102,7 +103,7 @@
                         />
 
                         <!-- Orbital particles -->
-                        {#each Array(12) as _, i}
+                        {#each Array(12) as _, i (i)}
                             {@const angle = i * 30}
                             {@const baseR = 45}
                             {@const expandR = 130}
@@ -154,7 +155,7 @@
                     <h3 class="text-xl lg:text-2xl font-semibold text-base-content mb-2">
                         Privacy powered with ZK
                     </h3>
-                    <p class="text-base-content/40 text-sm lg:text-base leading-relaxed">
+                    <p class="text-zen-fg-muted text-sm lg:text-base leading-relaxed">
                         Distribute tokens without exposing recipient identities on-chain.
                     </p>
                 </div>
@@ -177,6 +178,7 @@
                     class="relative aspect-[4/3] rounded-2xl overflow-hidden mb-6 bg-gradient-to-b from-base-content/[0.015] to-transparent"
                 >
                     <svg
+                        aria-hidden="true"
                         class="absolute inset-0 w-full h-full"
                         viewBox="0 0 400 300"
                         preserveAspectRatio="xMidYMid meet"
@@ -204,7 +206,7 @@
                         />
 
                         <!-- Milestone markers -->
-                        {#each [{ x: 225, y: 140, label: 'cliff', delay: 300 }, { x: 125, y: 80, label: '1y', delay: 500 }, { x: 330, y: 200, label: '2y', delay: 700 }, { x: 40, y: 100, label: '3y', delay: 900 }, { x: 120, y: 290, label: '4y', delay: 1100 }] as mark}
+                        {#each [{ x: 225, y: 140, label: 'cliff', delay: 300 }, { x: 125, y: 80, label: '1y', delay: 500 }, { x: 330, y: 200, label: '2y', delay: 700 }, { x: 40, y: 100, label: '3y', delay: 900 }, { x: 120, y: 290, label: '4y', delay: 1100 }] as mark (mark.label)}
                             <g
                                 class="transition-all ease-out"
                                 style="
@@ -273,7 +275,7 @@
                     <h3 class="text-xl lg:text-2xl font-semibold text-base-content mb-2">
                         On-chain & Programmable
                     </h3>
-                    <p class="text-base-content/40 text-sm lg:text-base leading-relaxed">
+                    <p class="text-zen-fg-muted text-sm lg:text-base leading-relaxed">
                         Configure cliff periods and linear release schedules in smart contracts.
                     </p>
                 </div>
@@ -296,6 +298,7 @@
                     class="relative aspect-[4/3] rounded-2xl overflow-hidden mb-6 bg-gradient-to-b from-base-content/[0.015] to-transparent"
                 >
                     <svg
+                        aria-hidden="true"
                         class="absolute inset-0 w-full h-full"
                         viewBox="0 0 400 300"
                         preserveAspectRatio="xMidYMid meet"
@@ -370,7 +373,7 @@
                         />
 
                         <!-- Traveling pulses with glow -->
-                        {#each [0, 0.33, 0.66] as offset, i}
+                        {#each [0, 0.33, 0.66] as offset, i (offset)}
                             <circle
                                 r={12 - i * 3}
                                 class="fill-base-content"
@@ -460,7 +463,7 @@
                     <h3 class="text-xl lg:text-2xl font-semibold text-base-content mb-2">
                         E-mail First Claiming
                     </h3>
-                    <p class="text-base-content/40 text-sm lg:text-base leading-relaxed">
+                    <p class="text-zen-fg-muted text-sm lg:text-base leading-relaxed">
                         No wallet needed to start. Recipients claim with just an email link.
                     </p>
                 </div>
@@ -483,6 +486,7 @@
                     class="relative aspect-[4/3] rounded-2xl overflow-hidden mb-6 bg-gradient-to-b from-base-content/[0.015] to-transparent"
                 >
                     <svg
+                        aria-hidden="true"
                         class="absolute inset-0 w-full h-full"
                         viewBox="0 0 400 300"
                         preserveAspectRatio="xMidYMid meet"
@@ -504,7 +508,7 @@
                         />
 
                         <!-- Verification blocks -->
-                        {#each [{ y: 60, width: 260 }, { y: 120, width: 220 }, { y: 180, width: 280 }, { y: 240, width: 200 }] as block, i}
+                        {#each [{ y: 60, width: 260 }, { y: 120, width: 220 }, { y: 180, width: 280 }, { y: 240, width: 200 }] as block, i (block.y)}
                             <!-- Connection dot -->
                             <circle
                                 cx="80"
@@ -589,7 +593,7 @@
                         {/each}
 
                         <!-- Hash connections -->
-                        {#each [90, 150, 210] as y, i}
+                        {#each [90, 150, 210] as y, i (y)}
                             <path
                                 d="M 90 {y} Q 105 {y + 15}, 120 {y + 30}"
                                 fill="none"
@@ -640,7 +644,7 @@
                     <h3 class="text-xl lg:text-2xl font-semibold text-base-content mb-2">
                         Verifiable & Auditable
                     </h3>
-                    <p class="text-base-content/40 text-sm lg:text-base leading-relaxed">
+                    <p class="text-zen-fg-muted text-sm lg:text-base leading-relaxed">
                         Distribution data stored on IPFS. Every transaction cryptographically
                         verified.
                     </p>

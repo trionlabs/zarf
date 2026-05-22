@@ -11,6 +11,7 @@ import { hashEmail } from '@zarf/core/utils/email';
 import type { StellarContractId } from '@zarf/core/types';
 import { getCidForVesting, type DiscoveredVesting } from '@zarf/core/services/vestingDiscovery';
 import { fetchIpfsJson, IpfsFetchError } from '@zarf/core/utils/ipfsFetch';
+import { warn, err } from '@zarf/core/utils/log';
 
 type FilterableDistribution = StellarContractId | DiscoveredVesting;
 
@@ -43,7 +44,7 @@ export async function isEmailInDistribution(
     try {
         const data = await fetchDistribution(distribution);
         if (!data) {
-            console.warn(`[EmailFilter] Distribution not found: ${address}`);
+            warn(`[EmailFilter] Distribution not found: ${address}`);
             return false;
         }
 
@@ -59,14 +60,14 @@ export async function isEmailInDistribution(
         return normalizedDistHashes.includes(normalizedUserHash);
     } catch (error) {
         if (error instanceof IpfsFetchError) {
-            console.warn(
+            warn(
                 `[EmailFilter] Skipping distribution with unreadable IPFS metadata:`,
                 error.message,
             );
             return false;
         }
 
-        console.error(`[EmailFilter] Error checking distribution:`, error);
+        err(`[EmailFilter] Error checking distribution:`, error);
         // On non-IPFS errors, default to showing (fail open for UX).
         return true;
     }

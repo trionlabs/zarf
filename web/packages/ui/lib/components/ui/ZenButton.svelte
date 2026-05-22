@@ -20,7 +20,7 @@
         loading = false,
         disabled,
         class: className = '',
-        popover, // Destructure popover to exclude it from rest
+        popover: _popover, // Destructure popover to exclude it from rest
         ...rest
     }: Props = $props();
 
@@ -57,7 +57,8 @@
      * Design Rules:
      * - NO scale transforms (feels cheap)
      * - NO translate effects (unnecessary motion)
-     * - NO opacity changes (use lightness/chroma shifts)
+     * - Prefer lightness/chroma shifts over opacity for color tokens;
+     *   opacity remains acceptable for the `disabled` state only.
      * - Self-colored borders (same hue family as surface)
      */
     const variantClasses = {
@@ -69,9 +70,9 @@
             ring-1 ring-inset ring-zen-btn-primary-border
             hover:ring-zen-btn-primary-border-hover
             active:ring-zen-btn-primary-border-active
-            shadow-[0_1px_3px_rgba(0,0,0,0.08),0_4px_8px_-2px_rgba(0,0,0,0.12)]
-            hover:shadow-[0_4px_8px_rgba(0,0,0,0.12),0_12px_24px_-4px_rgba(0,0,0,0.2)]
-            active:shadow-[inset_0_2px_4px_rgba(0,0,0,0.15)] active:translate-y-[1px]
+            shadow-[var(--zen-shadow-button)]
+            hover:shadow-[var(--zen-shadow-button-hover)]
+            active:shadow-[var(--zen-shadow-button-active)]
         `,
         /** Secondary: Alternative paths - Transparent with visible border */
         secondary: `
@@ -104,8 +105,7 @@
         inline-flex items-center justify-center relative
         font-semibold rounded-full
         tracking-[0.02em]
-        tracking-[0.02em]
-        transition-[background-color,box-shadow,transform,color] duration-200 ease-out
+        transition-[background-color,box-shadow,transform,color] duration-[var(--zen-motion-base)] ease-zen-out
         active:duration-75
         disabled:opacity-50 disabled:pointer-events-none
         whitespace-nowrap

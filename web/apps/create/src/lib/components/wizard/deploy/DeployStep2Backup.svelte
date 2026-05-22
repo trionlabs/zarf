@@ -17,6 +17,7 @@
         if (!merkleResult) return;
 
         try {
+            // eslint-disable-next-line svelte/prefer-svelte-reactivity -- function-local dedupe map, never read reactively
             const userMap = new Map<string, string>();
             merkleResult.claims.forEach((c) => {
                 if (!userMap.has(c.email)) {

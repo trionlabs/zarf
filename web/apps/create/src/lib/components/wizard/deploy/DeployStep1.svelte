@@ -10,6 +10,8 @@
     import { planScheduleSeconds } from '@zarf/core/domain/deployPlanner';
     import { pinClaimList } from '../../../services/pinService';
     import ZenButton from '@zarf/ui/components/ui/ZenButton.svelte';
+    import { toMessage } from '@zarf/core/utils/error';
+    import { err } from '@zarf/core/utils/log';
 
     // Direct state access from Runes Class
     let distribution = $derived(deployStore.distribution);
@@ -36,9 +38,9 @@
             });
             const pinned = await pinClaimList(claimList);
             deployStore.setMetadataCid(pinned.cid);
-        } catch (e: any) {
-            console.error('Pin error:', e);
-            deployStore.setPinError(e.message || 'Failed to pin claim list to IPFS');
+        } catch (e: unknown) {
+            err('Pin error:', e);
+            deployStore.setPinError(toMessage(e, 'Failed to pin claim list to IPFS'));
         }
     }
 
@@ -53,7 +55,7 @@
             // Map recipients to { email, amount } format expected by service
             // CRITICAL: Convert amount to token base units using token decimals.
             // This ensures the Merkle Root matches the on-chain values.
-            const entries = distribution.recipients.map((r: any) => ({
+            const entries = distribution.recipients.map((r) => ({
                 email: r.email || '',
                 // We pass BigInt directly to avoid precision loss
                 amount: parseTokenAmount(String(r.amount), tokenDecimals),
@@ -64,9 +66,9 @@
             const result = await processWhitelist(entries, distribution.schedule);
             deployStore.setMerkleResult(result);
             await pinList(result);
-        } catch (e: any) {
-            console.error('Merkle generation error:', e);
-            deployStore.setMerkleError(e.message || 'Failed to generate Merkle Tree');
+        } catch (e: unknown) {
+            err('Merkle generation error:', e);
+            deployStore.setMerkleError(toMessage(e, 'Failed to generate Merkle Tree'));
         }
     }
 
@@ -115,7 +117,7 @@
                 <div>
                     <span class="text-xs text-zen-fg-subtle block">Token Amount</span>
                     <span class="font-mono font-bold text-lg"
-                        >{Number(distribution.amount).toLocaleString()}</span
+                        >{Number(distribution.amount).toLocaleString('en-US')}</span
                     >
                 </div>
                 <div>

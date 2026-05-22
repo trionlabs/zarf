@@ -27,27 +27,27 @@ jobs:
       matrix:
         include:
           - app: landing
-            package: '@zarf/landing'
+            package: "@zarf/landing"
             kind: svelte
             url: https://zarf.to
           - app: create
-            package: '@zarf/create'
+            package: "@zarf/create"
             kind: svelte
             url: https://create.zarf.to
           - app: claim
-            package: '@zarf/claim'
+            package: "@zarf/claim"
             kind: svelte
             url: https://claim.zarf.to
           - app: indexer
-            package: '@zarf/indexer'
+            package: "@zarf/indexer"
             kind: worker
             url: https://indexer.zarf.to
           - app: pin-proxy
-            package: '@zarf/pin-proxy'
+            package: "@zarf/pin-proxy"
             kind: worker
             url: zarf-pin-proxy
           - app: jwk-rotation
-            package: '@zarf/jwk-rotation'
+            package: "@zarf/jwk-rotation"
             kind: worker
             url: https://jwt.zarf.to
     env:
@@ -89,7 +89,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: pnpm
           cache-dependency-path: web/pnpm-lock.yaml
 

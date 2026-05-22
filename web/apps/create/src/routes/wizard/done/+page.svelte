@@ -11,9 +11,22 @@
     let copied = $state(false);
 
     onMount(() => {
-        wizardStore.goToStep(2);
-        // Update with real address after hydration. Source of truth is deployStore;
-        // wizardStore no longer mirrors deployment results.
+        // Nothing in src/ programmatically navigates here — deploy
+        // completion routes to /distributions. A direct visit with an
+        // empty deployStore would render the "Not available" fallback,
+        // which is broken UX for a "deployment complete" landing. Redirect
+        // out instead of rendering a half-state.
+        if (!deployStore.contractAddress) {
+            goto('/distributions');
+            return;
+        }
+        // Index 3 = terminal "done" state (wizardStore bounds 0..3). The
+        // pre-rename code set goToStep(2) which incorrectly tagged a
+        // post-launch view with the deploy step's index — the exact bug
+        // Phase 5 was scoped to fix.
+        wizardStore.goToStep(3);
+        // Source of truth for the contract address is deployStore; wizardStore
+        // no longer mirrors deployment results.
         contractAddress = deployStore.contractAddress ?? '';
     });
 
@@ -29,6 +42,16 @@
         goto('/');
     }
 </script>
+
+<svelte:head>
+    <title>Distribution Deployed — Zarf Create</title>
+    <meta
+        name="description"
+        content="Your privacy-preserving token distribution has been deployed on Stellar."
+    />
+</svelte:head>
+
+<h1 class="sr-only">Distribution Deployed</h1>
 
 <div class="h-full flex flex-col justify-center items-center max-w-3xl mx-auto py-12 text-center">
     <div
@@ -65,7 +88,7 @@
                     {contractAddress || 'Not available'}
                 </span>
                 <button
-                    class="p-2 rounded-full hover:bg-zen-fg/5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    class="inline-flex items-center justify-center min-w-11 min-h-11 rounded-full hover:bg-zen-fg/5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                     disabled={!contractAddress}
                     aria-label="Copy contract address"
                     onclick={copyToClipboard}

@@ -4,7 +4,6 @@
     import {
         X,
         Calendar,
-        Clock,
         Users,
         Coins,
         Trash2,
@@ -13,6 +12,7 @@
         ChevronRight,
     } from 'lucide-svelte';
     import type { Distribution } from '../../stores/types';
+    import { formatAmount, formatDate } from '@zarf/core/utils';
 
     let {
         distribution,
@@ -34,17 +34,7 @@
 
     function handleDeploy() {
         // Navigate to the actual deployment wizard for this distribution
-        goto(`/wizard/deploy?id=${distribution.id}`);
-    }
-
-    // Format date for display
-    function formatDate(dateString: string): string {
-        if (!dateString) return 'Not set';
-        return new Date(dateString).toLocaleDateString('en-US', {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric',
-        });
+        goto(`/wizard/step-2?id=${distribution.id}`);
     }
 </script>
 
@@ -75,10 +65,11 @@
             </div>
         </div>
         <button
-            class="p-2 rounded-full hover:bg-zen-fg/5 transition-colors xl:hidden"
+            class="inline-flex items-center justify-center min-w-11 min-h-11 rounded-full hover:bg-zen-fg/5 transition-colors xl:hidden"
             onclick={onClose}
+            aria-label="Close details panel"
         >
-            <X class="w-4 h-4" />
+            <X class="w-4 h-4" aria-hidden="true" />
         </button>
     </header>
 
@@ -105,7 +96,7 @@
                 >
             </div>
             <p class="text-2xl font-mono font-bold text-zen-primary">
-                {Number(distribution.amount).toLocaleString()}
+                {formatAmount(distribution.amount)}
                 <span class="text-sm font-normal opacity-60"
                     >{wizardStore.tokenDetails.tokenSymbol}</span
                 >
@@ -124,7 +115,9 @@
                 <div class="p-3 rounded-lg bg-zen-fg/5 space-y-1">
                     <span class="text-[10px] text-zen-fg-subtle">Cliff Date</span>
                     <p class="text-sm font-medium">
-                        {formatDate(distribution.schedule.cliffEndDate)}
+                        {distribution.schedule.cliffEndDate
+                            ? formatDate(distribution.schedule.cliffEndDate)
+                            : 'Not set'}
                     </p>
                 </div>
                 <div class="p-3 rounded-lg bg-zen-fg/5 space-y-1">
@@ -151,7 +144,7 @@
             </div>
 
             <div class="space-y-2">
-                {#each distribution.recipients.slice(0, 5) as recipient, i}
+                {#each distribution.recipients.slice(0, 5) as recipient, i (i)}
                     <div
                         class="flex items-center justify-between p-2 rounded-lg bg-zen-fg/[0.03] text-sm"
                     >
@@ -159,7 +152,7 @@
                             {recipient.email || recipient.address?.slice(0, 10) + '...'}
                         </span>
                         <span class="font-mono text-xs text-zen-fg-subtle">
-                            {recipient.amount.toLocaleString()}
+                            {formatAmount(recipient.amount)}
                         </span>
                     </div>
                 {/each}
@@ -185,7 +178,7 @@
                     Compliance
                 </h3>
                 <div class="flex flex-wrap gap-2">
-                    {#each distribution.regulatoryRules as rule}
+                    {#each distribution.regulatoryRules as rule, i (i)}
                         <span
                             class="px-2 py-0.5 text-xs font-medium rounded-full border border-zen-border text-zen-fg-muted"
                             >{rule}</span

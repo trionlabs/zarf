@@ -12,12 +12,18 @@
     import { walletStore } from '../../stores/walletStore.svelte';
     import { X, Wallet } from 'lucide-svelte';
     import ZenButton from '../ui/ZenButton.svelte';
+    import { focusTrap } from '../../actions/focusTrap';
+
+    const baseId = $props.id();
+    const titleId = `${baseId}-title`;
+    const descId = `${baseId}-desc`;
+    let freighterBtn: HTMLButtonElement | undefined = $state();
 
     async function handleConnect() {
         try {
             await walletStore.connect();
             // Modal closes automatically via store logic on success
-        } catch (e) {
+        } catch {
             // Error handling is done in store
         }
     }
@@ -34,13 +40,21 @@
 </script>
 
 {#if walletStore.isModalOpen}
-    <!-- Backdrop -->
+    <!-- Backdrop. Keyboard semantics live in use:focusTrap (Tab cycle + Escape close),
+         which the a11y linter cannot statically detect. -->
+    <!-- svelte-ignore a11y_click_events_have_key_events -->
     <div
-        class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-zen-fade-in"
+        class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zen-scrim/50 backdrop-blur-sm animate-zen-fade-in"
         onclick={handleBackdropClick}
-        onkeydown={(e) => e.key === 'Escape' && handleClose()}
+        use:focusTrap={{
+            onEscape: handleClose,
+            initialFocus: () => freighterBtn ?? null,
+            hideBackground: true,
+        }}
         role="dialog"
         aria-modal="true"
+        aria-labelledby={titleId}
+        aria-describedby={descId}
         tabindex="-1"
     >
         <!-- Modal Box -->
@@ -57,7 +71,7 @@
             <div
                 class="flex items-center justify-between p-5 border-b-[0.5px] border-zen-border-subtle"
             >
-                <h3 class="text-lg font-semibold text-zen-fg">Connect Wallet</h3>
+                <h3 id={titleId} class="text-lg font-semibold text-zen-fg">Connect Wallet</h3>
                 <button
                     class="p-1.5 rounded-lg text-zen-fg-muted hover:text-zen-fg hover:bg-zen-fg/5 transition-colors"
                     onclick={handleClose}
@@ -69,10 +83,13 @@
 
             <!-- Body -->
             <div class="p-5 space-y-4">
-                <p class="text-sm text-zen-fg-muted">Zarf connects to Stellar through Freighter.</p>
+                <p id={descId} class="text-sm text-zen-fg-muted">
+                    Zarf connects to Stellar through Freighter.
+                </p>
 
                 <div class="space-y-2">
                     <button
+                        bind:this={freighterBtn}
                         class="
                             w-full flex items-center gap-3 p-3.5
                             rounded-xl border-[0.5px] border-zen-border

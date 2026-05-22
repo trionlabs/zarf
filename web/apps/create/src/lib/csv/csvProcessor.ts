@@ -13,7 +13,13 @@
 // `Recipient` shape, not the post-merkle on-chain `Recipient` (amount: bigint).
 import type { Recipient } from '../stores/types';
 import { normalizeEmail, isValidEmail } from '@zarf/core/utils/email';
-import { isValidAddress } from '@zarf/core/utils/address';
+// Shape-only check: regex-grade Stellar address validation. A typo'd
+// address that matches the shape regex but fails the StrKey checksum
+// passes parseCSV() here and is rejected later at transaction-build
+// time. Trade-off accepted so this module doesn't drag stellar-sdk
+// into SSR via parseCSV's top-level import (step-1's
+// DistributionRecipients.svelte was 500ing on the SSR pass).
+import { isValidAddressShape as isValidAddress } from '@zarf/core/utils/addressShape';
 
 // Re-export for backward compatibility
 export { normalizeEmail };

@@ -1,6 +1,6 @@
 <script lang="ts">
     import { wizardStore } from '../../stores/wizardStore.svelte';
-    import { isValidContractAddress } from '@zarf/core/utils/address';
+    import { isValidContractAddressShape as isValidContractAddress } from '@zarf/core/utils/addressShape';
     import { Check, X } from 'lucide-svelte';
 
     // Validation rules for Step 0 (Token Entry)
@@ -43,7 +43,7 @@
     </div>
 
     <div class="space-y-2">
-        {#each validations as item}
+        {#each validations as item, i (i)}
             <div
                 class="flex items-center gap-2 py-1.5 transition-all duration-300 {!item.touched &&
                 !item.valid

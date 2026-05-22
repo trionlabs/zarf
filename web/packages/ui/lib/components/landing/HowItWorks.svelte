@@ -101,7 +101,7 @@
                 <div class="relative order-2 md:order-1">
                     <!-- Step Indicator (inline, part of content) -->
                     <div class="flex items-center gap-2.5 mb-8">
-                        {#each STEPS as _, i}
+                        {#each STEPS as _, i (i)}
                             <button
                                 onclick={() => goToStep(i)}
                                 class="group flex items-center gap-1.5 transition-all duration-300"
@@ -110,7 +110,7 @@
                                     class="font-mono text-[10px] font-medium transition-all duration-300 {activeIndex ===
                                     i
                                         ? 'text-base-content/70'
-                                        : 'text-base-content/25'}"
+                                        : 'text-zen-fg-muted'}"
                                 >
                                     0{i + 1}
                                 </span>
@@ -128,7 +128,7 @@
 
                     <!-- Stacked Text Content -->
                     <div class="relative h-[240px] md:h-[280px]">
-                        {#each STEPS as step, i}
+                        {#each STEPS as step, i (step.title)}
                             <div
                                 class="absolute inset-0 transition-all duration-500 ease-out"
                                 style="
@@ -141,18 +141,16 @@
                                     pointer-events: {activeIndex === i ? 'auto' : 'none'};
                                 "
                             >
-                                <h3
+                                <h2
                                     class="text-2xl md:text-3xl lg:text-4xl font-semibold mb-3 tracking-tight text-base-content"
                                 >
                                     {step.title}
-                                </h3>
-                                <h4
-                                    class="text-base md:text-lg text-base-content/45 mb-4 font-normal"
-                                >
+                                </h2>
+                                <h3 class="text-base md:text-lg text-zen-fg-muted mb-4 font-normal">
                                     {step.subtitle}
-                                </h4>
+                                </h3>
                                 <p
-                                    class="text-sm md:text-base leading-relaxed text-base-content/40 max-w-md"
+                                    class="text-sm md:text-base leading-relaxed text-zen-fg-muted max-w-md"
                                 >
                                     {step.desc}
                                 </p>
@@ -171,7 +169,7 @@
 
                         <!-- Stacked Scenes -->
                         <div class="relative w-full h-full">
-                            {#each STEPS as _, i}
+                            {#each STEPS as _, i (i)}
                                 <div
                                     class="absolute inset-0 bg-base-100/80 backdrop-blur-sm rounded-2xl border border-base-content/[0.06] overflow-hidden transition-all duration-500 ease-out"
                                     style="
@@ -192,7 +190,7 @@
                                             class="absolute inset-0 flex flex-col items-center justify-center p-6"
                                         >
                                             <div class="space-y-2.5 w-full max-w-[200px]">
-                                                {#each [0, 1, 2] as k}
+                                                {#each [0, 1, 2] as k (k)}
                                                     <div
                                                         class="flex items-center gap-2.5 p-2.5 bg-base-content/[0.02] rounded-lg border border-base-content/[0.04] transition-all duration-500"
                                                         style="
@@ -207,7 +205,7 @@
                                                             class="w-7 h-7 rounded-full bg-base-content/[0.04] flex items-center justify-center"
                                                         >
                                                             <Mail
-                                                                class="w-3.5 h-3.5 text-base-content/40"
+                                                                class="w-3.5 h-3.5 text-zen-fg-muted"
                                                             />
                                                         </div>
                                                         <div class="flex-1 space-y-1.5">
@@ -232,7 +230,7 @@
                                                 "
                                             >
                                                 <span
-                                                    class="text-[10px] font-medium tracking-wide text-base-content/50 flex items-center gap-1.5 uppercase"
+                                                    class="text-[10px] font-medium tracking-wide text-zen-fg-muted flex items-center gap-1.5 uppercase"
                                                 >
                                                     <Sparkles class="w-2.5 h-2.5" />
                                                     Just Emails
@@ -253,7 +251,7 @@
                                                     opacity: {activeIndex === 1 ? 0.5 : 0};
                                                 "
                                             >
-                                                <Mail class="w-5 h-5 text-base-content/40" />
+                                                <Mail class="w-5 h-5 text-zen-fg-muted" />
                                             </div>
 
                                             <div
@@ -270,7 +268,7 @@
                                                     class="w-1.5 h-1.5 rounded-full bg-base-content/30"
                                                 ></div>
                                                 <span
-                                                    class="text-[10px] font-medium tracking-wide text-base-content/50 uppercase"
+                                                    class="text-[10px] font-medium tracking-wide text-zen-fg-muted uppercase"
                                                     >Unlinkable</span
                                                 >
                                             </div>
@@ -285,7 +283,7 @@
                                                     transition-delay: 160ms;
                                                 "
                                             >
-                                                <Wallet class="w-5 h-5 text-base-content/50" />
+                                                <Wallet class="w-5 h-5 text-zen-fg-muted" />
                                             </div>
                                         </div>
                                     {:else}
@@ -332,11 +330,9 @@
                                                             opacity: {activeIndex === 2 ? 1 : 0};
                                                         "
                                                     >
-                                                        <Shield
-                                                            class="w-5 h-5 text-base-content/50"
-                                                        />
+                                                        <Shield class="w-5 h-5 text-zen-fg-muted" />
                                                         <span
-                                                            class="text-[7px] font-medium tracking-wider text-base-content/30 mt-0.5 uppercase"
+                                                            class="text-[7px] font-medium tracking-wider text-zen-fg-muted mt-0.5 uppercase"
                                                             >Private</span
                                                         >
                                                     </div>
@@ -353,8 +349,8 @@
                                                         transition-delay: 160ms;
                                                     "
                                                 >
-                                                    <Clock class="w-2 h-2 text-base-content/40" />
-                                                    <span class="text-base-content/40">4y</span>
+                                                    <Clock class="w-2 h-2 text-zen-fg-muted" />
+                                                    <span class="text-zen-fg-muted">4y</span>
                                                 </div>
                                                 <div
                                                     class="absolute bottom-0 left-1 px-1.5 py-0.5 rounded bg-base-content/[0.03] border border-base-content/[0.06] text-[9px] font-mono flex items-center gap-1 transition-all duration-500"
@@ -366,8 +362,8 @@
                                                         transition-delay: 240ms;
                                                     "
                                                 >
-                                                    <Lock class="w-2 h-2 text-base-content/40" />
-                                                    <span class="text-base-content/40">Geo</span>
+                                                    <Lock class="w-2 h-2 text-zen-fg-muted" />
+                                                    <span class="text-zen-fg-muted">Geo</span>
                                                 </div>
                                             </div>
                                         </div>

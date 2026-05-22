@@ -150,6 +150,6 @@ export interface WalletState {
 
 /**
  * Available theme options (Binary: dark/light)
- * Maps to DaisyUI themes: light='wireframe', dark='glass-porcelain'
+ * Maps to data-theme tokens: light='paper-porcelain', dark='glass-porcelain'
  */
 export type Theme = 'dark' | 'light';

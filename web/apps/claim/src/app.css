@@ -14,7 +14,7 @@
     --zen-bg: #0a0a0b;
     --zen-bg-elevated: #131315;
     --zen-bg-sunken: #1a1a1d;
-    /* DaisyUI compatibility */
+    /* Tailwind v4 @theme registration */
     --color-base-100: #0a0a0b;
     --color-base-200: #131315;
     --color-base-300: #1a1a1d;

@@ -8,8 +8,10 @@
  */
 
 import type { StellarContractId } from '../types';
+import { TREE_DEPTH } from '../constants';
 import { getCidForVesting } from './vestingDiscovery';
 import { fetchIpfsJson } from '../utils/ipfsFetch';
+import { err } from '../utils/log';
 
 export interface EpochMetadata {
     /** BigInt as string (JSON restriction) */
@@ -114,6 +116,11 @@ export function validateDistributionData(raw: unknown): DistributionData {
                 `distribution: commitments['${key}']${suffix}.index must be a non-negative integer`,
             );
         }
+        if (m.index >= 2 ** TREE_DEPTH) {
+            throw new Error(
+                `distribution: commitments['${key}']${suffix}.index ${m.index} exceeds maximum (${2 ** TREE_DEPTH})`,
+            );
+        }
     };
 
     const commitments = d.commitments as Record<string, unknown>;
@@ -157,7 +164,7 @@ export async function fetchDistributionData(address: string): Promise<Distributi
         const raw = await fetchIpfsJson(cid);
         return validateDistributionData(raw);
     } catch (error) {
-        console.error('[Distribution] Failed to fetch data:', error);
+        err('[Distribution] Failed to fetch data:', error);
         throw error;
     }
 }

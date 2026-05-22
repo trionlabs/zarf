@@ -12,6 +12,9 @@
         onkeydown?: (e: KeyboardEvent) => void;
         role?: string;
         tabindex?: number;
+        'aria-label'?: string;
+        'aria-labelledby'?: string;
+        'aria-describedby'?: string;
     }
 
     let {
@@ -60,7 +63,7 @@
 
     const interactiveClasses = $derived(
         interactive
-            ? 'cursor-pointer transition-all duration-300 hover:border-zen-border-strong hover:shadow-[var(--zen-shadow-lg)]'
+            ? 'cursor-pointer transition-all duration-[var(--zen-motion-emphasis)] hover:border-zen-border-strong hover:shadow-[var(--zen-shadow-lg)]'
             : '',
     );
 </script>

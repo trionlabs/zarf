@@ -8,7 +8,19 @@
  */
 
 import type { DecodedJWT, GooglePublicKey, JWTHeader, JWTPayload, OAuthState } from '../types';
-import { isValidContractAddress } from '@zarf/core/utils/address';
+import { warn } from '@zarf/core/utils/log';
+import { isValidContractAddressShape } from '@zarf/core/utils/addressShape';
+import { base64UrlToBase64 } from '@zarf/core/utils/base64Url';
+import {
+    GOOGLE_ISSUERS as CORE_GOOGLE_ISSUERS,
+    validateGoogleClaims as coreValidateGoogleClaims,
+} from '@zarf/core/utils/googleClaims';
+
+// Re-export the validator from core so existing `@zarf/ui` imports continue
+// to work without a touch. The validator was moved to core for testability
+// under @zarf/core/vitest; its UI-package location was incidental.
+export const GOOGLE_ISSUERS = CORE_GOOGLE_ISSUERS;
+export const validateGoogleClaims = coreValidateGoogleClaims;
 
 // ============================================================================
 // Constants
@@ -86,14 +98,14 @@ export function decodeOAuthState(stateParam: string | null): OAuthState | null {
         const decoded = JSON.parse(stateParam);
 
         // Validate address format if present
-        if (decoded.address && !isValidContractAddress(decoded.address)) {
-            console.warn('[OAuth] Invalid address in state, ignoring');
+        if (decoded.address && !isValidContractAddressShape(decoded.address)) {
+            warn('[OAuth] Invalid address in state, ignoring');
             delete decoded.address;
         }
 
         return decoded as OAuthState;
     } catch (e) {
-        console.warn('[OAuth] Failed to parse state:', e);
+        warn('[OAuth] Failed to parse state:', e);
         return null;
     }
 }
@@ -128,12 +140,18 @@ export function initiateGoogleLogin(
 ): void {
     assertBrowser();
 
+    // If the caller didn't provide a nonce, generate one and persist
+    // it via sessionStorage so the OAuth callback can pair-check it
+    // (see consumeStoredNonce + validateGoogleClaims). Caller-supplied
+    // nonces are NOT auto-stored — the caller owns the storage path.
+    const effectiveNonce = nonce ?? generateAndStoreNonce();
+
     const params = new URLSearchParams({
         client_id: clientId,
         redirect_uri: redirectUri,
         response_type: 'id_token',
         scope: 'openid email profile',
-        nonce: nonce || crypto.randomUUID(),
+        nonce: effectiveNonce,
     });
 
     if (state) {
@@ -176,10 +194,10 @@ export function redirectToGoogle(contractAddress?: string): void {
     // Build state with optional contract address
     const oauthState: OAuthState = {};
     if (contractAddress) {
-        if (isValidContractAddress(contractAddress)) {
+        if (isValidContractAddressShape(contractAddress)) {
             oauthState.address = contractAddress;
         } else {
-            console.warn('[Auth] Invalid contract address format, not preserving');
+            warn('[Auth] Invalid contract address format, not preserving');
         }
     }
 
@@ -268,12 +286,58 @@ export function clearUrlFragment(): void {
 // JWT Utilities
 // ============================================================================
 
+// GOOGLE_ISSUERS and validateGoogleClaims now live in @zarf/core/utils/googleClaims
+// and are re-exported from the top of this file for backward compatibility.
+
+/**
+ * sessionStorage key for the per-request OAuth nonce. Survives the
+ * Google redirect roundtrip within the same tab; cleared on tab close
+ * and consumed (single-use) by the callback site.
+ */
+const OAUTH_NONCE_STORAGE_KEY = '__zarf_oauth_nonce';
+
+/**
+ * Generate a cryptographic nonce, persist it for the OAuth callback to
+ * validate against the returned `id_token.nonce` claim, and return the
+ * raw nonce for inclusion in the OAuth request URL.
+ *
+ * Stored in sessionStorage — survives the redirect to Google and back
+ * (same tab, same origin), is single-use, and is cleared on tab close.
+ * The pairing is what prevents id_token replay: a token captured from
+ * a different login attempt won't match the stored nonce.
+ */
+function generateAndStoreNonce(): string {
+    assertBrowser();
+    const nonce = crypto.randomUUID();
+    sessionStorage.setItem(OAUTH_NONCE_STORAGE_KEY, nonce);
+    return nonce;
+}
+
+/**
+ * Read + remove the stored OAuth nonce in one shot. Caller passes the
+ * returned value to {@link validateGoogleClaims} so the JWT's `nonce`
+ * claim is verified against what the OAuth request opened with.
+ *
+ * Returns `null` if no nonce is stored (no pending OAuth flow, or the
+ * nonce was already consumed). The callback site should treat `null`
+ * as "no pending flow to validate" — typically that means the user
+ * navigated to the callback URL directly, not via an OAuth redirect.
+ *
+ * SSR-safe: returns `null` outside the browser.
+ */
+export function consumeStoredNonce(): string | null {
+    if (typeof window === 'undefined') return null;
+    const nonce = sessionStorage.getItem(OAUTH_NONCE_STORAGE_KEY);
+    if (nonce) sessionStorage.removeItem(OAUTH_NONCE_STORAGE_KEY);
+    return nonce;
+}
+
 /**
  * Decodes a JWT without verification.
  *
  * WARNING: This does NOT verify the signature. Verification happens in the
- * ZK circuit (Noir) using the public key. This function is only for extracting
- * claims for display purposes.
+ * ZK circuit (Noir) using the public key. Callers MUST pair decodeJwt with
+ * {@link validateGoogleClaims} before trusting any claim (email, sub, exp).
  *
  * @param jwt - The JWT string (format: header.payload.signature)
  * @returns Decoded header and payload
@@ -284,7 +348,15 @@ export function clearUrlFragment(): void {
  * ```typescript
  * const token = extractTokenFromUrl();
  * const decoded = decodeJwt(token);
- * console.log(decoded.payload.email); // user@example.com
+ * // Callback context: a stored nonce must be present.
+ * const storedNonce = consumeStoredNonce();
+ * if (storedNonce === null) throw new Error('OAuth callback without pending flow');
+ * validateGoogleClaims(decoded.payload, {
+ *     clientId: VITE_GOOGLE_CLIENT_ID,
+ *     mode: 'callback',
+ *     expectedNonce: storedNonce,
+ * });
+ * console.log(decoded.payload.email); // user@example.com — now trusted
  * console.log(decoded.header.kid);    // Key ID for verification
  * ```
  */
@@ -296,11 +368,11 @@ export function decodeJwt(jwt: string): DecodedJWT {
     }
 
     try {
-        // Base64url decode (replace URL-safe chars, then decode)
-        const base64UrlDecode = (str: string): string => {
-            const base64 = str.replace(/-/g, '+').replace(/_/g, '/');
-            return atob(base64);
-        };
+        // Base64url decode (pad + replace URL-safe chars, then atob).
+        // Padding via base64UrlToBase64 is required: strict atob (Safari,
+        // some Firefox builds) throws InvalidCharacterError on inputs whose
+        // length is not a multiple of 4.
+        const base64UrlDecode = (str: string): string => atob(base64UrlToBase64(str));
 
         const header = JSON.parse(base64UrlDecode(parts[0])) as JWTHeader;
         const payload = JSON.parse(base64UrlDecode(parts[1])) as JWTPayload;
@@ -309,6 +381,7 @@ export function decodeJwt(jwt: string): DecodedJWT {
     } catch (error) {
         throw new Error(
             `Failed to decode JWT: ${error instanceof Error ? error.message : 'unknown error'}`,
+            { cause: error },
         );
     }
 }
@@ -351,6 +424,7 @@ export async function fetchGooglePublicKeys(): Promise<GooglePublicKey[]> {
     } catch (error) {
         throw new Error(
             `Failed to fetch Google public keys: ${error instanceof Error ? error.message : 'unknown error'}`,
+            { cause: error },
         );
     }
 }

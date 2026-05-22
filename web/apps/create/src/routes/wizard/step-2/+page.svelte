@@ -6,7 +6,6 @@
     import { deployStore } from '$lib/stores/deployStore.svelte';
     import ZenButton from '@zarf/ui/components/ui/ZenButton.svelte';
     import ZenSpinner from '@zarf/ui/components/ui/ZenSpinner.svelte';
-    import type { Distribution } from '$lib/stores/types';
     import { Check } from 'lucide-svelte';
 
     import DeployStep1 from '$lib/components/wizard/deploy/DeployStep1.svelte';
@@ -35,11 +34,6 @@
 
     const showContinue = $derived(currentStep < 4);
     const backButtonText = $derived(currentStep === 1 ? 'Cancel' : 'Back');
-
-    const isStep1 = $derived(currentStep >= 1);
-    const isStep2 = $derived(currentStep >= 2);
-    const isStep3 = $derived(currentStep >= 3);
-    const isStep4 = $derived(currentStep >= 4);
 
     // Navigation Logic
     const continueDisabled = $derived.by(() => {
@@ -81,6 +75,14 @@
     }
 </script>
 
+<svelte:head>
+    <title>Review & Deploy — Create Distribution — Zarf</title>
+    <meta
+        name="description"
+        content="Step 3 of 3: review the distribution and deploy to Stellar."
+    />
+</svelte:head>
+
 <div
     class="h-full flex flex-col relative max-w-5xl w-full px-4 md:px-0 transition-all duration-300 ml-0"
 >
@@ -101,7 +103,7 @@
 
         <!-- Stepper (Minimal) -->
         <div class="flex items-center gap-2 mb-6">
-            {#each [{ id: 1, label: 'Prepare' }, { id: 2, label: 'Backup' }, { id: 3, label: 'Approvals' }, { id: 4, label: 'Deploy' }] as step, i}
+            {#each [{ id: 1, label: 'Prepare' }, { id: 2, label: 'Backup' }, { id: 3, label: 'Approvals' }, { id: 4, label: 'Deploy' }] as step, i (step.id)}
                 {@const isActive = currentStep === step.id}
                 {@const isPast = currentStep > step.id}
 

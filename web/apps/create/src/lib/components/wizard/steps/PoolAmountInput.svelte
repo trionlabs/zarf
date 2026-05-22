@@ -1,7 +1,6 @@
 <script lang="ts">
     import { wizardStore } from '../../../stores/wizardStore.svelte';
     import { PERCENTAGE_PRESETS } from '@zarf/core/constants/wizard';
-    import ZenButton from '@zarf/ui/components/ui/ZenButton.svelte';
     import ZenNumberInput from '@zarf/ui/components/ui/ZenNumberInput.svelte';
 
     let { poolAmount = $bindable(), poolInputValue = $bindable() } = $props<{
@@ -90,6 +89,8 @@
             oninput={handleAmountInput}
             placeholder="0"
             aria-label="Distribution Pool Amount"
+            inputmode="decimal"
+            autocomplete="off"
             class="w-80 bg-transparent border-none !text-5xl font-medium tracking-tighter leading-none text-right placeholder:text-zen-fg/10 text-zen-fg focus:outline-none focus:ring-0 transition-all"
         />
         <span class="text-zen-fg/50 text-lg font-medium">
@@ -104,7 +105,7 @@
                 >Quick</span
             >
             <div class="flex items-center gap-1">
-                {#each PERCENTAGE_PRESETS as pct}
+                {#each PERCENTAGE_PRESETS as pct (pct)}
                     <button
                         type="button"
                         class="px-3 py-1.5 text-xs font-medium rounded-full transition-all {getPresetClass(
@@ -137,7 +138,7 @@
             </div>
         </div>
         <p class="text-xs text-zen-fg-muted pl-20">
-            Total Supply: {totalSupply.toLocaleString()}
+            Total Supply: {totalSupply.toLocaleString('en-US')}
             {tokenSymbol}
         </p>
     {/if}

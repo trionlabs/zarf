@@ -3,7 +3,7 @@
     import { goto } from '$app/navigation';
     import { onMount } from 'svelte';
     import { fade, slide } from 'svelte/transition';
-    import { ArrowRight, ArrowLeft, Sparkles, Check, X, Eye, Calendar, Users } from 'lucide-svelte';
+    import { ArrowRight, ArrowLeft, Sparkles, Eye, Calendar } from 'lucide-svelte';
     import type { Recipient, Distribution } from '$lib/stores/types';
     import type { DurationUnit } from '@zarf/core/utils/vesting';
     import { CREATION_STEPS } from '@zarf/core/constants/wizard';
@@ -78,28 +78,6 @@
     });
 
     // --- Actions ---
-    function resetForm() {
-        name = '';
-        description = '';
-        cliffDate = '';
-        duration = 12;
-        poolAmount = 0;
-        poolInputValue = '';
-        recipients = [];
-        csvFileName = null;
-        csvError = null;
-        validationErrors = [];
-        usRestricted = false;
-        euRestricted = false;
-        creationStep = 0;
-        wizardStore.clearEditingState();
-    }
-
-    function cancelCreation() {
-        resetForm();
-        goto('/distributions');
-    }
-
     function saveDistribution() {
         if (!isFormValid) return;
         const regulatoryRules: string[] = [];
@@ -139,6 +117,16 @@
 
     const creationSteps = CREATION_STEPS;
 </script>
+
+<svelte:head>
+    <title>Recipients & Schedule — Create Distribution — Zarf</title>
+    <meta
+        name="description"
+        content="Step 2 of 3: add recipients and configure the vesting schedule."
+    />
+</svelte:head>
+
+<h1 class="sr-only">Create Distribution — Step 2: Recipients and Schedule</h1>
 
 <div class="flex flex-col lg:flex-row gap-8 items-start p-2">
     <!-- LEFT COLUMN: Form Wizard -->
@@ -199,7 +187,6 @@
                         bind:csvError
                         bind:isProcessingCSV
                         bind:validationErrors
-                        {totalAmount}
                         {poolAmount}
                         unlockEvents={duration}
                         tokenSymbol={wizardStore.tokenDetails.tokenSymbol || 'TOKENS'}

@@ -1,12 +1,13 @@
 <script lang="ts">
-    import { readVestingContract } from '@zarf/core/contracts';
     import { ArrowRight, Loader2, Inbox } from 'lucide-svelte';
     import type { StellarContractId } from '@zarf/core/types';
-    import { isValidContractAddress } from '@zarf/core/utils/address';
+    import { isValidContractAddressShape } from '@zarf/core/utils/addressShape';
     import {
         fetchContractMetadata,
         type OnChainVestingContract,
     } from '@zarf/core/services/distributionDiscovery';
+    import { err } from '@zarf/core/utils/log';
+    import { formatDate as formatDateUS } from '@zarf/core/utils';
     import ZenCard from '@zarf/ui/components/ui/ZenCard.svelte';
     import AddressInput from '@zarf/ui/components/ui/AddressInput.svelte';
 
@@ -33,11 +34,7 @@
 
     function formatDate(timestamp: bigint) {
         if (timestamp === 0n) return 'Not Started';
-        return new Date(Number(timestamp) * 1000).toLocaleDateString('en-US', {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric',
-        });
+        return formatDateUS(Number(timestamp) * 1000);
     }
 
     // Fetch metadata when vaultAddresses changes (reactive to filtering)
@@ -76,7 +73,7 @@
             })
             .catch((e) => {
                 if (currentVersion !== fetchVersion) return;
-                console.error('Failed to fetch vault metadata', e);
+                err('Failed to fetch vault metadata', e);
             })
             .finally(() => {
                 if (currentVersion !== fetchVersion) return;
@@ -92,7 +89,7 @@
     async function handleSubmit() {
         const addr = address.trim();
 
-        if (!isValidContractAddress(addr)) {
+        if (!isValidContractAddressShape(addr)) {
             error = 'Enter a valid Stellar vesting contract ID.';
             return;
         }
@@ -101,9 +98,11 @@
         error = null;
 
         try {
+            const { readVestingContract } = await import('@zarf/core/contracts');
             await readVestingContract(addr);
-            onImport(address);
-        } catch (e) {
+            address = addr;
+            onImport(addr);
+        } catch {
             error = 'Could not find a valid Zarf Vesting contract';
         } finally {
             isLoading = false;
@@ -127,7 +126,7 @@
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             {#if (isFetchingVault || isFiltering) && vaultContracts.length === 0}
-                {#each Array(4) as _}
+                {#each Array(4) as _, i (i)}
                     <div
                         class="h-32 w-full animate-pulse bg-zen-bg/50 rounded-3xl border border-zen-border-subtle"
                     ></div>
@@ -147,7 +146,7 @@
                     </div>
                 </div>
             {:else}
-                {#each vaultContracts as contract}
+                {#each vaultContracts as contract (contract)}
                     <ZenCard
                         interactive
                         variant="elevated"
@@ -219,6 +218,7 @@
     <div class="max-w-xl mx-auto w-full pt-2">
         <label class="sr-only" for="contract-input">Manual Contract Address</label>
         <AddressInput
+            id="contract-input"
             bind:value={address}
             placeholder="Enter Stellar contract ID C..."
             {error}

@@ -133,6 +133,10 @@
     --zen-highlight-bg: oklch(96% 0.008 80);
     --zen-highlight-fg: oklch(45% 0.06 80);
 
+    /* Dialog/slide-over scrim - dark charcoal in cool-grey hue to harmonize
+     with the rest of the palette while still darkening the silver canvas. */
+    --zen-scrim: oklch(15% 0.01 290);
+
     /* Light mode shadows - layered, cool-tinted, refined */
     --zen-shadow-xs: 0 1px 2px 0 oklch(22% 0.01 290 / 0.04);
 

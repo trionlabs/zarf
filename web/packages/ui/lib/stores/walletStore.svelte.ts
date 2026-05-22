@@ -20,7 +20,7 @@ import {
     isSupportedNetwork,
     getConfiguredNetworkName,
 } from '@zarf/core/contracts/wallet';
-import { getAccountExplorerUrl } from '@zarf/core/contracts';
+import { getAccountExplorerUrl } from '@zarf/core/contracts/explorer';
 import type { StellarAddress, WalletAccount } from '@zarf/core/types';
 import { sanitizeBlockchainError } from '../utils/errorSanitizer';
 import { networkStore } from './networkStore.svelte';
@@ -59,7 +59,7 @@ const initialState: WalletState = {
     isModalOpen: false, // Added
 };
 
-let state = $state<WalletState>(structuredClone(initialState));
+const state = $state<WalletState>(structuredClone(initialState));
 let unwatchFn: (() => void) | null = null;
 let isInitialized = false;
 
@@ -159,21 +159,31 @@ async function init() {
     state.isReconnecting = true;
 
     // 1. Attempt Auto-Reconnect
+    // Reconnect failure is expected on first visit / cleared session;
+    // swallow and proceed with a disconnected initial state.
     try {
         await stellarReconnect();
-    } catch (e) {
+    } catch {
+        /* no-op */
     } finally {
         state.isReconnecting = false;
     }
+    if (!isInitialized) return; // destroy() ran during reconnect
 
     // 2. Initial Sync
     syncFromWallet();
 
     // 3. Setup Watcher
     if (unwatchFn) unwatchFn();
-    unwatchFn = watchWalletAccount((account: WalletAccount) => {
+    const unwatch = await watchWalletAccount((account: WalletAccount) => {
         updateInternalState({ ...account, address: account.address ?? undefined });
     });
+    if (!isInitialized) {
+        // destroy() ran during the dynamic import — stop the orphan watcher
+        unwatch();
+        return;
+    }
+    unwatchFn = unwatch;
 }
 
 /**
@@ -184,7 +194,7 @@ async function init() {
 async function requestConnection() {
     try {
         await connect();
-    } catch (e) {
+    } catch {
         state.isModalOpen = true;
     }
 }
@@ -225,9 +235,9 @@ async function connect() {
             networkPassphrase: result.networkPassphrase,
         });
         return result;
-    } catch (err: any) {
+    } catch (err: unknown) {
         // If it's already connected error, we can ignore it and just sync state
-        if (err.name === 'ConnectorAlreadyConnectedError') {
+        if (err instanceof Error && err.name === 'ConnectorAlreadyConnectedError') {
             syncFromWallet();
             return;
         }
@@ -246,7 +256,7 @@ async function disconnect() {
         await stellarDisconnect();
         updateInternalState({ isConnected: false });
         // State update handled by watcher
-    } catch (err: any) {
+    } catch (err: unknown) {
         state.error = sanitizeError(err);
     } finally {
         state.isDisconnecting = false;
@@ -260,7 +270,7 @@ async function switchChain() {
     try {
         await stellarSwitchChain();
         // State update handled by watcher
-    } catch (err: any) {
+    } catch (err: unknown) {
         state.error = sanitizeError(err);
     } finally {
         state.isSwitchingNetwork = false;

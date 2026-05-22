@@ -77,6 +77,7 @@ export function buildFactoryDeployInputs(
         } catch (e) {
             throw new Error(
                 `merkle claim #${i} (leafIndex=${c.leafIndex ?? '?'}): ${(e as Error).message}`,
+                { cause: e },
             );
         }
         if (typeof c.amount !== 'bigint' || c.amount <= 0n) {

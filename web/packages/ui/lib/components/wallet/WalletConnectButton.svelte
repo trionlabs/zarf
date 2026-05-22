@@ -22,6 +22,7 @@
     } from 'lucide-svelte';
     import ZenButton from '../ui/ZenButton.svelte';
     import ZenSpinner from '../ui/ZenSpinner.svelte';
+    import { warn } from '@zarf/core/utils/log';
 
     let mounted = $state(false);
     let copied = $state(false);
@@ -80,8 +81,8 @@
             await navigator.clipboard.writeText(walletStore.address);
             copied = true;
             setTimeout(() => (copied = false), 2000);
-        } catch (e) {
-            console.warn('Clipboard API not available');
+        } catch {
+            warn('Clipboard API not available');
         }
     }
 </script>

@@ -12,6 +12,7 @@
 
 import { browser } from '$app/environment';
 import { getActiveStellarNetworkId } from '@zarf/core/config/runtime';
+import { warn } from '@zarf/core/utils/log';
 import type { WizardState, TokenDetails, Distribution } from './types';
 
 const STORAGE_KEY = 'zarf_wizard_state';
@@ -80,7 +81,7 @@ function persist() {
     try {
         localStorage.setItem(storageKey(), JSON.stringify(state));
     } catch (error) {
-        console.warn('[WizardStore] Failed to persist:', error);
+        warn('[WizardStore] Failed to persist:', error);
     }
 }
 
@@ -97,7 +98,7 @@ function restore() {
             }
         }
     } catch (error) {
-        console.warn('[WizardStore] Failed to restore, clearing storage:', error);
+        warn('[WizardStore] Failed to restore, clearing storage:', error);
         localStorage.removeItem(storageKey());
     }
 }

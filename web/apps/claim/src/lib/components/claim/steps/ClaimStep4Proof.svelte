@@ -3,8 +3,8 @@
     import { claimStore } from '../../../stores/claimStore.svelte';
 
     import { CheckCircle, ShieldCheck, AlertTriangle, RefreshCw, Wallet } from 'lucide-svelte';
-    import { recipientId } from '@zarf/core/contracts';
     import ZenButton from '@zarf/ui/components/ui/ZenButton.svelte';
+    import { toMessage } from '@zarf/core/utils/error';
 
     let progress = $state(0);
     let statusMessage = $state('Initializing...');
@@ -44,11 +44,13 @@
                 { fetchPublicLeaves, getProofForLeaf },
                 { getPublicKeyForJwt },
                 { generateClaimProof },
+                { recipientId },
             ] = await Promise.all([
                 import('@zarf/core/crypto/merkleTree'),
                 import('../../../utils/proofHelpers'),
                 import('../../../utils/googleJwk'),
                 import('@zarf/core/zk'),
+                import('@zarf/core/contracts'),
             ]);
 
             statusMessage = 'Fetching Merkle Data...';
@@ -101,8 +103,8 @@
             advanceTimer = setTimeout(() => {
                 claimStore.nextStep();
             }, 1000);
-        } catch (e: any) {
-            error = e.message || 'Proof generation failed.';
+        } catch (e: unknown) {
+            error = toMessage(e, 'Proof generation failed.');
             isGenerating = false;
             statusMessage = 'Proof generation failed.';
         }

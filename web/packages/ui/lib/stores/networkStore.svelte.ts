@@ -22,7 +22,7 @@ function currentState(): NetworkState {
     };
 }
 
-let state = $state<NetworkState>(currentState());
+const state = $state<NetworkState>(currentState());
 
 function sync() {
     state.activeId = getActiveStellarNetworkId();

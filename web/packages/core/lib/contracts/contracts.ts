@@ -16,6 +16,7 @@ import { Buffer } from 'buffer';
 import { getStellarConfig } from '../config/runtime';
 import type { StellarRuntimeConfig } from '../config/runtime';
 import { fetchIndexerJson, indexerNetworkPath } from '../utils/indexerClient';
+import { validateTokenDecimals } from '../utils/tokenDecimals';
 import type {
     StellarAddress,
     StellarContractId,
@@ -197,6 +198,8 @@ export async function readVestingContract(
     const indexed = await fetchIndexerJson<IndexerVestingContract>(
         indexerNetworkPath(`/vestings/${encodeURIComponent(address)}`),
     );
+
+    validateTokenDecimals(indexed.tokenDecimals);
 
     return {
         name: indexed.name,
@@ -419,22 +422,4 @@ function requireFactoryAddress(): StellarContractId {
     const factoryAddress = cfg().factoryAddress;
     if (!factoryAddress) throw new Error('Missing Stellar factory contract address');
     return factoryAddress;
-}
-
-export function getExplorerUrl(hash: TransactionHash): string {
-    const base = cfg().explorerBaseUrl;
-    if (!base) throw new Error('Missing Stellar explorer URL');
-    return `${base.replace(/\/$/, '')}/tx/${hash}`;
-}
-
-export function getAccountExplorerUrl(address: StellarAddress): string {
-    const base = cfg().explorerBaseUrl;
-    if (!base) throw new Error('Missing Stellar explorer URL');
-    return `${base.replace(/\/$/, '')}/account/${address}`;
-}
-
-export function getContractExplorerUrl(address: StellarContractId): string {
-    const base = cfg().explorerBaseUrl;
-    if (!base) throw new Error('Missing Stellar explorer URL');
-    return `${base.replace(/\/$/, '')}/contract/${address}`;
 }

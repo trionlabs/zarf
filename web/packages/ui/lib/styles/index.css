@@ -12,6 +12,7 @@
 @import './tokens/spacing.css';
 @import './tokens/radius.css';
 @import './tokens/shadows.css';
+@import './tokens/motion.css';
 
 /* Base Styles */
 @import './base.css';
@@ -60,7 +61,7 @@
         color: var(--zen-fg);
         font-size: 0.875rem;
         line-height: 1.5;
-        transition: all 0.2s ease;
+        transition: all var(--zen-motion-base) var(--zen-ease-out);
     }
 
     .zen-input:hover {
@@ -129,7 +130,7 @@
         border-radius: var(--zen-radius-button);
         border: 0.5px solid transparent;
         cursor: pointer;
-        transition: all 0.2s ease;
+        transition: all var(--zen-motion-base) var(--zen-ease-out);
         text-decoration: none;
     }
 

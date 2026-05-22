@@ -47,7 +47,7 @@ describe('validateDistributionData — rejects (each path must throw a descripti
     });
 
     it('missing or non-hex merkleRoot', () => {
-        const { merkleRoot, ...noRoot } = validData;
+        const { merkleRoot: _merkleRoot, ...noRoot } = validData;
         expect(() => validateDistributionData(noRoot)).toThrow(/merkleRoot/);
         expect(() => validateDistributionData({ ...validData, merkleRoot: 'abc' })).toThrow(
             /0x-prefixed/,
@@ -64,14 +64,14 @@ describe('validateDistributionData — rejects (each path must throw a descripti
                 schedule: { ...validData.schedule, vestingStart: NaN },
             }),
         ).toThrow(/vestingStart/);
-        const { vestingDuration, ...partial } = validData.schedule;
+        const { vestingDuration: _vestingDuration, ...partial } = validData.schedule;
         expect(() => validateDistributionData({ ...validData, schedule: partial })).toThrow(
             /vestingDuration/,
         );
     });
 
     it('missing commitments or a malformed commitment entry', () => {
-        const { commitments, ...noCommits } = validData;
+        const { commitments: _commitments, ...noCommits } = validData;
         expect(() => validateDistributionData(noCommits)).toThrow(/commitments/);
         expect(() =>
             validateDistributionData({
@@ -92,5 +92,38 @@ describe('validateDistributionData — rejects (each path must throw a descripti
         expect(() => validateDistributionData({ ...validData, emailHashes: {} })).toThrow(
             /emailHashes/,
         );
+    });
+
+    it('a commitment index at or above the TREE_DEPTH ceiling (CRIT-8 DoS bound)', () => {
+        // TREE_DEPTH = 20 → max index is 2**20 - 1 = 1_048_575
+        expect(() =>
+            validateDistributionData({
+                ...validData,
+                commitments: {
+                    '0xkey': { amount: '1', unlockTime: 1, index: 2 ** 20 },
+                },
+            }),
+        ).toThrow(/exceeds maximum/);
+        expect(() =>
+            validateDistributionData({
+                ...validData,
+                commitments: {
+                    '0xkey': { amount: '1', unlockTime: 1, index: 2_000_000_000 },
+                },
+            }),
+        ).toThrow(/exceeds maximum/);
+    });
+});
+
+describe('validateDistributionData — index boundary (CRIT-8)', () => {
+    it('accepts index === 2**TREE_DEPTH - 1 (boundary)', () => {
+        expect(() =>
+            validateDistributionData({
+                ...validData,
+                commitments: {
+                    '0xkey': { amount: '1', unlockTime: 1, index: 2 ** 20 - 1 },
+                },
+            }),
+        ).not.toThrow();
     });
 });

@@ -1,7 +1,8 @@
-import type { Distribution, Recipient, MerkleTreeData } from './types';
+import type { Distribution, MerkleTreeData } from './types';
 import type { StellarAddress, StellarContractId } from '@zarf/core/types';
 import { getActiveStellarNetworkId } from '@zarf/core/config/runtime';
 import { safeParse, safeStringify } from '@zarf/core/utils/json';
+import { warn } from '@zarf/core/utils/log';
 
 export type DeployStep = 1 | 2 | 3 | 4;
 
@@ -73,7 +74,7 @@ export class DeployState {
             const key = this.storageKey(this.distribution.id);
             localStorage.setItem(key, safeStringify(state));
         } catch (e) {
-            console.warn('Failed to save deploy state', e);
+            warn('Failed to save deploy state', e);
         }
     }
 
@@ -115,7 +116,7 @@ export class DeployState {
                 this.metadataCid = this.schedulePlanAtMs ? state.metadataCid || null : null;
             }
         } catch (e) {
-            console.warn('Failed to load deploy state', e);
+            warn('Failed to load deploy state', e);
         }
     }
 

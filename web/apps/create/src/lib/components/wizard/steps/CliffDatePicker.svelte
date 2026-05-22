@@ -1,6 +1,6 @@
 <script lang="ts">
     import { MONTH_NAMES, CLIFF_PRESETS, TIME_PRESETS } from '@zarf/core/constants/time';
-    import { toIsoDate, fromIsoDate, getTodayIso, addMonthsToToday } from '@zarf/core/utils/date';
+    import { toIsoDate, fromIsoDate, addMonthsToToday } from '@zarf/core/utils/date';
     import ZenButton from '@zarf/ui/components/ui/ZenButton.svelte';
     import ZenNumberInput from '@zarf/ui/components/ui/ZenNumberInput.svelte';
     import ZenSelect from '@zarf/ui/components/ui/ZenSelect.svelte';
@@ -62,7 +62,6 @@
     });
 
     // --- Derived for clean markup ---
-    const today = getTodayIso();
     const monthOptions = MONTH_NAMES.map((m: string, i: number) => ({
         value: i,
         label: m,
@@ -110,7 +109,7 @@
 
     <!-- Quick Date Presets + Time Selector -->
     <div class="flex items-center gap-2 text-xs text-zen-fg-subtle">
-        {#each CLIFF_PRESETS as preset}
+        {#each CLIFF_PRESETS as preset, i (i)}
             {@const presetDate = addMonthsToToday(preset.months)}
             <ZenButton
                 variant={cliffDate === presetDate ? 'primary' : 'ghost'}
@@ -126,7 +125,7 @@
         <!-- Time with hover-to-edit -->
         {#if isEditingTime}
             <div class="flex items-center gap-1">
-                {#each TIME_PRESETS as time}
+                {#each TIME_PRESETS as time, i (i)}
                     <ZenButton
                         variant={cliffTime === time ? 'primary' : 'ghost'}
                         size="sm"

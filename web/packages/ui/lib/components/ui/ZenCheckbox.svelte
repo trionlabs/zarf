@@ -28,7 +28,7 @@
                 w-4 h-4 rounded
                 border-[0.5px] border-zen-border-strong
                 bg-transparent
-                transition-all duration-200
+                transition-all duration-[var(--zen-motion-base)]
                 peer-checked:bg-zen-primary
                 peer-checked:border-zen-primary
                 peer-focus-visible:ring-2

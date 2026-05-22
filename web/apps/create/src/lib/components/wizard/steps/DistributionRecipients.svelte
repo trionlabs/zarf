@@ -1,14 +1,5 @@
 <script lang="ts">
-    import {
-        Check,
-        Download,
-        AlertTriangle,
-        FileText,
-        X,
-        Mail,
-        Users,
-        ArrowRight,
-    } from 'lucide-svelte';
+    import { Check, Download, AlertTriangle, FileText, X } from 'lucide-svelte';
     import { readCSVFile, generateSampleCSV } from '../../../csv/csvProcessor';
     import type { Recipient } from '../../../stores/types';
     import ZenButton from '@zarf/ui/components/ui/ZenButton.svelte';
@@ -17,9 +8,9 @@
         recipients = $bindable(),
         csvFileName = $bindable(),
         csvError = $bindable(),
+        // eslint-disable-next-line no-useless-assignment -- $bindable() default through-prop write the parser cannot see
         isProcessingCSV = $bindable(),
         validationErrors = $bindable([]),
-        totalAmount,
         poolAmount = 0, // The total available in the distribution pool
         unlockEvents = 1, // Number of unlock events in the vesting schedule
         tokenSymbol = 'TOKENS',
@@ -29,13 +20,10 @@
         csvError: string | null;
         isProcessingCSV: boolean;
         validationErrors?: string[];
-        totalAmount: number;
         poolAmount?: number;
         unlockEvents?: number;
         tokenSymbol?: string;
     }>();
-
-    let showPreview = $state(true);
 
     // Derived stats
     let csvTotal = $derived(recipients.reduce((sum: number, r: Recipient) => sum + r.amount, 0));
@@ -48,10 +36,12 @@
 
     // Identify duplicates for highlighting
     let duplicateEmails = $derived.by(() => {
+        // eslint-disable-next-line svelte/prefer-svelte-reactivity -- derived-local counter, re-runs when recipients change
         const counts = new Map<string, number>();
         recipients.forEach((r: Recipient) => {
             if (r.email) counts.set(r.email, (counts.get(r.email) || 0) + 1);
         });
+        // eslint-disable-next-line svelte/prefer-svelte-reactivity -- derived-local result set, returned then consumed via $derived
         const dups = new Set<string>();
         counts.forEach((count, email) => {
             if (count > 1) dups.add(email);
@@ -63,7 +53,7 @@
     function formatAmount(num: number): string {
         if (num >= 1000000) return (num / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
         if (num >= 1000) return (num / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
-        return num.toLocaleString();
+        return num.toLocaleString('en-US');
     }
 
     async function handleFileUpload(event: Event) {
@@ -80,7 +70,6 @@
             recipients = result.entries;
             validationErrors = result.errors;
             csvFileName = file.name;
-            showPreview = true;
 
             // Note: validationErrors might contain duplicate warnings, but we still show the list.
             if (recipients.length === 0 && validationErrors.length > 0) {
@@ -113,7 +102,6 @@
         csvFileName = null;
         csvError = null;
         validationErrors = [];
-        showPreview = false;
     }
 </script>
 
@@ -334,7 +322,7 @@
                         {validationErrors.length} Warnings
                     </div>
                     <div class="max-h-32 overflow-y-auto space-y-2 pr-2">
-                        {#each validationErrors as err}
+                        {#each validationErrors as err, i (i)}
                             <div class="text-xs opacity-90 pl-2 border-l-2 border-zen-warning/30">
                                 {err}
                             </div>
@@ -370,7 +358,7 @@
             <!-- Scrollable List -->
             <div class="flex-1 overflow-y-auto scrollbar-hide bg-zen-bg">
                 <div class="divide-y divide-zen-border">
-                    {#each recipients as row, i}
+                    {#each recipients as row, i (i)}
                         <div
                             class="flex items-center justify-between px-5 py-3 hover:bg-zen-fg/[0.02] transition-colors border-b border-zen-fg/[0.02] last:border-0
                             {duplicateEmails.has(row.email || '')
@@ -397,7 +385,7 @@
 
                             <!-- Amount -->
                             <span class="text-sm font-medium text-zen-fg tabular-nums">
-                                {row.amount.toLocaleString()}
+                                {row.amount.toLocaleString('en-US')}
                             </span>
                         </div>
                     {/each}
@@ -412,7 +400,7 @@
                     >Total Rows: {recipients.length}</span
                 >
                 <span class="text-xs font-medium text-zen-fg/70"
-                    >Sum: {csvTotal.toLocaleString()} {tokenSymbol}</span
+                    >Sum: {csvTotal.toLocaleString('en-US')} {tokenSymbol}</span
                 >
             </div>
         </div>

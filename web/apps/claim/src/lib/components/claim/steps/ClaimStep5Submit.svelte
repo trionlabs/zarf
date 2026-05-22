@@ -1,6 +1,6 @@
 <script lang="ts">
     import { claimStore } from '../../../stores/claimStore.svelte';
-    import { submitClaim, getExplorerUrl } from '@zarf/core/contracts';
+    import { getExplorerUrl } from '@zarf/core/contracts/explorer';
     import {
         Send,
         FileText,
@@ -12,6 +12,7 @@
     import { walletStore } from '@zarf/ui/stores/walletStore.svelte';
     import { sanitizeBlockchainError } from '@zarf/ui/utils/errorSanitizer';
     import { formatTokenAmount } from '@zarf/core/utils/amount';
+    import { err } from '@zarf/core/utils/log';
     import ZenButton from '@zarf/ui/components/ui/ZenButton.svelte';
 
     let { contractAddress } = $props<{ contractAddress: string }>();
@@ -48,8 +49,8 @@
         void handleSubmit();
     }
 
-    function sanitizeError(err: unknown): string {
-        return sanitizeBlockchainError(err, {
+    function sanitizeError(e: unknown): string {
+        return sanitizeBlockchainError(e, {
             customRules: [
                 {
                     match: /InvalidPubkey|Contract, #4|is_valid_key_hash/i,
@@ -78,6 +79,7 @@
         try {
             const rawInputs = proof.publicValues;
 
+            const { submitClaim } = await import('@zarf/core/contracts');
             const result = await submitClaim(
                 proof.proof,
                 rawInputs,
@@ -94,8 +96,8 @@
 
             txHash = result.hash;
             success = true;
-        } catch (e: any) {
-            console.error('Submission failed:', e);
+        } catch (e: unknown) {
+            err('Submission failed:', e);
             error = sanitizeError(e);
         } finally {
             isSubmitting = false;

@@ -1,6 +1,7 @@
 import { browser } from '$app/environment';
-import { decodeJwt } from '../utils/googleAuth';
+import { decodeJwt, validateGoogleClaims } from '../utils/googleAuth';
 import { STORAGE_KEYS } from '@zarf/core/constants/storage';
+import { dev, warn, err } from '@zarf/core/utils/log';
 
 /**
  * Authentication Store — Gmail / OIDC session.
@@ -64,28 +65,45 @@ function clearGmailSession() {
 /**
  * Restores session from storage and validates JWT integrity.
  * Always marks isHydrated = true at the end, regardless of session state.
+ *
+ * @param clientId - Expected `aud` for the stored Google OIDC token.
+ *                   Required so the store rejects sessions from a
+ *                   different Google client (forged or stale). Missing
+ *                   or wrong clientId fails closed via clearGmailSession.
  */
-function restoreGmailSession() {
+function restoreGmailSession(clientId: string) {
     if (!browser) return;
+
+    // Fail closed when VITE_GOOGLE_CLIENT_ID is unset: validateGoogleClaims
+    // would otherwise accept any token whose aud is the empty string, which
+    // silently downgrades the audience check from "reject wrong-app tokens"
+    // to "accept anything".
+    if (!clientId) {
+        warn('[AuthStore] VITE_GOOGLE_CLIENT_ID is unset, clearing any stored session');
+        clearGmailSession();
+        isHydrated = true;
+        return;
+    }
 
     const jwt = sessionStorage.getItem(STORAGE_KEYS.GMAIL_JWT);
     if (jwt) {
         try {
             const { payload } = decodeJwt(jwt);
+            validateGoogleClaims(payload, { clientId, mode: 'restore' });
             const now = Math.floor(Date.now() / 1000);
 
             if (payload.exp < now) {
-                console.warn('[AuthStore] Session expired, clearing...');
+                warn('[AuthStore] Session expired, clearing...');
                 clearGmailSession();
             } else {
                 gmailState.email = payload.email;
                 gmailState.jwt = jwt;
                 gmailState.expiresAt = payload.exp;
                 gmailState.isAuthenticated = true;
-                console.log('[AuthStore] Session restored for:', payload.email);
+                dev('[AuthStore] Session restored for:', payload.email);
             }
         } catch (e) {
-            console.error('[AuthStore] Failed to restore session:', e);
+            err('[AuthStore] Failed to restore session:', e);
             clearGmailSession();
         }
     }

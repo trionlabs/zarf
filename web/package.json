@@ -22,7 +22,14 @@
     "deploy:jwk-rotation": "pnpm --filter @zarf/jwk-rotation run deploy",
     "deploy:indexer": "pnpm --filter @zarf/indexer run deploy",
     "deploy:all": "pnpm deploy:landing && pnpm deploy:create && pnpm deploy:claim && pnpm deploy:pin-proxy && pnpm deploy:jwk-rotation && pnpm deploy:indexer",
-    "check:type-forks": "node scripts/check-type-forks.mjs"
+    "check:type-forks": "node scripts/check-type-forks.mjs",
+    "check:budget": "node scripts/check-bundle-budget.mjs",
+    "check:any": "node scripts/check-any-allow-list.mjs",
+    "check:console": "node scripts/check-console-allow-list.mjs",
+    "lint": "eslint .",
+    "format:check": "prettier --check .",
+    "format:write": "prettier --write .",
+    "smoke:routes": "bash scripts/smoke-routes.sh"
   },
   "pnpm": {
     "overrides": {
@@ -32,5 +39,16 @@
     "onlyBuiltDependencies": [
       "esbuild"
     ]
+  },
+  "devDependencies": {
+    "@eslint/compat": "^2.1.0",
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.4.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-svelte": "^3.17.1",
+    "globals": "^17.6.0",
+    "prettier": "^3.8.3",
+    "prettier-plugin-svelte": "^4.0.1",
+    "typescript-eslint": "^8.59.4"
   }
 }

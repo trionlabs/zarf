@@ -1,7 +1,7 @@
 <script lang="ts">
     import { ExternalLink } from 'lucide-svelte';
     import type { OnChainVestingContract } from '@zarf/core/services/distributionDiscovery';
-    import { getContractExplorerUrl } from '@zarf/core/contracts';
+    import { getContractExplorerUrl } from '@zarf/core/contracts/explorer';
     import { formatTokenAmount } from '@zarf/core/utils/amount';
     import ZenCard from '@zarf/ui/components/ui/ZenCard.svelte';
     import ZenButton from '@zarf/ui/components/ui/ZenButton.svelte';
@@ -58,9 +58,20 @@
         interactive
         radius="3xl"
         onclick={() => onSelect?.(contract)}
-        onkeydown={(e) => e.key === 'Enter' && onSelect?.(contract)}
+        onkeydown={(e) => {
+            // Only handle activation when the key originates on the card
+            // itself; nested elements (View button, explorer anchor) bubble
+            // their keydown, and preventDefault here would cancel their
+            // native Space/Enter activation.
+            if (e.target !== e.currentTarget) return;
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                onSelect?.(contract);
+            }
+        }}
         role="button"
         tabindex={0}
+        aria-label={`View distribution ${contract.name || 'Unnamed'}`}
         class="flex-1 relative overflow-hidden transition-all duration-300 hover:-translate-y-0.5"
     >
         <div

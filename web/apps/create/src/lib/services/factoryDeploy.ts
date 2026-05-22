@@ -6,13 +6,17 @@
  * 2. Create and fund the vesting contract through the factory.
  */
 
-import {
-    approveTokenAllowance,
-    createAndFundVesting,
-    getLatestLedgerSequence,
-    getTokenAllowance,
-} from '@zarf/core/contracts';
+// Contracts module lazy-loaded via loadContracts() so the stellar-sdk
+// + buffer closure stays out of the SSR module graph for /wizard/step-2.
 import { getFactoryAddress as getConfiguredFactoryAddress } from '@zarf/core/config/contracts';
+
+let _contractsModule: typeof import('@zarf/core/contracts') | null = null;
+async function loadContracts(): Promise<typeof import('@zarf/core/contracts')> {
+    if (!_contractsModule) {
+        _contractsModule = await import('@zarf/core/contracts');
+    }
+    return _contractsModule;
+}
 import type {
     HexString,
     StellarAddress,
@@ -93,6 +97,9 @@ export class FactoryDeployService {
     async approveFactory(): Promise<TransactionHash | null> {
         this.onProgress({ step: 'approve', message: 'Checking token allowance...' });
 
+        const { getTokenAllowance, approveTokenAllowance, getLatestLedgerSequence } =
+            await loadContracts();
+
         const allowance = await this.withRetry(
             () =>
                 getTokenAllowance(
@@ -146,9 +153,11 @@ export class FactoryDeployService {
             message: 'Creating and funding Stellar vesting contract...',
         });
 
+        const { createAndFundVesting: createAndFundVestingTx } = await loadContracts();
+
         return this.withRetry(
             () =>
-                createAndFundVesting(
+                createAndFundVestingTx(
                     {
                         factoryAddress: this.config.factoryAddress,
                         owner: this.config.owner,

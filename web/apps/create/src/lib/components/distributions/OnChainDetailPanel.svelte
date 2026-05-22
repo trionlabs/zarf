@@ -3,7 +3,7 @@
     import type { OnChainVestingContract } from '@zarf/core/services/distributionDiscovery';
     import { getCidForVesting } from '@zarf/core/services/vestingDiscovery';
     import { fetchIpfsJson } from '@zarf/core/utils/ipfsFetch';
-    import { getContractExplorerUrl } from '@zarf/core/contracts';
+    import { getContractExplorerUrl } from '@zarf/core/contracts/explorer';
     import { formatTokenAmount } from '@zarf/core/utils/amount';
 
     let {
@@ -109,7 +109,12 @@
                 >
             </div>
         </div>
-        <button class="p-2 rounded-full hover:bg-zen-fg/5 transition-colors" onclick={onClose}>
+        <button
+            type="button"
+            aria-label="Close detail panel"
+            class="p-2 rounded-full hover:bg-zen-fg/5 transition-colors"
+            onclick={onClose}
+        >
             <X class="w-4 h-4" />
         </button>
     </header>

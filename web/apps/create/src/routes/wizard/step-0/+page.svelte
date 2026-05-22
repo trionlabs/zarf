@@ -2,23 +2,14 @@
     import { wizardStore } from '$lib/stores/wizardStore.svelte';
     import { goto } from '$app/navigation';
     import { onMount } from 'svelte';
-    import { browser } from '$app/environment';
-    import {
-        ArrowRight,
-        Clipboard,
-        CheckCircle,
-        Loader2,
-        AlertCircle,
-        Search,
-    } from 'lucide-svelte';
+    import { ArrowRight, Clipboard, Loader2, AlertCircle } from 'lucide-svelte';
     import { fetchTokenMetadata, type TokenMetadata } from '$lib/services/tokenMetadata';
-    import { isValidContractAddress } from '@zarf/core/utils/address';
+    import { isValidContractAddressShape as isValidContractAddress } from '@zarf/core/utils/addressShape';
     import { fade, fly } from 'svelte/transition';
     import ZenButton from '@zarf/ui/components/ui/ZenButton.svelte';
     import ZenCard from '@zarf/ui/components/ui/ZenCard.svelte';
 
     // --- State ---
-    let mounted = $state(false);
     let tokenAddress = $state('');
     let tokenMetadata = $state<TokenMetadata | null>(null);
     let isFetching = $state(false);
@@ -44,8 +35,6 @@
             };
         }
 
-        mounted = true;
-
         return () => {
             if (debounceTimer) clearTimeout(debounceTimer);
         };
@@ -53,7 +42,6 @@
 
     // --- Derived ---
     const isAddressValid = $derived(isValidContractAddress(tokenAddress));
-    const canProceed = $derived(isAddressValid && tokenMetadata !== null && !isFetching);
 
     // --- Actions ---
     async function handlePaste() {
@@ -108,7 +96,7 @@
             } else {
                 error = result.error || 'Could not fetch token metadata';
             }
-        } catch (e) {
+        } catch {
             error = 'Network error while fetching metadata';
         } finally {
             isFetching = false;
@@ -120,6 +108,16 @@
         goto('/wizard/step-1');
     }
 </script>
+
+<svelte:head>
+    <title>Token Details — Create Distribution — Zarf</title>
+    <meta
+        name="description"
+        content="Step 1 of 3: enter the Stellar token contract for your distribution."
+    />
+</svelte:head>
+
+<h1 class="sr-only">Create Distribution — Step 1: Token Details</h1>
 
 <div class="min-h-[50vh] flex flex-col items-center justify-center p-4 relative overflow-hidden">
     <!-- Background Decor -->
@@ -137,6 +135,8 @@
                 bind:value={tokenAddress}
                 oninput={handleAddressInput}
                 spellcheck="false"
+                autocomplete="off"
+                autocapitalize="none"
             />
 
             <!-- Paste Button (Visible when empty) -->
@@ -228,7 +228,7 @@
                     </ZenCard>
                 </div>
             {:else if !tokenAddress}
-                <p class="text-zen-fg-faint text-sm font-light">Supports Stellar</p>
+                <p class="text-zen-fg-muted text-sm font-light">Supports Stellar</p>
             {/if}
         </div>
     </div>

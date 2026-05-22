@@ -18,7 +18,7 @@
         role="radiogroup"
         aria-label="Stellar network"
     >
-        {#each visibleOptions as option}
+        {#each visibleOptions as option (option.id)}
             <button
                 type="button"
                 role="radio"

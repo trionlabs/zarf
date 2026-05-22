@@ -109,7 +109,7 @@ export function generateUnlockMarkers(
         const actualEvent = Math.min(eventNum, unlockEvents);
         const percentCompletion = actualEvent / unlockEvents;
 
-        let unlockDate = new Date(cliffDate.getTime());
+        const unlockDate = new Date(cliffDate.getTime());
 
         switch (durationUnit) {
             case 'minutes':
@@ -222,10 +222,6 @@ export function calculateVestingPeriods(
 
     const result: VestingPeriod[] = [];
     const now = Date.now() / 1000;
-
-    // Avoid division by zero if period is 0 (should act as single unlock)
-    const periodDuration =
-        schedule.vestingPeriod === 0 ? schedule.vestingDuration : schedule.vestingPeriod;
 
     // Calculate total number of unlocks
     // If vestingPeriod is 0, it means linear streaming or single unlock at end?

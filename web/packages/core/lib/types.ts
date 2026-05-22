@@ -96,6 +96,8 @@ export interface JWTPayload {
     iat: number; // Issued at timestamp
     sub: string; // Subject (user ID)
     email_verified?: boolean;
+    /** Per-request nonce echoed back by Google when sent in the OIDC request. */
+    nonce?: string;
 }
 
 /**

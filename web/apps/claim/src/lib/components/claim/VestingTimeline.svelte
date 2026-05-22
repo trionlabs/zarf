@@ -1,6 +1,7 @@
 <script lang="ts">
     import { claimStore } from '../../stores/claimStore.svelte';
     import { Clock } from 'lucide-svelte';
+    import { formatDate as formatDateUS } from '@zarf/core/utils';
 
     // Derived values for display
     let percent = $derived.by(() => {
@@ -9,12 +10,8 @@
         return total > 0 ? (vested / total) * 100 : 0;
     });
 
-    // Formatting dates
-    const formatDate = (ts: number) =>
-        new Date(ts * 1000).toLocaleDateString(undefined, {
-            month: 'short',
-            day: 'numeric',
-        });
+    // Formatting dates — unix-seconds timestamp → "Apr 5" (no year)
+    const formatDate = (ts: number) => formatDateUS(ts * 1000, 'monthDay');
 
     let start = $derived(
         claimStore.vestingSchedule ? formatDate(claimStore.vestingSchedule.vestingStart) : 'Start',
@@ -148,7 +145,7 @@
             <Clock class="w-3.5 h-3.5 text-zen-fg-subtle" />
             <span class="text-zen-fg-subtle">Next unlock:</span>
             <span class="font-medium text-zen-fg-muted"
-                >{nextUnlock.toLocaleDateString()} ({Math.ceil(
+                >{formatDateUS(nextUnlock)} ({Math.ceil(
                     (nextUnlock.getTime() - Date.now()) / (1000 * 60 * 60 * 24),
                 )} days)</span
             >

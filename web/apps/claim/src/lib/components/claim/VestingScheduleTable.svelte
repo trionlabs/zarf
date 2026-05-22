@@ -1,6 +1,7 @@
 <script lang="ts">
     import { claimStore } from '../../stores/claimStore.svelte';
     import { formatTokenAmount } from '@zarf/core/utils/amount';
+    import { formatDate as formatDateUS } from '@zarf/core/utils';
     import type { VestingPeriod } from '@zarf/core/utils';
     import { Check, Clock, Lock, ChevronDown, ChevronUp, X } from 'lucide-svelte';
     import { slide, fade } from 'svelte/transition';
@@ -13,13 +14,8 @@
     // Format token amounts
     const format = (val: bigint) => formatTokenAmount(val, claimStore.tokenDecimals, 2);
 
-    // Format dates
-    const formatDate = (ts: number) =>
-        new Date(ts * 1000).toLocaleDateString(undefined, {
-            month: 'short',
-            day: 'numeric',
-            year: 'numeric',
-        });
+    // Format dates — unix-seconds timestamp → "Apr 5, 2026"
+    const formatDate = (ts: number) => formatDateUS(ts * 1000);
 
     let periods = $derived(claimStore.periods);
 
@@ -46,7 +42,14 @@
     let activeEpochIndex = $derived(claimStore.state.selectedEpochIndex);
     let currentStep = $derived(claimStore.currentStep);
 
-    function handleStartClaim(index: number) {
+    // The inline panel below is rendered as a sibling <tr colspan="5">, not
+    // a modal — DOM, aria roles, and focus model are all table semantics.
+    // We still track the opener button so cancelling restores focus to it;
+    // without that, the close button removes itself from the DOM and focus
+    // falls to <body>, stranding keyboard and AT users mid-flow.
+    let openerEl: HTMLButtonElement | null = null;
+
+    function handleStartClaim(index: number, opener?: HTMLButtonElement) {
         // If already active, toggle off?
         if (activeEpochIndex === index - 1 && currentStep >= 3) {
             claimStore.state.currentStep = 2;
@@ -54,13 +57,21 @@
             return;
         }
 
+        openerEl = opener ?? null;
         claimStore.state.selectedEpochIndex = index - 1;
         claimStore.state.currentStep = 3; // Move to Wallet Step
     }
 
     function handleCancel() {
+        const restore = openerEl;
+        openerEl = null;
         claimStore.state.currentStep = 2;
         claimStore.state.selectedEpochIndex = null;
+        // Opener row stays mounted (only the inline panel row collapses),
+        // so synchronous focus is safe — no tick() needed.
+        if (restore && typeof document !== 'undefined' && document.contains(restore)) {
+            restore.focus();
+        }
     }
 </script>
 
@@ -72,19 +83,19 @@
             <div class="flex items-center gap-3 text-xs">
                 {#if claimedCount > 0}
                     <span class="flex items-center gap-1 text-zen-success">
-                        <Check class="w-3 h-3" />
+                        <Check aria-hidden="true" class="w-3 h-3" />
                         {claimedCount} claimed
                     </span>
                 {/if}
                 {#if claimableCount > 0}
                     <span class="flex items-center gap-1 text-zen-primary">
-                        <Clock class="w-3 h-3" />
+                        <Clock aria-hidden="true" class="w-3 h-3" />
                         {claimableCount} ready
                     </span>
                 {/if}
                 {#if lockedCount > 0}
                     <span class="flex items-center gap-1 text-zen-fg-subtle">
-                        <Lock class="w-3 h-3" />
+                        <Lock aria-hidden="true" class="w-3 h-3" />
                         {lockedCount} locked
                     </span>
                 {/if}
@@ -95,7 +106,10 @@
         <div
             class="overflow-hidden rounded-xl border-[0.5px] border-zen-border-subtle bg-zen-bg shadow-sm"
         >
-            <table class="w-full border-separate border-spacing-0">
+            <table
+                aria-label="Vesting unlock schedule"
+                class="w-full border-separate border-spacing-0"
+            >
                 <thead>
                     <tr class="bg-zen-fg/5 text-xs uppercase tracking-wider text-zen-fg-subtle">
                         <th scope="col" class="font-medium p-4 text-left">Period</th>
@@ -135,21 +149,21 @@
                                     <span
                                         class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-zen-success/10 text-zen-success"
                                     >
-                                        <Check class="w-3 h-3" />
+                                        <Check aria-hidden="true" class="w-3 h-3" />
                                         Claimed
                                     </span>
                                 {:else if period.status === 'claimable'}
                                     <span
                                         class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-zen-primary/10 text-zen-primary"
                                     >
-                                        <Clock class="w-3 h-3" />
+                                        <Clock aria-hidden="true" class="w-3 h-3" />
                                         Ready
                                     </span>
                                 {:else}
                                     <span
                                         class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-zen-fg/5 text-zen-fg-subtle"
                                     >
-                                        <Lock class="w-3 h-3" />
+                                        <Lock aria-hidden="true" class="w-3 h-3" />
                                         Locked
                                     </span>
                                 {/if}
@@ -157,10 +171,12 @@
                             <td class="p-4 text-right border-t-[0.5px] border-zen-border-subtle">
                                 {#if period.status === 'claimable'}
                                     <button
+                                        type="button"
                                         class="px-4 py-1 rounded-lg text-xs font-bold uppercase tracking-widest transition-colors {isActive
                                             ? 'text-zen-primary bg-transparent'
                                             : 'border border-zen-primary text-zen-primary hover:bg-zen-primary hover:text-zen-primary-content'}"
-                                        onclick={() => handleStartClaim(period.index)}
+                                        onclick={(e) =>
+                                            handleStartClaim(period.index, e.currentTarget)}
                                     >
                                         {isActive ? 'Active' : 'Claim'}
                                     </button>
@@ -181,7 +197,7 @@
                                             class="flex items-center justify-between px-6 py-3 border-b-[0.5px] border-zen-border-subtle"
                                         >
                                             <div class="flex gap-1.5">
-                                                {#each [3, 4, 5] as step}
+                                                {#each [3, 4, 5] as step (step)}
                                                     <div
                                                         class="h-1 w-6 rounded-full transition-all duration-500 {currentStep >=
                                                         step
@@ -191,10 +207,12 @@
                                                 {/each}
                                             </div>
                                             <button
+                                                type="button"
+                                                aria-label="Cancel claim"
                                                 class="text-zen-fg-faint hover:text-zen-fg-muted transition-colors"
                                                 onclick={handleCancel}
                                             >
-                                                <X class="w-4 h-4" />
+                                                <X aria-hidden="true" class="w-4 h-4" />
                                             </button>
                                         </div>
 

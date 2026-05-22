@@ -55,6 +55,14 @@ jobs:
   web:
     name: Web, Core, and Workers
     runs-on: ubuntu-latest
+    # Minimum Stellar config so the SvelteKit `analyse` pass can evaluate
+    # `+layout.ts`'s `coreInit` import without throwing. These are public
+    # testnet defaults — CI does not deploy, so no secrets are needed.
+    env:
+      VITE_STELLAR_DEFAULT_NETWORK: testnet
+      VITE_STELLAR_TESTNET_RPC_URL: https://soroban-testnet.stellar.org
+      VITE_STELLAR_TESTNET_HORIZON_URL: https://horizon-testnet.stellar.org
+      VITE_STELLAR_TESTNET_FACTORY_ADDRESS: CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB7
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -62,7 +70,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -89,3 +97,34 @@ jobs:
           pnpm --dir web --filter @zarf/indexer typecheck
           pnpm --dir web --filter @zarf/pin-proxy typecheck
           pnpm --dir web --filter @zarf/jwk-rotation typecheck
+
+      # Drift gates — no build artifacts required.
+      - name: Check explicit any allow-list
+        run: pnpm --dir web check:any
+
+      - name: Check direct console.* allow-list
+        run: pnpm --dir web check:console
+
+      # Build apps so check:budget has manifests + immutable assets to
+      # measure. Builds run sequentially because the three apps share
+      # the same pnpm store and vite worker pool; parallelizing here
+      # has not shown meaningful wall-clock savings in local timing.
+      - name: Build landing app
+        run: pnpm --dir web build:landing
+
+      - name: Build claim app
+        run: pnpm --dir web build:claim
+
+      - name: Build create app
+        run: pnpm --dir web build:create
+
+      - name: Check bundle budget (initialGz + totalGz per app)
+        run: pnpm --dir web check:budget
+
+      # Boot `vite dev` for all three apps and curl the SSR routes.
+      # Catches module-evaluation crashes (e.g. a top-level
+      # stellar-sdk + buffer import that 500s during SSR but passes
+      # both build and svelte-check). Fixed-port script so the CI log
+      # makes failures easy to attribute.
+      - name: Smoke SSR routes (vite dev)
+        run: pnpm --dir web smoke:routes

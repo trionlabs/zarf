@@ -24,9 +24,9 @@
     <div class="w-16 h-16 rounded-full flex items-center justify-center mb-4 {color}">
         <Icon class="w-8 h-8 {iconColor}" />
     </div>
-    <h3 class="font-medium text-lg mb-2">
+    <h2 class="font-medium text-lg mb-2">
         {title}
-    </h3>
+    </h2>
     <p class="text-sm text-zen-fg-muted max-w-sm mb-6">
         {description}
     </p>

@@ -26,6 +26,10 @@ Thumbs.db
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 
+# Bundle visualizer output
+stats.html
+apps/*/stats.html
+
 # Documentation & Backlogs
 _backlogs/
 reports/

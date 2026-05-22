@@ -13,7 +13,7 @@ import { browser } from '../utils/ssr';
 // This ensures Buffer is available before bb.js loads
 
 import type { Barretenberg } from '@aztec/bb.js';
-import type { WhitelistEntry, MerkleTreeData, MerkleProof, MerkleClaim, Schedule } from '../types';
+import type { MerkleTreeData, MerkleProof, MerkleClaim, Schedule } from '../types';
 import { TREE_DEPTH, MAX_EMAIL_LENGTH } from '../constants';
 
 // ============================================================================
@@ -57,6 +57,7 @@ async function initBarretenberg(): Promise<Barretenberg> {
             FrClass = null;
             throw new Error(
                 `Failed to initialize Barretenberg: ${error instanceof Error ? error.message : 'unknown error'}`,
+                { cause: error },
             );
         }
     })();
@@ -294,17 +295,12 @@ export function generateSecureCode(): string {
     const length = 8;
     const randomValues = new Uint8Array(length);
 
-    // Use Web Crypto API (Browser & Modern environments) for CSP compliance and security
-    if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
-        crypto.getRandomValues(randomValues);
-    } else {
-        // Fallback for environments without Web Crypto
-        // Using Math.random is NOT cryptographically secure but prevents build errors.
-        console.warn('Warning: Using non-secure RNG for salt generation');
-        for (let i = 0; i < length; i++) {
-            randomValues[i] = Math.floor(Math.random() * 256);
-        }
-    }
+    // Web Crypto is universally available in every runtime this module
+    // reaches (modern browsers, Node 16+, Cloudflare workerd). No fallback
+    // path — an environment that wouldn't expose crypto.getRandomValues
+    // couldn't reach this line anyway, since bb.js, Buffer polyfill, and
+    // the Pedersen WASM all assume the same baseline.
+    crypto.getRandomValues(randomValues);
 
     let result = '';
     for (let i = 0; i < length; i++) {

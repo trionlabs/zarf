@@ -7,6 +7,8 @@
         extractStateFromUrl,
         clearUrlFragment,
         decodeJwt,
+        validateGoogleClaims,
+        consumeStoredNonce,
     } from '@zarf/ui/utils/googleAuth';
     import ImportContractInput from '$lib/components/claim/ImportContractInput.svelte';
     import LoginPrompt from '$lib/components/claim/LoginPrompt.svelte';
@@ -18,11 +20,11 @@
         discoverAllVestings,
         type DiscoveredVesting,
     } from '@zarf/core/services/vestingDiscovery';
+    import { dev, warn, err } from '@zarf/core/utils/log';
 
     import { page } from '$app/state';
     import { goto } from '$app/navigation';
 
-    let isAuthenticating = $state(false);
     let isFiltering = $state(false);
     let hasFiltered = $state(false);
     let filteredAddresses = $state<StellarContractId[]>([]);
@@ -59,7 +61,7 @@
             const eligible = await filterDistributionsByEmail(vestings, email);
             filteredAddresses = eligible;
         } catch (error) {
-            console.error('[Claim] Failed to filter distributions:', error);
+            err('[Claim] Failed to filter distributions:', error);
             // Fall back to showing all on error
             filteredAddresses = vestings.map((vesting) => vesting.address);
         } finally {
@@ -73,7 +75,7 @@
             const vestings = await discoverAllVestings();
             discoveredVestings = Array.from(new Map(vestings.map((v) => [v.address, v])).values());
         } catch (e) {
-            console.warn('[Claim] Chain discovery failed', e);
+            warn('[Claim] Chain discovery failed', e);
         }
     });
 
@@ -81,10 +83,26 @@
         // 1. Handle OAuth Redirect Callback
         const idToken = extractTokenFromUrl();
         if (idToken) {
-            isAuthenticating = true;
             try {
                 // Decode to get email for display/validation
                 const { payload } = decodeJwt(idToken);
+
+                // Gate the token's claims against the configured Google
+                // client — rejects forged or wrong-app JWTs at the trust
+                // boundary before any caller reads payload.email.
+                // A non-null nonce is mandatory at fresh callback: a cold
+                // tab with no stored nonce means the token was injected
+                // (not initiated by this tab), so we refuse before any
+                // claim is trusted.
+                const storedNonce = consumeStoredNonce();
+                if (storedNonce === null) {
+                    throw new Error('OAuth callback without pending flow');
+                }
+                validateGoogleClaims(payload, {
+                    clientId: import.meta.env.VITE_GOOGLE_CLIENT_ID ?? '',
+                    mode: 'callback',
+                    expectedNonce: storedNonce,
+                });
 
                 // Store in AuthStore (Session only)
                 authStore.setGmailSession({
@@ -97,6 +115,7 @@
                 const oauthState = extractStateFromUrl();
                 if (oauthState?.address) {
                     // Preserve address in URL for the claim flow
+                    // eslint-disable-next-line svelte/prefer-svelte-reactivity -- local URL builder, never read reactively
                     const url = new URL(window.location.href);
                     url.searchParams.set('address', oauthState.address);
                     url.hash = ''; // Clear hash (token)
@@ -105,11 +124,9 @@
                     // Just clear URL fragment for aesthetics & security
                     clearUrlFragment();
                 }
-            } catch (err) {
-                console.error('[Claim] Auth failed:', err);
+            } catch (e) {
+                err('[Claim] Auth failed:', e);
                 clearUrlFragment();
-            } finally {
-                isAuthenticating = false;
             }
         }
     });
@@ -133,12 +150,20 @@
     let lastAddress = $state<string | null>(null);
     $effect(() => {
         if (importedAddress !== lastAddress) {
-            console.log('[Claim] Context Changed, Reseting Store:', importedAddress);
+            dev('[Claim] Context Changed, Reseting Store:', importedAddress);
             claimStore.reset();
             lastAddress = importedAddress;
         }
     });
 </script>
+
+<svelte:head>
+    <title>Claim Tokens — Zarf</title>
+    <meta
+        name="description"
+        content="Sign in with email to discover and claim your privacy-preserving token distributions on Stellar."
+    />
+</svelte:head>
 
 <div
     class="h-full flex flex-col relative max-w-5xl w-full px-4 md:px-0 transition-all duration-300"

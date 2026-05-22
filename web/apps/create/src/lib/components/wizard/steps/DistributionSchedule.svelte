@@ -10,9 +10,6 @@
      * - CliffDatePicker: Date/time selection with quick presets
      * - VestingDurationPicker: Duration and unit selection
      */
-    import { wizardStore } from '../../../stores/wizardStore.svelte';
-    import { fade } from 'svelte/transition';
-    import VestingTimeline from '../../../components/wizard/VestingTimeline.svelte';
     import type { DurationUnit } from '@zarf/core/utils/vesting';
 
     // Sub-components (Atomic)
@@ -35,10 +32,6 @@
         duration: number;
         durationUnit: DurationUnit;
     }>();
-
-    // Derived for template
-    const tokenSymbol = $derived(wizardStore.tokenDetails.tokenSymbol || 'TOKENS');
-    const hasCliffDate = $derived(cliffDate !== '');
 </script>
 
 <div class="space-y-4">

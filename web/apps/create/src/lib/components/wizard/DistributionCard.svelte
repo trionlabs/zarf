@@ -1,12 +1,13 @@
 <script lang="ts">
     import { goto } from '$app/navigation';
     import { browser } from '$app/environment';
-    import { Rocket, Trash2, Copy, Ban, Calendar } from 'lucide-svelte';
+    import { Rocket, Trash2, Copy, Calendar } from 'lucide-svelte';
     import { wizardStore } from '../../stores/wizardStore.svelte';
     import type { Distribution } from '../../stores/types';
     import ZenCard from '@zarf/ui/components/ui/ZenCard.svelte';
     import ZenButton from '@zarf/ui/components/ui/ZenButton.svelte';
     import ZenBadge from '@zarf/ui/components/ui/ZenBadge.svelte';
+    import { formatAmount, formatDate } from '@zarf/core/utils';
 
     let {
         distribution,
@@ -43,18 +44,9 @@
 
     const style = $derived(variantStyles[variant as keyof typeof variantStyles]);
 
-    function formatDate(dateString: string | undefined): string {
-        if (!dateString) return 'Not set';
-        return new Date(dateString).toLocaleDateString('en-US', {
-            month: 'short',
-            day: 'numeric',
-            year: 'numeric',
-        });
-    }
-
     function handleDeploy(e: Event) {
         e.stopPropagation();
-        goto(`/wizard/deploy?id=${distribution.id}`);
+        goto(`/wizard/step-2?id=${distribution.id}`);
     }
 
     function handleDelete(e: Event) {
@@ -89,9 +81,20 @@
         interactive
         radius="3xl"
         onclick={() => onSelect?.(distribution)}
-        onkeydown={(e) => e.key === 'Enter' && onSelect?.(distribution)}
+        onkeydown={(e) => {
+            // Only handle activation when the key originates on the card
+            // itself; nested buttons (Deploy/Duplicate/Delete) bubble their
+            // keydown, and preventDefault here would cancel their native
+            // Space/Enter click dispatch.
+            if (e.target !== e.currentTarget) return;
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                onSelect?.(distribution);
+            }
+        }}
         role="button"
         tabindex={0}
+        aria-label={`View distribution ${distribution.name}`}
         class="flex-1 relative overflow-hidden transition-all duration-300 hover:-translate-y-0.5"
     >
         <div class="p-6 md:p-8 flex flex-col md:flex-row md:items-center gap-6 md:gap-8 relative">
@@ -104,6 +107,7 @@
                         class="w-8 h-8 !p-0"
                         onclick={handleDuplicate}
                         title="Duplicate"
+                        aria-label={`Duplicate distribution ${distribution.name}`}
                     >
                         <Copy class="w-4 h-4" />
                     </ZenButton>
@@ -113,6 +117,7 @@
                         class="w-8 h-8 !p-0"
                         onclick={handleDelete}
                         title="Delete"
+                        aria-label={`Delete distribution ${distribution.name}`}
                     >
                         <Trash2 class="w-4 h-4" />
                     </ZenButton>
@@ -147,7 +152,9 @@
                         >
                             <Calendar class="w-3 h-3 shrink-0" />
                             <span class="truncate"
-                                >Cliff: {formatDate(distribution.schedule.cliffEndDate)}</span
+                                >Cliff: {distribution.schedule.cliffEndDate
+                                    ? formatDate(distribution.schedule.cliffEndDate)
+                                    : 'Not set'}</span
                             >
                         </div>
                     {/if}
@@ -166,7 +173,7 @@
                     <div
                         class="text-xl md:text-2xl font-black text-zen-fg tracking-tight leading-none"
                     >
-                        {Number(distribution.amount).toLocaleString()}
+                        {formatAmount(distribution.amount)}
                     </div>
                 </div>
 
@@ -226,6 +233,7 @@
                                 class="w-10 h-10 !p-0 shrink-0"
                                 onclick={handleDuplicate}
                                 title="Duplicate"
+                                aria-label={`Duplicate distribution ${distribution.name}`}
                             >
                                 <Copy class="w-5 h-5" />
                             </ZenButton>
@@ -235,6 +243,7 @@
                                 class="w-10 h-10 !p-0 shrink-0"
                                 onclick={handleDelete}
                                 title="Delete"
+                                aria-label={`Delete distribution ${distribution.name}`}
                             >
                                 <Trash2 class="w-5 h-5" />
                             </ZenButton>
