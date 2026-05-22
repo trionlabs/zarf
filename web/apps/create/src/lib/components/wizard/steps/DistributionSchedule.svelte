@@ -32,7 +32,6 @@
         duration: number;
         durationUnit: DurationUnit;
     }>();
-
 </script>
 
 <div class="space-y-4">

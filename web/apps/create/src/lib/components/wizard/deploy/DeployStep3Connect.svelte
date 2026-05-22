@@ -5,14 +5,7 @@
     // Contracts module dynamic-imported inside checkTokenBalance so the
     // stellar-sdk + buffer closure doesn't load at SSR module evaluation.
     import { formatTokenAmount, parseTokenAmount } from '@zarf/core/utils/amount';
-    import {
-        Wallet,
-        CheckCircle2,
-        AlertCircle,
-        LogOut,
-        CreditCard,
-        Coins,
-    } from 'lucide-svelte';
+    import { Wallet, CheckCircle2, AlertCircle, LogOut, CreditCard, Coins } from 'lucide-svelte';
     import ZenCard from '@zarf/ui/components/ui/ZenCard.svelte';
     import ZenButton from '@zarf/ui/components/ui/ZenButton.svelte';
     import ZenAlert from '@zarf/ui/components/ui/ZenAlert.svelte';
