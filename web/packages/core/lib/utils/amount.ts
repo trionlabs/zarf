@@ -2,7 +2,10 @@
  * Token amount parsing and formatting helpers.
  */
 
+import { validateTokenDecimals } from './tokenDecimals';
+
 export function parseTokenAmount(value: string | number, decimals: number): bigint {
+    validateTokenDecimals(decimals);
     const input = String(value).trim();
     if (!/^\d+(\.\d+)?$/.test(input)) {
         throw new Error(`Invalid token amount: ${input}`);
@@ -18,6 +21,7 @@ export function parseTokenAmount(value: string | number, decimals: number): bigi
 }
 
 export function formatTokenAmount(value: bigint, decimals: number, maxFractionDigits = 4): string {
+    validateTokenDecimals(decimals);
     const divisor = 10n ** BigInt(decimals);
     const whole = value / divisor;
     const fraction = value % divisor;

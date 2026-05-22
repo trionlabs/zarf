@@ -16,6 +16,7 @@ import { Buffer } from 'buffer';
 import { getStellarConfig } from '../config/runtime';
 import type { StellarRuntimeConfig } from '../config/runtime';
 import { fetchIndexerJson, indexerNetworkPath } from '../utils/indexerClient';
+import { validateTokenDecimals } from '../utils/tokenDecimals';
 import type {
     StellarAddress,
     StellarContractId,
@@ -197,6 +198,8 @@ export async function readVestingContract(
     const indexed = await fetchIndexerJson<IndexerVestingContract>(
         indexerNetworkPath(`/vestings/${encodeURIComponent(address)}`),
     );
+
+    validateTokenDecimals(indexed.tokenDecimals);
 
     return {
         name: indexed.name,
