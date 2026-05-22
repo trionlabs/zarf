@@ -39,6 +39,7 @@
         startedAt: number;
         remaining: number;
     }
+    // eslint-disable-next-line svelte/prefer-svelte-reactivity -- timeout-id store, never rendered in template
     const timers = new Map<string, TimerState>();
 
     function startTimer(toastId: string, durationMs: number) {

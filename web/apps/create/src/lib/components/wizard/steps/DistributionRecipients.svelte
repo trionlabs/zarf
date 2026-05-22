@@ -48,10 +48,12 @@
 
     // Identify duplicates for highlighting
     let duplicateEmails = $derived.by(() => {
+        // eslint-disable-next-line svelte/prefer-svelte-reactivity -- derived-local counter, re-runs when recipients change
         const counts = new Map<string, number>();
         recipients.forEach((r: Recipient) => {
             if (r.email) counts.set(r.email, (counts.get(r.email) || 0) + 1);
         });
+        // eslint-disable-next-line svelte/prefer-svelte-reactivity -- derived-local result set, returned then consumed via $derived
         const dups = new Set<string>();
         counts.forEach((count, email) => {
             if (count > 1) dups.add(email);

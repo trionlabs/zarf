@@ -109,6 +109,7 @@
                 const oauthState = extractStateFromUrl();
                 if (oauthState?.address) {
                     // Preserve address in URL for the claim flow
+                    // eslint-disable-next-line svelte/prefer-svelte-reactivity -- local URL builder, never read reactively
                     const url = new URL(window.location.href);
                     url.searchParams.set('address', oauthState.address);
                     url.hash = ''; // Clear hash (token)

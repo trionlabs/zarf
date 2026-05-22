@@ -214,6 +214,7 @@
     // Count unique recipients (group claims by email/identity)
     const uniqueRecipients = $derived(() => {
         if (!merkleResult?.claims) return [];
+        // eslint-disable-next-line svelte/prefer-svelte-reactivity -- derived-local accumulator, re-runs when claims change
         const grouped = new Map<string, { email: string; amount: number }>();
         for (const c of merkleResult.claims) {
             // Use email or identityCommitment as unique key
