@@ -1,7 +1,7 @@
 <script lang="ts">
-    import { Shield } from "lucide-svelte";
-    import ZenInput from "@zarf/ui/components/ui/ZenInput.svelte";
-    import ZenCheckbox from "@zarf/ui/components/ui/ZenCheckbox.svelte";
+    import { Shield } from 'lucide-svelte';
+    import ZenInput from '@zarf/ui/components/ui/ZenInput.svelte';
+    import ZenCheckbox from '@zarf/ui/components/ui/ZenCheckbox.svelte';
 
     let {
         name = $bindable(),
@@ -43,9 +43,7 @@
     <div class="pt-4 border-t border-zen-border-subtle">
         <div class="flex items-center gap-2 mb-3">
             <Shield class="w-3.5 h-3.5 text-zen-warning/70" />
-            <span class="text-xs font-medium text-zen-fg-subtle"
-                >Compliance Restrictions</span
-            >
+            <span class="text-xs font-medium text-zen-fg-subtle">Compliance Restrictions</span>
         </div>
         <div class="flex flex-wrap gap-4">
             <ZenCheckbox label="Block US" bind:checked={usRestricted} />

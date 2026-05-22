@@ -9,7 +9,7 @@
  */
 export function clickOutside(
     node: HTMLElement,
-    callback: () => void
+    callback: () => void,
 ): { destroy: () => void; update: (newCallback: () => void) => void } {
     let handler = callback;
 
@@ -22,7 +22,7 @@ export function clickOutside(
     }
 
     function handleKeydown(event: KeyboardEvent) {
-        if (event.key === "Escape") {
+        if (event.key === 'Escape') {
             handler();
         }
     }
@@ -30,8 +30,8 @@ export function clickOutside(
     // Use capture phase to handle clicks before they bubble
     // Small delay to avoid catching the click that opened the dropdown
     setTimeout(() => {
-        document.addEventListener("click", handleClick, true);
-        document.addEventListener("keydown", handleKeydown, true);
+        document.addEventListener('click', handleClick, true);
+        document.addEventListener('keydown', handleKeydown, true);
     }, 0);
 
     return {
@@ -39,8 +39,8 @@ export function clickOutside(
             handler = newCallback;
         },
         destroy() {
-            document.removeEventListener("click", handleClick, true);
-            document.removeEventListener("keydown", handleKeydown, true);
+            document.removeEventListener('click', handleClick, true);
+            document.removeEventListener('keydown', handleKeydown, true);
         },
     };
 }

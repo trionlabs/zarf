@@ -1,17 +1,10 @@
 <script lang="ts">
-    import {
-        X,
-        Calendar,
-        Coins,
-        ExternalLink,
-        ShieldCheck,
-        FileJson,
-    } from "lucide-svelte";
-    import type { OnChainVestingContract } from "@zarf/core/services/distributionDiscovery";
-    import { getCidForVesting } from "@zarf/core/services/vestingDiscovery";
-    import { fetchIpfsJson } from "@zarf/core/utils/ipfsFetch";
-    import { getContractExplorerUrl } from "@zarf/core/contracts";
-    import { formatTokenAmount } from "@zarf/core/utils/amount";
+    import { X, Calendar, Coins, ExternalLink, ShieldCheck, FileJson } from 'lucide-svelte';
+    import type { OnChainVestingContract } from '@zarf/core/services/distributionDiscovery';
+    import { getCidForVesting } from '@zarf/core/services/vestingDiscovery';
+    import { fetchIpfsJson } from '@zarf/core/utils/ipfsFetch';
+    import { getContractExplorerUrl } from '@zarf/core/contracts/explorer';
+    import { formatTokenAmount } from '@zarf/core/utils/amount';
 
     let {
         contract,
@@ -51,13 +44,11 @@
 
                 cid = found;
                 if (!found) {
-                    scheduleError = "No IPFS metadata found for this vesting";
+                    scheduleError = 'No IPFS metadata found for this vesting';
                     return;
                 }
 
-                const data = await fetchIpfsJson<{ schedule: OffChainSchedule }>(
-                    found,
-                );
+                const data = await fetchIpfsJson<{ schedule: OffChainSchedule }>(found);
                 if (requestId !== scheduleRequest) return;
                 schedule = data.schedule;
             } catch (e) {
@@ -76,7 +67,7 @@
     });
 
     function formatDuration(seconds: number): string {
-        if (seconds <= 0) return "—";
+        if (seconds <= 0) return '—';
         const days = seconds / 86400;
         if (days >= 1) return `${days.toFixed(2)} days`;
         const hours = seconds / 3600;
@@ -86,13 +77,13 @@
     }
 
     function formatDate(timestamp: number): string {
-        if (!timestamp || timestamp === 0) return "—";
-        return new Date(timestamp * 1000).toLocaleDateString("en-US", {
-            year: "numeric",
-            month: "short",
-            day: "numeric",
-            hour: "2-digit",
-            minute: "2-digit",
+        if (!timestamp || timestamp === 0) return '—';
+        return new Date(timestamp * 1000).toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
         });
     }
 
@@ -101,18 +92,16 @@
 
 <div class="h-full flex flex-col bg-zen-bg">
     <!-- Header -->
-    <header
-        class="p-4 border-b-[0.5px] border-zen-border-subtle flex items-center justify-between"
-    >
+    <header class="p-4 border-b-[0.5px] border-zen-border-subtle flex items-center justify-between">
         <div class="flex items-center gap-3">
             <div
                 class="w-10 h-10 rounded-xl bg-zen-success/10 flex items-center justify-center text-zen-success font-bold"
             >
-                {(contract.name || "U").charAt(0)}
+                {(contract.name || 'U').charAt(0)}
             </div>
             <div>
                 <h2 class="font-semibold text-base">
-                    {contract.name || "Unnamed"}
+                    {contract.name || 'Unnamed'}
                 </h2>
                 <span
                     class="px-2 py-0.5 text-xs font-medium rounded-full bg-zen-success/10 text-zen-success"
@@ -121,6 +110,8 @@
             </div>
         </div>
         <button
+            type="button"
+            aria-label="Close detail panel"
             class="p-2 rounded-full hover:bg-zen-fg/5 transition-colors"
             onclick={onClose}
         >
@@ -132,9 +123,7 @@
     <div class="flex-1 overflow-y-auto p-4 space-y-6">
         {#if contract.description}
             <div class="space-y-1">
-                <h3
-                    class="text-[10px] uppercase tracking-wider font-bold text-zen-fg-subtle"
-                >
+                <h3 class="text-[10px] uppercase tracking-wider font-bold text-zen-fg-subtle">
                     Description
                 </h3>
                 <p class="text-sm text-zen-fg-muted">
@@ -145,9 +134,7 @@
 
         <!-- Contract Address -->
         <div class="space-y-1">
-            <h3
-                class="text-[10px] uppercase tracking-wider font-bold text-zen-fg-subtle"
-            >
+            <h3 class="text-[10px] uppercase tracking-wider font-bold text-zen-fg-subtle">
                 Contract Address
             </h3>
             <div
@@ -159,24 +146,14 @@
         </div>
 
         <!-- Balance -->
-        <div
-            class="p-4 rounded-xl bg-zen-success/5 border-[0.5px] border-zen-success/10 space-y-1"
-        >
+        <div class="p-4 rounded-xl bg-zen-success/5 border-[0.5px] border-zen-success/10 space-y-1">
             <div class="flex items-center gap-2 text-zen-success/60">
                 <Coins class="w-4 h-4" />
-                <span class="text-[10px] uppercase tracking-wider font-bold"
-                    >Current Balance</span
-                >
+                <span class="text-[10px] uppercase tracking-wider font-bold">Current Balance</span>
             </div>
             <p class="text-2xl font-mono font-bold text-zen-success">
-                {formatTokenAmount(
-                    contract.tokenBalance,
-                    contract.tokenDecimals,
-                    4,
-                )}
-                <span class="text-sm font-normal opacity-60"
-                    >{contract.tokenSymbol}</span
-                >
+                {formatTokenAmount(contract.tokenBalance, contract.tokenDecimals, 4)}
+                <span class="text-sm font-normal opacity-60">{contract.tokenSymbol}</span>
             </p>
         </div>
 
@@ -196,26 +173,20 @@
             {:else if schedule}
                 <div class="grid grid-cols-1 gap-3">
                     <div class="p-3 rounded-lg bg-zen-fg/5 space-y-1">
-                        <span class="text-[10px] text-zen-fg-subtle"
-                            >Start Date</span
-                        >
+                        <span class="text-[10px] text-zen-fg-subtle">Start Date</span>
                         <p class="text-sm font-medium">
                             {formatDate(schedule.vestingStart)}
                         </p>
                     </div>
                     <div class="grid grid-cols-2 gap-3">
                         <div class="p-3 rounded-lg bg-zen-fg/5 space-y-1">
-                            <span class="text-[10px] text-zen-fg-subtle"
-                                >Cliff Duration</span
-                            >
+                            <span class="text-[10px] text-zen-fg-subtle">Cliff Duration</span>
                             <p class="text-sm font-medium">
                                 {formatDuration(schedule.cliffDuration)}
                             </p>
                         </div>
                         <div class="p-3 rounded-lg bg-zen-fg/5 space-y-1">
-                            <span class="text-[10px] text-zen-fg-subtle"
-                                >Vesting Duration</span
-                            >
+                            <span class="text-[10px] text-zen-fg-subtle">Vesting Duration</span>
                             <p class="text-sm font-medium">
                                 {formatDuration(schedule.vestingDuration)}
                             </p>
@@ -223,17 +194,13 @@
                     </div>
                     <div class="grid grid-cols-2 gap-3">
                         <div class="p-3 rounded-lg bg-zen-fg/5 space-y-1">
-                            <span class="text-[10px] text-zen-fg-subtle"
-                                >Period</span
-                            >
+                            <span class="text-[10px] text-zen-fg-subtle">Period</span>
                             <p class="text-sm font-medium">
                                 {formatDuration(schedule.vestingPeriod)}
                             </p>
                         </div>
                         <div class="p-3 rounded-lg bg-zen-fg/5 space-y-1">
-                            <span class="text-[10px] text-zen-fg-subtle"
-                                >Total Periods</span
-                            >
+                            <span class="text-[10px] text-zen-fg-subtle">Total Periods</span>
                             <p class="text-sm font-medium">
                                 {schedule.totalPeriods}
                             </p>

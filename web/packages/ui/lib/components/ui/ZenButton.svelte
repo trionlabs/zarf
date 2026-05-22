@@ -1,13 +1,13 @@
 <script lang="ts">
-    import type { Snippet } from "svelte";
-    import type { HTMLButtonAttributes } from "svelte/elements";
+    import type { Snippet } from 'svelte';
+    import type { HTMLButtonAttributes } from 'svelte/elements';
 
     interface Props extends HTMLButtonAttributes {
         children?: Snippet;
         iconLeft?: Snippet;
         iconRight?: Snippet;
-        variant?: "primary" | "secondary" | "ghost" | "danger";
-        size?: "xs" | "sm" | "md" | "lg";
+        variant?: 'primary' | 'secondary' | 'ghost' | 'danger';
+        size?: 'xs' | 'sm' | 'md' | 'lg';
         loading?: boolean;
     }
 
@@ -15,12 +15,12 @@
         children,
         iconLeft,
         iconRight,
-        variant = "primary",
-        size = "md",
+        variant = 'primary',
+        size = 'md',
         loading = false,
         disabled,
-        class: className = "",
-        popover, // Destructure popover to exclude it from rest
+        class: className = '',
+        popover: _popover, // Destructure popover to exclude it from rest
         ...rest
     }: Props = $props();
 
@@ -29,17 +29,17 @@
      * 4px base unit scale matching design tokens
      */
     const sizeClasses = {
-        xs: "px-2.5 py-1 text-xs gap-1",
-        sm: "px-4 py-2 text-xs gap-1.5", // Previously px-3 py-1.5
-        md: "px-6 py-3 text-sm gap-2", // Previously px-5 py-2.5
-        lg: "px-8 py-4 text-base gap-2.5", // Previously px-6 py-3
+        xs: 'px-2.5 py-1 text-xs gap-1',
+        sm: 'px-4 py-2 text-xs gap-1.5', // Previously px-3 py-1.5
+        md: 'px-6 py-3 text-sm gap-2', // Previously px-5 py-2.5
+        lg: 'px-8 py-4 text-base gap-2.5', // Previously px-6 py-3
     } as const;
 
     const spinnerSizes = {
-        xs: "w-3 h-3",
-        sm: "w-4 h-4",
-        md: "w-4 h-4",
-        lg: "w-5 h-5",
+        xs: 'w-3 h-3',
+        sm: 'w-4 h-4',
+        md: 'w-4 h-4',
+        lg: 'w-5 h-5',
     } as const;
 
     /**
@@ -57,7 +57,8 @@
      * Design Rules:
      * - NO scale transforms (feels cheap)
      * - NO translate effects (unnecessary motion)
-     * - NO opacity changes (use lightness/chroma shifts)
+     * - Prefer lightness/chroma shifts over opacity for color tokens;
+     *   opacity remains acceptable for the `disabled` state only.
      * - Self-colored borders (same hue family as surface)
      */
     const variantClasses = {
@@ -69,9 +70,9 @@
             ring-1 ring-inset ring-zen-btn-primary-border
             hover:ring-zen-btn-primary-border-hover
             active:ring-zen-btn-primary-border-active
-            shadow-[0_1px_3px_rgba(0,0,0,0.08),0_4px_8px_-2px_rgba(0,0,0,0.12)]
-            hover:shadow-[0_4px_8px_rgba(0,0,0,0.12),0_12px_24px_-4px_rgba(0,0,0,0.2)]
-            active:shadow-[inset_0_2px_4px_rgba(0,0,0,0.15)] active:translate-y-[1px]
+            shadow-[var(--zen-shadow-button)]
+            hover:shadow-[var(--zen-shadow-button-hover)]
+            active:shadow-[var(--zen-shadow-button-active)]
         `,
         /** Secondary: Alternative paths - Transparent with visible border */
         secondary: `
@@ -104,8 +105,7 @@
         inline-flex items-center justify-center relative
         font-semibold rounded-full
         tracking-[0.02em]
-        tracking-[0.02em]
-        transition-[background-color,box-shadow,transform,color] duration-200 ease-out
+        transition-[background-color,box-shadow,transform,color] duration-[var(--zen-motion-base)] ease-zen-out
         active:duration-75
         disabled:opacity-50 disabled:pointer-events-none
         whitespace-nowrap
@@ -116,9 +116,7 @@
 </script>
 
 <button
-    class="{baseClasses} {sizeClasses[size]} {variantClasses[
-        variant
-    ]} {className}"
+    class="{baseClasses} {sizeClasses[size]} {variantClasses[variant]} {className}"
     data-variant={variant}
     disabled={isDisabled}
     aria-busy={loading || undefined}
@@ -126,10 +124,7 @@
 >
     <!-- Loading overlay: absolutely positioned to preserve button dimensions -->
     {#if loading}
-        <span
-            class="absolute inset-0 flex items-center justify-center"
-            aria-hidden="true"
-        >
+        <span class="absolute inset-0 flex items-center justify-center" aria-hidden="true">
             <svg
                 class="animate-spin {spinnerSizes[size]}"
                 xmlns="http://www.w3.org/2000/svg"

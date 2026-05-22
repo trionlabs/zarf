@@ -1,20 +1,16 @@
 <script lang="ts">
     interface Props {
-        size?: "sm" | "md" | "lg";
+        size?: 'sm' | 'md' | 'lg';
         showText?: boolean;
         class?: string;
     }
 
-    let {
-        size = "md",
-        showText = true,
-        class: className = "",
-    }: Props = $props();
+    let { size = 'md', showText = true, class: className = '' }: Props = $props();
 
     const sizes = {
-        sm: { box: "w-4 h-4", icon: "w-2.5 h-2.5", text: "text-xs" },
-        md: { box: "w-5 h-5", icon: "w-3 h-3", text: "text-sm" },
-        lg: { box: "w-6 h-6", icon: "w-4 h-4", text: "text-base" },
+        sm: { box: 'w-4 h-4', icon: 'w-2.5 h-2.5', text: 'text-xs' },
+        md: { box: 'w-5 h-5', icon: 'w-3 h-3', text: 'text-sm' },
+        lg: { box: 'w-6 h-6', icon: 'w-4 h-4', text: 'text-base' },
     };
 </script>
 
@@ -36,8 +32,6 @@
         </svg>
     </div>
     {#if showText}
-        <span class="{sizes[size].text} font-semibold tracking-tight"
-            >zarf.to</span
-        >
+        <span class="{sizes[size].text} font-semibold tracking-tight">zarf.to</span>
     {/if}
 </div>

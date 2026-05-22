@@ -1,18 +1,17 @@
 <script lang="ts">
-    import "../app.css";
-    import { wizardStore } from "$lib/stores/wizardStore.svelte";
-    import { walletStore } from "@zarf/ui/stores/walletStore.svelte";
-    import { networkStore } from "@zarf/ui/stores/networkStore.svelte";
-    import { authStore } from "@zarf/ui/stores/authStore.svelte";
-    import { themeStore } from "@zarf/ui/stores/themeStore.svelte";
-    import { onMount } from "svelte";
-    import { browser } from "$app/environment";
-    import { page } from "$app/state";
-    import AppShell from "$lib/components/layout/AppShell.svelte";
-    import { LayoutGrid, PlusCircle, X } from "lucide-svelte";
-    import WalletSelectionModal from "@zarf/ui/components/wallet/WalletSelectionModal.svelte";
-    import ZenAlert from "@zarf/ui/components/ui/ZenAlert.svelte";
-    import ZenButton from "@zarf/ui/components/ui/ZenButton.svelte";
+    import '../app.css';
+    import { wizardStore } from '$lib/stores/wizardStore.svelte';
+    import { walletStore } from '@zarf/ui/stores/walletStore.svelte';
+    import { networkStore } from '@zarf/ui/stores/networkStore.svelte';
+    import { authStore } from '@zarf/ui/stores/authStore.svelte';
+    import { themeStore } from '@zarf/ui/stores/themeStore.svelte';
+    import { onMount } from 'svelte';
+    import { browser } from '$app/environment';
+    import { page } from '$app/state';
+    import AppShell from '@zarf/ui/components/layout/AppShell.svelte';
+    import { LayoutGrid, PlusCircle } from 'lucide-svelte';
+    import WalletSelectionModal from '@zarf/ui/components/wallet/WalletSelectionModal.svelte';
+    import ZenAlert from '@zarf/ui/components/ui/ZenAlert.svelte';
 
     let { children } = $props();
 
@@ -22,17 +21,17 @@
             themeStore.restore();
             networkStore.restore();
             walletStore.init();
-            authStore.restoreGmailSession();
+            authStore.restoreGmailSession(import.meta.env.VITE_GOOGLE_CLIENT_ID ?? '');
         }
         return () => walletStore.destroy();
     });
 
     // Determine active section from URL
-    let isDistributionsView = $derived(
-        page.url.pathname.startsWith("/distributions"),
-    );
-    let isCreateView = $derived(page.url.pathname.startsWith("/wizard"));
+    let isDistributionsView = $derived(page.url.pathname.startsWith('/distributions'));
+    let isCreateView = $derived(page.url.pathname.startsWith('/wizard'));
 </script>
+
+<a href="#main" class="skip-link">Skip to content</a>
 
 <!-- Subtle ripple background texture -->
 <div class="ripple-bg"></div>
@@ -48,7 +47,29 @@
 
 <WalletSelectionModal />
 
-<AppShell>
+<AppShell showWallet rootClass="selection:bg-zen-primary-muted selection:text-zen-fg">
+    {#snippet nav()}
+        <a
+            href="/wizard/step-0"
+            class="text-xs font-medium transition-colors hover:text-zen-fg {page.url.pathname.startsWith(
+                '/wizard',
+            )
+                ? 'text-zen-fg'
+                : 'text-zen-fg-muted'}"
+        >
+            Create
+        </a>
+        <a
+            href="/distributions"
+            class="text-xs font-medium transition-colors hover:text-zen-fg {page.url.pathname.startsWith(
+                '/distributions',
+            )
+                ? 'text-zen-fg'
+                : 'text-zen-fg-muted'}"
+        >
+            Distributions
+        </a>
+    {/snippet}
     {@render children()}
 </AppShell>
 

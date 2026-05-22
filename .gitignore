@@ -37,3 +37,6 @@ test/*.dev
 .claude/
 .kiro/
 .cursor/
+
+#plans
+plans/

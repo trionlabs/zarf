@@ -1,12 +1,13 @@
 <script lang="ts">
-    import { goto } from "$app/navigation";
-    import { browser } from "$app/environment";
-    import { Rocket, Trash2, Copy, Ban, Calendar } from "lucide-svelte";
-    import { wizardStore } from "../../stores/wizardStore.svelte";
-    import type { Distribution } from "../../stores/types";
-    import ZenCard from "@zarf/ui/components/ui/ZenCard.svelte";
-    import ZenButton from "@zarf/ui/components/ui/ZenButton.svelte";
-    import ZenBadge from "@zarf/ui/components/ui/ZenBadge.svelte";
+    import { goto } from '$app/navigation';
+    import { browser } from '$app/environment';
+    import { Rocket, Trash2, Copy, Calendar } from 'lucide-svelte';
+    import { wizardStore } from '../../stores/wizardStore.svelte';
+    import type { Distribution } from '../../stores/types';
+    import ZenCard from '@zarf/ui/components/ui/ZenCard.svelte';
+    import ZenButton from '@zarf/ui/components/ui/ZenButton.svelte';
+    import ZenBadge from '@zarf/ui/components/ui/ZenBadge.svelte';
+    import { formatAmount, formatDate } from '@zarf/core/utils';
 
     let {
         distribution,
@@ -16,47 +17,36 @@
         onSelect?: (dist: Distribution) => void;
     } = $props();
 
-    const currentState = $derived(distribution.state || "created");
+    const currentState = $derived(distribution.state || 'created');
 
     const variant = $derived(
-        currentState === "launched"
-            ? "deployed"
-            : currentState === "cancelled"
-              ? "cancelled"
-              : "draft",
+        currentState === 'launched'
+            ? 'deployed'
+            : currentState === 'cancelled'
+              ? 'cancelled'
+              : 'draft',
     );
 
     const variantStyles = {
         deployed: {
-            badgeVariant: "success" as const,
-            badge: "Active",
+            badgeVariant: 'success' as const,
+            badge: 'Active',
         },
         cancelled: {
-            badgeVariant: "error" as const,
-            badge: "Cancelled",
+            badgeVariant: 'error' as const,
+            badge: 'Cancelled',
         },
         draft: {
-            badgeVariant: "warning" as const,
-            badge: "Draft",
+            badgeVariant: 'warning' as const,
+            badge: 'Draft',
         },
     } as const;
 
-    const style = $derived(
-        variantStyles[variant as keyof typeof variantStyles],
-    );
-
-    function formatDate(dateString: string | undefined): string {
-        if (!dateString) return "Not set";
-        return new Date(dateString).toLocaleDateString("en-US", {
-            month: "short",
-            day: "numeric",
-            year: "numeric",
-        });
-    }
+    const style = $derived(variantStyles[variant as keyof typeof variantStyles]);
 
     function handleDeploy(e: Event) {
         e.stopPropagation();
-        goto(`/wizard/deploy?id=${distribution.id}`);
+        goto(`/wizard/step-2?id=${distribution.id}`);
     }
 
     function handleDelete(e: Event) {
@@ -72,7 +62,7 @@
             ...distribution,
             id: crypto.randomUUID(),
             name: `${distribution.name} (Copy)`,
-            state: "created",
+            state: 'created',
             createdAt: new Date().toISOString(),
             launchedAt: undefined,
             cancelledAt: undefined,
@@ -91,16 +81,25 @@
         interactive
         radius="3xl"
         onclick={() => onSelect?.(distribution)}
-        onkeydown={(e) => e.key === "Enter" && onSelect?.(distribution)}
+        onkeydown={(e) => {
+            // Only handle activation when the key originates on the card
+            // itself; nested buttons (Deploy/Duplicate/Delete) bubble their
+            // keydown, and preventDefault here would cancel their native
+            // Space/Enter click dispatch.
+            if (e.target !== e.currentTarget) return;
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                onSelect?.(distribution);
+            }
+        }}
         role="button"
         tabindex={0}
+        aria-label={`View distribution ${distribution.name}`}
         class="flex-1 relative overflow-hidden transition-all duration-300 hover:-translate-y-0.5"
     >
-        <div
-            class="p-6 md:p-8 flex flex-col md:flex-row md:items-center gap-6 md:gap-8 relative"
-        >
+        <div class="p-6 md:p-8 flex flex-col md:flex-row md:items-center gap-6 md:gap-8 relative">
             <!-- Mobile Top Right Actions -->
-            {#if variant === "draft"}
+            {#if variant === 'draft'}
                 <div class="absolute top-4 right-4 flex gap-1 md:hidden">
                     <ZenButton
                         variant="ghost"
@@ -108,6 +107,7 @@
                         class="w-8 h-8 !p-0"
                         onclick={handleDuplicate}
                         title="Duplicate"
+                        aria-label={`Duplicate distribution ${distribution.name}`}
                     >
                         <Copy class="w-4 h-4" />
                     </ZenButton>
@@ -117,15 +117,14 @@
                         class="w-8 h-8 !p-0"
                         onclick={handleDelete}
                         title="Delete"
+                        aria-label={`Delete distribution ${distribution.name}`}
                     >
                         <Trash2 class="w-4 h-4" />
                     </ZenButton>
                 </div>
             {/if}
             <!-- Identity -->
-            <div
-                class="flex items-center gap-4 md:gap-5 w-full md:w-auto md:min-w-[200px]"
-            >
+            <div class="flex items-center gap-4 md:gap-5 w-full md:w-auto md:min-w-[200px]">
                 <div
                     class="w-12 h-12 md:w-16 md:h-16 rounded-full bg-zen-highlight-bg text-zen-highlight-fg flex items-center justify-center text-lg md:text-2xl font-black tracking-tighter shrink-0"
                 >
@@ -144,18 +143,18 @@
                         <span
                             class="text-[10px] font-bold text-zen-fg-faint tracking-widest uppercase truncate"
                         >
-                            {wizardStore.tokenDetails.tokenSymbol || "TOKEN"}
+                            {wizardStore.tokenDetails.tokenSymbol || 'TOKEN'}
                         </span>
                     </div>
-                    {#if variant === "draft"}
+                    {#if variant === 'draft'}
                         <div
                             class="flex items-center gap-1.5 text-[10px] text-zen-fg-faint font-medium pt-0.5"
                         >
                             <Calendar class="w-3 h-3 shrink-0" />
                             <span class="truncate"
-                                >Cliff: {formatDate(
-                                    distribution.schedule.cliffEndDate,
-                                )}</span
+                                >Cliff: {distribution.schedule.cliffEndDate
+                                    ? formatDate(distribution.schedule.cliffEndDate)
+                                    : 'Not set'}</span
                             >
                         </div>
                     {/if}
@@ -163,9 +162,7 @@
             </div>
 
             <!-- Stats -->
-            <div
-                class="grid grid-cols-3 gap-4 w-full md:flex md:w-auto md:gap-12 md:ml-auto"
-            >
+            <div class="grid grid-cols-3 gap-4 w-full md:flex md:w-auto md:gap-12 md:ml-auto">
                 <!-- Amount -->
                 <div>
                     <div
@@ -176,7 +173,7 @@
                     <div
                         class="text-xl md:text-2xl font-black text-zen-fg tracking-tight leading-none"
                     >
-                        {Number(distribution.amount).toLocaleString()}
+                        {formatAmount(distribution.amount)}
                     </div>
                 </div>
 
@@ -214,7 +211,7 @@
                 <div
                     class="flex items-center gap-3 w-full md:w-auto md:ml-6 border-t-[0.5px] md:border-t-0 md:border-l-[0.5px] border-zen-border-subtle pt-4 md:pt-0 md:pl-6 mt-2 md:mt-0"
                 >
-                    {#if variant === "draft"}
+                    {#if variant === 'draft'}
                         <ZenButton
                             variant="primary"
                             size="md"
@@ -236,6 +233,7 @@
                                 class="w-10 h-10 !p-0 shrink-0"
                                 onclick={handleDuplicate}
                                 title="Duplicate"
+                                aria-label={`Duplicate distribution ${distribution.name}`}
                             >
                                 <Copy class="w-5 h-5" />
                             </ZenButton>
@@ -245,6 +243,7 @@
                                 class="w-10 h-10 !p-0 shrink-0"
                                 onclick={handleDelete}
                                 title="Delete"
+                                aria-label={`Delete distribution ${distribution.name}`}
                             >
                                 <Trash2 class="w-5 h-5" />
                             </ZenButton>

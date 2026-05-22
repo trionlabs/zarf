@@ -5,10 +5,7 @@
  * Core keeps it optional so local/dev flows can still fall back to direct
  * public RPC/gateway reads when VITE_INDEXER_URL is not configured.
  */
-import {
-    getActiveStellarNetworkId,
-    getCoreConfig,
-} from '../config/runtime';
+import { getActiveStellarNetworkId, getCoreConfig } from '../config/runtime';
 
 export class IndexerRequestError extends Error {
     constructor(

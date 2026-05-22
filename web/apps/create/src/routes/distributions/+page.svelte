@@ -1,41 +1,39 @@
 <script lang="ts">
-    import { onMount } from "svelte";
-    import { fade, slide, fly } from "svelte/transition";
-    import { goto } from "$app/navigation";
-    import {
-        Plus,
-        Wallet,
-        Loader2,
-        Sparkles,
-        AlertCircle,
-    } from "lucide-svelte";
+    import { onMount } from 'svelte';
+    import { fade, slide, fly } from 'svelte/transition';
+    import { goto } from '$app/navigation';
+    import { Plus, Wallet, Loader2, Sparkles, AlertCircle } from 'lucide-svelte';
 
     // Stores & Services
-    import { wizardStore } from "$lib/stores/wizardStore.svelte";
-    import { walletStore } from "@zarf/ui/stores/walletStore.svelte";
+    import { wizardStore } from '$lib/stores/wizardStore.svelte';
+    import { walletStore } from '@zarf/ui/stores/walletStore.svelte';
     import {
         discoverOwnerVestings,
         type OnChainVestingContract,
-    } from "@zarf/core/services/distributionDiscovery";
+    } from '@zarf/core/services/distributionDiscovery';
+    import { err } from '@zarf/core/utils/log';
 
     // Components
-    import PageHeader from "@zarf/ui/components/ui/PageHeader.svelte";
-    import ZenButton from "@zarf/ui/components/ui/ZenButton.svelte";
-    import ZenBadge from "@zarf/ui/components/ui/ZenBadge.svelte";
-    import ZenAlert from "@zarf/ui/components/ui/ZenAlert.svelte";
-    import DistributionCard from "$lib/components/wizard/DistributionCard.svelte";
-    import OnChainCard from "$lib/components/distributions/OnChainCard.svelte";
-    import OnChainDetailPanel from "$lib/components/distributions/OnChainDetailPanel.svelte";
-    import DistributionEmptyState from "$lib/components/distributions/DistributionEmptyState.svelte";
-    import WalletConnectButton from "@zarf/ui/components/wallet/WalletConnectButton.svelte";
+    import PageHeader from '@zarf/ui/components/ui/PageHeader.svelte';
+    import ZenButton from '@zarf/ui/components/ui/ZenButton.svelte';
+    import ZenBadge from '@zarf/ui/components/ui/ZenBadge.svelte';
+    import ZenAlert from '@zarf/ui/components/ui/ZenAlert.svelte';
+    import DistributionCard from '$lib/components/wizard/DistributionCard.svelte';
+    import OnChainCard from '$lib/components/distributions/OnChainCard.svelte';
+    import OnChainDetailPanel from '$lib/components/distributions/OnChainDetailPanel.svelte';
+    import DistributionEmptyState from '$lib/components/distributions/DistributionEmptyState.svelte';
+    import WalletConnectButton from '@zarf/ui/components/wallet/WalletConnectButton.svelte';
+    import { focusTrap } from '@zarf/ui/actions/focusTrap';
 
     // State
-    let activeTab = $state<"drafts" | "active" | "history">("drafts");
+    let activeTab = $state<'drafts' | 'active' | 'history'>('drafts');
     let isFetching = $state(false);
     let onChainContracts = $state<OnChainVestingContract[]>([]);
     let fetchError = $state<string | null>(null);
     let selectedContract = $state<OnChainVestingContract | null>(null);
     let fetchRequestId = 0;
+
+    let dialogEl: HTMLDivElement | undefined = $state();
 
     function handleSelect(c: OnChainVestingContract) {
         selectedContract = c;
@@ -45,26 +43,16 @@
         selectedContract = null;
     }
 
-    function onKeydown(e: KeyboardEvent) {
-        if (e.key === "Escape") closePanel();
-    }
-
     // Derived Lists
     const drafts = $derived(
         wizardStore.distributions.filter(
-            (d) =>
-                d.state === "created" ||
-                (d.state === "launched" && !d.depositTxHash),
+            (d) => d.state === 'created' || (d.state === 'launched' && !d.depositTxHash),
         ),
     );
 
-    const activeDistributions = $derived(
-        onChainContracts.filter((c) => c.tokenBalance > 0n),
-    );
+    const activeDistributions = $derived(onChainContracts.filter((c) => c.tokenBalance > 0n));
 
-    const historyDistributions = $derived(
-        onChainContracts.filter((c) => c.tokenBalance === 0n),
-    );
+    const historyDistributions = $derived(onChainContracts.filter((c) => c.tokenBalance === 0n));
 
     // Fetch Logic
     async function fetchOnChain(forceRefresh = false, owner = walletStore.address) {
@@ -84,8 +72,8 @@
             onChainContracts = result.contracts;
         } catch (e) {
             if (requestId !== fetchRequestId) return;
-            console.error("Discovery failed:", e);
-            fetchError = "Could not fetch distributions from blockchain.";
+            err('Discovery failed:', e);
+            fetchError = 'Could not fetch distributions from blockchain.';
         } finally {
             if (requestId === fetchRequestId) {
                 isFetching = false;
@@ -96,29 +84,33 @@
     // Reactivity
     $effect(() => {
         const owner = walletStore.address;
-        if (walletStore.isConnected && owner && activeTab !== "drafts") {
+        if (walletStore.isConnected && owner && activeTab !== 'drafts') {
             fetchOnChain(false, owner);
         }
     });
 
     onMount(() => {
         if (drafts.length === 0 && walletStore.isConnected) {
-            activeTab = "active";
+            activeTab = 'active';
         }
     });
 
     function handleCreateNew() {
-        goto("/wizard/step-0");
+        goto('/wizard/step-0');
     }
 </script>
 
-<div
-    class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 h-full flex flex-col gap-8"
->
+<svelte:head>
+    <title>My Distributions — Zarf Create</title>
+    <meta
+        name="description"
+        content="Manage your privacy-preserving token distributions deployed on Stellar."
+    />
+</svelte:head>
+
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 h-full flex flex-col gap-8">
     <!-- Header with Action -->
-    <div
-        class="flex flex-col sm:flex-row sm:items-center justify-between gap-6"
-    >
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
         <PageHeader
             title="My Distributions"
             description="Manage your drafts, active vesting contracts, and history."
@@ -132,50 +124,47 @@
     </div>
 
     <!-- Zen Tabs -->
-    <div role="tablist" class="flex gap-1 border-b-[0.5px] border-zen-border-subtle w-full max-w-md">
+    <div
+        role="tablist"
+        class="flex gap-1 border-b-[0.5px] border-zen-border-subtle w-full max-w-md"
+    >
         <button
             role="tab"
-            aria-selected={activeTab === "drafts"}
+            aria-selected={activeTab === 'drafts'}
             class="relative px-4 py-3 text-sm font-medium transition-all duration-200 flex items-center gap-2
-                {activeTab === 'drafts'
-                    ? 'text-zen-fg'
-                    : 'text-zen-fg-subtle hover:text-zen-fg'}"
-            onclick={() => (activeTab = "drafts")}
+                {activeTab === 'drafts' ? 'text-zen-fg' : 'text-zen-fg-subtle hover:text-zen-fg'}"
+            onclick={() => (activeTab = 'drafts')}
         >
             Drafts
             {#if drafts.length > 0}
                 <ZenBadge variant="default" size="sm">{drafts.length}</ZenBadge>
             {/if}
-            {#if activeTab === "drafts"}
+            {#if activeTab === 'drafts'}
                 <span class="absolute bottom-0 left-0 right-0 h-0.5 bg-zen-fg"></span>
             {/if}
         </button>
         <button
             role="tab"
-            aria-selected={activeTab === "active"}
+            aria-selected={activeTab === 'active'}
             class="relative px-4 py-3 text-sm font-medium transition-all duration-200 flex items-center gap-2
-                {activeTab === 'active'
-                    ? 'text-zen-fg'
-                    : 'text-zen-fg-subtle hover:text-zen-fg'}"
-            onclick={() => (activeTab = "active")}
+                {activeTab === 'active' ? 'text-zen-fg' : 'text-zen-fg-subtle hover:text-zen-fg'}"
+            onclick={() => (activeTab = 'active')}
         >
             Active
             <span class="w-2 h-2 rounded-full bg-zen-success animate-pulse"></span>
-            {#if activeTab === "active"}
+            {#if activeTab === 'active'}
                 <span class="absolute bottom-0 left-0 right-0 h-0.5 bg-zen-fg"></span>
             {/if}
         </button>
         <button
             role="tab"
-            aria-selected={activeTab === "history"}
+            aria-selected={activeTab === 'history'}
             class="relative px-4 py-3 text-sm font-medium transition-all duration-200 flex items-center gap-2
-                {activeTab === 'history'
-                    ? 'text-zen-fg'
-                    : 'text-zen-fg-subtle hover:text-zen-fg'}"
-            onclick={() => (activeTab = "history")}
+                {activeTab === 'history' ? 'text-zen-fg' : 'text-zen-fg-subtle hover:text-zen-fg'}"
+            onclick={() => (activeTab = 'history')}
         >
             History
-            {#if activeTab === "history"}
+            {#if activeTab === 'history'}
                 <span class="absolute bottom-0 left-0 right-0 h-0.5 bg-zen-fg"></span>
             {/if}
         </button>
@@ -183,15 +172,11 @@
 
     <!-- Snippets -->
     {#snippet createAction()}
-        <ZenButton variant="primary" onclick={handleCreateNew}>
-            Create First Distribution
-        </ZenButton>
+        <ZenButton variant="primary" onclick={handleCreateNew}>Create First Distribution</ZenButton>
     {/snippet}
 
     {#snippet deployAction()}
-        <ZenButton variant="primary" onclick={handleCreateNew}>
-            Deploy New
-        </ZenButton>
+        <ZenButton variant="primary" onclick={handleCreateNew}>Deploy New</ZenButton>
     {/snippet}
 
     {#snippet connectAction()}
@@ -201,7 +186,7 @@
     <!-- Content Area -->
     <div class="relative min-h-[400px]">
         <!-- DRAFTS VIEW -->
-        {#if activeTab === "drafts"}
+        {#if activeTab === 'drafts'}
             <div in:fade={{ duration: 200 }} class="space-y-6">
                 {#if drafts.length === 0}
                     <DistributionEmptyState
@@ -213,10 +198,7 @@
                 {:else}
                     <div class="flex flex-col gap-6 pb-12">
                         {#each drafts as dist (dist.id)}
-                            <div
-                                in:slide|global={{ duration: 200 }}
-                                class="w-full"
-                            >
+                            <div in:slide|global={{ duration: 200 }} class="w-full">
                                 <DistributionCard distribution={dist} />
                             </div>
                         {/each}
@@ -235,9 +217,7 @@
                         action={connectAction}
                     />
                 {:else if isFetching && onChainContracts.length === 0}
-                    <div
-                        class="flex flex-col items-center justify-center h-64 gap-4"
-                    >
+                    <div class="flex flex-col items-center justify-center h-64 gap-4">
                         <Loader2 class="w-8 h-8 text-zen-fg animate-spin" />
                         <span class="text-sm text-zen-fg-subtle"
                             >Scanning network for distributions...</span
@@ -256,32 +236,24 @@
                 {:else}
                     <!-- List Active or History based on Tab -->
                     {@const list =
-                        activeTab === "active"
-                            ? activeDistributions
-                            : historyDistributions}
+                        activeTab === 'active' ? activeDistributions : historyDistributions}
 
                     {#if list.length === 0}
                         <DistributionEmptyState
                             icon={AlertCircle}
-                            title={activeTab === "active"
-                                ? "No Active Distributions"
-                                : "No History Found"}
-                            description={activeTab === "active"
+                            title={activeTab === 'active'
+                                ? 'No Active Distributions'
+                                : 'No History Found'}
+                            description={activeTab === 'active'
                                 ? "You don't have any active vesting contracts on this network."
-                                : "No completed or cancelled contracts found."}
+                                : 'No completed or cancelled contracts found.'}
                             action={deployAction}
                         />
                     {:else}
                         <div class="flex flex-col gap-6 pb-12">
                             {#each list as contract (contract.address)}
-                                <div
-                                    in:slide|global={{ duration: 200 }}
-                                    class="w-full"
-                                >
-                                    <OnChainCard
-                                        {contract}
-                                        onSelect={handleSelect}
-                                    />
+                                <div in:slide|global={{ duration: 200 }} class="w-full">
+                                    <OnChainCard {contract} onSelect={handleSelect} />
                                 </div>
                             {/each}
                         </div>
@@ -292,30 +264,45 @@
     </div>
 </div>
 
-<svelte:window on:keydown={onKeydown} />
-
 {#if selectedContract}
-    <!-- Backdrop -->
-    <button
-        type="button"
-        aria-label="Close detail panel"
-        class="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"
-        onclick={closePanel}
-        transition:fade={{ duration: 150 }}
-    ></button>
-
-    <!-- Slide-out panel (right side) -->
+    <!-- Wrapper hosts use:focusTrap so the backdrop and the dialog become
+         CHILDREN of the trap node, not siblings. Without this wrapper the
+         hideBackground walk-up (focusTrap.ts:applyBackgroundInert) would
+         mark the backdrop `inert` and silently disable click-to-close. -->
     <div
-        role="dialog"
-        aria-modal="true"
-        aria-label="Distribution contract details"
-        tabindex="-1"
-        class="fixed top-0 right-0 z-50 h-full w-full sm:w-[28rem] shadow-2xl border-l-[0.5px] border-zen-border-subtle"
-        transition:fly={{ x: 400, duration: 250 }}
+        use:focusTrap={{
+            onEscape: closePanel,
+            initialFocus: () => dialogEl ?? null,
+            hideBackground: true,
+        }}
     >
-        <OnChainDetailPanel
-            contract={selectedContract}
-            onClose={closePanel}
-        />
+        <!-- Backdrop. tabindex="-1" keeps the close affordance (Enter/Space on the
+             button still fires) but removes it from the focusTrap Tab cycle; Escape
+             + panel X cover keyboard close. -->
+        <button
+            type="button"
+            aria-label="Close detail panel"
+            tabindex="-1"
+            class="fixed inset-0 z-40 bg-zen-scrim/40 backdrop-blur-sm"
+            onclick={closePanel}
+            transition:fade={{ duration: 150 }}
+        ></button>
+
+        <!-- Slide-out panel (right side). aria-label is dynamic from contract.name;
+             a proper cross-component aria-labelledby that targets the panel's <h2>
+             is a Phase 3 follow-up (prop-drill a titleId into OnChainDetailPanel). -->
+        <div
+            bind:this={dialogEl}
+            role="dialog"
+            aria-modal="true"
+            aria-label={selectedContract?.name
+                ? `${selectedContract.name} — distribution details`
+                : 'Distribution contract details'}
+            tabindex="-1"
+            class="fixed top-0 right-0 z-50 h-full w-full sm:w-[28rem] shadow-2xl border-l-[0.5px] border-zen-border-subtle"
+            transition:fly={{ x: 400, duration: 250 }}
+        >
+            <OnChainDetailPanel contract={selectedContract} onClose={closePanel} />
+        </div>
     </div>
 {/if}

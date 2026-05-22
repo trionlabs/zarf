@@ -1,8 +1,8 @@
 <script lang="ts">
-    import { Mail, Shield, ArrowRight } from "lucide-svelte";
-    import { redirectToGoogle } from "@zarf/ui/utils/googleAuth";
-    import ZenCard from "@zarf/ui/components/ui/ZenCard.svelte";
-    import ZenButton from "@zarf/ui/components/ui/ZenButton.svelte";
+    import { Mail, Shield, ArrowRight } from 'lucide-svelte';
+    import { redirectToGoogle } from '@zarf/ui/utils/googleAuth';
+    import ZenCard from '@zarf/ui/components/ui/ZenCard.svelte';
+    import ZenButton from '@zarf/ui/components/ui/ZenButton.svelte';
 
     function handleLogin() {
         redirectToGoogle();
@@ -20,27 +20,20 @@
             </div>
 
             <div class="space-y-2">
-                <h2 class="text-xl font-bold text-zen-fg">
-                    Sign in to View Distributions
-                </h2>
+                <h2 class="text-xl font-bold text-zen-fg">Sign in to View Distributions</h2>
                 <p class="text-sm text-zen-fg-muted leading-relaxed">
-                    We'll show you only the distributions where you have an
-                    allocation. Your email is verified privately using
-                    cryptographic proofs.
+                    We'll show you only the distributions where you have an allocation. Your email
+                    is verified privately using cryptographic proofs.
                 </p>
             </div>
 
             <!-- Privacy note -->
-            <div
-                class="flex items-start gap-3 p-4 rounded-xl bg-zen-fg/5 text-left"
-            >
+            <div class="flex items-start gap-3 p-4 rounded-xl bg-zen-fg/5 text-left">
                 <Shield class="w-5 h-5 text-zen-success flex-shrink-0 mt-0.5" />
                 <div class="text-xs text-zen-fg-subtle leading-relaxed">
-                    <span class="font-medium text-zen-fg"
-                        >Privacy Protected:</span
-                    >
-                    Your email is only used to filter distributions locally. We never
-                    store or transmit your email to any server.
+                    <span class="font-medium text-zen-fg">Privacy Protected:</span>
+                    Your email is only used to filter distributions locally. We never store or transmit
+                    your email to any server.
                 </div>
             </div>
 

@@ -1,13 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import {
-    __resetCoreConfigForTests,
-    configureCore,
-} from '../config/runtime';
-import {
-    clearIpfsCache,
-    fetchIpfsJson,
-    IpfsFetchError,
-} from './ipfsFetch';
+import { __resetCoreConfigForTests, configureCore } from '../config/runtime';
+import { clearIpfsCache, fetchIpfsJson, IpfsFetchError } from './ipfsFetch';
 
 const CID_V0 = 'QmXDPJoABe6ysT6seSWk2M3TPZTyjkfdJS17iygh6irNr3';
 
@@ -29,11 +22,12 @@ describe('fetchIpfsJson', () => {
             stellar: {},
             indexerUrl: 'https://indexer.zarf.to',
         });
-        const fetchMock = vi.fn(async () =>
-            new Response(JSON.stringify({ ok: true }), {
-                status: 200,
-                headers: { 'Content-Type': 'application/json' },
-            }),
+        const fetchMock = vi.fn(
+            async () =>
+                new Response(JSON.stringify({ ok: true }), {
+                    status: 200,
+                    headers: { 'Content-Type': 'application/json' },
+                }),
         );
         vi.stubGlobal('fetch', fetchMock);
 
@@ -47,11 +41,12 @@ describe('fetchIpfsJson', () => {
             stellar: {},
             indexerUrl: 'https://indexer.zarf.to',
         });
-        const fetchMock = vi.fn(async () =>
-            new Response(JSON.stringify({ ok: true }), {
-                status: 200,
-                headers: { 'Content-Type': 'application/json' },
-            }),
+        const fetchMock = vi.fn(
+            async () =>
+                new Response(JSON.stringify({ ok: true }), {
+                    status: 200,
+                    headers: { 'Content-Type': 'application/json' },
+                }),
         );
         vi.stubGlobal('fetch', fetchMock);
 
@@ -64,11 +59,12 @@ describe('fetchIpfsJson', () => {
             stellar: {},
             indexerUrl: 'https://indexer.zarf.to',
         });
-        const fetchMock = vi.fn(async () =>
-            new Response(JSON.stringify({ error: 'down' }), {
-                status: 503,
-                headers: { 'Content-Type': 'application/json' },
-            }),
+        const fetchMock = vi.fn(
+            async () =>
+                new Response(JSON.stringify({ error: 'down' }), {
+                    status: 503,
+                    headers: { 'Content-Type': 'application/json' },
+                }),
         );
         vi.stubGlobal('fetch', fetchMock);
 
