@@ -10,6 +10,7 @@
 
 import type { StellarContractId } from '@zarf/core/types';
 import { isValidContractAddressShape } from '@zarf/core/utils/addressShape';
+import { validateTokenDecimals } from '@zarf/core/utils/tokenDecimals';
 
 export interface TokenMetadata {
     name: string | null;
@@ -44,6 +45,15 @@ export async function fetchTokenMetadata(
                 success: false,
                 data: null,
                 error: 'This contract does not expose Stellar token metadata.',
+            };
+        }
+        try {
+            validateTokenDecimals(metadata.decimals);
+        } catch (e) {
+            return {
+                success: false,
+                data: null,
+                error: e instanceof Error ? e.message : 'Unsupported token decimals.',
             };
         }
 
