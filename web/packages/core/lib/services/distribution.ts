@@ -8,6 +8,7 @@
  */
 
 import type { StellarContractId } from '../types';
+import { TREE_DEPTH } from '../constants';
 import { getCidForVesting } from './vestingDiscovery';
 import { fetchIpfsJson } from '../utils/ipfsFetch';
 import { err } from '../utils/log';
@@ -113,6 +114,11 @@ export function validateDistributionData(raw: unknown): DistributionData {
         if (typeof m.index !== 'number' || !Number.isInteger(m.index) || m.index < 0) {
             throw new Error(
                 `distribution: commitments['${key}']${suffix}.index must be a non-negative integer`,
+            );
+        }
+        if (m.index >= 1 << TREE_DEPTH) {
+            throw new Error(
+                `distribution: commitments['${key}']${suffix}.index ${m.index} exceeds maximum (${1 << TREE_DEPTH})`,
             );
         }
     };
