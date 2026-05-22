@@ -9,11 +9,6 @@ import { warn } from '@zarf/core/utils/log';
 import { isValidContractAddressShape } from '@zarf/core/utils/addressShape';
 export type { OAuthState };
 
-// Landing applies the same shape check as the claim-side callback. Full
-// StrKey CRC validation lives in @zarf/core/utils/address and runs at
-// claim-time; addressShape is the SDK-free mirror so this import does
-// not pull @stellar/stellar-sdk into the landing eager graph.
-
 /**
  * Decodes OAuth state from URL parameter.
  */

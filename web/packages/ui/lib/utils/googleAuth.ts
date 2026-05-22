@@ -11,12 +11,6 @@ import type { DecodedJWT, GooglePublicKey, JWTHeader, JWTPayload, OAuthState } f
 import { warn } from '@zarf/core/utils/log';
 import { isValidContractAddressShape } from '@zarf/core/utils/addressShape';
 
-// Defensive OAuth-state pre-validation uses the shared SDK-free shape
-// check. Full StrKey CRC validation lives in @zarf/core/utils/address and
-// runs at form-submit time; addressShape is the SDK-free mirror so this
-// import does not pull @stellar/stellar-sdk into the root-layout eager
-// graph (authStore is the entry point for both apps).
-
 // ============================================================================
 // Constants
 // ============================================================================

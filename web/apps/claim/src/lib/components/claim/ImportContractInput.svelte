@@ -1,12 +1,6 @@
 <script lang="ts">
     import { ArrowRight, Loader2, Inbox } from 'lucide-svelte';
     import type { StellarContractId } from '@zarf/core/types';
-
-    // Format-only client check via the SDK-free shape helper. Full StrKey
-    // CRC validation runs server-side at the indexer when
-    // readVestingContract() below fires; the indexer's /vestings/:address
-    // handler uses StellarSdkAddress.fromString and rejects invalid
-    // addresses with 400.
     import { isValidContractAddressShape } from '@zarf/core/utils/addressShape';
     import {
         fetchContractMetadata,
