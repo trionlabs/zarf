@@ -74,6 +74,17 @@ function clearGmailSession() {
 function restoreGmailSession(clientId: string) {
     if (!browser) return;
 
+    // Fail closed when VITE_GOOGLE_CLIENT_ID is unset: validateGoogleClaims
+    // would otherwise accept any token whose aud is the empty string, which
+    // silently downgrades the audience check from "reject wrong-app tokens"
+    // to "accept anything".
+    if (!clientId) {
+        warn('[AuthStore] VITE_GOOGLE_CLIENT_ID is unset, clearing any stored session');
+        clearGmailSession();
+        isHydrated = true;
+        return;
+    }
+
     const jwt = sessionStorage.getItem(STORAGE_KEYS.GMAIL_JWT);
     if (jwt) {
         try {
