@@ -73,9 +73,7 @@ async function processDistributionData(data: unknown): Promise<bigint[]> {
             throw new Error(`Invalid commitment index for key ${commitment}`);
         }
         if (entry.index >= 1 << TREE_DEPTH) {
-            throw new Error(
-                `Commitment index ${entry.index} exceeds maximum (${1 << TREE_DEPTH})`,
-            );
+            throw new Error(`Commitment index ${entry.index} exceeds maximum (${1 << TREE_DEPTH})`);
         }
         if (leavesMap.has(entry.index)) {
             throw new Error(`Duplicate commitment index: ${entry.index}`);

@@ -50,22 +50,20 @@ describe('validateGoogleClaims — callback mode', () => {
 describe('validateGoogleClaims — restore mode', () => {
     it('accepts a payload without checking nonce', () => {
         const noNonce = { ...basePayload, nonce: undefined };
-        expect(() =>
-            validateGoogleClaims(noNonce, { clientId, mode: 'restore' }),
-        ).not.toThrow();
+        expect(() => validateGoogleClaims(noNonce, { clientId, mode: 'restore' })).not.toThrow();
     });
 
     it('still validates iss + aud', () => {
         const wrongAud = { ...basePayload, aud: 'someone-else' };
-        expect(() =>
-            validateGoogleClaims(wrongAud, { clientId, mode: 'restore' }),
-        ).toThrow(/audience does not match/);
+        expect(() => validateGoogleClaims(wrongAud, { clientId, mode: 'restore' })).toThrow(
+            /audience does not match/,
+        );
     });
 
     it('rejects when clientId is empty (regression: empty aud is not a wildcard)', () => {
-        expect(() =>
-            validateGoogleClaims(basePayload, { clientId: '', mode: 'restore' }),
-        ).toThrow(/audience does not match/);
+        expect(() => validateGoogleClaims(basePayload, { clientId: '', mode: 'restore' })).toThrow(
+            /audience does not match/,
+        );
     });
 });
 
