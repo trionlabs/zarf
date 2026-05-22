@@ -4,6 +4,7 @@
  */
 
 import { devTag, err } from '@zarf/core/utils/log';
+import { base64UrlToBase64 } from '@zarf/core/utils/base64Url';
 
 const log = devTag('GoogleJWK');
 
@@ -66,7 +67,7 @@ export async function fetchGoogleJwks(): Promise<GoogleJwkSet> {
 export async function getPublicKeyForJwt(jwt: string): Promise<GoogleJwk> {
     // Decode JWT header to get `kid`
     const [headerB64] = jwt.split('.');
-    const headerJson = atob(headerB64.replace(/-/g, '+').replace(/_/g, '/'));
+    const headerJson = atob(base64UrlToBase64(headerB64));
     const header = JSON.parse(headerJson);
 
     const kid = header.kid;

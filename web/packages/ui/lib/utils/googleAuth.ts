@@ -10,6 +10,7 @@
 import type { DecodedJWT, GooglePublicKey, JWTHeader, JWTPayload, OAuthState } from '../types';
 import { warn } from '@zarf/core/utils/log';
 import { isValidContractAddressShape } from '@zarf/core/utils/addressShape';
+import { base64UrlToBase64 } from '@zarf/core/utils/base64Url';
 import {
     GOOGLE_ISSUERS as CORE_GOOGLE_ISSUERS,
     validateGoogleClaims as coreValidateGoogleClaims,
@@ -360,11 +361,11 @@ export function decodeJwt(jwt: string): DecodedJWT {
     }
 
     try {
-        // Base64url decode (replace URL-safe chars, then decode)
-        const base64UrlDecode = (str: string): string => {
-            const base64 = str.replace(/-/g, '+').replace(/_/g, '/');
-            return atob(base64);
-        };
+        // Base64url decode (pad + replace URL-safe chars, then atob).
+        // Padding via base64UrlToBase64 is required: strict atob (Safari,
+        // some Firefox builds) throws InvalidCharacterError on inputs whose
+        // length is not a multiple of 4.
+        const base64UrlDecode = (str: string): string => atob(base64UrlToBase64(str));
 
         const header = JSON.parse(base64UrlDecode(parts[0])) as JWTHeader;
         const payload = JSON.parse(base64UrlDecode(parts[1])) as JWTPayload;
