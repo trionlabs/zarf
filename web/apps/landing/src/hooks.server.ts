@@ -22,5 +22,10 @@ export const handle: Handle = async ({ event, resolve }) => {
         'Permissions-Policy',
         'camera=(), microphone=(), geolocation=(), payment=()',
     );
+    // Defense-in-depth: isolate the browsing context group. Landing has no
+    // wallet flow and no popup/opener use. COEP intentionally not added
+    // (no SharedArrayBuffer usage; require-corp would break cross-origin
+    // font/image loads with zero current gain).
+    response.headers.set('Cross-Origin-Opener-Policy', 'same-origin');
     return response;
 };

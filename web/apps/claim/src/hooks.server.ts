@@ -67,5 +67,12 @@ export const handle: Handle = async ({ event, resolve }) => {
         'Permissions-Policy',
         'camera=(), microphone=(), geolocation=(), payment=()',
     );
+    // Defense-in-depth: isolate the browsing context group. Verified safe —
+    // no in-app window.open / window.opener / cross-origin postMessage use;
+    // Freighter wallet communicates via its content-script bridge, which
+    // COOP same-origin does not affect. COEP intentionally not added
+    // (no SharedArrayBuffer usage; require-corp would break cross-origin
+    // font/image loads with zero current gain).
+    response.headers.set('Cross-Origin-Opener-Policy', 'same-origin');
     return response;
 };
