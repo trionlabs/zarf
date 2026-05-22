@@ -15,10 +15,8 @@ import {
 import { Buffer } from 'buffer';
 import { getStellarConfig } from '../config/runtime';
 import type { StellarRuntimeConfig } from '../config/runtime';
-import {
-    fetchIndexerJson,
-    indexerNetworkPath,
-} from '../utils/indexerClient';
+import { fetchIndexerJson, indexerNetworkPath } from '../utils/indexerClient';
+import { validateTokenDecimals } from '../utils/tokenDecimals';
 import type {
     StellarAddress,
     StellarContractId,
@@ -122,9 +120,7 @@ function hexToBuffer(value: string, expectedBytes?: number): Buffer {
 }
 
 function fieldToBytes(value: string | bigint): Buffer {
-    const hex = typeof value === 'bigint'
-        ? value.toString(16)
-        : normalizeHex(value);
+    const hex = typeof value === 'bigint' ? value.toString(16) : normalizeHex(value);
     if (!/^[0-9a-fA-F]+$/.test(hex)) {
         throw new Error(`Invalid field element: ${String(value)}`);
     }
@@ -202,6 +198,8 @@ export async function readVestingContract(
     const indexed = await fetchIndexerJson<IndexerVestingContract>(
         indexerNetworkPath(`/vestings/${encodeURIComponent(address)}`),
     );
+
+    validateTokenDecimals(indexed.tokenDecimals);
 
     return {
         name: indexed.name,
@@ -291,46 +289,64 @@ export async function submitClaim(
     return { hash, receipt };
 }
 
-export async function approveTokenAllowance(params: {
-    tokenAddress: StellarContractId;
-    owner: StellarAddress;
-    spender: StellarContractId;
-    amount: bigint;
-    expirationLedger: number;
-}, onSubmitted?: (hash: TransactionHash) => void): Promise<TransactionHash> {
-    const { hash } = await invoke(params.owner, params.tokenAddress, 'approve', [
-        scAddress(params.owner),
-        scAddress(params.spender),
-        scI128(params.amount),
-        scU32(params.expirationLedger),
-    ], onSubmitted);
+export async function approveTokenAllowance(
+    params: {
+        tokenAddress: StellarContractId;
+        owner: StellarAddress;
+        spender: StellarContractId;
+        amount: bigint;
+        expirationLedger: number;
+    },
+    onSubmitted?: (hash: TransactionHash) => void,
+): Promise<TransactionHash> {
+    const { hash } = await invoke(
+        params.owner,
+        params.tokenAddress,
+        'approve',
+        [
+            scAddress(params.owner),
+            scAddress(params.spender),
+            scI128(params.amount),
+            scU32(params.expirationLedger),
+        ],
+        onSubmitted,
+    );
     return hash;
 }
 
-export async function createAndFundVesting(params: {
-    factoryAddress: StellarContractId;
-    owner: StellarAddress;
-    tokenAddress: StellarContractId;
-    salt: `0x${string}`;
-    name: string;
-    description: string;
-    merkleRoot: `0x${string}`;
-    recipientCount: number;
-    totalAmount: bigint;
-    metadataCid: string;
-}, onSubmitted?: (hash: TransactionHash) => void): Promise<{ hash: TransactionHash; vestingAddress: StellarContractId }> {
+export async function createAndFundVesting(
+    params: {
+        factoryAddress: StellarContractId;
+        owner: StellarAddress;
+        tokenAddress: StellarContractId;
+        salt: `0x${string}`;
+        name: string;
+        description: string;
+        merkleRoot: `0x${string}`;
+        recipientCount: number;
+        totalAmount: bigint;
+        metadataCid: string;
+    },
+    onSubmitted?: (hash: TransactionHash) => void,
+): Promise<{ hash: TransactionHash; vestingAddress: StellarContractId }> {
     const predicted = await predictVestingAddress(params.factoryAddress, params.salt);
-    const { hash } = await invoke(params.owner, params.factoryAddress, 'create_and_fund_vesting', [
-        scAddress(params.owner),
-        scAddress(params.tokenAddress),
-        scBytesN32(params.salt),
-        scString(params.name),
-        scString(params.description),
-        scBytesN32(params.merkleRoot),
-        scU32(params.recipientCount),
-        scI128(params.totalAmount),
-        scString(params.metadataCid),
-    ], onSubmitted);
+    const { hash } = await invoke(
+        params.owner,
+        params.factoryAddress,
+        'create_and_fund_vesting',
+        [
+            scAddress(params.owner),
+            scAddress(params.tokenAddress),
+            scBytesN32(params.salt),
+            scString(params.name),
+            scString(params.description),
+            scBytesN32(params.merkleRoot),
+            scU32(params.recipientCount),
+            scI128(params.totalAmount),
+            scString(params.metadataCid),
+        ],
+        onSubmitted,
+    );
     return { hash, vestingAddress: predicted };
 }
 
@@ -406,22 +422,4 @@ function requireFactoryAddress(): StellarContractId {
     const factoryAddress = cfg().factoryAddress;
     if (!factoryAddress) throw new Error('Missing Stellar factory contract address');
     return factoryAddress;
-}
-
-export function getExplorerUrl(hash: TransactionHash): string {
-    const base = cfg().explorerBaseUrl;
-    if (!base) throw new Error('Missing Stellar explorer URL');
-    return `${base.replace(/\/$/, '')}/tx/${hash}`;
-}
-
-export function getAccountExplorerUrl(address: StellarAddress): string {
-    const base = cfg().explorerBaseUrl;
-    if (!base) throw new Error('Missing Stellar explorer URL');
-    return `${base.replace(/\/$/, '')}/account/${address}`;
-}
-
-export function getContractExplorerUrl(address: StellarContractId): string {
-    const base = cfg().explorerBaseUrl;
-    if (!base) throw new Error('Missing Stellar explorer URL');
-    return `${base.replace(/\/$/, '')}/contract/${address}`;
 }

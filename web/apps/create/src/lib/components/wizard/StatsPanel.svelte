@@ -1,30 +1,22 @@
 <script lang="ts">
-    import { wizardStore } from "../../stores/wizardStore.svelte";
-    import {
-        Wallet,
-        Users,
-        Coins,
-        FileText,
-        Package,
-        Calendar,
-    } from "lucide-svelte";
-    import type { ComponentType } from "svelte";
+    import { wizardStore } from '../../stores/wizardStore.svelte';
+    import { Wallet, Users, Coins, FileText, Package, Calendar } from 'lucide-svelte';
+    import type { ComponentType } from 'svelte';
+    import { formatAmount } from '@zarf/core/utils';
 
     // ——————————————————————————————————————————————————————————————————————————
     // Derived Stats
     // ——————————————————————————————————————————————————————————————————————————
 
     // Token Identity
-    const tokenName = $derived(wizardStore.tokenDetails.tokenName || "—");
-    const tokenSymbol = $derived(wizardStore.tokenDetails.tokenSymbol || "");
-    const tokenTotalSupply = $derived(
-        wizardStore.tokenDetails.tokenTotalSupply || "—",
-    );
+    const tokenName = $derived(wizardStore.tokenDetails.tokenName || '—');
+    const tokenSymbol = $derived(wizardStore.tokenDetails.tokenSymbol || '');
+    const tokenTotalSupply = $derived(wizardStore.tokenDetails.tokenTotalSupply || '—');
 
     // Address Formatting
     const tokenAddress = $derived.by(() => {
         const addr = wizardStore.tokenDetails.tokenAddress;
-        if (!addr) return "—";
+        if (!addr) return '—';
         return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
     });
 
@@ -38,50 +30,44 @@
     );
 
     // Total Recipients (Saved + Editing)
-    const totalRecipients = $derived(
-        savedRecipients + wizardStore.editingRecipientCount,
-    );
+    const totalRecipients = $derived(savedRecipients + wizardStore.editingRecipientCount);
 
     const savedAmount = $derived(
-        distributions.reduce((acc, d) => acc + parseFloat(d.amount || "0"), 0),
+        distributions.reduce((acc, d) => acc + parseFloat(d.amount || '0'), 0),
     );
 
     // Total Amount (Saved + Editing)
     const totalAmount = $derived(savedAmount + wizardStore.editingPoolAmount);
-    const distributionAmountDisplay = $derived(
-        totalAmount > 0 ? totalAmount.toLocaleString() : "—",
-    );
+    const distributionAmountDisplay = $derived(totalAmount > 0 ? formatAmount(totalAmount) : '—');
 
     // Schedule Summary (combines saved + editing)
     const scheduleSummary = $derived.by(() => {
         // Collect durations from saved distributions (always stored in months)
-        const savedDurations = distributions.map(
-            (d) => d.schedule.distributionDuration,
-        );
+        const savedDurations = distributions.map((d) => d.schedule.distributionDuration);
 
         // If we're editing, show the editing duration with its unit
         if (wizardStore.editingVestingDuration > 0) {
             const editDuration = wizardStore.editingVestingDuration;
-            const editUnit = wizardStore.editingDurationUnit || "months";
+            const editUnit = wizardStore.editingDurationUnit || 'months';
 
             // Format unit label
             const unitLabels: Record<string, string> = {
-                weeks: "Weeks",
-                months: "Months",
-                quarters: "Quarters",
-                years: "Years",
+                weeks: 'Weeks',
+                months: 'Months',
+                quarters: 'Quarters',
+                years: 'Years',
             };
-            const unitLabel = unitLabels[editUnit] || "Months";
+            const unitLabel = unitLabels[editUnit] || 'Months';
 
             // If there are saved distributions, show a range
             if (savedDurations.length > 0) {
                 // Convert editing duration to months for comparison
                 const editInMonths =
-                    editUnit === "weeks"
+                    editUnit === 'weeks'
                         ? editDuration / 4
-                        : editUnit === "quarters"
+                        : editUnit === 'quarters'
                           ? editDuration * 3
-                          : editUnit === "years"
+                          : editUnit === 'years'
                             ? editDuration * 12
                             : editDuration;
 
@@ -98,7 +84,7 @@
         }
 
         // Only saved distributions
-        if (savedDurations.length === 0) return "—";
+        if (savedDurations.length === 0) return '—';
 
         const min = Math.min(...savedDurations);
         const max = Math.max(...savedDurations);
@@ -115,9 +101,7 @@
     );
 
     const hasData = $derived(
-        wizardStore.tokenDetails.tokenAddress !== null ||
-            totalDistributions > 0 ||
-            isEditing,
+        wizardStore.tokenDetails.tokenAddress !== null || totalDistributions > 0 || isEditing,
     );
 </script>
 
@@ -143,53 +127,44 @@
             class="transition-colors text-right
             {options.isMono ? 'font-mono' : 'font-medium'} 
             {options.highlight ? 'text-zen-primary' : ''}
-            {value !== '—' && value !== 0
-                ? 'text-zen-fg'
-                : 'text-zen-fg-muted text-xs'}"
+            {value !== '—' && value !== 0 ? 'text-zen-fg' : 'text-zen-fg-muted text-xs'}"
             title={options.title}
-            class:text-sm={value !== "—"}
+            class:text-sm={value !== '—'}
         >
-            {value}{options.subValue || ""}
+            {value}{options.subValue || ''}
         </span>
     </div>
 {/snippet}
 
 <div class="space-y-5">
-    <h3
-        class="text-[10px] font-semibold uppercase tracking-[0.15em] text-zen-fg-subtle"
-    >
+    <h3 class="text-[10px] font-semibold uppercase tracking-[0.15em] text-zen-fg-subtle">
         Basket Summary
     </h3>
 
     <div class="space-y-0.5">
         <!-- Token Details -->
-        {@render statRow(FileText, "Token", tokenName, {
-            subValue: tokenSymbol ? ` (${tokenSymbol})` : "",
-            title: wizardStore.tokenDetails.tokenName || "",
+        {@render statRow(FileText, 'Token', tokenName, {
+            subValue: tokenSymbol ? ` (${tokenSymbol})` : '',
+            title: wizardStore.tokenDetails.tokenName || '',
         })}
 
-        {@render statRow(Wallet, "Contract", tokenAddress, { isMono: true })}
+        {@render statRow(Wallet, 'Contract', tokenAddress, { isMono: true })}
 
-        {@render statRow(Package, "Total Supply", tokenTotalSupply, {
+        {@render statRow(Package, 'Total Supply', tokenTotalSupply, {
             isMono: true,
         })}
 
         <!-- Distribution Stats -->
-        {@render statRow(
-            Coins,
-            "Total Distributing",
-            distributionAmountDisplay,
-            {
-                highlight: distributionAmountDisplay !== "—",
-                isMono: true,
-            },
-        )}
+        {@render statRow(Coins, 'Total Distributing', distributionAmountDisplay, {
+            highlight: distributionAmountDisplay !== '—',
+            isMono: true,
+        })}
 
-        {@render statRow(Calendar, "Vesting Range", scheduleSummary)}
+        {@render statRow(Calendar, 'Vesting Range', scheduleSummary)}
 
-        {@render statRow(Users, "Total Recipients", totalRecipients)}
+        {@render statRow(Users, 'Total Recipients', totalRecipients)}
 
-        {@render statRow(FileText, "Distributions", totalDistributions)}
+        {@render statRow(FileText, 'Distributions', totalDistributions)}
     </div>
 
     <!-- Empty State Hint -->

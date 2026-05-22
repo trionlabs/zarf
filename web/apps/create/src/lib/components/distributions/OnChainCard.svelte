@@ -1,13 +1,11 @@
 <script lang="ts">
-    import {
-        ExternalLink,
-    } from "lucide-svelte";
-    import type { OnChainVestingContract } from "@zarf/core/services/distributionDiscovery";
-    import { getContractExplorerUrl } from "@zarf/core/contracts";
-    import { formatTokenAmount } from "@zarf/core/utils/amount";
-    import ZenCard from "@zarf/ui/components/ui/ZenCard.svelte";
-    import ZenButton from "@zarf/ui/components/ui/ZenButton.svelte";
-    import ZenBadge from "@zarf/ui/components/ui/ZenBadge.svelte";
+    import { ExternalLink } from 'lucide-svelte';
+    import type { OnChainVestingContract } from '@zarf/core/services/distributionDiscovery';
+    import { getContractExplorerUrl } from '@zarf/core/contracts/explorer';
+    import { formatTokenAmount } from '@zarf/core/utils/amount';
+    import ZenCard from '@zarf/ui/components/ui/ZenCard.svelte';
+    import ZenButton from '@zarf/ui/components/ui/ZenButton.svelte';
+    import ZenBadge from '@zarf/ui/components/ui/ZenBadge.svelte';
 
     let {
         contract,
@@ -19,16 +17,16 @@
 
     // Derived State
     const isActive = $derived(contract.tokenBalance > 0n);
-    const variant = $derived(isActive ? "active" : "history");
+    const variant = $derived(isActive ? 'active' : 'history');
 
     const styles = {
         active: {
-            badgeVariant: "success" as const,
-            badge: "Active",
+            badgeVariant: 'success' as const,
+            badge: 'Active',
         },
         history: {
-            badgeVariant: "default" as const,
-            badge: "Completed",
+            badgeVariant: 'default' as const,
+            badge: 'Completed',
         },
     } as const;
 
@@ -44,9 +42,7 @@
         return Number((elapsed * 100n) / duration);
     }
 
-    let progress = $derived(
-        calculateProgress(contract.vestingStart, contract.vestingDuration),
-    );
+    let progress = $derived(calculateProgress(contract.vestingStart, contract.vestingDuration));
 
     function handleViewDashboard(e: Event) {
         e.stopPropagation();
@@ -62,9 +58,20 @@
         interactive
         radius="3xl"
         onclick={() => onSelect?.(contract)}
-        onkeydown={(e) => e.key === "Enter" && onSelect?.(contract)}
+        onkeydown={(e) => {
+            // Only handle activation when the key originates on the card
+            // itself; nested elements (View button, explorer anchor) bubble
+            // their keydown, and preventDefault here would cancel their
+            // native Space/Enter activation.
+            if (e.target !== e.currentTarget) return;
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                onSelect?.(contract);
+            }
+        }}
         role="button"
         tabindex={0}
+        aria-label={`View distribution ${contract.name || 'Unnamed'}`}
         class="flex-1 relative overflow-hidden transition-all duration-300 hover:-translate-y-0.5"
     >
         <div
@@ -74,15 +81,17 @@
             <div class="flex items-center gap-4 md:gap-6 min-w-0 pr-6">
                 <div
                     class="w-12 h-12 md:w-16 md:h-16 rounded-full flex items-center justify-center text-lg md:text-2xl font-black tracking-tighter shrink-0 transition-colors
-                    {isActive ? 'bg-zen-highlight-bg text-zen-highlight-fg' : 'bg-zen-fg/5 text-zen-fg-subtle'}"
+                    {isActive
+                        ? 'bg-zen-highlight-bg text-zen-highlight-fg'
+                        : 'bg-zen-fg/5 text-zen-fg-subtle'}"
                 >
-                    {(contract.name || "U").charAt(0).toUpperCase()}
+                    {(contract.name || 'U').charAt(0).toUpperCase()}
                 </div>
                 <div class="space-y-1 min-w-0">
                     <h3
                         class="font-extrabold text-xl md:text-2xl text-zen-fg leading-none truncate"
                     >
-                        {contract.name || "Unnamed"}
+                        {contract.name || 'Unnamed'}
                     </h3>
                     <div class="flex flex-wrap items-center gap-2">
                         <ZenBadge variant={style.badgeVariant} size="sm">
@@ -91,7 +100,7 @@
                         <span
                             class="text-[10px] font-bold text-zen-fg-faint tracking-widest uppercase truncate"
                         >
-                            {contract.tokenSymbol || "TOKEN"}
+                            {contract.tokenSymbol || 'TOKEN'}
                         </span>
                     </div>
                 </div>
@@ -116,11 +125,7 @@
                         <div
                             class="text-xl md:text-2xl font-black text-zen-fg tracking-tight leading-none"
                         >
-                            {formatTokenAmount(
-                                contract.tokenBalance,
-                                contract.tokenDecimals,
-                                0,
-                            )}
+                            {formatTokenAmount(contract.tokenBalance, contract.tokenDecimals, 0)}
                         </div>
                     </div>
 

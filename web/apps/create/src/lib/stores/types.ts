@@ -34,11 +34,11 @@ export type {
 export interface TokenDetails {
     // Token Contract Info (fetched from API)
     tokenAddress: StellarContractId | null;
-    tokenName: string | null;        // Fetched from contract
-    tokenSymbol: string | null;      // Fetched from contract (ticker)
-    tokenDecimals: number | null;    // Fetched from contract
+    tokenName: string | null; // Fetched from contract
+    tokenSymbol: string | null; // Fetched from contract (ticker)
+    tokenDecimals: number | null; // Fetched from contract
     tokenTotalSupply: string | null; // Fetched from contract
-    iconUrl: string | null;          // Fetched from API (if available)
+    iconUrl: string | null; // Fetched from API (if available)
 }
 
 /**
@@ -51,7 +51,7 @@ export interface TokenDetails {
  */
 export interface Recipient {
     address: string; // Keep as primary identifier, but might be empty if email is used initially
-    email?: string;  // Add optional email field
+    email?: string; // Add optional email field
     amount: number;
     leafIndex?: number; // assigned after merkle generation
     salt?: string;
@@ -61,10 +61,10 @@ export interface Recipient {
  * Distribution State
  */
 export type DistributionState =
-    | 'created'      // Draft / Waiting for launch
-    | 'launched'     // Active / Deposit made
-    | 'in_progress'  // Claiming started
-    | 'cancelled';   // Cancelled
+    | 'created' // Draft / Waiting for launch
+    | 'launched' // Active / Deposit made
+    | 'in_progress' // Claiming started
+    | 'cancelled'; // Cancelled
 
 /**
  * Detailed deployment progress steps
@@ -86,10 +86,10 @@ export interface Distribution {
 
     // State Management
     state: DistributionState;
-    createdAt: string;       // ISO timestamp
-    launchedAt?: string;     // Deposit timestamp
-    depositTxHash?: string;  // Deposit transaction hash
-    cancelledAt?: string;    // Cancel timestamp
+    createdAt: string; // ISO timestamp
+    launchedAt?: string; // Deposit timestamp
+    depositTxHash?: string; // Deposit transaction hash
+    cancelledAt?: string; // Cancel timestamp
 
     // UI Deployment State
     deploymentStep?: DeploymentStep;
@@ -121,7 +121,6 @@ export interface WizardState {
  */
 export type ClaimStep = 1 | 2 | 3 | 4 | 5;
 
-
 /**
  * Selected tranche for claiming
  */
@@ -130,7 +129,6 @@ export interface SelectedTranche {
     amount: number;
     index: number; // Tranche index in schedule
 }
-
 
 // ============================================================================
 // Wallet Store Types
@@ -152,6 +150,6 @@ export interface WalletState {
 
 /**
  * Available theme options (Binary: dark/light)
- * Maps to DaisyUI themes: light='wireframe', dark='glass-porcelain'
+ * Maps to data-theme tokens: light='paper-porcelain', dark='glass-porcelain'
  */
 export type Theme = 'dark' | 'light';

@@ -22,7 +22,7 @@ function currentState(): NetworkState {
     };
 }
 
-let state = $state<NetworkState>(currentState());
+const state = $state<NetworkState>(currentState());
 
 function sync() {
     state.activeId = getActiveStellarNetworkId();
@@ -65,11 +65,21 @@ function restore() {
 }
 
 export const networkStore = {
-    get activeId() { return state.activeId; },
-    get options() { return state.options; },
-    get active() { return state.options.find((option) => option.id === state.activeId) ?? null; },
-    get error() { return state.error; },
-    get canSwitch() { return state.options.filter((option) => option.configured).length > 1; },
+    get activeId() {
+        return state.activeId;
+    },
+    get options() {
+        return state.options;
+    },
+    get active() {
+        return state.options.find((option) => option.id === state.activeId) ?? null;
+    },
+    get error() {
+        return state.error;
+    },
+    get canSwitch() {
+        return state.options.filter((option) => option.configured).length > 1;
+    },
     select,
     restore,
     sync,

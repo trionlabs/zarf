@@ -12,7 +12,10 @@ import type { ClaimListJson } from '@zarf/core/domain/claimListBuilder';
 import { serializeClaimList } from '@zarf/core/domain/claimListBuilder';
 
 export class PinError extends Error {
-    constructor(message: string, public readonly cause?: unknown) {
+    constructor(
+        message: string,
+        public readonly cause?: unknown,
+    ) {
         super(message);
         this.name = 'PinError';
     }

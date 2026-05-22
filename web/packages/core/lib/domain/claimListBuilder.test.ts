@@ -25,25 +25,47 @@ describe('buildClaimList', () => {
     };
 
     it('throws on empty claims', async () => {
-        await expect(
-            buildClaimList({ ...inputs, claims: [] }),
-        ).rejects.toThrow(/no claims/);
+        await expect(buildClaimList({ ...inputs, claims: [] })).rejects.toThrow(/no claims/);
     });
 
     it('produces byte-identical output for the same logical input (CID stability)', async () => {
         const a = await buildClaimList({
             ...inputs,
             claims: [
-                claim({ email: 'a@b.com', leafIndex: 0, leaf: 1n, identityCommitment: '0xa', unlockTime: 100 }),
-                claim({ email: 'c@d.com', leafIndex: 1, leaf: 2n, identityCommitment: '0xb', unlockTime: 200 }),
+                claim({
+                    email: 'a@b.com',
+                    leafIndex: 0,
+                    leaf: 1n,
+                    identityCommitment: '0xa',
+                    unlockTime: 100,
+                }),
+                claim({
+                    email: 'c@d.com',
+                    leafIndex: 1,
+                    leaf: 2n,
+                    identityCommitment: '0xb',
+                    unlockTime: 200,
+                }),
             ],
         });
         // Different insertion order, same logical content
         const b = await buildClaimList({
             ...inputs,
             claims: [
-                claim({ email: 'c@d.com', leafIndex: 1, leaf: 2n, identityCommitment: '0xb', unlockTime: 200 }),
-                claim({ email: 'a@b.com', leafIndex: 0, leaf: 1n, identityCommitment: '0xa', unlockTime: 100 }),
+                claim({
+                    email: 'c@d.com',
+                    leafIndex: 1,
+                    leaf: 2n,
+                    identityCommitment: '0xb',
+                    unlockTime: 200,
+                }),
+                claim({
+                    email: 'a@b.com',
+                    leafIndex: 0,
+                    leaf: 1n,
+                    identityCommitment: '0xa',
+                    unlockTime: 100,
+                }),
             ],
         });
         expect(serializeClaimList(a)).toEqual(serializeClaimList(b));

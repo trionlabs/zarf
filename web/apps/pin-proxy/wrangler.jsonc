@@ -6,17 +6,17 @@
     "compatibility_date": "2025-01-15",
     "vars": {
         "ALLOWED_ORIGINS": "http://localhost:5173,http://localhost:5174,http://localhost:5175,https://create.zarf.to,https://claim.zarf.to",
-        "MAX_BODY_BYTES": "1048576"
+        "MAX_BODY_BYTES": "1048576",
     },
     "observability": {
-        "enabled": true
+        "enabled": true,
     },
     "routes": [
         {
             "pattern": "pin.zarf.to",
-            "custom_domain": true
-        }
-    ]
+            "custom_domain": true,
+        },
+    ],
     // Set the Pinata JWT as a secret (NOT a var):
     //   wrangler secret put PINATA_JWT
     //

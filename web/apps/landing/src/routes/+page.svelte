@@ -1,16 +1,15 @@
 <script lang="ts">
-    import { onMount } from "svelte";
-    import { goto } from "$app/navigation";
-    import { extractStateFromUrl } from "$lib/utils/oauth";
-    import ThemeToggle from "@zarf/ui/components/layout/ThemeToggle.svelte";
-    import Tooltip from "@zarf/ui/components/ui/Tooltip.svelte";
-    import Hero from "@zarf/ui/components/landing/Hero.svelte";
-    import HowItWorks from "@zarf/ui/components/landing/HowItWorks.svelte";
-    import Features from "@zarf/ui/components/landing/Features.svelte";
-    import UseCases from "@zarf/ui/components/landing/UseCases.svelte";
-    import ZarfLogo from "@zarf/ui/components/brand/ZarfLogo.svelte";
-    import ZenButton from "@zarf/ui/components/ui/ZenButton.svelte";
-    import { Zap } from "lucide-svelte";
+    import { onMount } from 'svelte';
+    import { extractStateFromUrl } from '$lib/utils/oauth';
+    import ThemeToggle from '@zarf/ui/components/layout/ThemeToggle.svelte';
+    import Tooltip from '@zarf/ui/components/ui/Tooltip.svelte';
+    import Hero from '@zarf/ui/components/landing/Hero.svelte';
+    import HowItWorks from '@zarf/ui/components/landing/HowItWorks.svelte';
+    import Features from '@zarf/ui/components/landing/Features.svelte';
+    import UseCases from '@zarf/ui/components/landing/UseCases.svelte';
+    import ZarfLogo from '@zarf/ui/components/brand/ZarfLogo.svelte';
+    import ZenButton from '@zarf/ui/components/ui/ZenButton.svelte';
+    import { dev } from '@zarf/core/utils/log';
 
     const DEBUG = import.meta.env.DEV;
 
@@ -25,45 +24,40 @@
         const hash = window.location.hash;
 
         // 1. Handle Successful OAuth Callback
-        if (hash.includes("id_token=")) {
-            if (DEBUG) {
-                console.log(
-                    "[Landing] Detected ID Token, processing redirect...",
-                );
-            }
+        if (hash.includes('id_token=')) {
+            dev('[Landing] Detected ID Token, processing redirect...');
 
             // Parse state to restore context (e.g. contract address)
             const oauthState = extractStateFromUrl();
-            const addressQuery = oauthState?.address
-                ? `?address=${oauthState.address}`
-                : "";
+            const addressQuery = oauthState?.address ? `?address=${oauthState.address}` : '';
 
             // Forward to claim subdomain with state and hash
             const target = `https://claim.zarf.to${addressQuery}${hash}`;
-            if (DEBUG) {
-                console.log("[Landing] Redirecting to:", target);
-            }
+            dev('[Landing] Redirecting to:', target);
             window.location.replace(target);
             return;
         }
 
         // 2. Handle OAuth Errors (e.g. access_denied, interaction_required)
-        if (hash.includes("error=")) {
+        if (hash.includes('error=')) {
             if (DEBUG) {
-                console.warn("[Landing] OAuth Error detected:", hash);
+                console.warn('[Landing] OAuth Error detected:', hash);
             }
 
             const oauthState = extractStateFromUrl();
-            const addressQuery = oauthState?.address
-                ? `?address=${oauthState.address}`
-                : "";
 
-            // Redirect back to claim page with generic error param
+            // Redirect back to claim page with generic error param.
             // We strip the specific error hash to avoid raw error exposure,
             // but add clean query param for Claim app to handle.
-            window.location.replace(
-                `https://claim.zarf.to${addressQuery}&error=auth_failed`,
-            );
+            // URL + searchParams handles the empty-address case correctly;
+            // the previous template literal emitted `claim.zarf.to&error=…`
+            // (missing query separator) when no address was preserved.
+            const redirect = new URL('https://claim.zarf.to');
+            if (oauthState?.address) {
+                redirect.searchParams.set('address', oauthState.address);
+            }
+            redirect.searchParams.set('error', 'auth_failed');
+            window.location.replace(redirect.toString());
             return;
         }
     });
@@ -75,13 +69,35 @@
         name="description"
         content="Create private token distributions and payroll with built-in vesting and privacy-preserving claims using Zero-Knowledge proofs."
     />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Zarf" />
+    <meta property="og:url" content="https://zarf.to/" />
+    <meta property="og:title" content="Zarf — Privacy-Preserving Token Distribution" />
+    <meta
+        property="og:description"
+        content="Create private token distributions and payroll with built-in vesting and privacy-preserving claims using Zero-Knowledge proofs."
+    />
+    <meta property="og:image" content="https://zarf.to/og.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Zarf — E-Mail First Confidential Token Distributions" />
+
+    <!-- Twitter card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:url" content="https://zarf.to/" />
+    <meta name="twitter:title" content="Zarf — Privacy-Preserving Token Distribution" />
+    <meta
+        name="twitter:description"
+        content="Create private token distributions and payroll with built-in vesting and privacy-preserving claims using Zero-Knowledge proofs."
+    />
+    <meta name="twitter:image" content="https://zarf.to/og.png" />
 </svelte:head>
 
 <svelte:window bind:scrollY={scrollPosition} />
 
-<div
-    class="min-h-screen flex flex-col relative font-sans selection:bg-primary/20"
->
+<div class="min-h-screen flex flex-col relative font-sans selection:bg-primary/20">
     <!-- GLOBAL BACKGROUND: Fixed dark void behind everything to prevent grain artifacts -->
     <div class="fixed inset-0 bg-base-100 -z-10"></div>
 
@@ -109,11 +125,13 @@
                 href="https://x.com/trionlabs"
                 target="_blank"
                 rel="noopener noreferrer"
+                aria-label="Follow Zarf on X"
                 class="inline-block"
             >
                 <ZenButton
                     variant="ghost"
                     size="sm"
+                    aria-label="Follow Zarf on X"
                     class="rounded-full bg-base-content/5 text-base-content/70 border border-base-content/8 hover:text-base-content hover:bg-base-content/10 !ring-0 px-4 py-1.5"
                 >
                     {#snippet iconLeft()}
@@ -154,9 +172,7 @@
         <!-- Final CTA -->
         <section class="py-24 relative overflow-hidden">
             <div class="container mx-auto px-6 max-w-2xl text-center">
-                <p
-                    class="text-xs font-medium tracking-[0.2em] uppercase text-base-content/40 mb-4"
-                >
+                <p class="text-xs font-medium tracking-[0.2em] uppercase text-zen-fg-muted mb-4">
                     Stay Updated
                 </p>
                 <h2
@@ -164,15 +180,11 @@
                 >
                     Join the Waitlist
                 </h2>
-                <p
-                    class="text-base text-base-content/50 mb-10 max-w-md mx-auto leading-relaxed"
-                >
-                    Be the first to know when zarf.to launches. Follow us for
-                    exclusive updates and early access.
+                <p class="text-base text-zen-fg-muted mb-10 max-w-md mx-auto leading-relaxed">
+                    Be the first to know when zarf.to launches. Follow us for exclusive updates and
+                    early access.
                 </p>
-                <div
-                    class="flex flex-col sm:flex-row items-center justify-center gap-4"
-                >
+                <div class="flex flex-col sm:flex-row items-center justify-center gap-4">
                     <a
                         href="https://x.com/trionlabs"
                         target="_blank"
@@ -220,26 +232,21 @@
     </div>
 
     <!-- Footer -->
-    <footer
-        class="relative mt-auto border-t border-base-content/5 overflow-hidden"
-    >
+    <footer class="relative mt-auto border-t border-base-content/5 overflow-hidden">
         <div class="container mx-auto px-6 py-10 relative z-10">
-            <div
-                class="flex flex-col md:flex-row justify-between items-center gap-5"
-            >
+            <div class="flex flex-col md:flex-row justify-between items-center gap-5">
                 <div
-                    class="flex items-center gap-2 text-base-content/40 hover:text-base-content/60 transition-colors duration-300"
+                    class="flex items-center gap-2 text-zen-fg-muted hover:text-base-content/60 transition-colors duration-300"
                 >
-                    <ZarfLogo size="sm" class="opacity-40" />
+                    <ZarfLogo size="sm" />
                 </div>
 
-                <div
-                    class="flex gap-6 text-xs font-medium text-base-content/40"
-                >
+                <div class="flex gap-6 text-xs font-medium text-zen-fg-muted">
                     <a
                         href="https://x.com/trionlabs"
                         target="_blank"
                         rel="noopener noreferrer"
+                        aria-label="Zarf on X"
                         class="hover:text-base-content/70 transition-colors duration-300 flex items-center gap-1.5"
                     >
                         <svg
@@ -254,14 +261,10 @@
                         </svg>
                         X
                     </a>
-                    <span class="text-base-content/25 cursor-not-allowed"
-                        >GitHub</span
-                    >
+                    <span class="text-zen-fg-muted cursor-not-allowed">GitHub</span>
                 </div>
 
-                <div
-                    class="text-xs text-base-content/30 flex items-center gap-1.5"
-                >
+                <div class="text-xs text-zen-fg-muted flex items-center gap-1.5">
                     <span>© 2026</span>
                     <span class="text-base-content/20">·</span>
                     <span>Built by</span>
@@ -269,7 +272,7 @@
                         href="https://trionlabs.dev"
                         target="_blank"
                         rel="noopener noreferrer"
-                        class="text-base-content/40 hover:text-base-content/60 transition-colors duration-300"
+                        class="text-zen-fg-muted hover:text-base-content/60 transition-colors duration-300"
                         >trionlabs.dev</a
                     >
                 </div>

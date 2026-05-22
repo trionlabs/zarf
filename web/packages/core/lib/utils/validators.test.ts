@@ -13,8 +13,8 @@ describe('isValidEmail', () => {
     it('rejects malformed inputs (regression guard: old csvProcessor copy accepted "aa@b")', () => {
         expect(isValidEmail('')).toBe(false);
         expect(isValidEmail('no-at-sign')).toBe(false);
-        expect(isValidEmail('aa@b')).toBe(false);          // no TLD
-        expect(isValidEmail('a b@c.d')).toBe(false);       // whitespace
+        expect(isValidEmail('aa@b')).toBe(false); // no TLD
+        expect(isValidEmail('a b@c.d')).toBe(false); // whitespace
         expect(isValidEmail(null as unknown as string)).toBe(false);
     });
 });

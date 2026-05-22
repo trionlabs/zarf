@@ -1,14 +1,16 @@
 <script lang="ts">
-    import { claimStore } from "../../../stores/claimStore.svelte";
-    import { authStore } from "@zarf/ui/stores/authStore.svelte";
+    import { claimStore } from '../../../stores/claimStore.svelte';
+    import { discoverEpochs } from '../../../services/claimActions';
+    import { authStore } from '@zarf/ui/stores/authStore.svelte';
     // We import from merkleTree which handles the Barretenberg WASM loading
-    import { Lock, Mail, KeyRound, Loader2, ArrowRight, LogOut } from "lucide-svelte";
-    import { redirectToGoogle } from "@zarf/ui/utils/googleAuth";
-    import { PIN_LENGTH } from "@zarf/core/constants";
-    import { browser } from "$app/environment";
-    import { onMount } from "svelte";
-    import ZenInput from "@zarf/ui/components/ui/ZenInput.svelte";
-    import ZenButton from "@zarf/ui/components/ui/ZenButton.svelte";
+    import { Lock, Mail, KeyRound, Loader2, ArrowRight, LogOut } from 'lucide-svelte';
+    import { redirectToGoogle } from '@zarf/ui/utils/googleAuth';
+    import { PIN_LENGTH } from '@zarf/core/constants';
+    import { onMount } from 'svelte';
+    import ZenInput from '@zarf/ui/components/ui/ZenInput.svelte';
+    import ZenButton from '@zarf/ui/components/ui/ZenButton.svelte';
+    import { toMessage } from '@zarf/core/utils/error';
+    import { err } from '@zarf/core/utils/log';
 
     let { contractAddress } = $props<{ contractAddress: string }>();
 
@@ -24,22 +26,20 @@
     // Double-safe: Only show authenticated after mount AND store says authenticated
     let isAuthenticated = $derived(mounted && authStore.isAuthenticated);
 
-    let pin = $state("");
+    let pin = $state('');
     let isUnlocking = $state(false);
     let error = $state<string | null>(null);
 
     // Reset PIN when auth state changes (e.g. user re-logins) or on mount
     $effect(() => {
         if (isAuthenticated) {
-            pin = "";
+            pin = '';
             error = null;
         }
     });
 
     // Derived state form submission eligibility
-    let canSubmit = $derived(
-        isAuthenticated && pin.length >= PIN_LENGTH && !isUnlocking,
-    );
+    let canSubmit = $derived(isAuthenticated && pin.length >= PIN_LENGTH && !isUnlocking);
 
     function handleGoogleLogin() {
         redirectToGoogle(contractAddress);
@@ -52,12 +52,12 @@
         error = null;
 
         try {
-            // New Pattern: Delegate discovery loop to the Store
-            // This handles Fetch JSON -> Derive Keys -> Check Local -> Check Chain
-            await claimStore.discoverEpochs(email, jwt!, pin, contractAddress);
-        } catch (e: any) {
-            console.error("Unlock failed:", e);
-            error = e.message || "Failed to verify identity.";
+            // Discovery loop: Fetch JSON -> Derive Keys -> Check Local -> Check Chain.
+            // Lives in services/claimActions so claimStore stays free of @zarf/core/contracts.
+            await discoverEpochs(email, jwt!, pin, contractAddress);
+        } catch (e: unknown) {
+            err('Unlock failed:', e);
+            error = toMessage(e, 'Failed to verify identity.');
         } finally {
             isUnlocking = false;
         }
@@ -83,28 +83,20 @@
 
         <!-- 1. Google Auth -->
         <div class="space-y-3">
-            <h3 class="text-xs font-bold uppercase tracking-widest opacity-40">
-                1. Verification
-            </h3>
+            <h3 class="text-xs font-bold uppercase tracking-widest opacity-40">1. Verification</h3>
 
             {#if isAuthenticated}
                 <div
                     class="flex flex-col sm:flex-row sm:items-center gap-3 p-4 bg-zen-success/5 border border-zen-success/20 rounded-xl text-zen-success group relative overflow-hidden transition-all hover:bg-zen-success/10"
                 >
-                    <div
-                        class="p-2 bg-zen-success/10 rounded-full flex-shrink-0 text-zen-success"
-                    >
+                    <div class="p-2 bg-zen-success/10 rounded-full flex-shrink-0 text-zen-success">
                         <Mail class="w-5 h-5" />
                     </div>
                     <div class="flex-1 min-w-0">
-                        <p
-                            class="text-xs font-semibold uppercase tracking-wider opacity-60 mb-0.5"
-                        >
+                        <p class="text-xs font-semibold uppercase tracking-wider opacity-60 mb-0.5">
                             Verified Account
                         </p>
-                        <p
-                            class="text-base font-semibold truncate text-zen-fg"
-                        >
+                        <p class="text-base font-semibold truncate text-zen-fg">
                             {email}
                         </p>
                     </div>
@@ -166,15 +158,9 @@
                 ? 'opacity-100'
                 : 'opacity-30 pointer-events-none'}"
         >
-            <h3 class="text-xs font-bold uppercase tracking-widest opacity-40">
-                2. Access Code
-            </h3>
+            <h3 class="text-xs font-bold uppercase tracking-widest opacity-40">2. Access Code</h3>
 
-            <div
-                class="relative"
-                role="group"
-                onmouseenter={() => claimStore.preloadCrypto()}
-            >
+            <div class="relative" role="group" onmouseenter={() => claimStore.preloadCrypto()}>
                 <ZenInput
                     type="password"
                     class="input-lg pl-11 tracking-widest font-mono placeholder:font-sans placeholder:tracking-normal"
@@ -184,7 +170,7 @@
                     {error}
                     icon={KeyRound}
                     oninput={() => (error = null)}
-                    onkeydown={(e) => e.key === "Enter" && handleUnlock()}
+                    onkeydown={(e) => e.key === 'Enter' && handleUnlock()}
                     onfocus={() => claimStore.preloadCrypto()}
                 />
             </div>

@@ -8,13 +8,13 @@ import {
     rpc,
     scValToNative,
     xdr,
-} from "@stellar/stellar-sdk";
-import { keccak_256 } from "@noble/hashes/sha3";
-import { Buffer } from "buffer";
+} from '@stellar/stellar-sdk';
+import { keccak_256 } from '@noble/hashes/sha3';
+import { Buffer } from 'buffer';
 
-const DEFAULT_GOOGLE_JWKS_URL = "https://www.googleapis.com/oauth2/v3/certs";
+const DEFAULT_GOOGLE_JWKS_URL = 'https://www.googleapis.com/oauth2/v3/certs';
 const SIMULATION_SOURCE = StrKey.encodeEd25519PublicKey(Buffer.alloc(32));
-const ZERO_HASH = `0x${"0".repeat(64)}` as const;
+const ZERO_HASH = `0x${'0'.repeat(64)}` as const;
 const LIMB_BITS = 120n;
 const LIMB_COUNT = 18;
 const FIELD_BYTES = 32;
@@ -58,7 +58,7 @@ interface RegistryKey {
 }
 
 interface RegistryAction {
-    action: "register" | "revoke" | "noop" | "error";
+    action: 'register' | 'revoke' | 'noop' | 'error';
     kid: string;
     keyHash: HexString;
     reason: string;
@@ -69,7 +69,7 @@ interface RegistryAction {
 interface RotationReport {
     ok: boolean;
     dryRun: boolean;
-    source: "scheduled" | "manual";
+    source: 'scheduled' | 'manual';
     startedAt: string;
     finishedAt: string;
     fetchedKeys: number;
@@ -87,10 +87,10 @@ export default {
     async fetch(request: Request, env: Env): Promise<Response> {
         const url = new URL(request.url);
 
-        if (url.pathname === "/health" && request.method === "GET") {
+        if (url.pathname === '/health' && request.method === 'GET') {
             return json({
                 ok: true,
-                state: "on-chain",
+                state: 'on-chain',
                 hasRegistry: Boolean(env.JWK_REGISTRY_ADDRESS),
                 hasRpc: Boolean(env.STELLAR_RPC_URL),
                 hasOwnerSecret: Boolean(env.REGISTRY_OWNER_SECRET),
@@ -98,7 +98,7 @@ export default {
             });
         }
 
-        if (url.pathname === "/state" && request.method === "GET") {
+        if (url.pathname === '/state' && request.method === 'GET') {
             const auth = requireAdmin(request, env);
             if (auth) return auth;
             validateConfig(env);
@@ -114,16 +114,16 @@ export default {
             });
         }
 
-        if (url.pathname === "/rotate" && request.method === "POST") {
+        if (url.pathname === '/rotate' && request.method === 'POST') {
             const auth = requireAdmin(request, env);
             if (auth) return auth;
 
-            const dryRun = parseBoolean(url.searchParams.get("dryRun"), false);
-            const report = await runRotation(env, { dryRun, source: "manual" });
+            const dryRun = parseBoolean(url.searchParams.get('dryRun'), false);
+            const report = await runRotation(env, { dryRun, source: 'manual' });
             return json(report, report.ok ? 200 : 500);
         }
 
-        return json({ error: "not_found" }, 404);
+        return json({ error: 'not_found' }, 404);
     },
 
     async scheduled(
@@ -136,7 +136,7 @@ export default {
 };
 
 async function runScheduledRotation(env: Env): Promise<void> {
-    const report = await runRotation(env, { dryRun: false, source: "scheduled" });
+    const report = await runRotation(env, { dryRun: false, source: 'scheduled' });
     if (!report.ok) {
         throw new Error(`JWK rotation failed with ${report.errors} error(s)`);
     }
@@ -144,7 +144,7 @@ async function runScheduledRotation(env: Env): Promise<void> {
 
 async function runRotation(
     env: Env,
-    options: { dryRun: boolean; source: "scheduled" | "manual" },
+    options: { dryRun: boolean; source: 'scheduled' | 'manual' },
 ): Promise<RotationReport> {
     const startedAt = new Date().toISOString();
     const actions: RegistryAction[] = [];
@@ -152,7 +152,10 @@ async function runRotation(
 
     try {
         validateConfig(env);
-        const [jwks, registryKeys] = await Promise.all([fetchGoogleJwks(env), loadRegistryKeys(env)]);
+        const [jwks, registryKeys] = await Promise.all([
+            fetchGoogleJwks(env),
+            loadRegistryKeys(env),
+        ]);
         currentKeys.push(...convertGoogleKeys(jwks));
         const currentHashes = new Set(currentKeys.map((key) => key.keyHash));
         const activeRegistryHashes = new Set(
@@ -165,13 +168,13 @@ async function runRotation(
             if (!isValid) {
                 const action = await registerKey(env, key, options.dryRun);
                 actions.push(action);
-                if (action.action === "error") continue;
+                if (action.action === 'error') continue;
             } else {
                 actions.push({
-                    action: "noop",
+                    action: 'noop',
                     kid: key.kid,
                     keyHash: key.keyHash,
-                    reason: "already_active_on_chain",
+                    reason: 'already_active_on_chain',
                 });
             }
         }
@@ -185,14 +188,14 @@ async function runRotation(
                 const action = await revokeKey(
                     env,
                     registryKey,
-                    "removed_from_google_jwks",
+                    'removed_from_google_jwks',
                     options.dryRun,
                 );
                 actions.push(action);
             }
         }
 
-        const hasErrors = actions.some((action) => action.action === "error");
+        const hasErrors = actions.some((action) => action.action === 'error');
         const report = summarizeReport({
             ok: !hasErrors,
             dryRun: options.dryRun,
@@ -203,12 +206,12 @@ async function runRotation(
             currentKeys,
             actions,
         });
-        console.info("[jwk-rotation] completed", report);
-        await sendAlert(env, hasErrors ? "jwk_rotation_failed" : "jwk_rotation_completed", report);
+        console.info('[jwk-rotation] completed', report);
+        await sendAlert(env, hasErrors ? 'jwk_rotation_failed' : 'jwk_rotation_completed', report);
         return report;
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        console.error("[jwk-rotation] failed", message);
+        console.error('[jwk-rotation] failed', message);
 
         const report = summarizeReport({
             ok: false,
@@ -221,47 +224,49 @@ async function runRotation(
             actions: [
                 ...actions,
                 {
-                    action: "error",
-                    kid: "rotation",
+                    action: 'error',
+                    kid: 'rotation',
                     keyHash: ZERO_HASH,
-                    reason: "rotation_failed",
+                    reason: 'rotation_failed',
                     error: message,
                 },
             ],
         });
-        await sendAlert(env, "jwk_rotation_failed", report);
+        await sendAlert(env, 'jwk_rotation_failed', report);
         return report;
     }
 }
 
-function summarizeReport(input: Omit<RotationReport, "registered" | "revoked" | "unchanged" | "errors">): RotationReport {
+function summarizeReport(
+    input: Omit<RotationReport, 'registered' | 'revoked' | 'unchanged' | 'errors'>,
+): RotationReport {
     return {
         ...input,
-        registered: input.actions.filter((a) => a.action === "register").length,
-        revoked: input.actions.filter((a) => a.action === "revoke").length,
-        unchanged: input.actions.filter((a) => a.action === "noop").length,
-        errors: input.actions.filter((a) => a.action === "error").length,
+        registered: input.actions.filter((a) => a.action === 'register').length,
+        revoked: input.actions.filter((a) => a.action === 'revoke').length,
+        unchanged: input.actions.filter((a) => a.action === 'noop').length,
+        errors: input.actions.filter((a) => a.action === 'error').length,
     };
 }
 
 async function fetchGoogleJwks(env: Env): Promise<GoogleJwks> {
     const url = env.GOOGLE_JWKS_URL || DEFAULT_GOOGLE_JWKS_URL;
     const response = await fetch(url, {
-        headers: { Accept: "application/json" },
+        headers: { Accept: 'application/json' },
     });
     if (!response.ok) {
         throw new Error(`Google JWKS fetch failed: HTTP ${response.status}`);
     }
     const body = (await response.json()) as Partial<GoogleJwks>;
     if (!body || !Array.isArray(body.keys)) {
-        throw new Error("Google JWKS response is missing keys[]");
+        throw new Error('Google JWKS response is missing keys[]');
     }
     return { keys: body.keys };
 }
 
 function convertGoogleKeys(jwks: GoogleJwks): ConvertedGoogleKey[] {
     return jwks.keys
-        .filter((key) => key.kty === "RSA" && key.n && (!key.use || key.use === "sig"))
+        .filter((key) => key.kty === 'RSA' && key.n && (!key.use || key.use === 'sig'))
         .map((key) => {
             const limbs = jwkModulusToLimbs(key.n);
             return {
@@ -299,31 +304,31 @@ async function registerKey(
 ): Promise<RegistryAction> {
     if (dryRun) {
         return {
-            action: "register",
+            action: 'register',
             kid: key.kid,
             keyHash: key.keyHash,
-            reason: "dry_run_new_key",
+            reason: 'dry_run_new_key',
         };
     }
 
     try {
-        const txHash = await submitRegistryCall(env, "register_key", [
+        const txHash = await submitRegistryCall(env, 'register_key', [
             scString(key.kid),
             scVec(key.limbs.map(scBytesN32)),
         ]);
         return {
-            action: "register",
+            action: 'register',
             kid: key.kid,
             keyHash: key.keyHash,
-            reason: "new_google_key",
+            reason: 'new_google_key',
             txHash,
         };
     } catch (error) {
         return {
-            action: "error",
+            action: 'error',
             kid: key.kid,
             keyHash: key.keyHash,
-            reason: "register_failed",
+            reason: 'register_failed',
             error: error instanceof Error ? error.message : String(error),
         };
     }
@@ -337,28 +342,28 @@ async function revokeKey(
 ): Promise<RegistryAction> {
     if (dryRun) {
         return {
-            action: "revoke",
-            kid: "unknown",
+            action: 'revoke',
+            kid: 'unknown',
             keyHash: key.keyHash,
             reason: `dry_run_${reason}`,
         };
     }
 
     try {
-        const txHash = await submitRegistryCall(env, "revoke_key", [scBytesN32(key.keyHash)]);
+        const txHash = await submitRegistryCall(env, 'revoke_key', [scBytesN32(key.keyHash)]);
         return {
-            action: "revoke",
-            kid: "unknown",
+            action: 'revoke',
+            kid: 'unknown',
             keyHash: key.keyHash,
             reason,
             txHash,
         };
     } catch (error) {
         return {
-            action: "error",
-            kid: "unknown",
+            action: 'error',
+            kid: 'unknown',
             keyHash: key.keyHash,
-            reason: "revoke_failed",
+            reason: 'revoke_failed',
             error: error instanceof Error ? error.message : String(error),
         };
     }
@@ -378,17 +383,17 @@ async function loadRegistryKeys(env: Env): Promise<RegistryKey[]> {
 }
 
 async function getRegisteredKeyCount(env: Env): Promise<number> {
-    const result = await simulateRegistryCall(env, "get_registered_key_count");
+    const result = await simulateRegistryCall(env, 'get_registered_key_count');
     return Number(scValToNative(result));
 }
 
 async function getRegisteredKey(env: Env, index: number): Promise<HexString> {
-    const result = await simulateRegistryCall(env, "get_registered_key", [scU32(index)]);
+    const result = await simulateRegistryCall(env, 'get_registered_key', [scU32(index)]);
     return bytesToHex(scValToNative(result) as Buffer);
 }
 
 async function isRegistryKeyValid(env: Env, keyHash: HexString): Promise<boolean> {
-    const result = await simulateRegistryCall(env, "is_valid_key_hash", [scBytesN32(keyHash)]);
+    const result = await simulateRegistryCall(env, 'is_valid_key_hash', [scBytesN32(keyHash)]);
     return Boolean(scValToNative(result));
 }
 
@@ -398,7 +403,7 @@ async function simulateRegistryCall(
     args: xdr.ScVal[] = [],
 ): Promise<xdr.ScVal> {
     const server = new rpc.Server(env.STELLAR_RPC_URL);
-    const tx = new TransactionBuilder(new Account(SIMULATION_SOURCE, "0"), {
+    const tx = new TransactionBuilder(new Account(SIMULATION_SOURCE, '0'), {
         fee: BASE_FEE,
         networkPassphrase: env.STELLAR_NETWORK_PASSPHRASE,
     })
@@ -411,16 +416,12 @@ async function simulateRegistryCall(
         throw new Error(`Registry simulation failed: ${result.error}`);
     }
     if (!result.result) {
-        throw new Error("Registry simulation returned no result");
+        throw new Error('Registry simulation returned no result');
     }
     return result.result.retval;
 }
 
-async function submitRegistryCall(
-    env: Env,
-    method: string,
-    args: xdr.ScVal[],
-): Promise<string> {
+async function submitRegistryCall(env: Env, method: string, args: xdr.ScVal[]): Promise<string> {
     const keypair = Keypair.fromSecret(env.REGISTRY_OWNER_SECRET);
     const server = new rpc.Server(env.STELLAR_RPC_URL);
     const source = await server.getAccount(keypair.publicKey());
@@ -436,11 +437,11 @@ async function submitRegistryCall(
     prepared.sign(keypair);
 
     const sent = await server.sendTransaction(prepared);
-    if (sent.status === "ERROR") {
+    if (sent.status === 'ERROR') {
         throw new Error(`Registry ${method} submission failed`);
     }
 
-    const attempts = Number(env.TX_POLL_ATTEMPTS || "20");
+    const attempts = Number(env.TX_POLL_ATTEMPTS || '20');
     const receipt = await server.pollTransaction(sent.hash, { attempts });
     if (receipt.status !== rpc.Api.GetTransactionStatus.SUCCESS) {
         throw new Error(`Registry ${method} transaction ${receipt.status}`);
@@ -451,25 +452,25 @@ async function submitRegistryCall(
 
 function validateConfig(env: Env): void {
     const missing = [
-        ["STELLAR_RPC_URL", env.STELLAR_RPC_URL],
-        ["STELLAR_NETWORK_PASSPHRASE", env.STELLAR_NETWORK_PASSPHRASE],
-        ["JWK_REGISTRY_ADDRESS", env.JWK_REGISTRY_ADDRESS],
-        ["REGISTRY_OWNER_SECRET", env.REGISTRY_OWNER_SECRET],
+        ['STELLAR_RPC_URL', env.STELLAR_RPC_URL],
+        ['STELLAR_NETWORK_PASSPHRASE', env.STELLAR_NETWORK_PASSPHRASE],
+        ['JWK_REGISTRY_ADDRESS', env.JWK_REGISTRY_ADDRESS],
+        ['REGISTRY_OWNER_SECRET', env.REGISTRY_OWNER_SECRET],
     ].filter(([, value]) => !value);
 
     if (missing.length > 0) {
-        throw new Error(`Missing required config: ${missing.map(([name]) => name).join(", ")}`);
+        throw new Error(`Missing required config: ${missing.map(([name]) => name).join(', ')}`);
     }
 }
 
 function requireAdmin(request: Request, env: Env): Response | null {
     if (!env.ADMIN_TOKEN) {
-        return json({ error: "admin_token_not_configured" }, 503);
+        return json({ error: 'admin_token_not_configured' }, 503);
     }
 
-    const auth = request.headers.get("Authorization") || "";
+    const auth = request.headers.get('Authorization') || '';
     if (auth !== `Bearer ${env.ADMIN_TOKEN}`) {
-        return json({ error: "unauthorized" }, 401);
+        return json({ error: 'unauthorized' }, 401);
     }
 
     return null;
@@ -480,15 +481,15 @@ async function sendAlert(env: Env, event: string, report: RotationReport): Promi
 
     try {
         const response = await fetch(env.ALERT_WEBHOOK_URL, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ event, report }),
         });
         if (!response.ok) {
-            console.error("[jwk-rotation] alert webhook failed", response.status);
+            console.error('[jwk-rotation] alert webhook failed', response.status);
         }
     } catch (error) {
-        console.error("[jwk-rotation] alert webhook unreachable", error);
+        console.error('[jwk-rotation] alert webhook unreachable', error);
     }
 }
 
@@ -509,13 +510,13 @@ function scU32(value: number): xdr.ScVal {
 }
 
 function parseBoolean(value: string | undefined | null, fallback: boolean): boolean {
-    if (value === undefined || value === null || value === "") return fallback;
-    return ["1", "true", "yes", "on"].includes(value.toLowerCase());
+    if (value === undefined || value === null || value === '') return fallback;
+    return ['1', 'true', 'yes', 'on'].includes(value.toLowerCase());
 }
 
 function base64UrlToBytes(base64url: string): Uint8Array {
-    const base64 = base64url.replace(/-/g, "+").replace(/_/g, "/");
-    const padding = "=".repeat((4 - (base64.length % 4)) % 4);
+    const base64 = base64url.replace(/-/g, '+').replace(/_/g, '/');
+    const padding = '='.repeat((4 - (base64.length % 4)) % 4);
     const binary = atob(base64 + padding);
     return Uint8Array.from(binary, (char) => char.charCodeAt(0));
 }
@@ -529,7 +530,7 @@ function bytesToBigInt(bytes: Uint8Array): bigint {
 }
 
 function bigIntToFieldHex(value: bigint): HexString {
-    return `0x${value.toString(16).padStart(FIELD_BYTES * 2, "0")}`;
+    return `0x${value.toString(16).padStart(FIELD_BYTES * 2, '0')}`;
 }
 
 function hexToBytes(value: HexString, expectedBytes?: number): Uint8Array {
@@ -548,7 +549,7 @@ function hexToBytes(value: HexString, expectedBytes?: number): Uint8Array {
 }
 
 function bytesToHex(bytes: Uint8Array): HexString {
-    return `0x${Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("")}`;
+    return `0x${Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('')}`;
 }
 
 function concatBytes(chunks: Uint8Array[]): Uint8Array {
@@ -565,6 +566,6 @@ function concatBytes(chunks: Uint8Array[]): Uint8Array {
 function json(body: unknown, status = 200): Response {
     return new Response(JSON.stringify(body, null, 2), {
         status,
-        headers: { "Content-Type": "application/json" },
+        headers: { 'Content-Type': 'application/json' },
     });
 }
