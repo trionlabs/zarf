@@ -348,7 +348,14 @@ export function consumeStoredNonce(): string | null {
  * ```typescript
  * const token = extractTokenFromUrl();
  * const decoded = decodeJwt(token);
- * validateGoogleClaims(decoded.payload, { clientId: VITE_GOOGLE_CLIENT_ID });
+ * // Callback context: a stored nonce must be present.
+ * const storedNonce = consumeStoredNonce();
+ * if (storedNonce === null) throw new Error('OAuth callback without pending flow');
+ * validateGoogleClaims(decoded.payload, {
+ *     clientId: VITE_GOOGLE_CLIENT_ID,
+ *     mode: 'callback',
+ *     expectedNonce: storedNonce,
+ * });
  * console.log(decoded.payload.email); // user@example.com — now trusted
  * console.log(decoded.header.kid);    // Key ID for verification
  * ```

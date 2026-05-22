@@ -116,9 +116,9 @@ export function validateDistributionData(raw: unknown): DistributionData {
                 `distribution: commitments['${key}']${suffix}.index must be a non-negative integer`,
             );
         }
-        if (m.index >= 1 << TREE_DEPTH) {
+        if (m.index >= 2 ** TREE_DEPTH) {
             throw new Error(
-                `distribution: commitments['${key}']${suffix}.index ${m.index} exceeds maximum (${1 << TREE_DEPTH})`,
+                `distribution: commitments['${key}']${suffix}.index ${m.index} exceeds maximum (${2 ** TREE_DEPTH})`,
             );
         }
     };

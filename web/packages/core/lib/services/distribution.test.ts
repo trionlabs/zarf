@@ -95,12 +95,12 @@ describe('validateDistributionData — rejects (each path must throw a descripti
     });
 
     it('a commitment index at or above the TREE_DEPTH ceiling (CRIT-8 DoS bound)', () => {
-        // TREE_DEPTH = 20 → max index is (1 << 20) - 1 = 1_048_575
+        // TREE_DEPTH = 20 → max index is 2**20 - 1 = 1_048_575
         expect(() =>
             validateDistributionData({
                 ...validData,
                 commitments: {
-                    '0xkey': { amount: '1', unlockTime: 1, index: 1 << 20 },
+                    '0xkey': { amount: '1', unlockTime: 1, index: 2 ** 20 },
                 },
             }),
         ).toThrow(/exceeds maximum/);
@@ -116,12 +116,12 @@ describe('validateDistributionData — rejects (each path must throw a descripti
 });
 
 describe('validateDistributionData — index boundary (CRIT-8)', () => {
-    it('accepts index === (1 << TREE_DEPTH) - 1 (boundary)', () => {
+    it('accepts index === 2**TREE_DEPTH - 1 (boundary)', () => {
         expect(() =>
             validateDistributionData({
                 ...validData,
                 commitments: {
-                    '0xkey': { amount: '1', unlockTime: 1, index: (1 << 20) - 1 },
+                    '0xkey': { amount: '1', unlockTime: 1, index: 2 ** 20 - 1 },
                 },
             }),
         ).not.toThrow();
