@@ -1,17 +1,16 @@
 <script lang="ts">
-    import { Search, AlertCircle, Loader2 } from 'lucide-svelte';
-    import type { ComponentType } from 'svelte';
+    import { Search, AlertCircle, Loader2 } from "lucide-svelte";
+    import type { ComponentType } from "svelte";
 
     let {
         value = $bindable(),
-        placeholder = '0x...',
+        placeholder = "0x...",
         error = null,
         onInput = () => {},
         isLoading = false,
         onAction = () => {},
         actionIcon: ActionIcon = null,
         actionLabel = null,
-        id,
     } = $props<{
         value: string;
         placeholder?: string;
@@ -21,13 +20,9 @@
         onAction?: () => void;
         actionIcon?: ComponentType | null;
         actionLabel?: string | null;
-        id?: string;
     }>();
 
     const hasError = $derived(error !== null);
-    const generatedId = $props.id();
-    const inputId = $derived(id ?? generatedId);
-    const errorId = $derived(`${inputId}-error`);
 </script>
 
 <div class="w-full space-y-2">
@@ -36,11 +31,11 @@
         class="
             flex items-stretch w-full
             rounded-xl overflow-hidden
-            border-[0.5px] transition-all duration-[var(--zen-motion-emphasis)]
+            border-[0.5px] transition-all duration-300
             bg-zen-bg
             {hasError
-            ? 'border-zen-error/50'
-            : 'border-zen-border hover:border-zen-border-strong focus-within:border-zen-primary/50'}
+                ? 'border-zen-error/50'
+                : 'border-zen-border hover:border-zen-border-strong focus-within:border-zen-primary/50'}
             shadow-sm hover:shadow-md focus-within:shadow-md
         "
     >
@@ -53,14 +48,8 @@
 
         <!-- Input -->
         <input
-            id={inputId}
             type="text"
             {placeholder}
-            autocomplete="off"
-            autocapitalize="none"
-            spellcheck="false"
-            aria-invalid={hasError ? 'true' : undefined}
-            aria-describedby={hasError ? errorId : undefined}
             class="
                 flex-1 px-4 py-3.5
                 bg-transparent
@@ -68,23 +57,22 @@
                 text-zen-fg
                 placeholder:text-zen-fg-faint
                 focus:outline-none
-                transition-colors duration-[var(--zen-motion-base)]
+                transition-colors duration-200
             "
             bind:value
             oninput={onInput}
-            onkeydown={(e) => e.key === 'Enter' && onAction()}
+            onkeydown={(e) => e.key === "Enter" && onAction()}
         />
 
         <!-- Action Button -->
         <button
             type="button"
-            aria-label={isLoading ? 'Loading' : (actionLabel ?? 'Submit')}
             class="
                 flex items-center justify-center gap-2 px-5
                 bg-zen-fg/[0.02] hover:bg-zen-fg/[0.05]
                 border-l-[0.5px] border-zen-border-subtle
                 text-zen-fg-muted hover:text-zen-fg
-                transition-all duration-[var(--zen-motion-base)]
+                transition-all duration-200
                 disabled:opacity-50 disabled:cursor-not-allowed
             "
             onclick={onAction}
@@ -102,10 +90,7 @@
 
     <!-- Error Message -->
     {#if error}
-        <div
-            id={errorId}
-            class="flex items-center gap-1.5 pl-1 text-zen-error animate-zen-slide-up"
-        >
+        <div class="flex items-center gap-1.5 pl-1 text-zen-error animate-zen-slide-up">
             <AlertCircle class="w-3.5 h-3.5 shrink-0" />
             <span class="text-xs font-medium">{error}</span>
         </div>

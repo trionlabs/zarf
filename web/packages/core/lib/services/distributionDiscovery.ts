@@ -4,8 +4,10 @@
 
 import type { StellarAddress, StellarContractId } from '../types';
 import { getActiveStellarNetworkId } from '../config/runtime';
-import { fetchIndexerJson, indexerNetworkPath } from '../utils/indexerClient';
-import { warn } from '../utils/log';
+import {
+    fetchIndexerJson,
+    indexerNetworkPath,
+} from '../utils/indexerClient';
 
 export interface OnChainVestingContract {
     address: StellarContractId;
@@ -156,7 +158,7 @@ export async function fetchContractMetadata(
         );
         return fromIndexerContract(indexed);
     } catch (error) {
-        warn('[DiscoveryService] Indexer metadata read failed:', error);
+        console.warn('[DiscoveryService] Indexer metadata read failed:', error);
         return null;
     }
 }

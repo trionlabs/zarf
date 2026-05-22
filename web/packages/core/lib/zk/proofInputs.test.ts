@@ -23,9 +23,9 @@ describe('padMerkleProof', () => {
         const { siblings, indices } = padMerkleProof(['0xaa', '255'], ['0', '1']);
         expect(siblings).toHaveLength(TREE_DEPTH);
         expect(indices).toHaveLength(TREE_DEPTH);
-        expect(siblings.slice(0, 2)).toEqual(['0xaa', '0xff']); // decimal-string normalized
+        expect(siblings.slice(0, 2)).toEqual(['0xaa', '0xff']);  // decimal-string normalized
         expect(indices.slice(0, 2)).toEqual(['0x0', '0x1']);
-        expect(siblings.slice(2).every((s) => s === '0x0')).toBe(true);
+        expect(siblings.slice(2).every(s => s === '0x0')).toBe(true);
     });
 
     it('does not mutate input arrays', () => {
@@ -80,14 +80,9 @@ const fixtureJwt: NoirJwtResult = {
 describe('buildCircuitInputs', () => {
     it('produces the exact circuit input shape (golden — any drift fails this)', () => {
         // 'alice@example.com' = 17 ASCII bytes; circuit slot is 64.
-        const emailBytes = [
-            0x61, 0x6c, 0x69, 0x63, 0x65, 0x40, 0x65, 0x78, 0x61, 0x6d, 0x70, 0x6c, 0x65, 0x2e,
-            0x63, 0x6f, 0x6d,
-        ];
-        const pad = <T>(head: T[], n: number, fill: T) => [
-            ...head,
-            ...Array<T>(n - head.length).fill(fill),
-        ];
+        const emailBytes = [0x61, 0x6c, 0x69, 0x63, 0x65, 0x40, 0x65, 0x78,
+                            0x61, 0x6d, 0x70, 0x6c, 0x65, 0x2e, 0x63, 0x6f, 0x6d];
+        const pad = <T>(head: T[], n: number, fill: T) => [...head, ...Array<T>(n - head.length).fill(fill)];
 
         expect(buildCircuitInputs(fixtureClaim, fixtureJwt)).toEqual({
             data: { storage: [1, 2, 3], len: 3 },
@@ -107,8 +102,6 @@ describe('buildCircuitInputs', () => {
     });
 
     it("substitutes recipient='0x0' when claim has empty recipient (branch)", () => {
-        expect(buildCircuitInputs({ ...fixtureClaim, recipient: '' }, fixtureJwt).recipient).toBe(
-            '0x0',
-        );
+        expect(buildCircuitInputs({ ...fixtureClaim, recipient: '' }, fixtureJwt).recipient).toBe('0x0');
     });
 });

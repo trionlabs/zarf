@@ -1,29 +1,37 @@
 <script lang="ts">
-    import { walletStore } from '@zarf/ui/stores/walletStore.svelte';
-    import { deployStore } from '../../../stores/deployStore.svelte';
-    import { wizardStore } from '../../../stores/wizardStore.svelte';
-    // Contracts module dynamic-imported inside checkTokenBalance so the
-    // stellar-sdk + buffer closure doesn't load at SSR module evaluation.
-    import { formatTokenAmount, parseTokenAmount } from '@zarf/core/utils/amount';
-    import { Wallet, CheckCircle2, AlertCircle, LogOut, CreditCard, Coins } from 'lucide-svelte';
-    import ZenCard from '@zarf/ui/components/ui/ZenCard.svelte';
-    import ZenButton from '@zarf/ui/components/ui/ZenButton.svelte';
-    import ZenAlert from '@zarf/ui/components/ui/ZenAlert.svelte';
-    import ZenBadge from '@zarf/ui/components/ui/ZenBadge.svelte';
-    import ZenSpinner from '@zarf/ui/components/ui/ZenSpinner.svelte';
-    import { toMessage } from '@zarf/core/utils/error';
-    import { err } from '@zarf/core/utils/log';
-    import { formatAmount } from '@zarf/core/utils/format';
+    import { walletStore } from "@zarf/ui/stores/walletStore.svelte";
+    import { deployStore } from "../../../stores/deployStore.svelte";
+    import { wizardStore } from "../../../stores/wizardStore.svelte";
+    import { getTokenBalance, readTokenContract } from "@zarf/core/contracts";
+    import { formatTokenAmount, parseTokenAmount } from "@zarf/core/utils/amount";
+    import {
+        Wallet,
+        Loader2,
+        CheckCircle2,
+        AlertCircle,
+        LogOut,
+        CreditCard,
+        Coins,
+    } from "lucide-svelte";
+    import ZenCard from "@zarf/ui/components/ui/ZenCard.svelte";
+    import ZenButton from "@zarf/ui/components/ui/ZenButton.svelte";
+    import ZenAlert from "@zarf/ui/components/ui/ZenAlert.svelte";
+    import ZenBadge from "@zarf/ui/components/ui/ZenBadge.svelte";
+    import ZenSpinner from "@zarf/ui/components/ui/ZenSpinner.svelte";
 
     let distribution = $derived(deployStore.distribution);
 
-    const showNetworkName = $derived(walletStore.isConnected && walletStore.networkName);
-    const showBalanceCheck = $derived(walletStore.isConnected && distribution !== null);
+    const showNetworkName = $derived(
+        walletStore.isConnected && walletStore.networkName,
+    );
+    const showBalanceCheck = $derived(
+        walletStore.isConnected && distribution !== null,
+    );
 
     let checkState = $state({
         isLoading: false,
         balance: BigInt(0),
-        symbol: '',
+        symbol: "",
         decimals: 7,
         hasEnoughBalance: false,
         error: null as string | null,
@@ -51,12 +59,13 @@
 
         try {
             const tokenAddress = wizardStore.tokenDetails.tokenAddress;
-            if (!tokenAddress) throw new Error('No token address configured');
+            if (!tokenAddress) throw new Error("No token address configured");
 
-            const { getTokenBalance, readTokenContract } = await import('@zarf/core/contracts');
             const metadata = await readTokenContract(tokenAddress);
-            const decimals = metadata.decimals ?? wizardStore.tokenDetails.tokenDecimals ?? 7;
-            const symbol = metadata.symbol ?? wizardStore.tokenDetails.tokenSymbol ?? 'XLM';
+            const decimals =
+                metadata.decimals ?? wizardStore.tokenDetails.tokenDecimals ?? 7;
+            const symbol =
+                metadata.symbol ?? wizardStore.tokenDetails.tokenSymbol ?? "XLM";
             const balance = await getTokenBalance(tokenAddress, walletStore.address);
             const requiredAmount = parseTokenAmount(distribution.amount, decimals);
 
@@ -64,14 +73,12 @@
             checkState.decimals = decimals;
             checkState.symbol = symbol;
             checkState.hasEnoughBalance = balance >= requiredAmount;
-        } catch (e: unknown) {
-            err('Balance check failed:', e);
-            const msg = toMessage(e, 'Failed to fetch token balance. Please try again.');
-            if (msg.includes('NetworkError') || msg.includes('fetch')) {
-                checkState.error =
-                    'Network error connecting to Stellar RPC. Please check your internet connection and try again.';
+        } catch (e: any) {
+            console.error("Balance check failed:", e);
+            if (e.message?.includes('NetworkError') || e.message?.includes('fetch')) {
+                checkState.error = "Network error connecting to Stellar RPC. Please check your internet connection and try again.";
             } else {
-                checkState.error = msg;
+                checkState.error = e.message || "Failed to fetch token balance. Please try again.";
             }
         } finally {
             checkState.isLoading = false;
@@ -82,7 +89,7 @@
         try {
             await walletStore.requestConnection();
         } catch (e) {
-            err('Connection failed:', e);
+            console.error("Connection failed:", e);
         }
     }
 
@@ -101,7 +108,8 @@
         <div>
             <h2 class="text-2xl font-bold">Connect Wallet</h2>
             <p class="text-zen-fg-muted mt-1">
-                Connect the wallet that holds the tokens you want to distribute to your recipients.
+                Connect the wallet that holds the tokens you want to distribute
+                to your recipients.
             </p>
         </div>
     </div>
@@ -116,7 +124,9 @@
         ></div>
 
         <div class="p-6 sm:p-8">
-            <div class="flex flex-col sm:flex-row items-center justify-between gap-6">
+            <div
+                class="flex flex-col sm:flex-row items-center justify-between gap-6"
+            >
                 <div class="flex items-center gap-4 w-full sm:w-auto">
                     <div class="relative">
                         <div
@@ -132,7 +142,9 @@
                             {/if}
                         </div>
                         {#if walletStore.isConnected}
-                            <div class="absolute -bottom-1 -right-1 bg-zen-bg rounded-full p-1">
+                            <div
+                                class="absolute -bottom-1 -right-1 bg-zen-bg rounded-full p-1"
+                            >
                                 <div
                                     class="w-4 h-4 bg-zen-success rounded-full border-2 border-zen-bg"
                                 ></div>
@@ -142,7 +154,9 @@
 
                     <div>
                         <h3 class="font-bold text-lg">
-                            {walletStore.isConnected ? 'Wallet Connected' : 'No Wallet Connected'}
+                            {walletStore.isConnected
+                                ? "Wallet Connected"
+                                : "No Wallet Connected"}
                         </h3>
                         {#if walletStore.isConnected}
                             <p
@@ -151,18 +165,26 @@
                                 {walletStore.shortAddress}
                             </p>
                         {:else}
-                            <p class="text-sm text-zen-fg-muted">Connect your wallet to proceed</p>
+                            <p class="text-sm text-zen-fg-muted">
+                                Connect your wallet to proceed
+                            </p>
                         {/if}
                         {#if showNetworkName}
-                            <div class="flex items-center gap-1.5 mt-2 text-xs text-zen-fg-subtle">
-                                <div class="w-1.5 h-1.5 rounded-full bg-zen-fg-subtle"></div>
+                            <div
+                                class="flex items-center gap-1.5 mt-2 text-xs text-zen-fg-subtle"
+                            >
+                                <div
+                                    class="w-1.5 h-1.5 rounded-full bg-zen-fg-subtle"
+                                ></div>
                                 {walletStore.networkName}
                             </div>
                         {/if}
                     </div>
                 </div>
 
-                <div class="flex flex-col items-stretch sm:items-end gap-2 w-full sm:w-auto">
+                <div
+                    class="flex flex-col items-stretch sm:items-end gap-2 w-full sm:w-auto"
+                >
                     {#if !walletStore.isConnected}
                         <ZenButton
                             variant="primary"
@@ -172,10 +194,12 @@
                             disabled={walletStore.isConnecting}
                             loading={walletStore.isConnecting}
                         >
-                            {walletStore.isConnecting ? 'Connecting...' : 'Connect Wallet'}
+                            {walletStore.isConnecting ? "Connecting..." : "Connect Wallet"}
                         </ZenButton>
                     {:else}
-                        <div class="flex items-center justify-center sm:justify-end gap-2 w-full">
+                        <div
+                            class="flex items-center justify-center sm:justify-end gap-2 w-full"
+                        >
                             {#if walletStore.isWrongNetwork}
                                 <ZenBadge variant="error" size="lg">
                                     <AlertCircle class="w-4 h-4 mr-1" />
@@ -187,7 +211,11 @@
                                     Connected
                                 </ZenBadge>
                             {/if}
-                            <ZenButton variant="ghost" size="sm" onclick={handleDisconnect}>
+                            <ZenButton
+                                variant="ghost"
+                                size="sm"
+                                onclick={handleDisconnect}
+                            >
                                 <LogOut class="w-4 h-4 mr-1" />
                                 Switch
                             </ZenButton>
@@ -219,13 +247,17 @@
         <div class="mt-6">
             <ZenCard variant="bordered" class="overflow-hidden">
                 {#if checkState.isLoading}
-                    <div class="p-12 flex flex-col items-center justify-center text-center gap-4">
+                    <div
+                        class="p-12 flex flex-col items-center justify-center text-center gap-4"
+                    >
                         <div
                             class="w-12 h-12 bg-zen-fg/5 rounded-full flex items-center justify-center"
                         >
                             <ZenSpinner size="md" />
                         </div>
-                        <p class="text-sm text-zen-fg-subtle">Verifying token balance...</p>
+                        <p class="text-sm text-zen-fg-subtle">
+                            Verifying token balance...
+                        </p>
                     </div>
                 {:else if checkState.error}
                     <div class="p-6">
@@ -249,7 +281,10 @@
                                 <div
                                     class="text-3xl sm:text-4xl font-mono font-bold tracking-tight mt-2 truncate"
                                 >
-                                    {formatTokenAmount(checkState.balance, checkState.decimals)}
+                                    {formatTokenAmount(
+                                        checkState.balance,
+                                        checkState.decimals,
+                                    )}
                                     <span
                                         class="text-lg text-zen-fg-faint ml-1 font-sans font-normal"
                                         >{checkState.symbol}</span
@@ -258,7 +293,9 @@
                             </div>
 
                             <!-- Required Amount -->
-                            <div class="p-6 sm:p-8 flex flex-col gap-1 bg-zen-fg/5">
+                            <div
+                                class="p-6 sm:p-8 flex flex-col gap-1 bg-zen-fg/5"
+                            >
                                 <span
                                     class="text-sm uppercase tracking-wider text-zen-fg-subtle font-semibold flex items-center gap-2"
                                 >
@@ -269,7 +306,9 @@
                                         ? 'text-zen-success'
                                         : 'text-zen-error'}"
                                 >
-                                    {formatAmount(distribution?.amount ?? 0)}
+                                    {Number(
+                                        distribution?.amount ?? 0,
+                                    ).toLocaleString()}
                                     <span
                                         class="text-lg text-zen-fg-faint ml-1 font-sans font-normal"
                                         >{checkState.symbol}</span
@@ -285,7 +324,8 @@
                             >
                                 <AlertCircle class="w-5 h-5 shrink-0" />
                                 <span class="font-medium text-sm"
-                                    >Insufficient balance to fund this distribution.</span
+                                    >Insufficient balance to fund this
+                                    distribution.</span
                                 >
                             </div>
                         {:else}

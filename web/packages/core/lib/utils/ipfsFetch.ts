@@ -29,7 +29,9 @@ function validateCid(cid: unknown): string {
     }
 
     const trimmed = cid.trim();
-    const withoutScheme = trimmed.startsWith('ipfs://') ? trimmed.slice('ipfs://'.length) : trimmed;
+    const withoutScheme = trimmed.startsWith('ipfs://')
+        ? trimmed.slice('ipfs://'.length)
+        : trimmed;
 
     if (
         trimmed.length === 0 ||

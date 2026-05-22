@@ -1,24 +1,23 @@
 /**
  * Theme Store - Application Theme Management
- *
+ * 
  * Manages binary dark/light theme selection.
- * Maps to data-theme tokens: light='paper-porcelain', dark='glass-porcelain'
+ * Maps to DaisyUI themes: light='wireframe', dark='glass-porcelain'
  * Persists to localStorage and applies to document root.
- *
+ * 
  * @module stores/themeStore
  */
 
 import { browser } from '@zarf/core/utils/ssr';
-import { warn } from '@zarf/core/utils/log';
 import type { Theme } from './types';
 
 const STORAGE_KEY = 'zarf_theme';
 const DEFAULT_THEME: Theme = 'dark';
 
-// Theme name → Tailwind v4 @theme registration token
+// DaisyUI theme mapping
 const THEME_MAP: Record<Theme, string> = {
     light: 'paper-porcelain',
-    dark: 'glass-porcelain',
+    dark: 'glass-porcelain'
 };
 
 // ============================================================================
@@ -46,10 +45,10 @@ function persist(theme: Theme) {
 
     try {
         localStorage.setItem(STORAGE_KEY, theme);
-        const themeName = THEME_MAP[theme];
-        document.documentElement.setAttribute('data-theme', themeName);
+        const daisyTheme = THEME_MAP[theme];
+        document.documentElement.setAttribute('data-theme', daisyTheme);
     } catch (error) {
-        warn('[ThemeStore] Failed to persist theme:', error);
+        console.warn('[ThemeStore] Failed to persist theme:', error);
     }
 }
 
@@ -64,14 +63,14 @@ function restore() {
 
         if (saved && ['dark', 'light'].includes(saved)) {
             currentTheme = saved;
-            const themeName = THEME_MAP[saved];
-            document.documentElement.setAttribute('data-theme', themeName);
+            const daisyTheme = THEME_MAP[saved];
+            document.documentElement.setAttribute('data-theme', daisyTheme);
         } else {
             // Default theme
             persist(DEFAULT_THEME);
         }
     } catch (error) {
-        warn('[ThemeStore] Failed to restore theme:', error);
+        console.warn('[ThemeStore] Failed to restore theme:', error);
         persist(DEFAULT_THEME);
     }
 }
@@ -100,17 +99,11 @@ function reset() {
 
 export const themeStore = {
     // Getters (read-only)
-    get current() {
-        return currentTheme;
-    },
+    get current() { return currentTheme; },
 
     // Derived getters
-    get isDark() {
-        return isDark;
-    },
-    get isLight() {
-        return isLight;
-    },
+    get isDark() { return isDark; },
+    get isLight() { return isLight; },
 
     // Mutation methods
     setTheme,
@@ -118,5 +111,5 @@ export const themeStore = {
     reset,
 
     // Lifecycle
-    restore,
+    restore
 };

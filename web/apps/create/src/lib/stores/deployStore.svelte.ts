@@ -1,8 +1,7 @@
-import type { Distribution, MerkleTreeData } from './types';
+import type { Distribution, Recipient, MerkleTreeData } from './types';
 import type { StellarAddress, StellarContractId } from '@zarf/core/types';
 import { getActiveStellarNetworkId } from '@zarf/core/config/runtime';
 import { safeParse, safeStringify } from '@zarf/core/utils/json';
-import { warn } from '@zarf/core/utils/log';
 
 export type DeployStep = 1 | 2 | 3 | 4;
 
@@ -55,7 +54,7 @@ export class DeployState {
 
     // Persistence Logic ("Write-Ahead Log")
     private save() {
-        if (typeof window === 'undefined' || !this.distribution?.id) return;
+        if (typeof window === "undefined" || !this.distribution?.id) return;
 
         try {
             const state = {
@@ -69,17 +68,17 @@ export class DeployState {
                 createTxHash: this.createTxHash,
                 metadataCid: this.metadataCid,
                 schedulePlanAtMs: this.schedulePlanAtMs,
-                timestamp: Date.now(),
+                timestamp: Date.now()
             };
             const key = this.storageKey(this.distribution.id);
             localStorage.setItem(key, safeStringify(state));
         } catch (e) {
-            warn('Failed to save deploy state', e);
+            console.warn("Failed to save deploy state", e);
         }
     }
 
     private load(distributionId: string) {
-        if (typeof window === 'undefined') return;
+        if (typeof window === "undefined") return;
 
         try {
             const key = this.storageKey(distributionId);
@@ -90,12 +89,12 @@ export class DeployState {
 
             // Validate TTL (e.g., 24 hours). If too old, discard (security/stale data)
             const ONE_DAY = 24 * 60 * 60 * 1000;
-            if (state.timestamp && Date.now() - state.timestamp > ONE_DAY) {
+            if (state.timestamp && (Date.now() - state.timestamp > ONE_DAY)) {
                 localStorage.removeItem(key);
                 return;
             }
 
-            if (state && typeof state === 'object') {
+            if (state && typeof state === "object") {
                 if (state.version !== 2) {
                     localStorage.removeItem(key);
                     return;
@@ -103,20 +102,26 @@ export class DeployState {
 
                 const restoredStep = Number(state.currentStep);
                 this.currentStep =
-                    restoredStep >= 1 && restoredStep <= 4 ? (restoredStep as DeployStep) : 1;
+                    restoredStep >= 1 && restoredStep <= 4
+                        ? (restoredStep as DeployStep)
+                        : 1;
                 this.merkleResult = state.merkleResult;
                 this.isBackupDownloaded = !!state.isBackupDownloaded;
                 this.isBackupConfirmed = !!state.isBackupConfirmed;
 
                 // Restore recovery state
                 this.schedulePlanAtMs =
-                    typeof state.schedulePlanAtMs === 'number' ? state.schedulePlanAtMs : null;
+                    typeof state.schedulePlanAtMs === "number"
+                        ? state.schedulePlanAtMs
+                        : null;
                 this.approveTxHash = state.approveTxHash || null;
                 this.createTxHash = state.createTxHash || null;
-                this.metadataCid = this.schedulePlanAtMs ? state.metadataCid || null : null;
+                this.metadataCid = this.schedulePlanAtMs
+                    ? state.metadataCid || null
+                    : null;
             }
         } catch (e) {
-            warn('Failed to load deploy state', e);
+            console.warn("Failed to load deploy state", e);
         }
     }
 
@@ -225,7 +230,7 @@ export class DeployState {
         this.isDeployed = true;
         this.contractAddress = address;
         // Clean up log on success
-        if (typeof window !== 'undefined' && this.distribution?.id) {
+        if (typeof window !== "undefined" && this.distribution?.id) {
             localStorage.removeItem(this.storageKey(this.distribution.id));
         }
     }
@@ -261,7 +266,7 @@ export class DeployState {
         this.metadataCid = null;
         this.schedulePlanAtMs = null;
 
-        if (typeof window !== 'undefined' && this.distribution?.id) {
+        if (typeof window !== "undefined" && this.distribution?.id) {
             localStorage.removeItem(this.storageKey(this.distribution.id));
         }
     }

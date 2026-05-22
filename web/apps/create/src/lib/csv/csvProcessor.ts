@@ -13,13 +13,7 @@
 // `Recipient` shape, not the post-merkle on-chain `Recipient` (amount: bigint).
 import type { Recipient } from '../stores/types';
 import { normalizeEmail, isValidEmail } from '@zarf/core/utils/email';
-// Shape-only check: regex-grade Stellar address validation. A typo'd
-// address that matches the shape regex but fails the StrKey checksum
-// passes parseCSV() here and is rejected later at transaction-build
-// time. Trade-off accepted so this module doesn't drag stellar-sdk
-// into SSR via parseCSV's top-level import (step-1's
-// DistributionRecipients.svelte was 500ing on the SSR pass).
-import { isValidAddressShape as isValidAddress } from '@zarf/core/utils/addressShape';
+import { isValidAddress } from '@zarf/core/utils/address';
 
 // Re-export for backward compatibility
 export { normalizeEmail };
@@ -53,6 +47,7 @@ export function parseCSV(content: string): ParseResult {
     const entries: Recipient[] = [];
     const errors: string[] = [];
 
+
     for (let i = 0; i < lines.length; i++) {
         const line = lines[i].trim();
 
@@ -61,12 +56,11 @@ export function parseCSV(content: string): ParseResult {
 
         // Skip header row if present (case-insensitive)
         const lineLower = line.toLowerCase();
-        if (
-            i === 0 &&
-            (lineLower.includes('email') ||
-                lineLower.includes('amount') ||
-                lineLower.includes('number'))
-        ) {
+        if (i === 0 && (
+            lineLower.includes('email') ||
+            lineLower.includes('amount') ||
+            lineLower.includes('number')
+        )) {
             continue;
         }
 
@@ -90,20 +84,18 @@ export function parseCSV(content: string): ParseResult {
         if (isValidEmail(identifier)) {
             const email = normalizeEmail(identifier);
             // Allow duplicates in the list so the total amount matches the CSV file.
-            entries.push({ address: '', email, amount });
+            entries.push({ address: "", email, amount });
         } else if (isValidAddress(identifier)) {
             entries.push({ address: normalizeAddress(identifier), amount });
         } else {
-            errors.push(
-                `Line ${i + 1}: Invalid format (expected email or address) - "${identifier}"`,
-            );
+            errors.push(`Line ${i + 1}: Invalid format (expected email or address) - "${identifier}"`);
             continue;
         }
     }
 
     // Post-processing: Detect duplicates for error reporting
     const emailCounts = new Map<string, number>();
-    entries.forEach((e) => {
+    entries.forEach(e => {
         if (e.email) {
             emailCounts.set(e.email, (emailCounts.get(e.email) || 0) + 1);
         }
@@ -120,7 +112,7 @@ export function parseCSV(content: string): ParseResult {
 
 /**
  * Read a CSV file from File API and parse into whitelist entries.
- *
+ * 
  * @param file - File object from input[type="file"]
  * @returns Promise resolving to ParseResult
  */
@@ -134,7 +126,7 @@ export async function readCSVFile(file: File): Promise<ParseResult> {
     const MAX_SIZE = 5 * 1024 * 1024; // 5MB
     if (file.size > MAX_SIZE) {
         throw new Error(
-            `File too large: ${(file.size / 1024 / 1024).toFixed(2)}MB. Maximum size is 5MB.`,
+            `File too large: ${(file.size / 1024 / 1024).toFixed(2)}MB. Maximum size is 5MB.`
         );
     }
 
@@ -155,7 +147,7 @@ export async function readCSVFile(file: File): Promise<ParseResult> {
                 reject(
                     error instanceof Error
                         ? error
-                        : new Error('Failed to parse CSV: unknown error'),
+                        : new Error('Failed to parse CSV: unknown error')
                 );
             }
         };

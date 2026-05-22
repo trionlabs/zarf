@@ -1,12 +1,12 @@
 <script lang="ts">
-    import type { Snippet } from 'svelte';
-    import { AlertCircle, CheckCircle, Info, AlertTriangle, X } from 'lucide-svelte';
+    import type { Snippet } from "svelte";
+    import { AlertCircle, CheckCircle, Info, AlertTriangle, X } from "lucide-svelte";
 
     interface Props {
         children?: Snippet;
         title?: Snippet;
         actions?: Snippet;
-        variant?: 'info' | 'success' | 'warning' | 'error';
+        variant?: "info" | "success" | "warning" | "error";
         dismissible?: boolean;
         ondismiss?: () => void;
         class?: string;
@@ -16,24 +16,24 @@
         children,
         title,
         actions,
-        variant = 'info',
+        variant = "info",
         dismissible = false,
         ondismiss,
-        class: className = '',
+        class: className = "",
     }: Props = $props();
 
     const variantClasses = {
-        info: 'bg-zen-info-muted border-zen-info/20 text-zen-info-content',
-        success: 'bg-zen-success-muted border-zen-success/20 text-zen-success-content',
-        warning: 'bg-zen-warning-muted border-zen-warning/20 text-zen-warning-content',
-        error: 'bg-zen-error-muted border-zen-error/20 text-zen-error',
+        info: "bg-zen-info-muted border-zen-info/20 text-zen-info-content",
+        success: "bg-zen-success-muted border-zen-success/20 text-zen-success-content",
+        warning: "bg-zen-warning-muted border-zen-warning/20 text-zen-warning-content",
+        error: "bg-zen-error-muted border-zen-error/20 text-zen-error",
     };
 
     const iconClasses = {
-        info: 'text-zen-info',
-        success: 'text-zen-success',
-        warning: 'text-zen-warning',
-        error: 'text-zen-error',
+        info: "text-zen-info",
+        success: "text-zen-success",
+        warning: "text-zen-warning",
+        error: "text-zen-error",
     };
 
     const icons = {

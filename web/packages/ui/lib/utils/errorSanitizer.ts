@@ -33,33 +33,24 @@ const BUILTIN_RULES: ErrorRule[] = [
     // Funds / balance / allowance
     { match: 'insufficient funds', message: 'Insufficient funds to cover gas fees.' },
     { match: 'insufficient balance', message: 'Insufficient token balance.' },
-    {
-        match: 'insufficient allowance',
-        message: 'Insufficient token approval. Please approve more tokens.',
-    },
+    { match: 'insufficient allowance', message: 'Insufficient token approval. Please approve more tokens.' },
 
     // RPC / rate limit
-    {
-        match: /rate limit|too many|resource not available|resourceunavailable/i,
-        message: 'RPC rate limited. Please try again in a moment.',
-    },
+    { match: /rate limit|too many|resource not available|resourceunavailable/i,
+      message: 'RPC rate limited. Please try again in a moment.' },
 
     // Network
-    {
-        match: /network|disconnected/i,
-        message: 'Network error. Please check your connection and try again.',
-    },
+    { match: /network|disconnected/i, message: 'Network error. Please check your connection and try again.' },
 ];
 
-export function sanitizeBlockchainError(err: unknown, options: SanitizeErrorOptions = {}): string {
+export function sanitizeBlockchainError(
+    err: unknown,
+    options: SanitizeErrorOptions = {},
+): string {
     const { customRules = [], fallback = 'An unexpected error occurred' } = options;
 
     const e = err as { message?: string; code?: number; toString?: () => string } | null;
-    const message = (
-        e?.message ||
-        (typeof e?.toString === 'function' ? e.toString() : '') ||
-        ''
-    ).toString();
+    const message = (e?.message || (typeof e?.toString === 'function' ? e.toString() : '') || '').toString();
     const normalizedMessage = message.toLowerCase();
     const code = e?.code;
 

@@ -1,16 +1,28 @@
 <script lang="ts">
-    import { wizardStore } from '$lib/stores/wizardStore.svelte';
-    import { goto } from '$app/navigation';
-    import { onMount } from 'svelte';
-    import { ArrowRight, Clipboard, Loader2, AlertCircle } from 'lucide-svelte';
-    import { fetchTokenMetadata, type TokenMetadata } from '$lib/services/tokenMetadata';
-    import { isValidContractAddressShape as isValidContractAddress } from '@zarf/core/utils/addressShape';
-    import { fade, fly } from 'svelte/transition';
-    import ZenButton from '@zarf/ui/components/ui/ZenButton.svelte';
-    import ZenCard from '@zarf/ui/components/ui/ZenCard.svelte';
+    import { wizardStore } from "$lib/stores/wizardStore.svelte";
+    import { goto } from "$app/navigation";
+    import { onMount } from "svelte";
+    import { browser } from "$app/environment";
+    import {
+        ArrowRight,
+        Clipboard,
+        CheckCircle,
+        Loader2,
+        AlertCircle,
+        Search,
+    } from "lucide-svelte";
+    import {
+        fetchTokenMetadata,
+        type TokenMetadata,
+    } from "$lib/services/tokenMetadata";
+    import { isValidContractAddress } from "@zarf/core/utils/address";
+    import { fade, fly } from "svelte/transition";
+    import ZenButton from "@zarf/ui/components/ui/ZenButton.svelte";
+    import ZenCard from "@zarf/ui/components/ui/ZenCard.svelte";
 
     // --- State ---
-    let tokenAddress = $state('');
+    let mounted = $state(false);
+    let tokenAddress = $state("");
     let tokenMetadata = $state<TokenMetadata | null>(null);
     let isFetching = $state(false);
     let error = $state<string | null>(null);
@@ -25,15 +37,20 @@
         }
 
         // Auto-fill metadata if already in store
-        if (wizardStore.tokenDetails.tokenAddress && wizardStore.tokenDetails.tokenName) {
+        if (
+            wizardStore.tokenDetails.tokenAddress &&
+            wizardStore.tokenDetails.tokenName
+        ) {
             tokenMetadata = {
                 name: wizardStore.tokenDetails.tokenName,
-                symbol: wizardStore.tokenDetails.tokenSymbol || '',
+                symbol: wizardStore.tokenDetails.tokenSymbol || "",
                 decimals: wizardStore.tokenDetails.tokenDecimals || 18,
-                totalSupply: wizardStore.tokenDetails.tokenTotalSupply || '0',
+                totalSupply: wizardStore.tokenDetails.tokenTotalSupply || "0",
                 logoUrl: wizardStore.tokenDetails.iconUrl,
             };
         }
+
+        mounted = true;
 
         return () => {
             if (debounceTimer) clearTimeout(debounceTimer);
@@ -42,6 +59,9 @@
 
     // --- Derived ---
     const isAddressValid = $derived(isValidContractAddress(tokenAddress));
+    const canProceed = $derived(
+        isAddressValid && tokenMetadata !== null && !isFetching,
+    );
 
     // --- Actions ---
     async function handlePaste() {
@@ -51,10 +71,10 @@
                 tokenAddress = text;
                 handleAddressInput();
             } else {
-                error = 'Invalid address in clipboard';
+                error = "Invalid address in clipboard";
             }
         } catch {
-            error = 'Could not access clipboard';
+            error = "Could not access clipboard";
         }
     }
 
@@ -64,8 +84,8 @@
         tokenMetadata = null;
 
         if (!isValidContractAddress(tokenAddress)) {
-            if (tokenAddress.length > 0 && !tokenAddress.startsWith('C')) {
-                error = 'Stellar contract IDs start with C';
+            if (tokenAddress.length > 0 && !tokenAddress.startsWith("C")) {
+                error = "Stellar contract IDs start with C";
             }
             return;
         }
@@ -94,10 +114,10 @@
                     iconUrl: tokenMetadata.logoUrl,
                 });
             } else {
-                error = result.error || 'Could not fetch token metadata';
+                error = result.error || "Could not fetch token metadata";
             }
-        } catch {
-            error = 'Network error while fetching metadata';
+        } catch (e) {
+            error = "Network error while fetching metadata";
         } finally {
             isFetching = false;
         }
@@ -105,21 +125,13 @@
 
     function handleNext() {
         wizardStore.nextStep();
-        goto('/wizard/step-1');
+        goto("/wizard/step-1");
     }
 </script>
 
-<svelte:head>
-    <title>Token Details — Create Distribution — Zarf</title>
-    <meta
-        name="description"
-        content="Step 1 of 3: enter the Stellar token contract for your distribution."
-    />
-</svelte:head>
-
-<h1 class="sr-only">Create Distribution — Step 1: Token Details</h1>
-
-<div class="min-h-[50vh] flex flex-col items-center justify-center p-4 relative overflow-hidden">
+<div
+    class="min-h-[50vh] flex flex-col items-center justify-center p-4 relative overflow-hidden"
+>
     <!-- Background Decor -->
     <div
         class="absolute -z-10 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-zen-fg/5 rounded-full blur-[120px] pointer-events-none"
@@ -135,8 +147,6 @@
                 bind:value={tokenAddress}
                 oninput={handleAddressInput}
                 spellcheck="false"
-                autocomplete="off"
-                autocapitalize="none"
             />
 
             <!-- Paste Button (Visible when empty) -->
@@ -164,15 +174,23 @@
         <!-- Status / Result -->
         <div class="h-32 flex items-center justify-center">
             {#if isFetching}
-                <div class="flex flex-col items-center gap-3 text-zen-fg-faint" in:fade>
-                    <Loader2 class="w-6 h-6 animate-spin text-zen-fg" />
+                <div
+                    class="flex flex-col items-center gap-3 text-zen-fg-faint"
+                    in:fade
+                >
+                    <Loader2
+                        class="w-6 h-6 animate-spin text-zen-fg"
+                    />
                     <span class="text-sm tracking-widest uppercase text-[10px]"
                         >Analyzing Chain</span
                     >
                 </div>
             {:else if tokenMetadata}
                 <!-- Token Card (Minimal) -->
-                <div in:fly={{ y: 10, duration: 400 }} class="w-full max-w-md mx-auto">
+                <div
+                    in:fly={{ y: 10, duration: 400 }}
+                    class="w-full max-w-md mx-auto"
+                >
                     <ZenCard
                         interactive
                         onclick={handleNext}
@@ -197,8 +215,12 @@
 
                         <!-- Details -->
                         <div class="flex-1 min-w-0">
-                            <div class="flex items-baseline justify-between mb-1">
-                                <h3 class="text-lg font-medium text-zen-fg truncate pr-4">
+                            <div
+                                class="flex items-baseline justify-between mb-1"
+                            >
+                                <h3
+                                    class="text-lg font-medium text-zen-fg truncate pr-4"
+                                >
                                     {tokenMetadata.name}
                                 </h3>
                                 <span
@@ -213,8 +235,13 @@
                                 >
                                     {tokenMetadata.symbol}
                                 </span>
-                                <span class="text-xs text-zen-fg-faint truncate font-mono">
-                                    {tokenAddress.slice(0, 6)}...{tokenAddress.slice(-4)}
+                                <span
+                                    class="text-xs text-zen-fg-faint truncate font-mono"
+                                >
+                                    {tokenAddress.slice(
+                                        0,
+                                        6,
+                                    )}...{tokenAddress.slice(-4)}
                                 </span>
                             </div>
                         </div>
@@ -228,7 +255,9 @@
                     </ZenCard>
                 </div>
             {:else if !tokenAddress}
-                <p class="text-zen-fg-muted text-sm font-light">Supports Stellar</p>
+                <p class="text-zen-fg-faint text-sm font-light">
+                    Supports Stellar
+                </p>
             {/if}
         </div>
     </div>

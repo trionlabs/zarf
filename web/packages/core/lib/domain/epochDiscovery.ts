@@ -15,7 +15,6 @@
  */
 
 import type { DistributionData, CommitmentMetadata, EpochMetadata } from '../services/distribution';
-import { warn } from '../utils/log';
 
 /** Subset of @zarf/core/crypto/merkleTree the discovery loop calls. Inject for testing. */
 export interface DiscoveryCryptoDeps {
@@ -140,9 +139,9 @@ export async function discoverEpochs(
         let isClaimed = false;
         try {
             isClaimed = await data.isEpochClaimed(commitment, contractAddress);
-        } catch (e) {
+        } catch (err) {
             // On-chain status check failures should not abort discovery; treat as unclaimed.
-            warn(`[Discovery] Status check failed for epoch ${index}`, e);
+            console.warn(`[Discovery] Status check failed for epoch ${index}`, err);
         }
 
         const now = nowSeconds();

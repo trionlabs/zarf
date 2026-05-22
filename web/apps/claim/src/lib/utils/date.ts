@@ -12,8 +12,8 @@ export function toIsoDate(year: number, monthIndex: number, day: number): string
     if (day < 1 || day > 31) return null;
     if (monthIndex < 0 || monthIndex > 11) return null;
 
-    const d = day.toString().padStart(2, '0');
-    const m = (monthIndex + 1).toString().padStart(2, '0');
+    const d = day.toString().padStart(2, "0");
+    const m = (monthIndex + 1).toString().padStart(2, "0");
     const y = year.toString();
 
     const iso = `${y}-${m}-${d}`;
@@ -39,13 +39,13 @@ export function fromIsoDate(isoDate: string) {
         return {
             year: now.getFullYear(),
             month: now.getMonth(),
-            day: now.getDate(),
+            day: now.getDate()
         };
     }
     return {
         year: d.getUTCFullYear(), // Use UTC to avoid timezone shifts on simple dates
         month: d.getUTCMonth(),
-        day: d.getUTCDate(),
+        day: d.getUTCDate()
     };
 }
 
@@ -53,7 +53,7 @@ export function fromIsoDate(isoDate: string) {
  * Returns today's date in YYYY-MM-DD format
  */
 export function getTodayIso(): string {
-    return new Date().toISOString().split('T')[0];
+    return new Date().toISOString().split("T")[0];
 }
 
 /**
@@ -62,5 +62,5 @@ export function getTodayIso(): string {
 export function addMonthsToToday(months: number): string {
     const d = new Date();
     d.setMonth(d.getMonth() + months);
-    return d.toISOString().split('T')[0];
+    return d.toISOString().split("T")[0];
 }

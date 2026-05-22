@@ -13,7 +13,12 @@
  * @module domain/deployPlanner
  */
 
-import type { DurationUnit, HexString, StellarAddress, StellarContractId } from '../types';
+import type {
+    DurationUnit,
+    HexString,
+    StellarAddress,
+    StellarContractId,
+} from '../types';
 import {
     durationToSeconds,
     cliffDateToSeconds,
@@ -57,11 +62,7 @@ export function planScheduleSeconds(
     if (schedule.cliffEndDate) {
         const cliffDateTime = `${schedule.cliffEndDate}T${schedule.cliffTime || '00:00'}:00Z`;
         const cliffDate = new Date(cliffDateTime);
-        const endDate = calculateEndDate(
-            cliffDate,
-            schedule.distributionDuration,
-            schedule.durationUnit,
-        );
+        const endDate = calculateEndDate(cliffDate, schedule.distributionDuration, schedule.durationUnit);
         if (endDate && endDate.getTime() <= now.getTime()) {
             cliffSeconds = 0n;
             vestingSeconds = 1n;
@@ -189,7 +190,8 @@ export function buildOptimisticContract(args: {
             args.plannedSchedule?.vestingSeconds ??
             durationToSeconds(args.schedule.distributionDuration, args.schedule.durationUnit),
         vestingPeriod:
-            args.plannedSchedule?.periodSeconds ?? unitToPeriodSeconds(args.schedule.durationUnit),
+            args.plannedSchedule?.periodSeconds ??
+            unitToPeriodSeconds(args.schedule.durationUnit),
         tokenBalance: args.totalAmount,
         metadataCid: null,
     };

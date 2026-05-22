@@ -1,18 +1,18 @@
 <script lang="ts">
-    import { wizardStore } from '../../stores/wizardStore.svelte';
-    import { goto } from '$app/navigation';
+    import { wizardStore } from "../../stores/wizardStore.svelte";
+    import { goto } from "$app/navigation";
     import {
         X,
         Calendar,
+        Clock,
         Users,
         Coins,
         Trash2,
         Rocket,
         FileText,
         ChevronRight,
-    } from 'lucide-svelte';
-    import type { Distribution } from '../../stores/types';
-    import { formatAmount, formatDate } from '@zarf/core/utils';
+    } from "lucide-svelte";
+    import type { Distribution } from "../../stores/types";
 
     let {
         distribution,
@@ -23,7 +23,7 @@
     } = $props();
 
     // Fallback for legacy data
-    let currentState = $derived(distribution.state || 'created');
+    let currentState = $derived(distribution.state || "created");
 
     function handleDelete() {
         if (confirm(`Delete "${distribution.name}"? This cannot be undone.`)) {
@@ -34,13 +34,25 @@
 
     function handleDeploy() {
         // Navigate to the actual deployment wizard for this distribution
-        goto(`/wizard/step-2?id=${distribution.id}`);
+        goto(`/wizard/deploy?id=${distribution.id}`);
+    }
+
+    // Format date for display
+    function formatDate(dateString: string): string {
+        if (!dateString) return "Not set";
+        return new Date(dateString).toLocaleDateString("en-US", {
+            year: "numeric",
+            month: "short",
+            day: "numeric",
+        });
     }
 </script>
 
 <div class="h-full flex flex-col bg-zen-bg">
     <!-- Header -->
-    <header class="p-4 border-b border-zen-border-subtle flex items-center justify-between">
+    <header
+        class="p-4 border-b border-zen-border-subtle flex items-center justify-between"
+    >
         <div class="flex items-center gap-3">
             <div
                 class="w-10 h-10 rounded-xl bg-zen-primary/10 flex items-center justify-center text-zen-primary font-bold"
@@ -56,20 +68,19 @@
                           ? 'bg-zen-success/10 text-zen-success'
                           : 'bg-zen-error/10 text-zen-error'}"
                 >
-                    {currentState === 'created'
-                        ? 'Draft'
-                        : currentState === 'launched'
-                          ? 'Active'
-                          : 'Cancelled'}
+                    {currentState === "created"
+                        ? "Draft"
+                        : currentState === "launched"
+                          ? "Active"
+                          : "Cancelled"}
                 </span>
             </div>
         </div>
         <button
-            class="inline-flex items-center justify-center min-w-11 min-h-11 rounded-full hover:bg-zen-fg/5 transition-colors xl:hidden"
+            class="p-2 rounded-full hover:bg-zen-fg/5 transition-colors xl:hidden"
             onclick={onClose}
-            aria-label="Close details panel"
         >
-            <X class="w-4 h-4" aria-hidden="true" />
+            <X class="w-4 h-4" />
         </button>
     </header>
 
@@ -78,7 +89,9 @@
         <!-- Description -->
         {#if distribution.description}
             <div class="space-y-1">
-                <h3 class="text-[10px] uppercase tracking-wider font-bold text-zen-fg-subtle">
+                <h3
+                    class="text-[10px] uppercase tracking-wider font-bold text-zen-fg-subtle"
+                >
                     Description
                 </h3>
                 <p class="text-sm text-zen-fg-muted">
@@ -88,7 +101,9 @@
         {/if}
 
         <!-- Amount -->
-        <div class="p-4 rounded-xl bg-zen-primary/5 border border-zen-primary/10 space-y-1">
+        <div
+            class="p-4 rounded-xl bg-zen-primary/5 border border-zen-primary/10 space-y-1"
+        >
             <div class="flex items-center gap-2 text-zen-primary/60">
                 <Coins class="w-4 h-4" />
                 <span class="text-[10px] uppercase tracking-wider font-bold"
@@ -96,7 +111,7 @@
                 >
             </div>
             <p class="text-2xl font-mono font-bold text-zen-primary">
-                {formatAmount(distribution.amount)}
+                {Number(distribution.amount).toLocaleString()}
                 <span class="text-sm font-normal opacity-60"
                     >{wizardStore.tokenDetails.tokenSymbol}</span
                 >
@@ -113,15 +128,17 @@
             </h3>
             <div class="grid grid-cols-2 gap-3">
                 <div class="p-3 rounded-lg bg-zen-fg/5 space-y-1">
-                    <span class="text-[10px] text-zen-fg-subtle">Cliff Date</span>
+                    <span class="text-[10px] text-zen-fg-subtle"
+                        >Cliff Date</span
+                    >
                     <p class="text-sm font-medium">
-                        {distribution.schedule.cliffEndDate
-                            ? formatDate(distribution.schedule.cliffEndDate)
-                            : 'Not set'}
+                        {formatDate(distribution.schedule.cliffEndDate)}
                     </p>
                 </div>
                 <div class="p-3 rounded-lg bg-zen-fg/5 space-y-1">
-                    <span class="text-[10px] text-zen-fg-subtle">Duration</span>
+                    <span class="text-[10px] text-zen-fg-subtle"
+                        >Duration</span
+                    >
                     <p class="text-sm font-medium">
                         {distribution.schedule.distributionDuration}
                         {distribution.schedule.durationUnit}
@@ -139,20 +156,22 @@
                     <Users class="w-3.5 h-3.5" />
                     Recipients
                 </h3>
-                <span class="text-xs text-zen-fg-muted">{distribution.recipients.length} total</span
+                <span class="text-xs text-zen-fg-muted"
+                    >{distribution.recipients.length} total</span
                 >
             </div>
 
             <div class="space-y-2">
-                {#each distribution.recipients.slice(0, 5) as recipient, i (i)}
+                {#each distribution.recipients.slice(0, 5) as recipient, i}
                     <div
                         class="flex items-center justify-between p-2 rounded-lg bg-zen-fg/[0.03] text-sm"
                     >
                         <span class="font-mono text-xs truncate max-w-[120px]">
-                            {recipient.email || recipient.address?.slice(0, 10) + '...'}
+                            {recipient.email ||
+                                recipient.address?.slice(0, 10) + "..."}
                         </span>
                         <span class="font-mono text-xs text-zen-fg-subtle">
-                            {formatAmount(recipient.amount)}
+                            {recipient.amount.toLocaleString()}
                         </span>
                     </div>
                 {/each}
@@ -178,11 +197,8 @@
                     Compliance
                 </h3>
                 <div class="flex flex-wrap gap-2">
-                    {#each distribution.regulatoryRules as rule, i (i)}
-                        <span
-                            class="px-2 py-0.5 text-xs font-medium rounded-full border border-zen-border text-zen-fg-muted"
-                            >{rule}</span
-                        >
+                    {#each distribution.regulatoryRules as rule}
+                        <span class="px-2 py-0.5 text-xs font-medium rounded-full border border-zen-border text-zen-fg-muted">{rule}</span>
                     {/each}
                 </div>
             </div>
@@ -190,7 +206,7 @@
     </div>
 
     <!-- Footer Actions -->
-    {#if currentState === 'created'}
+    {#if currentState === "created"}
         <footer class="p-4 border-t border-zen-border-subtle space-y-2">
             <button
                 class="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-zen-primary text-zen-primary-content font-medium text-sm transition-all active:scale-95 hover:opacity-90"

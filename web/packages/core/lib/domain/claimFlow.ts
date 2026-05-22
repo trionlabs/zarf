@@ -34,37 +34,21 @@ const sumIf = <T>(xs: ReadonlyArray<T>, pred: (x: T) => boolean, get: (x: T) => 
     xs.reduce((acc, x) => (pred(x) ? acc + get(x) : acc), 0n);
 
 export function totalAllocation(epochs: ReadonlyArray<EpochAmount>): bigint {
-    return sumIf(
-        epochs,
-        () => true,
-        (e) => e.amount,
-    );
+    return sumIf(epochs, () => true, e => e.amount);
 }
 
 export function claimedAmount(epochs: ReadonlyArray<EpochAmount>): bigint {
-    return sumIf(
-        epochs,
-        (e) => e.isClaimed,
-        (e) => e.amount,
-    );
+    return sumIf(epochs, e => e.isClaimed, e => e.amount);
 }
 
 /** Unlocked = anything not currently locked, regardless of whether claimed yet. */
 export function unlockedAmount(epochs: ReadonlyArray<EpochAmount>): bigint {
-    return sumIf(
-        epochs,
-        (e) => !e.isLocked,
-        (e) => e.amount,
-    );
+    return sumIf(epochs, e => !e.isLocked, e => e.amount);
 }
 
 /** Claimable = unlocked AND not yet claimed. */
 export function claimableAmount(epochs: ReadonlyArray<EpochAmount>): bigint {
-    return sumIf(
-        epochs,
-        (e) => !e.isLocked && !e.isClaimed,
-        (e) => e.amount,
-    );
+    return sumIf(epochs, e => !e.isLocked && !e.isClaimed, e => e.amount);
 }
 
 // ──────────────────────────────────────────────────────────────────────────
@@ -102,7 +86,7 @@ export function cliffEndDate(schedule: Schedule | null | undefined): Date | null
  * yet claimed. Returns `null` if nothing qualifies.
  */
 export function findNextClaimableIdx(epochs: ReadonlyArray<EpochSelectable>): number | null {
-    const idx = epochs.findIndex((e) => !e.isLocked && !e.isClaimed);
+    const idx = epochs.findIndex(e => !e.isLocked && !e.isClaimed);
     return idx === -1 ? null : idx;
 }
 
@@ -117,9 +101,7 @@ export function findNextClaimableIdx(epochs: ReadonlyArray<EpochSelectable>): nu
  */
 export function buildClaimedMap(epochs: ReadonlyArray<EpochAmount>): Record<number, boolean> {
     const map: Record<number, boolean> = {};
-    epochs.forEach((e, i) => {
-        if (e.isClaimed) map[i] = true;
-    });
+    epochs.forEach((e, i) => { if (e.isClaimed) map[i] = true; });
     return map;
 }
 

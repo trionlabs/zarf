@@ -72,10 +72,10 @@ function networkEntries(): Array<[StellarNetworkId, StellarRuntimeConfig]> {
 function isConfigured(config: StellarRuntimeConfig): boolean {
     return Boolean(
         config.rpcUrl &&
-        config.horizonUrl &&
-        config.networkPassphrase &&
-        config.factoryAddress &&
-        config.explorerBaseUrl,
+            config.horizonUrl &&
+            config.networkPassphrase &&
+            config.factoryAddress &&
+            config.explorerBaseUrl,
     );
 }
 
@@ -102,7 +102,9 @@ function getActiveNetworkConfig(): StellarRuntimeConfig {
  */
 export function configureCore(config: CoreRuntimeConfig): void {
     if (_config) {
-        throw new Error('[core] configureCore called twice. Configure once at app boot.');
+        throw new Error(
+            '[core] configureCore called twice. Configure once at app boot.',
+        );
     }
     _config = config;
 
@@ -111,7 +113,7 @@ export function configureCore(config: CoreRuntimeConfig): void {
     const hasDefault = defaultNetwork && config.stellarNetworks?.[defaultNetwork];
     _activeStellarNetworkId = hasDefault
         ? defaultNetwork
-        : (entries[0]?.[0] ?? config.stellar.id ?? null);
+        : entries[0]?.[0] ?? config.stellar.id ?? null;
 }
 
 /**
@@ -138,9 +140,7 @@ export function getConfiguredStellarNetworks(): StellarNetworkOption[] {
         return [
             {
                 id: stellar.id ?? 'testnet',
-                label:
-                    stellar.label ??
-                    normalizeNetworkName(stellar.networkName, stellar.networkPassphrase),
+                label: stellar.label ?? normalizeNetworkName(stellar.networkName, stellar.networkPassphrase),
                 networkPassphrase: stellar.networkPassphrase,
                 configured: isConfigured(stellar),
             },
