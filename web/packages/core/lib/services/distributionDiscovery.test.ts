@@ -46,37 +46,31 @@ describe('fetchContractMetadata', () => {
             stellar: { id: 'testnet' },
             indexerUrl: 'https://indexer.zarf.to',
         });
-        const fetchMock = vi.fn(
-            async () =>
-                new Response(
-                    JSON.stringify({
-                        address: 'CVESTING',
-                        name: 'Team Grant',
-                        description: 'May cohort',
-                        token: 'CTOKEN',
-                        tokenSymbol: 'ZRF',
-                        tokenDecimals: 7,
-                        owner: 'GOWNER',
-                        vestingStart: '0',
-                        cliffDuration: '0',
-                        vestingDuration: '0',
-                        vestingPeriod: '0',
-                        tokenBalance: '42000000',
-                        metadataCid: 'bafy-metadata',
-                    }),
-                    {
-                        status: 200,
-                        headers: { 'Content-Type': 'application/json' },
-                    },
-                ),
+        const fetchMock = vi.fn(async () =>
+            new Response(JSON.stringify({
+                address: 'CVESTING',
+                name: 'Team Grant',
+                description: 'May cohort',
+                token: 'CTOKEN',
+                tokenSymbol: 'ZRF',
+                tokenDecimals: 7,
+                owner: 'GOWNER',
+                vestingStart: '0',
+                cliffDuration: '0',
+                vestingDuration: '0',
+                vestingPeriod: '0',
+                tokenBalance: '42000000',
+                metadataCid: 'bafy-metadata',
+            }), {
+                status: 200,
+                headers: { 'Content-Type': 'application/json' },
+            }),
         );
         vi.stubGlobal('fetch', fetchMock);
 
         const metadata = await fetchContractMetadata('CVESTING');
 
-        expect(fetchMock.mock.calls[0][0]).toBe(
-            'https://indexer.zarf.to/v1/testnet/vestings/CVESTING',
-        );
+        expect(fetchMock.mock.calls[0][0]).toBe('https://indexer.zarf.to/v1/testnet/vestings/CVESTING');
         expect(metadata?.tokenBalance).toBe(42_000_000n);
         expect(metadata?.metadataCid).toBe('bafy-metadata');
     });
@@ -86,12 +80,11 @@ describe('fetchContractMetadata', () => {
             stellar: { id: 'testnet' },
             indexerUrl: 'https://indexer.zarf.to',
         });
-        const fetchMock = vi.fn(
-            async () =>
-                new Response(JSON.stringify({ error: 'down' }), {
-                    status: 503,
-                    headers: { 'Content-Type': 'application/json' },
-                }),
+        const fetchMock = vi.fn(async () =>
+            new Response(JSON.stringify({ error: 'down' }), {
+                status: 503,
+                headers: { 'Content-Type': 'application/json' },
+            }),
         );
         vi.stubGlobal('fetch', fetchMock);
 

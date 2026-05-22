@@ -44,11 +44,9 @@ describe('buildFactoryDeployInputs', () => {
 
     it('rejects malformed input (empty list, missing commitment, non-positive amount)', () => {
         expect(() => buildFactoryDeployInputs([], 0n)).toThrow(/empty claims/);
-        expect(() =>
-            buildFactoryDeployInputs([baseClaim(), baseClaim({ identityCommitment: '' })], 0n),
-        ).toThrow(/#1/);
-        expect(() => buildFactoryDeployInputs([baseClaim({ amount: 0n })], 0n)).toThrow(
-            /positive bigint/,
-        );
+        expect(() => buildFactoryDeployInputs(
+            [baseClaim(), baseClaim({ identityCommitment: '' })], 0n,
+        )).toThrow(/#1/);
+        expect(() => buildFactoryDeployInputs([baseClaim({ amount: 0n })], 0n)).toThrow(/positive bigint/);
     });
 });

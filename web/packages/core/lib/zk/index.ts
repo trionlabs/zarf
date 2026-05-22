@@ -56,11 +56,8 @@ function initWorker() {
                 terminateWorker();
             } else if (type === 'PROGRESS') {
                 if (pendingProgress) {
-                    try {
-                        pendingProgress(message);
-                    } catch (e) {
-                        console.error('[ZK Prover] onProgress threw:', e);
-                    }
+                    try { pendingProgress(message); }
+                    catch (e) { console.error('[ZK Prover] onProgress threw:', e); }
                 } else {
                     console.log('[ZK Prover]', message);
                 }

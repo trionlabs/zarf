@@ -1,12 +1,12 @@
 <script lang="ts">
-    import ThemeToggle from '@zarf/ui/components/layout/ThemeToggle.svelte';
-    import WalletConnectButton from '@zarf/ui/components/wallet/WalletConnectButton.svelte';
-    import WalletBadge from '@zarf/ui/components/wallet/WalletBadge.svelte';
-    import ZarfLogo from '@zarf/ui/components/brand/ZarfLogo.svelte';
-    import NetworkToggle from '@zarf/ui/components/layout/NetworkToggle.svelte';
-    import { authStore } from '@zarf/ui/stores/authStore.svelte';
-    import { redirectToGoogle } from '@zarf/ui/utils/googleAuth';
-    import type { Snippet } from 'svelte';
+    import ThemeToggle from "@zarf/ui/components/layout/ThemeToggle.svelte";
+    import WalletConnectButton from "@zarf/ui/components/wallet/WalletConnectButton.svelte";
+    import WalletBadge from "@zarf/ui/components/wallet/WalletBadge.svelte";
+    import ZarfLogo from "@zarf/ui/components/brand/ZarfLogo.svelte";
+    import NetworkToggle from "@zarf/ui/components/layout/NetworkToggle.svelte";
+    import { authStore } from "@zarf/ui/stores/authStore.svelte";
+    import { redirectToGoogle } from "@zarf/ui/utils/googleAuth";
+    import type { Snippet } from "svelte";
 
     let {
         hideActions = false,
@@ -58,7 +58,9 @@
                 <div class="w-px h-4 bg-zen-border"></div>
                 {#if authStore.isAuthenticated}
                     <div class="flex items-center gap-2">
-                        <span class="text-xs text-zen-fg-muted font-mono hidden sm:inline-block">
+                        <span
+                            class="text-xs text-zen-fg-muted font-mono hidden sm:inline-block"
+                        >
                             {authStore.gmail.email}
                         </span>
                         <button

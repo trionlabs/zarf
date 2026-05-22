@@ -21,7 +21,14 @@ const FORKED_TYPES = [
     'OAuthState',
 ];
 
-const SKIP_DIRS = new Set(['node_modules', '.svelte-kit', '.wrangler', 'dist', 'build', '.git']);
+const SKIP_DIRS = new Set([
+    'node_modules',
+    '.svelte-kit',
+    '.wrangler',
+    'dist',
+    'build',
+    '.git',
+]);
 
 const TYPE_DECL_RE = new RegExp(
     `^\\s*export\\s+(?:interface|type)\\s+(${FORKED_TYPES.join('|')})\\b`,
@@ -46,14 +53,18 @@ for (const file of walk(ROOT)) {
     const lines = src.split('\n');
     for (let i = 0; i < lines.length; i++) {
         const m = lines[i].match(
-            new RegExp(`^\\s*export\\s+(?:interface|type)\\s+(${FORKED_TYPES.join('|')})\\b`),
+            new RegExp(
+                `^\\s*export\\s+(?:interface|type)\\s+(${FORKED_TYPES.join('|')})\\b`,
+            ),
         );
         if (m) offenders.push(`${rel}:${i + 1}: ${m[1]}`);
     }
 }
 
 if (offenders.length > 0) {
-    console.error('\n❌ Forked domain types detected. These types must live in @zarf/core only:\n');
+    console.error(
+        '\n❌ Forked domain types detected. These types must live in @zarf/core only:\n',
+    );
     for (const o of offenders) console.error('   ' + o);
     console.error(
         '\n   Move the declaration into packages/core/lib/types.ts and re-export it from the offending file.\n',
@@ -61,4 +72,6 @@ if (offenders.length > 0) {
     process.exit(1);
 }
 
-console.log(`✓ No forked declarations of ${FORKED_TYPES.join(', ')} outside @zarf/core.`);
+console.log(
+    `✓ No forked declarations of ${FORKED_TYPES.join(', ')} outside @zarf/core.`,
+);

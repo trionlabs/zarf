@@ -12,11 +12,7 @@ const padded = (n: number) => '0x' + n.toString(16).padStart(64, '0');
 
 const fakeSchedule = { vestingStart: 0, cliffDuration: 0, vestingDuration: 0, vestingPeriod: 0 };
 
-const meta = (idx: number, amount: string, unlockTime: number) => ({
-    index: idx,
-    amount,
-    unlockTime,
-});
+const meta = (idx: number, amount: string, unlockTime: number) => ({ index: idx, amount, unlockTime });
 
 // ──────────────────────────────────────────────────────────────────────────
 // buildCommitmentLookup / lookupCommitment
@@ -25,8 +21,8 @@ const meta = (idx: number, amount: string, unlockTime: number) => ({
 describe('buildCommitmentLookup + lookupCommitment', () => {
     it('matches both padded and unpadded keys (older distributions stored unpadded)', () => {
         const map = buildCommitmentLookup({
-            [padded(0xabc)]: meta(0, '100', 0), // padded form
-            '0xdead': meta(1, '200', 0), // unpadded form
+            [padded(0xabc)]: meta(0, '100', 0),  // padded form
+            '0xdead':        meta(1, '200', 0),  // unpadded form
         });
         expect(lookupCommitment(map, padded(0xabc))?.[0].amount).toBe('100');
         expect(lookupCommitment(map, padded(0xdead))?.[0].amount).toBe('200');
@@ -34,7 +30,10 @@ describe('buildCommitmentLookup + lookupCommitment', () => {
 
     it('preserves multiple metadata entries for one commitment', () => {
         const map = buildCommitmentLookup({
-            [padded(0xabc)]: [meta(0, '100', 0), meta(1, '200', 10)],
+            [padded(0xabc)]: [
+                meta(0, '100', 0),
+                meta(1, '200', 10),
+            ],
         });
         expect(lookupCommitment(map, padded(0xabc))?.map((m) => m.index)).toEqual([0, 1]);
     });
@@ -50,15 +49,12 @@ describe('buildCommitmentLookup + lookupCommitment', () => {
 
 const fakeCrypto: DiscoveryCryptoDeps = {
     stringToBytes: (s) => new Uint8Array(s.split('').map((c) => c.charCodeAt(0))),
-    pedersenHashBytes: async (bytes) => BigInt(bytes.reduce((a, b) => a + b, 0)) + 1n, // start at sum+1
-    pedersenHashField: async (n) => n + 1n, // walk by +1
-    computeIdentityCommitment: async (_email, secret) => BigInt(secret), // identity, drops email
+    pedersenHashBytes: async (bytes) => BigInt(bytes.reduce((a, b) => a + b, 0)) + 1n,  // start at sum+1
+    pedersenHashField:  async (n) => n + 1n,                                            // walk by +1
+    computeIdentityCommitment: async (_email, secret) => BigInt(secret),                // identity, drops email
 };
 
-function fakeData(
-    commitments: DistributionData['commitments'],
-    claimedSet: Set<string> = new Set(),
-): DiscoveryDataDeps {
+function fakeData(commitments: DistributionData['commitments'], claimedSet: Set<string> = new Set()): DiscoveryDataDeps {
     return {
         fetchDistribution: async () => ({
             merkleRoot: '0xroot',
@@ -86,32 +82,24 @@ describe('discoverEpochs', () => {
             fakeData(commitments),
         );
         expect(result.epochs).toHaveLength(3);
-        expect(result.epochs.map((e) => e.amount)).toEqual([100n, 200n, 300n]);
-        expect(result.epochs.map((e) => e.leafIndex)).toEqual([0, 1, 2]);
+        expect(result.epochs.map(e => e.amount)).toEqual([100n, 200n, 300n]);
+        expect(result.epochs.map(e => e.leafIndex)).toEqual([0, 1, 2]);
     });
 
     it('throws "No allocation found" when the very first commitment is absent (wrong PIN/email)', async () => {
         const commitments: DistributionData['commitments'] = { [padded(999)]: meta(0, '100', 0) };
-        await expect(
-            discoverEpochs(
-                { email: 'x@y.z', pin: 'A', contractAddress: '0xv', nowSeconds: () => 0 },
-                fakeCrypto,
-                fakeData(commitments),
-            ),
-        ).rejects.toThrow(/No allocation found/);
+        await expect(discoverEpochs(
+            { email: 'x@y.z', pin: 'A', contractAddress: '0xv', nowSeconds: () => 0 },
+            fakeCrypto,
+            fakeData(commitments),
+        )).rejects.toThrow(/No allocation found/);
     });
 
     it('treats an isEpochClaimed failure as "not claimed" and continues', async () => {
         const commitments: DistributionData['commitments'] = { [padded(66)]: meta(0, '100', 0) };
         const flakyData: DiscoveryDataDeps = {
-            fetchDistribution: async () => ({
-                merkleRoot: '0x',
-                schedule: fakeSchedule,
-                commitments,
-            }),
-            isEpochClaimed: async () => {
-                throw new Error('RPC down');
-            },
+            fetchDistribution: async () => ({ merkleRoot: '0x', schedule: fakeSchedule, commitments }),
+            isEpochClaimed: async () => { throw new Error('RPC down'); },
         };
         const result = await discoverEpochs(
             { email: 'a@b.co', pin: 'A', contractAddress: '0xv', nowSeconds: () => 0 },
@@ -123,8 +111,8 @@ describe('discoverEpochs', () => {
 
     it('marks isLocked / canClaim relative to the injected clock', async () => {
         const commitments: DistributionData['commitments'] = {
-            [padded(66)]: meta(0, '100', 1000), // unlock at t=1000
-            [padded(67)]: meta(1, '200', 2000), // unlock at t=2000
+            [padded(66)]: meta(0, '100', 1000),  // unlock at t=1000
+            [padded(67)]: meta(1, '200', 2000),  // unlock at t=2000
         };
         const result = await discoverEpochs(
             { email: 'a@b.co', pin: 'A', contractAddress: '0xv', nowSeconds: () => 1500 },
@@ -144,13 +132,7 @@ describe('discoverEpochs', () => {
         for (let i = 0; i < 5; i++) commitments[padded(66 + i)] = meta(i, '1', 0);
 
         const result = await discoverEpochs(
-            {
-                email: 'a@b.co',
-                pin: 'A',
-                contractAddress: '0xv',
-                nowSeconds: () => 0,
-                maxEpochs: 3,
-            },
+            { email: 'a@b.co', pin: 'A', contractAddress: '0xv', nowSeconds: () => 0, maxEpochs: 3 },
             fakeCrypto,
             fakeData(commitments),
         );
@@ -175,7 +157,10 @@ describe('discoverEpochs', () => {
 
     it('discovers multiple metadata entries for the same commitment', async () => {
         const commitments: DistributionData['commitments'] = {
-            [padded(66)]: [meta(0, '100', 0), meta(1, '200', 10)],
+            [padded(66)]: [
+                meta(0, '100', 0),
+                meta(1, '200', 10),
+            ],
         };
         const result = await discoverEpochs(
             { email: 'a@b.co', pin: 'A', contractAddress: '0xv', nowSeconds: () => 1000 },

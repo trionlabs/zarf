@@ -1,8 +1,8 @@
 <script lang="ts">
-    import { claimStore } from '../../../stores/claimStore.svelte';
-    import { walletStore } from '@zarf/ui/stores/walletStore.svelte';
-    import { Wallet, ArrowRight } from 'lucide-svelte';
-    import ZenButton from '@zarf/ui/components/ui/ZenButton.svelte';
+    import { claimStore } from "../../../stores/claimStore.svelte";
+    import { walletStore } from "@zarf/ui/stores/walletStore.svelte";
+    import { Wallet, ArrowRight } from "lucide-svelte";
+    import ZenButton from "@zarf/ui/components/ui/ZenButton.svelte";
 
     let isConnected = $derived(walletStore.isConnected);
     let address = $derived(walletStore.address);
@@ -18,7 +18,9 @@
     <div class="max-w-xl mx-auto space-y-8">
         <!-- Minimal Header -->
         <div class="space-y-1">
-            <h2 class="text-xl font-medium text-zen-fg tracking-tight">Recipient Wallet</h2>
+            <h2 class="text-xl font-medium text-zen-fg tracking-tight">
+                Recipient Wallet
+            </h2>
             <p class="text-xs text-zen-fg-subtle font-light italic">
                 Specify the address where your tokens will be sent.
             </p>
@@ -31,7 +33,8 @@
                     class="group relative p-6 rounded-2xl border border-zen-border-subtle bg-zen-fg/5 hover:bg-zen-fg/10 transition-all"
                 >
                     <div class="flex items-center justify-between mb-2">
-                        <span class="text-xs uppercase tracking-widest text-zen-success font-bold"
+                        <span
+                            class="text-xs uppercase tracking-widest text-zen-success font-bold"
                             >Connected Address</span
                         >
                         <div class="flex gap-1.5">
@@ -40,7 +43,9 @@
                             ></div>
                         </div>
                     </div>
-                    <div class="font-mono text-lg text-zen-fg-muted break-all leading-tight">
+                    <div
+                        class="font-mono text-lg text-zen-fg-muted break-all leading-tight"
+                    >
                         {address}
                     </div>
 
@@ -61,8 +66,12 @@
                         <Wallet class="w-5 h-5 text-zen-fg-faint" />
                     </div>
                     <div class="text-center space-y-1">
-                        <p class="text-sm text-zen-fg-subtle">No wallet connected</p>
-                        <p class="text-xs text-zen-fg-faint max-w-[200px] leading-relaxed">
+                        <p class="text-sm text-zen-fg-subtle">
+                            No wallet connected
+                        </p>
+                        <p
+                            class="text-xs text-zen-fg-faint max-w-[200px] leading-relaxed"
+                        >
                             Please connect your wallet to set as the recipient.
                         </p>
                     </div>
@@ -79,14 +88,17 @@
         </div>
 
         <!-- Action Bar -->
-        <div class="pt-4 border-t border-zen-border-subtle flex items-center justify-between">
+        <div
+            class="pt-4 border-t border-zen-border-subtle flex items-center justify-between"
+        >
             <div class="flex items-center gap-2">
                 <div
                     class="w-2 h-2 rounded-full bg-zen-primary/20 flex items-center justify-center"
                 >
                     <div class="w-1 h-1 rounded-full bg-zen-primary"></div>
                 </div>
-                <span class="text-xs uppercase tracking-widest text-zen-fg-subtle font-medium"
+                <span
+                    class="text-xs uppercase tracking-widest text-zen-fg-subtle font-medium"
                     >Ready to confirm</span
                 >
             </div>

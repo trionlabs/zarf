@@ -1,47 +1,68 @@
 <script lang="ts">
-    import { Check, Download, AlertTriangle, FileText, X } from 'lucide-svelte';
-    import { readCSVFile, generateSampleCSV } from '../../../csv/csvProcessor';
-    import type { Recipient } from '../../../stores/types';
-    import ZenButton from '@zarf/ui/components/ui/ZenButton.svelte';
+    import {
+        Check,
+        Download,
+        AlertTriangle,
+        FileText,
+        X,
+        Mail,
+        Users,
+        ArrowRight,
+    } from "lucide-svelte";
+    import { readCSVFile, generateSampleCSV } from "../../../csv/csvProcessor";
+    import type { Recipient } from "../../../stores/types";
+    import ZenButton from "@zarf/ui/components/ui/ZenButton.svelte";
 
     let {
         recipients = $bindable(),
         csvFileName = $bindable(),
         csvError = $bindable(),
-        // eslint-disable-next-line no-useless-assignment -- $bindable() default through-prop write the parser cannot see
         isProcessingCSV = $bindable(),
         validationErrors = $bindable([]),
+        totalAmount,
         poolAmount = 0, // The total available in the distribution pool
         unlockEvents = 1, // Number of unlock events in the vesting schedule
-        tokenSymbol = 'TOKENS',
+        tokenSymbol = "TOKENS",
     } = $props<{
         recipients: Recipient[];
         csvFileName: string | null;
         csvError: string | null;
         isProcessingCSV: boolean;
         validationErrors?: string[];
+        totalAmount: number;
         poolAmount?: number;
         unlockEvents?: number;
         tokenSymbol?: string;
     }>();
 
+    let showPreview = $state(true);
+
     // Derived stats
-    let csvTotal = $derived(recipients.reduce((sum: number, r: Recipient) => sum + r.amount, 0));
+    let csvTotal = $derived(
+        recipients.reduce(
+            (sum: number, r: Recipient) => sum + r.amount,
+            0,
+        ),
+    );
 
     // Budget validation (Float safe)
-    let isOverBudget = $derived(poolAmount > 0 && csvTotal - poolAmount > 0.000001);
-    let isUnderBudget = $derived(poolAmount > 0 && poolAmount - csvTotal > 0.000001);
-    let isBudgetMatch = $derived(poolAmount > 0 && Math.abs(csvTotal - poolAmount) <= 0.000001);
+    let isOverBudget = $derived(
+        poolAmount > 0 && csvTotal - poolAmount > 0.000001,
+    );
+    let isUnderBudget = $derived(
+        poolAmount > 0 && poolAmount - csvTotal > 0.000001,
+    );
+    let isBudgetMatch = $derived(
+        poolAmount > 0 && Math.abs(csvTotal - poolAmount) <= 0.000001,
+    );
     let budgetDifference = $derived(Math.abs(csvTotal - poolAmount));
 
     // Identify duplicates for highlighting
     let duplicateEmails = $derived.by(() => {
-        // eslint-disable-next-line svelte/prefer-svelte-reactivity -- derived-local counter, re-runs when recipients change
         const counts = new Map<string, number>();
         recipients.forEach((r: Recipient) => {
             if (r.email) counts.set(r.email, (counts.get(r.email) || 0) + 1);
         });
-        // eslint-disable-next-line svelte/prefer-svelte-reactivity -- derived-local result set, returned then consumed via $derived
         const dups = new Set<string>();
         counts.forEach((count, email) => {
             if (count > 1) dups.add(email);
@@ -51,9 +72,11 @@
 
     // Format large numbers (e.g., 125000 -> "125K")
     function formatAmount(num: number): string {
-        if (num >= 1000000) return (num / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
-        if (num >= 1000) return (num / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
-        return num.toLocaleString('en-US');
+        if (num >= 1000000)
+            return (num / 1000000).toFixed(1).replace(/\.0$/, "") + "M";
+        if (num >= 1000)
+            return (num / 1000).toFixed(1).replace(/\.0$/, "") + "K";
+        return num.toLocaleString();
     }
 
     async function handleFileUpload(event: Event) {
@@ -70,14 +93,15 @@
             recipients = result.entries;
             validationErrors = result.errors;
             csvFileName = file.name;
+            showPreview = true;
 
             // Note: validationErrors might contain duplicate warnings, but we still show the list.
             if (recipients.length === 0 && validationErrors.length > 0) {
                 // Only throw if NO valid entries were found at all
-                throw new Error('No valid entries found in file');
+                throw new Error("No valid entries found in file");
             }
         } catch (e) {
-            csvError = e instanceof Error ? e.message : 'Failed to parse CSV';
+            csvError = e instanceof Error ? e.message : "Failed to parse CSV";
             recipients = [];
             csvFileName = null;
         } finally {
@@ -87,11 +111,11 @@
 
     function handleDownloadSample() {
         const content = generateSampleCSV();
-        const blob = new Blob([content], { type: 'text/csv' });
+        const blob = new Blob([content], { type: "text/csv" });
         const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
+        const a = document.createElement("a");
         a.href = url;
-        a.download = 'zarf_whitelist_template.csv';
+        a.download = "zarf_whitelist_template.csv";
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -102,58 +126,89 @@
         csvFileName = null;
         csvError = null;
         validationErrors = [];
+        showPreview = false;
     }
 </script>
 
 <!-- Stats Summary Bar (Brutalist) -->
 {#if recipients.length > 0}
-    <div class="mb-8 p-6 bg-zen-fg/[0.02] border border-zen-border-subtle rounded-2xl">
+    <div
+        class="mb-8 p-6 bg-zen-fg/[0.02] border border-zen-border-subtle rounded-2xl"
+    >
         <div class="grid grid-cols-4 gap-8 items-center">
             <!-- Recipients -->
             <div>
-                <span class="text-xs font-medium text-zen-fg-muted block mb-1">Recipients</span>
+                <span
+                    class="text-xs font-medium text-zen-fg-muted block mb-1"
+                    >Recipients</span
+                >
                 <div class="flex items-baseline gap-1.5">
-                    <span class="text-2xl font-semibold tracking-tight text-zen-fg"
+                    <span
+                        class="text-2xl font-semibold tracking-tight text-zen-fg"
                         >{recipients.length}</span
                     >
-                    <span class="text-xs text-zen-fg-subtle font-medium">People</span>
+                    <span
+                        class="text-xs text-zen-fg-subtle font-medium"
+                        >People</span
+                    >
                 </div>
             </div>
 
             <!-- CSV Total -->
             <div>
-                <span class="text-xs font-medium text-zen-fg-muted block mb-1">Allocated</span>
+                <span
+                    class="text-xs font-medium text-zen-fg-muted block mb-1"
+                    >Allocated</span
+                >
                 <div class="flex items-baseline gap-1.5">
                     <span
                         class="text-2xl font-semibold tracking-tight {isBudgetMatch
                             ? 'text-zen-success'
                             : isOverBudget
                               ? 'text-zen-error'
-                              : 'text-zen-warning'}">{formatAmount(csvTotal)}</span
+                              : 'text-zen-warning'}"
+                        >{formatAmount(csvTotal)}</span
                     >
-                    <span class="text-xs text-zen-fg-subtle font-medium">{tokenSymbol}</span>
+                    <span
+                        class="text-xs text-zen-fg-subtle font-medium"
+                        >{tokenSymbol}</span
+                    >
                 </div>
             </div>
 
             <!-- Pool Target -->
             <div>
-                <span class="text-xs font-medium text-zen-fg-muted block mb-1">Pool Target</span>
+                <span
+                    class="text-xs font-medium text-zen-fg-muted block mb-1"
+                    >Pool Target</span
+                >
                 <div class="flex items-baseline gap-1.5">
-                    <span class="text-2xl font-semibold tracking-tight text-zen-fg"
+                    <span
+                        class="text-2xl font-semibold tracking-tight text-zen-fg"
                         >{formatAmount(poolAmount)}</span
                     >
-                    <span class="text-xs text-zen-fg-subtle font-medium">{tokenSymbol}</span>
+                    <span
+                        class="text-xs text-zen-fg-subtle font-medium"
+                        >{tokenSymbol}</span
+                    >
                 </div>
             </div>
 
             <!-- Events -->
             <div>
-                <span class="text-xs font-medium text-zen-fg-muted block mb-1">Events</span>
+                <span
+                    class="text-xs font-medium text-zen-fg-muted block mb-1"
+                    >Events</span
+                >
                 <div class="flex items-baseline gap-1.5">
-                    <span class="text-2xl font-semibold tracking-tight text-zen-fg"
+                    <span
+                        class="text-2xl font-semibold tracking-tight text-zen-fg"
                         >{unlockEvents}</span
                     >
-                    <span class="text-xs text-zen-fg-subtle font-medium">Unlocks</span>
+                    <span
+                        class="text-xs text-zen-fg-subtle font-medium"
+                        >Unlocks</span
+                    >
                 </div>
             </div>
         </div>
@@ -171,9 +226,12 @@
             >
                 <AlertTriangle class="w-5 h-5 shrink-0 mt-0.5" />
                 <div>
-                    <h3 class="font-semibold text-sm">Duplicate Recipients Found</h3>
+                    <h3 class="font-semibold text-sm">
+                        Duplicate Recipients Found
+                    </h3>
                     <p class="text-xs opacity-80 mt-1">
-                        There are {duplicateEmails.size} duplicate email addresses in your CSV file.
+                        There are {duplicateEmails.size} duplicate email addresses
+                        in your CSV file.
                     </p>
                 </div>
             </div>
@@ -240,7 +298,9 @@
                 : 'p-8 min-h-[200px] flex-col'}"
         >
             {#if recipients.length > 0}
-                <div class="flex items-center gap-4 relative z-10 w-full">
+                <div
+                    class="flex items-center gap-4 relative z-10 w-full"
+                >
                     <div
                         class="w-10 h-10 bg-zen-success/10 text-zen-success rounded-full flex items-center justify-center shrink-0"
                     >
@@ -251,8 +311,7 @@
                             {csvFileName}
                         </h3>
                         <p class="text-xs text-zen-fg-muted">
-                            {recipients.length} recipients · {formatAmount(csvTotal)}
-                            {tokenSymbol}
+                            {recipients.length} recipients · {formatAmount(csvTotal)} {tokenSymbol}
                         </p>
                     </div>
                     <ZenButton
@@ -276,10 +335,14 @@
                 <div class="space-y-4 pointer-events-none relative z-10">
                     <Download class="w-8 h-8 mx-auto text-zen-fg/20" />
                     <div>
-                        <p class="text-sm font-semibold text-zen-fg/60 uppercase tracking-widest">
+                        <p
+                            class="text-sm font-semibold text-zen-fg/60 uppercase tracking-widest"
+                        >
                             Upload CSV
                         </p>
-                        <p class="text-xs mt-2 text-zen-fg-subtle">format: email, amount</p>
+                        <p class="text-xs mt-2 text-zen-fg-subtle">
+                            format: email, amount
+                        </p>
                     </div>
                 </div>
             {/if}
@@ -294,7 +357,9 @@
                     class="w-full justify-center group"
                     onclick={handleDownloadSample}
                 >
-                    <FileText class="w-4 h-4 text-zen-fg/30 group-hover:text-zen-fg mr-2" />
+                    <FileText
+                        class="w-4 h-4 text-zen-fg/30 group-hover:text-zen-fg mr-2"
+                    />
                     Download Template CSV
                 </ZenButton>
             {/if}
@@ -305,7 +370,9 @@
                 >
                     <AlertTriangle class="w-4 h-4 shrink-0 mt-0.5" />
                     <div>
-                        <span class="font-bold block mb-1">Error Parsing CSV</span>
+                        <span class="font-bold block mb-1"
+                            >Error Parsing CSV</span
+                        >
                         {csvError}
                     </div>
                 </div>
@@ -322,8 +389,10 @@
                         {validationErrors.length} Warnings
                     </div>
                     <div class="max-h-32 overflow-y-auto space-y-2 pr-2">
-                        {#each validationErrors as err, i (i)}
-                            <div class="text-xs opacity-90 pl-2 border-l-2 border-zen-warning/30">
+                        {#each validationErrors as err}
+                            <div
+                                class="text-xs opacity-90 pl-2 border-l-2 border-zen-warning/30"
+                            >
                                 {err}
                             </div>
                         {/each}
@@ -342,7 +411,8 @@
             <div
                 class="px-5 py-3 border-b border-zen-border-subtle flex justify-between items-center bg-zen-bg/50 backdrop-blur-sm"
             >
-                <span class="text-xs font-semibold text-zen-fg-subtle uppercase tracking-wider w-12"
+                <span
+                    class="text-xs font-semibold text-zen-fg-subtle uppercase tracking-wider w-12"
                     >#</span
                 >
                 <span
@@ -356,9 +426,11 @@
             </div>
 
             <!-- Scrollable List -->
-            <div class="flex-1 overflow-y-auto scrollbar-hide bg-zen-bg">
+            <div
+                class="flex-1 overflow-y-auto scrollbar-hide bg-zen-bg"
+            >
                 <div class="divide-y divide-zen-border">
-                    {#each recipients as row, i (i)}
+                    {#each recipients as row, i}
                         <div
                             class="flex items-center justify-between px-5 py-3 hover:bg-zen-fg/[0.02] transition-colors border-b border-zen-fg/[0.02] last:border-0
                             {duplicateEmails.has(row.email || '')
@@ -366,16 +438,19 @@
                                 : ''}"
                         >
                             <!-- Index -->
-                            <span class="text-xs font-medium text-zen-fg/30 w-12 tabular-nums"
+                            <span
+                                class="text-xs font-medium text-zen-fg/30 w-12 tabular-nums"
                                 >{i + 1}</span
                             >
 
                             <!-- Email -->
                             <div class="flex-1 flex items-center gap-2 min-w-0">
-                                <span class="text-sm font-medium text-zen-fg truncate">
+                                <span
+                                    class="text-sm font-medium text-zen-fg truncate"
+                                >
                                     {row.email}
                                 </span>
-                                {#if duplicateEmails.has(row.email || '')}
+                                {#if duplicateEmails.has(row.email || "")}
                                     <span
                                         class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-zen-error/10 text-zen-error uppercase tracking-wider"
                                         >DUP</span
@@ -384,8 +459,10 @@
                             </div>
 
                             <!-- Amount -->
-                            <span class="text-sm font-medium text-zen-fg tabular-nums">
-                                {row.amount.toLocaleString('en-US')}
+                            <span
+                                class="text-sm font-medium text-zen-fg tabular-nums"
+                            >
+                                {row.amount.toLocaleString()}
                             </span>
                         </div>
                     {/each}
@@ -400,7 +477,7 @@
                     >Total Rows: {recipients.length}</span
                 >
                 <span class="text-xs font-medium text-zen-fg/70"
-                    >Sum: {csvTotal.toLocaleString('en-US')} {tokenSymbol}</span
+                    >Sum: {csvTotal.toLocaleString()} {tokenSymbol}</span
                 >
             </div>
         </div>

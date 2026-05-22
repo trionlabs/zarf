@@ -1,5 +1,5 @@
 <script lang="ts">
-    import type { Snippet } from 'svelte';
+    import type { Snippet } from "svelte";
 
     interface Props {
         children?: Snippet;
@@ -7,7 +7,11 @@
         class?: string;
     }
 
-    let { children, vertical = false, class: className = '' }: Props = $props();
+    let {
+        children,
+        vertical = false,
+        class: className = "",
+    }: Props = $props();
 </script>
 
 {#if children}

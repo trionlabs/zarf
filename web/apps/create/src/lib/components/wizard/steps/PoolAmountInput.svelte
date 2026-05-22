@@ -1,7 +1,8 @@
 <script lang="ts">
-    import { wizardStore } from '../../../stores/wizardStore.svelte';
-    import { PERCENTAGE_PRESETS } from '@zarf/core/constants/wizard';
-    import ZenNumberInput from '@zarf/ui/components/ui/ZenNumberInput.svelte';
+    import { wizardStore } from "../../../stores/wizardStore.svelte";
+    import { PERCENTAGE_PRESETS } from "@zarf/core/constants/wizard";
+    import ZenButton from "@zarf/ui/components/ui/ZenButton.svelte";
+    import ZenNumberInput from "@zarf/ui/components/ui/ZenNumberInput.svelte";
 
     let { poolAmount = $bindable(), poolInputValue = $bindable() } = $props<{
         poolAmount: number;
@@ -11,31 +12,41 @@
     // --- Derived ---
     const totalSupply = $derived(
         wizardStore.tokenDetails.tokenTotalSupply
-            ? Number(String(wizardStore.tokenDetails.tokenTotalSupply).replace(/,/g, ''))
+            ? Number(
+                  String(wizardStore.tokenDetails.tokenTotalSupply).replace(
+                      /,/g,
+                      "",
+                  ),
+              )
             : 0,
     );
 
-    const tokenSymbol = $derived(wizardStore.tokenDetails.tokenSymbol || 'TOKENS');
+    const tokenSymbol = $derived(
+        wizardStore.tokenDetails.tokenSymbol || "TOKENS",
+    );
     const hasSupply = $derived(totalSupply > 0);
 
     // --- Actions ---
-    import { untrack } from 'svelte';
+    import { untrack } from "svelte";
 
     // --- Actions ---
     function handleAmountInput(e: Event) {
         const target = e.currentTarget as HTMLInputElement;
         // Allow numbers and one decimal point
-        const raw = target.value.replace(/[^0-9.]/g, (match, offset, string) => {
-            if (match === '.' && string.indexOf('.') !== offset) return '';
-            return match;
-        });
+        const raw = target.value.replace(
+            /[^0-9.]/g,
+            (match, offset, string) => {
+                if (match === "." && string.indexOf(".") !== offset) return "";
+                return match;
+            },
+        );
 
         // Update local bound value immediately to prevent jitter
         // But only update numeric state if valid
         const parsed = parseFloat(raw);
         if (!isNaN(parsed)) {
             poolAmount = parsed;
-        } else if (raw === '') {
+        } else if (raw === "") {
             poolAmount = 0;
         }
 
@@ -59,12 +70,19 @@
             if (amt > 0 && Math.abs(currentInput - amt) > 0.000001) {
                 // If they differ (and it's not just a trailing dot issue), sync up
                 // Verify we aren't overwriting a user trying to type a decimal
-                if (!poolInputValue.endsWith('.') && !poolInputValue.endsWith('.0')) {
+                if (
+                    !poolInputValue.endsWith(".") &&
+                    !poolInputValue.endsWith(".0")
+                ) {
                     poolInputValue = amt.toString();
                 }
-            } else if (amt === 0 && poolInputValue !== '' && parseFloat(poolInputValue) !== 0) {
+            } else if (
+                amt === 0 &&
+                poolInputValue !== "" &&
+                parseFloat(poolInputValue) !== 0
+            ) {
                 // Handle reset to 0
-                poolInputValue = '';
+                poolInputValue = "";
             }
         });
     });
@@ -73,8 +91,8 @@
     function getPresetClass(pct: number): string {
         const pctAmount = Math.floor((totalSupply * pct) / 100);
         return poolAmount === pctAmount
-            ? 'bg-zen-fg text-zen-bg shadow-sm'
-            : 'bg-zen-fg/5 text-zen-fg-subtle hover:bg-zen-fg/10';
+            ? "bg-zen-fg text-zen-bg shadow-sm"
+            : "bg-zen-fg/5 text-zen-fg-subtle hover:bg-zen-fg/10";
     }
 </script>
 
@@ -89,8 +107,6 @@
             oninput={handleAmountInput}
             placeholder="0"
             aria-label="Distribution Pool Amount"
-            inputmode="decimal"
-            autocomplete="off"
             class="w-80 bg-transparent border-none !text-5xl font-medium tracking-tighter leading-none text-right placeholder:text-zen-fg/10 text-zen-fg focus:outline-none focus:ring-0 transition-all"
         />
         <span class="text-zen-fg/50 text-lg font-medium">
@@ -101,11 +117,12 @@
     <!-- Quick Presets (% Supply) -->
     {#if hasSupply}
         <div class="flex items-center gap-3">
-            <span class="text-xs text-zen-fg-muted uppercase tracking-widest w-16 shrink-0"
+            <span
+                class="text-xs text-zen-fg-muted uppercase tracking-widest w-16 shrink-0"
                 >Quick</span
             >
             <div class="flex items-center gap-1">
-                {#each PERCENTAGE_PRESETS as pct (pct)}
+                {#each PERCENTAGE_PRESETS as pct}
                     <button
                         type="button"
                         class="px-3 py-1.5 text-xs font-medium rounded-full transition-all {getPresetClass(
@@ -131,14 +148,16 @@
                         class="w-14"
                         onchange={(e) =>
                             setPercentage(
-                                parseFloat((e.currentTarget as HTMLInputElement).value) || 0,
+                                parseFloat(
+                                    (e.currentTarget as HTMLInputElement).value,
+                                ) || 0,
                             )}
                     />
                 </div>
             </div>
         </div>
         <p class="text-xs text-zen-fg-muted pl-20">
-            Total Supply: {totalSupply.toLocaleString('en-US')}
+            Total Supply: {totalSupply.toLocaleString()}
             {tokenSymbol}
         </p>
     {/if}

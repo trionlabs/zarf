@@ -1,21 +1,34 @@
 <script lang="ts">
-    import { claimStore } from '../../stores/claimStore.svelte';
-    import { formatTokenAmount } from '@zarf/core/utils/amount';
-    import VestingTimeline from './VestingTimeline.svelte';
-    import VestingScheduleTable from './VestingScheduleTable.svelte';
-    import CliffCountdown from './CliffCountdown.svelte';
-    import { CalendarClock, Coins, Lock, CheckCircle } from 'lucide-svelte';
-    import ZenButton from '@zarf/ui/components/ui/ZenButton.svelte';
+    import { claimStore } from "../../stores/claimStore.svelte";
+    import { formatTokenAmount } from "@zarf/core/utils/amount";
+    import VestingTimeline from "./VestingTimeline.svelte";
+    import VestingScheduleTable from "./VestingScheduleTable.svelte";
+    import CliffCountdown from "./CliffCountdown.svelte";
+    import { CalendarClock, Coins, Lock, CheckCircle } from "lucide-svelte";
+    import ZenButton from "@zarf/ui/components/ui/ZenButton.svelte";
 
     let { contractAddress } = $props<{ contractAddress: string }>();
 
     // Computed formatters
-    const format = (val: bigint) => formatTokenAmount(val, claimStore.tokenDecimals, 0);
+    const format = (val: bigint) =>
+        formatTokenAmount(val, claimStore.tokenDecimals, 0);
 
     let total = $derived(claimStore.totalAllocation);
     let claimed = $derived(claimStore.claimedAmount);
     let vested = $derived(claimStore.vestedAmount);
     let claimable = $derived(claimStore.claimableAmount);
+
+    // Debug: Log when values update
+    $effect(() => {
+        console.log(
+            "[VestingStatusCard] Total:",
+            total.toString(),
+            "Claimed:",
+            claimed.toString(),
+            "Claimable:",
+            claimable.toString(),
+        );
+    });
 
     // Status Logic
     let isCliffActive = $derived(claimStore.isCliffPassed === false);
@@ -29,7 +42,9 @@
         total > 0n && hasUnlocked && !hasClaimable && !isFullyClaimed,
     );
     let vestedPercent = $derived(
-        Number(total) > 0 ? ((Number(vested) / Number(total)) * 100).toFixed(0) : '0',
+        Number(total) > 0
+            ? ((Number(vested) / Number(total)) * 100).toFixed(0)
+            : "0",
     );
 </script>
 
@@ -40,7 +55,9 @@
         <header class="space-y-4">
             <div class="flex items-start justify-between flex-wrap gap-4">
                 <div>
-                    <h2 class="text-2xl font-light tracking-tight text-zen-fg">
+                    <h2
+                        class="text-2xl font-light tracking-tight text-zen-fg"
+                    >
                         {#if isFullyClaimed}
                             Allocation Complete
                         {:else if isCliffActive}
@@ -57,11 +74,9 @@
                         {#if isFullyClaimed}
                             You have claimed 100% of your tokens.
                         {:else if isWaitingForFirstUnlock}
-                            Your allocation was found. The first unlocked period has not arrived
-                            yet.
+                            Your allocation was found. The first unlocked period has not arrived yet.
                         {:else if isWaitingForNextUnlock}
-                            Nothing new is claimable right now. Your remaining periods are still
-                            locked.
+                            Nothing new is claimable right now. Your remaining periods are still locked.
                         {:else}
                             Track your unlocking schedule.
                         {/if}
@@ -75,9 +90,12 @@
                     >
                         Total Allocation
                     </div>
-                    <div class="text-xl font-mono font-semibold text-zen-fg mt-0.5">
+                    <div
+                        class="text-xl font-mono font-semibold text-zen-fg mt-0.5"
+                    >
                         {format(total)}
-                        <span class="text-sm text-zen-fg-subtle font-sans font-normal"
+                        <span
+                            class="text-sm text-zen-fg-subtle font-sans font-normal"
                             >{claimStore.tokenSymbol}</span
                         >
                     </div>
@@ -99,7 +117,9 @@
                         class="text-[10px] uppercase tracking-wider text-zen-fg-subtle font-medium"
                         >Already Claimed</span
                     >
-                    <div class="text-xl font-mono font-semibold text-zen-fg-muted">
+                    <div
+                        class="text-xl font-mono font-semibold text-zen-fg-muted"
+                    >
                         {format(claimed)}
                     </div>
                 </div>
@@ -122,9 +142,7 @@
 
                 <!-- Claimable Now (Hero) -->
                 <div
-                    class="p-4 rounded-xl {hasClaimable
-                        ? 'bg-zen-primary/5 border-zen-primary/10'
-                        : 'bg-zen-fg/5 border-zen-border-subtle'} border-[0.5px] space-y-2 relative overflow-hidden group"
+                    class="p-4 rounded-xl {hasClaimable ? 'bg-zen-primary/5 border-zen-primary/10' : 'bg-zen-fg/5 border-zen-border-subtle'} border-[0.5px] space-y-2 relative overflow-hidden group"
                 >
                     <div
                         class="absolute inset-0 bg-gradient-to-br from-zen-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"
@@ -139,11 +157,9 @@
                         {format(claimable)}
                     </div>
                     <div
-                        class="text-[10px] {hasClaimable
-                            ? 'text-zen-primary/50'
-                            : 'text-zen-fg-subtle'} font-light relative z-10"
+                        class="text-[10px] {hasClaimable ? 'text-zen-primary/50' : 'text-zen-fg-subtle'} font-light relative z-10"
                     >
-                        {hasClaimable ? 'Ready to withdraw' : 'Awaiting unlock'}
+                        {hasClaimable ? "Ready to withdraw" : "Awaiting unlock"}
                     </div>
                     <Coins
                         class="absolute -bottom-3 -right-3 w-12 h-12 text-zen-primary/5 -rotate-12"
@@ -163,14 +179,12 @@
                 </div>
                 <div class="space-y-1">
                     <p class="text-sm font-medium text-zen-fg">
-                        {isWaitingForFirstUnlock
-                            ? 'You are eligible, but nothing is unlocked yet.'
-                            : 'You are caught up for now.'}
+                        {isWaitingForFirstUnlock ? "You are eligible, but nothing is unlocked yet." : "You are caught up for now."}
                     </p>
                     <p class="text-xs text-zen-fg-muted leading-relaxed">
                         {isWaitingForFirstUnlock
-                            ? 'Keep this distribution in your vault. The claim action will appear automatically when the first period unlocks.'
-                            : 'Return when the next period unlocks, or use the schedule below to see what is already claimed and what is still locked.'}
+                            ? "Keep this distribution in your vault. The claim action will appear automatically when the first period unlocks."
+                            : "Return when the next period unlocks, or use the schedule below to see what is already claimed and what is still locked."}
                     </p>
                 </div>
             </div>
@@ -198,7 +212,8 @@
             {:else if hasClaimable}
                 <div class="text-center space-y-2">
                     <p class="text-xs text-zen-fg-muted">
-                        Select an unlocked period from the schedule above to start your claim.
+                        Select an unlocked period from the schedule above to
+                        start your claim.
                     </p>
                 </div>
             {:else}
@@ -209,9 +224,7 @@
                 >
                     {#if isWaitingForFirstUnlock || isWaitingForNextUnlock}
                         <CalendarClock class="w-4 h-4 mr-2" />
-                        {isWaitingForFirstUnlock
-                            ? 'Waiting for First Unlock'
-                            : 'Next Unlock Pending'}
+                        {isWaitingForFirstUnlock ? "Waiting for First Unlock" : "Next Unlock Pending"}
                     {:else}
                         <Lock class="w-4 h-4 mr-2" />
                         No Tokens Available Yet

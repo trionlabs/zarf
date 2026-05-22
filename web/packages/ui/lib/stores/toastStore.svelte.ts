@@ -7,7 +7,7 @@ export interface Toast {
     message: string;
     type: ToastType;
     duration?: number;
-    icon?: Component;
+    icon?: Component; 
 }
 
 class ToastState {
@@ -17,28 +17,23 @@ class ToastState {
         const id = crypto.randomUUID();
         const toast: Toast = { id, message, type, duration };
         this.toasts.push(toast);
-        // Auto-dismiss is scheduled by ToastContainer so that hover/focus
-        // can pause the countdown (WCAG 2.2.1 Timing Adjustable). The
-        // store keeps `duration` on the toast as the source of truth.
+
+        if (duration > 0) {
+            setTimeout(() => {
+                this.remove(id);
+            }, duration);
+        }
     }
 
     remove(id: string) {
-        this.toasts = this.toasts.filter((t) => t.id !== id);
+        this.toasts = this.toasts.filter(t => t.id !== id);
     }
 
     // Convenience methods
-    success(msg: string, duration?: number) {
-        this.add(msg, 'success', duration);
-    }
-    error(msg: string, duration?: number) {
-        this.add(msg, 'error', duration);
-    }
-    info(msg: string, duration?: number) {
-        this.add(msg, 'info', duration);
-    }
-    warning(msg: string, duration?: number) {
-        this.add(msg, 'warning', duration);
-    }
+    success(msg: string, duration?: number) { this.add(msg, 'success', duration); }
+    error(msg: string, duration?: number) { this.add(msg, 'error', duration); }
+    info(msg: string, duration?: number) { this.add(msg, 'info', duration); }
+    warning(msg: string, duration?: number) { this.add(msg, 'warning', duration); }
 }
 
 export const toastStore = new ToastState();

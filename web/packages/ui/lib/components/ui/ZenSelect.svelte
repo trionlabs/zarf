@@ -1,7 +1,7 @@
 <script lang="ts">
-    import { clickOutside } from '@zarf/ui/actions/clickOutside';
-    import ChevronDown from 'lucide-svelte/icons/chevron-down';
-    import Check from 'lucide-svelte/icons/check';
+    import { clickOutside } from "@zarf/ui/actions/clickOutside";
+    import ChevronDown from "lucide-svelte/icons/chevron-down";
+    import Check from "lucide-svelte/icons/check";
 
     type OptionValue = string | number;
 
@@ -13,24 +13,24 @@
     interface Props {
         value?: OptionValue;
         options: readonly Option[] | Option[];
-        size?: 'sm' | 'md' | 'lg' | 'xl';
-        variant?: 'default' | 'ghost';
+        size?: "sm" | "md" | "lg" | "xl";
+        variant?: "default" | "ghost";
         placeholder?: string;
         disabled?: boolean;
         class?: string;
-        'aria-label'?: string;
+        "aria-label"?: string;
         onchange?: (value: OptionValue) => void;
     }
 
     let {
         value = $bindable(),
         options,
-        size = 'md',
-        variant = 'default',
-        placeholder = 'Select...',
+        size = "md",
+        variant = "default",
+        placeholder = "Select...",
         disabled = false,
-        class: className = '',
-        'aria-label': ariaLabel,
+        class: className = "",
+        "aria-label": ariaLabel,
         onchange,
     }: Props = $props();
 
@@ -48,31 +48,31 @@
      * xl variant matches the large display text in date/duration pickers
      */
     const sizeClasses = {
-        sm: 'text-sm h-8 px-2 gap-1',
-        md: 'text-base h-10 px-3 gap-2',
-        lg: 'text-xl h-12 px-4 gap-2',
-        xl: '!text-4xl h-auto px-1 py-0 gap-2 font-medium tracking-tighter leading-none',
+        sm: "text-sm h-8 px-2 gap-1",
+        md: "text-base h-10 px-3 gap-2",
+        lg: "text-xl h-12 px-4 gap-2",
+        xl: "!text-4xl h-auto px-1 py-0 gap-2 font-medium tracking-tighter leading-none",
     } as const;
 
     const dropdownSizes = {
-        sm: 'text-sm py-1',
-        md: 'text-base py-1.5',
-        lg: 'text-lg py-2',
-        xl: 'text-xl py-2',
+        sm: "text-sm py-1",
+        md: "text-base py-1.5",
+        lg: "text-lg py-2",
+        xl: "text-xl py-2",
     } as const;
 
     const optionSizes = {
-        sm: 'px-2 py-1.5 text-sm',
-        md: 'px-3 py-2 text-base',
-        lg: 'px-4 py-2.5 text-lg',
-        xl: 'px-4 py-3 text-xl',
+        sm: "px-2 py-1.5 text-sm",
+        md: "px-3 py-2 text-base",
+        lg: "px-4 py-2.5 text-lg",
+        xl: "px-4 py-3 text-xl",
     } as const;
 
     const chevronSizes = {
-        sm: 'w-3 h-3',
-        md: 'w-4 h-4',
-        lg: 'w-5 h-5',
-        xl: 'w-5 h-5',
+        sm: "w-3 h-3",
+        md: "w-4 h-4",
+        lg: "w-5 h-5",
+        xl: "w-5 h-5",
     } as const;
 
     /**
@@ -94,7 +94,7 @@
 
     const baseClasses = `
         inline-flex items-center justify-between
-        text-zen-fg transition-all duration-[var(--zen-motion-base)]
+        text-zen-fg transition-all duration-200
         disabled:opacity-50 disabled:cursor-not-allowed
         focus:outline-none cursor-pointer
     `;
@@ -126,7 +126,7 @@
 
     function handleKeydown(e: KeyboardEvent) {
         if (!isOpen) {
-            if (e.key === 'Enter' || e.key === ' ' || e.key === 'ArrowDown') {
+            if (e.key === "Enter" || e.key === " " || e.key === "ArrowDown") {
                 e.preventDefault();
                 toggle();
             }
@@ -134,25 +134,26 @@
         }
 
         switch (e.key) {
-            case 'ArrowDown':
+            case "ArrowDown":
                 e.preventDefault();
                 highlightedIndex = (highlightedIndex + 1) % options.length;
                 break;
-            case 'ArrowUp':
+            case "ArrowUp":
                 e.preventDefault();
-                highlightedIndex = (highlightedIndex - 1 + options.length) % options.length;
+                highlightedIndex =
+                    (highlightedIndex - 1 + options.length) % options.length;
                 break;
-            case 'Enter':
-            case ' ':
+            case "Enter":
+            case " ":
                 e.preventDefault();
                 selectOption(highlightedIndex);
                 break;
-            case 'Escape':
+            case "Escape":
                 e.preventDefault();
                 close();
                 triggerRef?.focus();
                 break;
-            case 'Tab':
+            case "Tab":
                 close();
                 break;
         }
@@ -195,13 +196,15 @@
                 ? `option-${highlightedIndex}`
                 : undefined}
         >
-            {#each options as option, i (option.value)}
+            {#each options as option, i}
                 <button
                     id="option-{i}"
                     type="button"
                     role="option"
                     aria-selected={value === option.value}
-                    class="w-full flex items-center justify-between {optionSizes[size]}
+                    class="w-full flex items-center justify-between {optionSizes[
+                        size
+                    ]}
                            text-left transition-colors cursor-pointer
                            {i === highlightedIndex
                         ? 'bg-zen-fg/10 text-zen-fg'

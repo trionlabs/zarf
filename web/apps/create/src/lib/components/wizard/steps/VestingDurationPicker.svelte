@@ -1,9 +1,9 @@
 <script lang="ts">
-    import { DURATION_UNITS } from '@zarf/core/constants/time';
-    import type { DurationUnit } from '@zarf/core/utils/vesting';
-    import ZenButton from '@zarf/ui/components/ui/ZenButton.svelte';
-    import ZenNumberInput from '@zarf/ui/components/ui/ZenNumberInput.svelte';
-    import ZenSelect from '@zarf/ui/components/ui/ZenSelect.svelte';
+    import { DURATION_UNITS } from "@zarf/core/constants/time";
+    import type { DurationUnit } from "@zarf/core/utils/vesting";
+    import ZenButton from "@zarf/ui/components/ui/ZenButton.svelte";
+    import ZenNumberInput from "@zarf/ui/components/ui/ZenNumberInput.svelte";
+    import ZenSelect from "@zarf/ui/components/ui/ZenSelect.svelte";
 
     let { duration = $bindable(), durationUnit = $bindable() } = $props<{
         duration: number;
@@ -43,9 +43,9 @@
 
         <!-- Quick Unit Selectors -->
         <div class="flex items-center gap-2">
-            {#each DURATION_UNITS as unit, i (i)}
+            {#each DURATION_UNITS as unit}
                 <ZenButton
-                    variant={durationUnit === unit.value ? 'primary' : 'ghost'}
+                    variant={durationUnit === unit.value ? "primary" : "ghost"}
                     size="sm"
                     class="px-3 rounded-full text-xs font-medium"
                     onclick={() => (durationUnit = unit.value as DurationUnit)}
@@ -67,9 +67,10 @@
                 <div class="text-xs space-y-1 text-zen-warning/80">
                     <p class="font-bold">Discrete Periodic Unlocks</p>
                     <p class="leading-relaxed opacity-90">
-                        Tokens unlock in full <b>{durationUnit}</b> batches only. There is no
-                        continuous streaming; users must complete a full {durationUnit.slice(0, -1)} to
-                        claim that period's allocation.
+                        Tokens unlock in full <b>{durationUnit}</b> batches
+                        only. There is no continuous streaming; users must
+                        complete a full {durationUnit.slice(0, -1)} to claim that
+                        period's allocation.
                     </p>
                 </div>
             </div>

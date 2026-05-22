@@ -3,14 +3,17 @@
  *
  * Freighter owns browser wallet access and signing. Core keeps the small typed
  * wrapper so apps and UI do not import extension APIs directly.
- *
- * `@stellar/freighter-api` is dynamically imported so the stellar-vendor chunk
- * stays off the eager root-layout graph. Value imports here would pull the SDK
- * into the initial bundle via the walletStore → root-layout edge.
  */
 
 import { browser } from '../utils/ssr';
-import type { WatchWalletChanges } from '@stellar/freighter-api';
+import {
+    getAddress,
+    getNetworkDetails,
+    isConnected,
+    requestAccess,
+    signTransaction as freighterSignTransaction,
+    WatchWalletChanges,
+} from '@stellar/freighter-api';
 import { getStellarConfig } from '../config/runtime';
 import type { StellarAddress, WalletAccount, WalletConnection } from '../types';
 
@@ -28,14 +31,6 @@ interface HorizonAccountResponse {
 }
 
 let watcher: InstanceType<typeof WatchWalletChanges> | null = null;
-let freighterPromise: Promise<typeof import('@stellar/freighter-api')> | null = null;
-
-function loadFreighter(): Promise<typeof import('@stellar/freighter-api')> {
-    if (!freighterPromise) {
-        freighterPromise = import('@stellar/freighter-api');
-    }
-    return freighterPromise;
-}
 
 function freighterErrorMessage(error: unknown): string {
     if (!error) return 'Freighter request failed';
@@ -79,19 +74,18 @@ export function isSupportedNetwork(networkPassphrase?: string): boolean {
 
 export async function connectWallet(): Promise<WalletConnection> {
     assertBrowser();
-    const fr = await loadFreighter();
 
-    const connected = await fr.isConnected();
+    const connected = await isConnected();
     if (connected.error) throw new Error(freighterErrorMessage(connected.error));
     if (!connected.isConnected) {
         throw new Error('No Stellar wallet detected. Please install Freighter.');
     }
 
-    const access = await fr.requestAccess();
+    const access = await requestAccess();
     if (access.error) throw new Error(freighterErrorMessage(access.error));
     if (!access.address) throw new Error('Freighter did not return a Stellar address.');
 
-    const network = await fr.getNetworkDetails();
+    const network = await getNetworkDetails();
     if (network.error) throw new Error(freighterErrorMessage(network.error));
 
     return {
@@ -111,9 +105,7 @@ export async function reconnectWallet(): Promise<void> {
 }
 
 export async function switchChain(): Promise<void> {
-    throw new Error(
-        'Network changes are handled in Freighter. Select the configured Stellar network there.',
-    );
+    throw new Error('Network changes are handled in Freighter. Select the configured Stellar network there.');
 }
 
 export async function getNativeBalance(address: StellarAddress): Promise<StellarBalance> {
@@ -137,12 +129,11 @@ export async function getNativeBalance(address: StellarAddress): Promise<Stellar
 
 export async function getWalletAccount(): Promise<WalletAccount> {
     if (!browser) return { isConnected: false };
-    const fr = await loadFreighter();
 
-    const connected = await fr.isConnected();
+    const connected = await isConnected();
     if (connected.error || !connected.isConnected) return { isConnected: false };
 
-    const [address, network] = await Promise.all([fr.getAddress(), fr.getNetworkDetails()]);
+    const [address, network] = await Promise.all([getAddress(), getNetworkDetails()]);
     if (address.error || network.error || !address.address) {
         return { isConnected: false };
     }
@@ -155,14 +146,11 @@ export async function getWalletAccount(): Promise<WalletAccount> {
     };
 }
 
-export async function watchWalletAccount(
-    callback: (account: WalletAccount) => void,
-): Promise<() => void> {
+export function watchWalletAccount(callback: (account: WalletAccount) => void): () => void {
     if (!browser) return () => {};
-    const fr = await loadFreighter();
 
     stopWatcher();
-    watcher = new fr.WatchWalletChanges(1000);
+    watcher = new WatchWalletChanges(1000);
     watcher.watch(({ address, network, networkPassphrase, error }) => {
         if (error || !address) {
             callback({ isConnected: false });
@@ -185,10 +173,12 @@ function stopWatcher(): void {
     watcher = null;
 }
 
-export async function signTransaction(xdr: string, address: StellarAddress): Promise<string> {
+export async function signTransaction(
+    xdr: string,
+    address: StellarAddress,
+): Promise<string> {
     const cfg = getStellarConfig();
-    const fr = await loadFreighter();
-    const result = await fr.signTransaction(xdr, {
+    const result = await freighterSignTransaction(xdr, {
         address,
         networkPassphrase: cfg.networkPassphrase,
     });

@@ -1,5 +1,5 @@
 <script lang="ts">
-    import WizardSteps from '$lib/components/wizard/WizardSteps.svelte';
+    import WizardSteps from "$lib/components/wizard/WizardSteps.svelte";
     let { children } = $props();
 </script>
 

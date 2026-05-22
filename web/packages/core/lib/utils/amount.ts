@@ -2,10 +2,7 @@
  * Token amount parsing and formatting helpers.
  */
 
-import { validateTokenDecimals } from './tokenDecimals';
-
 export function parseTokenAmount(value: string | number, decimals: number): bigint {
-    validateTokenDecimals(decimals);
     const input = String(value).trim();
     if (!/^\d+(\.\d+)?$/.test(input)) {
         throw new Error(`Invalid token amount: ${input}`);
@@ -21,13 +18,12 @@ export function parseTokenAmount(value: string | number, decimals: number): bigi
 }
 
 export function formatTokenAmount(value: bigint, decimals: number, maxFractionDigits = 4): string {
-    validateTokenDecimals(decimals);
     const divisor = 10n ** BigInt(decimals);
     const whole = value / divisor;
     const fraction = value % divisor;
 
     if (fraction === 0n || maxFractionDigits === 0) {
-        return whole.toLocaleString('en-US');
+        return whole.toLocaleString();
     }
 
     const fractionText = fraction
@@ -36,7 +32,5 @@ export function formatTokenAmount(value: bigint, decimals: number, maxFractionDi
         .slice(0, maxFractionDigits)
         .replace(/0+$/, '');
 
-    return fractionText
-        ? `${whole.toLocaleString('en-US')}.${fractionText}`
-        : whole.toLocaleString('en-US');
+    return fractionText ? `${whole.toLocaleString()}.${fractionText}` : whole.toLocaleString();
 }

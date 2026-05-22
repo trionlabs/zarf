@@ -1,13 +1,17 @@
 <script lang="ts">
-    import { fade } from 'svelte/transition';
+    import { fade } from "svelte/transition";
 
     interface Props {
         text?: string;
-        position?: 'top' | 'bottom' | 'left' | 'right';
-        children?: import('svelte').Snippet;
+        position?: "top" | "bottom" | "left" | "right";
+        children?: import("svelte").Snippet;
     }
 
-    let { text = 'Coming Soon', position = 'bottom', children }: Props = $props();
+    let {
+        text = "Coming Soon",
+        position = "bottom",
+        children,
+    }: Props = $props();
 
     let isHovered = $state(false);
     let isFocused = $state(false);

@@ -7,7 +7,7 @@
     "triggers": {
         // Google OAuth keys usually rotate roughly every couple of weeks.
         // Polling every 6 hours gives us plenty of overlap while avoiding noise.
-        "crons": ["0 */6 * * *"],
+        "crons": ["0 */6 * * *"]
     },
     "vars": {
         "GOOGLE_JWKS_URL": "https://www.googleapis.com/oauth2/v3/certs",
@@ -15,17 +15,17 @@
         "STELLAR_NETWORK_PASSPHRASE": "Test SDF Network ; September 2015",
         "JWK_REGISTRY_ADDRESS": "CCHROEUE37RFZJASWV43DGBYD4FU5G7H3AD6GKFJ2PEQAXMYGOAHMIDI",
         "REVOKE_REMOVED_KEYS": "true",
-        "TX_POLL_ATTEMPTS": "20",
+        "TX_POLL_ATTEMPTS": "20"
     },
     "observability": {
-        "enabled": true,
+        "enabled": true
     },
     "routes": [
         {
             "pattern": "jwt.zarf.to",
-            "custom_domain": true,
-        },
-    ],
+            "custom_domain": true
+        }
+    ]
     // Required secrets:
     //   wrangler secret put REGISTRY_OWNER_SECRET
     //   wrangler secret put ADMIN_TOKEN

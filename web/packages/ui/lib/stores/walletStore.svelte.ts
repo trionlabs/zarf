@@ -1,9 +1,9 @@
 /**
  * Wallet Store - Svelte 5 Runes + Stellar/Freighter Integration
- *
+ * 
  * Single source of truth for wallet connection state.
  * Supports Freighter connection, network validation, and XLM balance display.
- *
+ * 
  * @module stores/walletStore
  */
 
@@ -19,17 +19,13 @@ import {
     formatAddress,
     isSupportedNetwork,
     getConfiguredNetworkName,
-} from '@zarf/core/contracts/wallet';
-import { getAccountExplorerUrl } from '@zarf/core/contracts/explorer';
-import type { StellarAddress, WalletAccount } from '@zarf/core/types';
+} from "@zarf/core/contracts/wallet";
+import { getAccountExplorerUrl } from "@zarf/core/contracts";
+import type { StellarAddress, WalletAccount } from "@zarf/core/types";
 import { sanitizeBlockchainError } from '../utils/errorSanitizer';
 import { networkStore } from './networkStore.svelte';
 
-interface WalletBalance {
-    value: bigint;
-    formatted: string;
-    symbol: string;
-}
+interface WalletBalance { value: bigint; formatted: string; symbol: string; }
 
 interface WalletState {
     address: StellarAddress | null;
@@ -56,10 +52,10 @@ const initialState: WalletState = {
     networkPassphrase: null,
     balance: null,
     error: null,
-    isModalOpen: false, // Added
+    isModalOpen: false // Added
 };
 
-const state = $state<WalletState>(structuredClone(initialState));
+let state = $state<WalletState>(structuredClone(initialState));
 let unwatchFn: (() => void) | null = null;
 let isInitialized = false;
 
@@ -67,20 +63,12 @@ let isInitialized = false;
 const activeNetworkId = $derived(networkStore.activeId);
 const configuredNetworkName = $derived(networkStore.active?.label ?? getConfiguredNetworkName());
 const isWrongNetwork = $derived(
-    activeNetworkId &&
-        state.isConnected &&
-        !isSupportedNetwork(state.networkPassphrase ?? undefined),
+    activeNetworkId && state.isConnected && !isSupportedNetwork(state.networkPassphrase ?? undefined),
 );
 const networkName = $derived(state.network || configuredNetworkName);
 const shortAddress = $derived(state.address ? formatAddress(state.address) : null);
-const isLoading = $derived(
-    state.isConnecting || state.isDisconnecting || state.isReconnecting || state.isSwitchingNetwork,
-);
-const formattedBalance = $derived(
-    state.balance
-        ? `${parseFloat(state.balance.formatted).toFixed(4)} ${state.balance.symbol}`
-        : null,
-);
+const isLoading = $derived(state.isConnecting || state.isDisconnecting || state.isReconnecting || state.isSwitchingNetwork);
+const formattedBalance = $derived(state.balance ? `${parseFloat(state.balance.formatted).toFixed(4)} ${state.balance.symbol}` : null);
 
 // Private Helpers
 
@@ -113,11 +101,7 @@ function updateInternalState(account: WalletAccount) {
     // Balance Fetch Logic
     if (state.isConnected && state.address) {
         // Fetch if address/chain changed or valid connected state exists
-        if (
-            state.address !== prevAddress ||
-            state.networkPassphrase !== prevNetworkPassphrase ||
-            !state.balance
-        ) {
+        if (state.address !== prevAddress || state.networkPassphrase !== prevNetworkPassphrase || !state.balance) {
             refreshBalance();
         }
     } else {
@@ -135,18 +119,12 @@ function syncFromWallet() {
 function sanitizeError(err: unknown): string {
     return sanitizeBlockchainError(err, {
         customRules: [
-            {
-                match: /No wallet|No Stellar wallet|Freighter/i,
-                message: 'No Stellar wallet detected. Please install Freighter.',
-            },
-            {
-                match: 'already pending',
-                message: 'A connection request is already pending. Check your wallet.',
-            },
-            {
-                match: 'Network changes',
-                message: 'Switch to the configured Stellar network in Freighter.',
-            },
+            { match: /No wallet|No Stellar wallet|Freighter/i,
+                message: 'No Stellar wallet detected. Please install Freighter.' },
+            { match: 'already pending',
+                message: 'A connection request is already pending. Check your wallet.' },
+            { match: 'Network changes',
+                message: 'Switch to the configured Stellar network in Freighter.' },
         ],
     });
 }
@@ -159,31 +137,16 @@ async function init() {
     state.isReconnecting = true;
 
     // 1. Attempt Auto-Reconnect
-    // Reconnect failure is expected on first visit / cleared session;
-    // swallow and proceed with a disconnected initial state.
-    try {
-        await stellarReconnect();
-    } catch {
-        /* no-op */
-    } finally {
-        state.isReconnecting = false;
-    }
-    if (!isInitialized) return; // destroy() ran during reconnect
+    try { await stellarReconnect(); } catch (e) { } finally { state.isReconnecting = false; }
 
     // 2. Initial Sync
     syncFromWallet();
 
     // 3. Setup Watcher
     if (unwatchFn) unwatchFn();
-    const unwatch = await watchWalletAccount((account: WalletAccount) => {
+    unwatchFn = watchWalletAccount((account: WalletAccount) => {
         updateInternalState({ ...account, address: account.address ?? undefined });
     });
-    if (!isInitialized) {
-        // destroy() ran during the dynamic import — stop the orphan watcher
-        unwatch();
-        return;
-    }
-    unwatchFn = unwatch;
 }
 
 /**
@@ -194,7 +157,7 @@ async function init() {
 async function requestConnection() {
     try {
         await connect();
-    } catch {
+    } catch (e) {
         state.isModalOpen = true;
     }
 }
@@ -216,10 +179,7 @@ async function refreshBalance() {
 
 async function connect() {
     if (!browser) return;
-    if (state.isReconnecting) {
-        state.error = 'Please wait, restoring previous session...';
-        return;
-    }
+    if (state.isReconnecting) { state.error = 'Please wait, restoring previous session...'; return; }
 
     // Close modal if open
     state.isModalOpen = false;
@@ -235,9 +195,9 @@ async function connect() {
             networkPassphrase: result.networkPassphrase,
         });
         return result;
-    } catch (err: unknown) {
+    } catch (err: any) {
         // If it's already connected error, we can ignore it and just sync state
-        if (err instanceof Error && err.name === 'ConnectorAlreadyConnectedError') {
+        if (err.name === 'ConnectorAlreadyConnectedError') {
             syncFromWallet();
             return;
         }
@@ -256,11 +216,7 @@ async function disconnect() {
         await stellarDisconnect();
         updateInternalState({ isConnected: false });
         // State update handled by watcher
-    } catch (err: unknown) {
-        state.error = sanitizeError(err);
-    } finally {
-        state.isDisconnecting = false;
-    }
+    } catch (err: any) { state.error = sanitizeError(err); } finally { state.isDisconnecting = false; }
 }
 
 async function switchChain() {
@@ -270,75 +226,36 @@ async function switchChain() {
     try {
         await stellarSwitchChain();
         // State update handled by watcher
-    } catch (err: unknown) {
-        state.error = sanitizeError(err);
-    } finally {
-        state.isSwitchingNetwork = false;
-    }
+    } catch (err: any) { state.error = sanitizeError(err); } finally { state.isSwitchingNetwork = false; }
 }
 
-function clearError() {
-    state.error = null;
-}
+function clearError() { state.error = null; }
 
 function destroy() {
-    if (unwatchFn) {
-        unwatchFn();
-        unwatchFn = null;
-    }
+    if (unwatchFn) { unwatchFn(); unwatchFn = null; }
     isInitialized = false;
 }
 
-function setError(message: string) {
-    state.error = message;
-}
+function setError(message: string) { state.error = message; }
 
 export const walletStore = {
     // State getters
-    get address() {
-        return state.address;
-    },
-    get isConnected() {
-        return state.isConnected;
-    },
-    get isConnecting() {
-        return state.isConnecting;
-    },
-    get isDisconnecting() {
-        return state.isDisconnecting;
-    },
-    get isSwitchingNetwork() {
-        return state.isSwitchingNetwork;
-    },
-    get network() {
-        return state.network;
-    },
-    get networkPassphrase() {
-        return state.networkPassphrase;
-    },
-    get balance() {
-        return state.balance;
-    },
-    get error() {
-        return state.error;
-    },
-    get isModalOpen() {
-        return state.isModalOpen;
-    }, // Exposed
+    get address() { return state.address; },
+    get isConnected() { return state.isConnected; },
+    get isConnecting() { return state.isConnecting; },
+    get isDisconnecting() { return state.isDisconnecting; },
+    get isSwitchingNetwork() { return state.isSwitchingNetwork; },
+    get network() { return state.network; },
+    get networkPassphrase() { return state.networkPassphrase; },
+    get balance() { return state.balance; },
+    get error() { return state.error; },
+    get isModalOpen() { return state.isModalOpen; }, // Exposed
 
     // Derived getters
-    get isWrongNetwork() {
-        return isWrongNetwork;
-    },
-    get networkName() {
-        return networkName;
-    },
-    get shortAddress() {
-        return shortAddress;
-    },
-    get formattedBalance() {
-        return formattedBalance;
-    },
+    get isWrongNetwork() { return isWrongNetwork; },
+    get networkName() { return networkName; },
+    get shortAddress() { return shortAddress; },
+    get formattedBalance() { return formattedBalance; },
     get accountExplorerUrl() {
         if (!state.address) return null;
         try {
@@ -347,9 +264,7 @@ export const walletStore = {
             return null;
         }
     },
-    get isLoading() {
-        return isLoading;
-    },
+    get isLoading() { return isLoading; },
 
     // Actions
     init,
@@ -361,7 +276,11 @@ export const walletStore = {
     clearError,
     setError, // Added
     closeModal, // Exposed
-    destroy,
+    destroy
 };
 
-export { formatAddress, isSupportedNetwork, getConfiguredNetworkName };
+export {
+    formatAddress,
+    isSupportedNetwork,
+    getConfiguredNetworkName,
+};

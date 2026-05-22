@@ -1,26 +1,26 @@
 <script lang="ts">
-    import type { ComponentType } from 'svelte';
-    import type { HTMLInputAttributes } from 'svelte/elements';
+    import type { ComponentType } from "svelte";
+    import type { HTMLInputAttributes } from "svelte/elements";
 
     interface Props extends HTMLInputAttributes {
         label?: string;
         error?: string | null;
         icon?: ComponentType;
         containerClass?: string;
-        tag?: 'input' | 'textarea';
-        variant?: 'bordered' | 'ghost';
+        tag?: "input" | "textarea";
+        variant?: "bordered" | "ghost";
     }
 
     let {
         label,
         error = null,
         icon: Icon,
-        containerClass = '',
-        class: className = '',
+        containerClass = "",
+        class: className = "",
         id,
         value = $bindable(),
-        tag = 'input',
-        variant = 'bordered',
+        tag = "input",
+        variant = "bordered",
         ...rest
     }: Props = $props();
 
@@ -29,7 +29,7 @@
     const errorId = $derived(`${inputId}-error`);
 
     const baseInputClasses = `
-        w-full transition-all duration-[var(--zen-motion-base)]
+        w-full transition-all duration-200
         text-zen-fg placeholder:text-zen-fg-subtle
         disabled:opacity-50 disabled:cursor-not-allowed
         focus:outline-none
@@ -53,7 +53,11 @@
         `,
     };
 
-    const errorClasses = $derived(error ? 'border-zen-error text-zen-error' : '');
+    const errorClasses = $derived(
+        error
+            ? "border-zen-error text-zen-error"
+            : ""
+    );
 </script>
 
 <div class="w-full {containerClass}">
@@ -67,21 +71,17 @@
     {/if}
 
     <div class="relative group">
-        {#if Icon && tag === 'input'}
-            <div
-                class="absolute left-4 top-1/2 -translate-y-1/2 text-zen-fg-faint group-focus-within:text-zen-primary transition-colors pointer-events-none"
-            >
+        {#if Icon && tag === "input"}
+            <div class="absolute left-4 top-1/2 -translate-y-1/2 text-zen-fg-faint group-focus-within:text-zen-primary transition-colors pointer-events-none">
                 <Icon class="w-5 h-5" />
             </div>
         {/if}
 
-        {#if tag === 'input'}
+        {#if tag === "input"}
             <input
                 id={inputId}
-                class="{baseInputClasses} {variantClasses[variant]} {errorClasses} {Icon
-                    ? 'pl-12'
-                    : ''} {className}"
-                aria-invalid={error ? 'true' : undefined}
+                class="{baseInputClasses} {variantClasses[variant]} {errorClasses} {Icon ? 'pl-12' : ''} {className}"
+                aria-invalid={error ? "true" : undefined}
                 aria-describedby={error ? errorId : undefined}
                 bind:value
                 {...rest}
@@ -89,10 +89,8 @@
         {:else}
             <textarea
                 id={inputId}
-                class="{baseInputClasses} {variantClasses[
-                    variant
-                ]} {errorClasses} resize-none min-h-24 {className}"
-                aria-invalid={error ? 'true' : undefined}
+                class="{baseInputClasses} {variantClasses[variant]} {errorClasses} resize-none min-h-24 {className}"
+                aria-invalid={error ? "true" : undefined}
                 aria-describedby={error ? errorId : undefined}
                 bind:value
                 {...rest as any}

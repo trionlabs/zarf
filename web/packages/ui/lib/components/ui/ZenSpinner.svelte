@@ -1,17 +1,17 @@
 <script lang="ts">
     interface Props {
-        size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
+        size?: "xs" | "sm" | "md" | "lg" | "xl";
         class?: string;
     }
 
-    let { size = 'md', class: className = '' }: Props = $props();
+    let { size = "md", class: className = "" }: Props = $props();
 
     const sizeClasses = {
-        xs: 'w-3 h-3',
-        sm: 'w-4 h-4',
-        md: 'w-6 h-6',
-        lg: 'w-8 h-8',
-        xl: 'w-12 h-12',
+        xs: "w-3 h-3",
+        sm: "w-4 h-4",
+        md: "w-6 h-6",
+        lg: "w-8 h-8",
+        xl: "w-12 h-12",
     };
 </script>
 
@@ -22,7 +22,14 @@
     viewBox="0 0 24 24"
     aria-label="Loading"
 >
-    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+    <circle
+        class="opacity-25"
+        cx="12"
+        cy="12"
+        r="10"
+        stroke="currentColor"
+        stroke-width="4"
+    />
     <path
         class="opacity-75"
         fill="currentColor"

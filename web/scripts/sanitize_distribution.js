@@ -11,8 +11,8 @@ const INPUT_FILE = process.argv[2] || 'static/distribution.json';
 const ADDRESS = process.argv[3];
 
 if (!ADDRESS) {
-    console.error('❌ Error: Contract Address is required.');
-    console.error('Usage: node scripts/sanitize_distribution.js <input-file> <contract-address>');
+    console.error("❌ Error: Contract Address is required.");
+    console.error("Usage: node scripts/sanitize_distribution.js <input-file> <contract-address>");
     process.exit(1);
 }
 
@@ -38,7 +38,7 @@ const schedule = data.schedule || {
     vestingStart: Math.floor(Date.now() / 1000) - 86400, // Started yesterday
     cliffDuration: 0,
     vestingDuration: 0,
-    vestingPeriod: 1,
+    vestingPeriod: 1
 };
 
 if (!data.schedule) {
@@ -52,24 +52,24 @@ const leaves = [];
 if (Array.isArray(data.recipients)) {
     console.log(`Processing ${data.recipients.length} recipients...`);
 
-    data.recipients.forEach((r) => {
+    data.recipients.forEach(r => {
         // Calculate Unlock Time
         // For Discrete Vesting, usually different leaves have different times.
         // If the JSON lacks specific unlock times, we use the Schedule's start + cliff.
-        const unlockTime = r.unlockTime || schedule.vestingStart + schedule.cliffDuration;
+        const unlockTime = r.unlockTime || (schedule.vestingStart + schedule.cliffDuration);
 
         // Map Key: IdentityCommitment (The hash of Email + PIN)
         // Map Value: Public Metadata
         commitments[r.identityCommitment] = {
             amount: r.amount,
             unlockTime: unlockTime,
-            index: r.leafIndex,
+            index: r.leafIndex
         };
 
         leaves.push(r.leaf);
     });
 } else if (data.commitments) {
-    console.log('Data already seems to be in Map format.');
+    console.log("Data already seems to be in Map format.");
     Object.assign(commitments, data.commitments);
 } else {
     console.error("❌ Error: Could not find 'recipients' array or 'commitments' map in input.");
@@ -83,7 +83,7 @@ const output = {
     distributionId: data.distributionId, // Optional, but good to keep
     schedule: schedule,
     commitments: commitments,
-    leaves: leaves, // Optional legacy support
+    leaves: leaves // Optional legacy support
 };
 
 // Write to static/distributions

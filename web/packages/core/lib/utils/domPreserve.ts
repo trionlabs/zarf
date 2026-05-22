@@ -27,7 +27,7 @@ export function detectSESLockdown(): boolean {
         typeof (globalThis as any).Compartment === 'function',
     ];
 
-    return signals.some((s) => s);
+    return signals.some(s => s);
 }
 
 /**
@@ -58,25 +58,13 @@ export function installSESShim(): void {
 
     const originalGOPD = Object.getOwnPropertyDescriptor;
     const domProps = [
-        'nextSibling',
-        'previousSibling',
-        'firstChild',
-        'lastChild',
-        'childNodes',
-        'parentNode',
-        'parentElement',
-        'textContent',
-        'nextElementSibling',
-        'previousElementSibling',
-        'firstElementChild',
-        'lastElementChild',
-        'children',
+        'nextSibling', 'previousSibling', 'firstChild', 'lastChild',
+        'childNodes', 'parentNode', 'parentElement', 'textContent',
+        'nextElementSibling', 'previousElementSibling',
+        'firstElementChild', 'lastElementChild', 'children'
     ];
 
-    Object.getOwnPropertyDescriptor = function (
-        obj: any,
-        prop: PropertyKey,
-    ): PropertyDescriptor | undefined {
+    Object.getOwnPropertyDescriptor = function(obj: any, prop: PropertyKey): PropertyDescriptor | undefined {
         const desc = originalGOPD(obj, prop);
 
         // If it's a DOM prototype and the property is a known DOM traversal property
@@ -90,9 +78,7 @@ export function installSESShim(): void {
                 return {
                     configurable: true,
                     enumerable: true,
-                    get: function (this: any) {
-                        return this[prop];
-                    },
+                    get: function(this: any) { return this[prop]; }
                 };
             }
         }
