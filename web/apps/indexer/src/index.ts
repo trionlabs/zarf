@@ -23,8 +23,8 @@ import {
     rpc,
     scValToNative,
     xdr,
-} from "@stellar/stellar-sdk";
-import { Buffer } from "buffer";
+} from '@stellar/stellar-sdk';
+import { Buffer } from 'buffer';
 
 interface Env {
     ALLOWED_ORIGINS?: string;
@@ -88,18 +88,18 @@ class HttpError extends Error {
         message: string,
     ) {
         super(message);
-        this.name = "HttpError";
+        this.name = 'HttpError';
     }
 }
 
 const SIMULATION_SOURCE = StrKey.encodeEd25519PublicKey(Buffer.alloc(32));
-const TESTNET_PASSPHRASE = "Test SDF Network ; September 2015";
-const MAINNET_PASSPHRASE = "Public Global Stellar Network ; September 2015";
+const TESTNET_PASSPHRASE = 'Test SDF Network ; September 2015';
+const MAINNET_PASSPHRASE = 'Public Global Stellar Network ; September 2015';
 const IPFS_READ_GATEWAYS = [
-    "https://gateway.pinata.cloud/ipfs",
-    "https://ipfs.io/ipfs",
-    "https://dweb.link/ipfs",
-    "https://w3s.link/ipfs",
+    'https://gateway.pinata.cloud/ipfs',
+    'https://ipfs.io/ipfs',
+    'https://dweb.link/ipfs',
+    'https://w3s.link/ipfs',
 ];
 const GATEWAY_TIMEOUT_MS = 5_000;
 const FACTORY_RANGE_LIMIT = 100;
@@ -107,48 +107,52 @@ const FACTORY_RANGE_LIMIT = 100;
 export default {
     async fetch(request: Request, env: Env): Promise<Response> {
         const url = new URL(request.url);
-        const origin = request.headers.get("Origin");
+        const origin = request.headers.get('Origin');
         const corsHeaders = buildCorsHeaders(origin, env);
 
-        if (request.method === "OPTIONS") {
+        if (request.method === 'OPTIONS') {
             return new Response(null, { status: 204, headers: corsHeaders });
         }
 
-        if (request.method !== "GET") {
-            return json({ error: "method_not_allowed" }, 405, corsHeaders);
+        if (request.method !== 'GET') {
+            return json({ error: 'method_not_allowed' }, 405, corsHeaders);
         }
 
         try {
-            if (url.pathname === "/health") {
-                return json({
-                    ok: true,
-                    cache: "none",
-                }, 200, corsHeaders);
+            if (url.pathname === '/health') {
+                return json(
+                    {
+                        ok: true,
+                        cache: 'none',
+                    },
+                    200,
+                    corsHeaders,
+                );
             }
 
-            const parts = url.pathname.split("/").filter(Boolean);
-            if (parts[0] !== "v1") {
-                return json({ error: "not_found" }, 404, corsHeaders);
+            const parts = url.pathname.split('/').filter(Boolean);
+            if (parts[0] !== 'v1') {
+                return json({ error: 'not_found' }, 404, corsHeaders);
             }
 
-            if (parts[1] === "ipfs" && parts.length === 3) {
+            if (parts[1] === 'ipfs' && parts.length === 3) {
                 return handleIpfsRead(parts[2], corsHeaders);
             }
 
-            if (parts.length === 4 && parts[2] === "ledger" && parts[3] === "latest") {
+            if (parts.length === 4 && parts[2] === 'ledger' && parts[3] === 'latest') {
                 const network = decodeSegment(parts[1]);
                 const cfg = getNetworkConfig(env, network);
                 return handleLatestLedger(cfg, corsHeaders);
             }
 
-            if (parts.length === 5 && parts[2] === "factory" && parts[3] === "predict") {
+            if (parts.length === 5 && parts[2] === 'factory' && parts[3] === 'predict') {
                 const network = decodeSegment(parts[1]);
                 const cfg = getNetworkConfig(env, network);
                 const salt = decodeSegment(parts[4]);
                 return handlePredictVestingAddress(salt, cfg, corsHeaders);
             }
 
-            if (parts.length >= 3 && parts[2] === "vestings") {
+            if (parts.length >= 3 && parts[2] === 'vestings') {
                 const network = decodeSegment(parts[1]);
                 const cfg = getNetworkConfig(env, network);
                 if (parts.length === 3) {
@@ -158,48 +162,44 @@ export default {
                     const address = decodeSegment(parts[3]);
                     return handleVesting(address, cfg, corsHeaders);
                 }
-                if (parts.length === 6 && parts[4] === "claimed") {
+                if (parts.length === 6 && parts[4] === 'claimed') {
                     const address = decodeSegment(parts[3]);
                     const commitment = decodeSegment(parts[5]);
                     return handleEpochClaimed(address, commitment, cfg, corsHeaders);
                 }
-                if (parts.length === 6 && parts[4] === "recipient-id") {
+                if (parts.length === 6 && parts[4] === 'recipient-id') {
                     const address = decodeSegment(parts[3]);
                     const recipient = decodeSegment(parts[5]);
                     return handleRecipientId(address, recipient, cfg, corsHeaders);
                 }
             }
 
-            if (parts.length >= 4 && parts[2] === "tokens") {
+            if (parts.length >= 4 && parts[2] === 'tokens') {
                 const network = decodeSegment(parts[1]);
                 const cfg = getNetworkConfig(env, network);
                 const token = decodeSegment(parts[3]);
                 if (parts.length === 4) {
                     return handleTokenMetadata(token, cfg, corsHeaders);
                 }
-                if (parts.length === 6 && parts[4] === "balances") {
+                if (parts.length === 6 && parts[4] === 'balances') {
                     const owner = decodeSegment(parts[5]);
                     return handleTokenBalance(token, owner, cfg, corsHeaders);
                 }
-                if (parts.length === 7 && parts[4] === "allowances") {
+                if (parts.length === 7 && parts[4] === 'allowances') {
                     const owner = decodeSegment(parts[5]);
                     const spender = decodeSegment(parts[6]);
                     return handleTokenAllowance(token, owner, spender, cfg, corsHeaders);
                 }
             }
 
-            if (
-                parts.length === 5 &&
-                parts[2] === "owners" &&
-                parts[4] === "vestings"
-            ) {
+            if (parts.length === 5 && parts[2] === 'owners' && parts[4] === 'vestings') {
                 const network = decodeSegment(parts[1]);
                 const owner = decodeSegment(parts[3]);
                 const cfg = getNetworkConfig(env, network);
                 return handleOwnerVestings(owner, url, env, cfg, corsHeaders);
             }
 
-            return json({ error: "not_found" }, 404, corsHeaders);
+            return json({ error: 'not_found' }, 404, corsHeaders);
         } catch (error) {
             if (error instanceof HttpError) {
                 return json(
@@ -209,8 +209,8 @@ export default {
                 );
             }
 
-            console.error("[Indexer] Unhandled error:", error);
-            return json({ error: "indexer_error" }, 500, corsHeaders);
+            console.error('[Indexer] Unhandled error:', error);
+            return json({ error: 'indexer_error' }, 500, corsHeaders);
         }
     },
 };
@@ -220,14 +220,18 @@ async function handleAllVestings(
     corsHeaders: Record<string, string>,
 ): Promise<Response> {
     const deployments = await fetchDeploymentInfos(cfg);
-    return json({
-        vestings: deployments.map(({ address, metadataCid }) => ({
-            address,
-            metadataCid,
-        })),
-        total: deployments.length,
-        fetchedAt: Date.now(),
-    }, 200, corsHeaders);
+    return json(
+        {
+            vestings: deployments.map(({ address, metadataCid }) => ({
+                address,
+                metadataCid,
+            })),
+            total: deployments.length,
+            fetchedAt: Date.now(),
+        },
+        200,
+        corsHeaders,
+    );
 }
 
 async function handleOwnerVestings(
@@ -237,7 +241,7 @@ async function handleOwnerVestings(
     cfg: NetworkConfig,
     corsHeaders: Record<string, string>,
 ): Promise<Response> {
-    assertAddress(owner, "owner");
+    assertAddress(owner, 'owner');
 
     const maxContracts = readMaxContracts(url, env);
     const deployments = await fetchOwnerDeploymentInfos(cfg, owner);
@@ -252,11 +256,17 @@ async function handleOwnerVestings(
         }),
     );
 
-    return json({
-        contracts: contracts.filter((contract): contract is VestingContract => contract !== null),
-        total: deployments.length,
-        fetchedAt: Date.now(),
-    }, 200, corsHeaders);
+    return json(
+        {
+            contracts: contracts.filter(
+                (contract): contract is VestingContract => contract !== null,
+            ),
+            total: deployments.length,
+            fetchedAt: Date.now(),
+        },
+        200,
+        corsHeaders,
+    );
 }
 
 async function handleVesting(
@@ -264,7 +274,7 @@ async function handleVesting(
     cfg: NetworkConfig,
     corsHeaders: Record<string, string>,
 ): Promise<Response> {
-    assertAddress(address, "vesting address");
+    assertAddress(address, 'vesting address');
 
     return json(await getVestingContract(cfg, address), 200, corsHeaders);
 }
@@ -281,10 +291,14 @@ async function handleLatestLedger(
     cfg: NetworkConfig,
     corsHeaders: Record<string, string>,
 ): Promise<Response> {
-    return json({
-        sequence: await getLatestLedgerSequence(cfg),
-        fetchedAt: Date.now(),
-    }, 200, corsHeaders);
+    return json(
+        {
+            sequence: await getLatestLedgerSequence(cfg),
+            fetchedAt: Date.now(),
+        },
+        200,
+        corsHeaders,
+    );
 }
 
 async function handlePredictVestingAddress(
@@ -292,12 +306,16 @@ async function handlePredictVestingAddress(
     cfg: NetworkConfig,
     corsHeaders: Record<string, string>,
 ): Promise<Response> {
-    validateHex32(salt, "salt");
+    validateHex32(salt, 'salt');
 
-    return json({
-        address: await predictVestingAddress(cfg, salt),
-        fetchedAt: Date.now(),
-    }, 200, corsHeaders);
+    return json(
+        {
+            address: await predictVestingAddress(cfg, salt),
+            fetchedAt: Date.now(),
+        },
+        200,
+        corsHeaders,
+    );
 }
 
 async function handleEpochClaimed(
@@ -306,13 +324,17 @@ async function handleEpochClaimed(
     cfg: NetworkConfig,
     corsHeaders: Record<string, string>,
 ): Promise<Response> {
-    assertAddress(address, "vesting address");
-    validateHex32(commitment, "epoch commitment");
+    assertAddress(address, 'vesting address');
+    validateHex32(commitment, 'epoch commitment');
 
-    return json({
-        claimed: await isEpochClaimed(cfg, address, commitment),
-        fetchedAt: Date.now(),
-    }, 200, corsHeaders);
+    return json(
+        {
+            claimed: await isEpochClaimed(cfg, address, commitment),
+            fetchedAt: Date.now(),
+        },
+        200,
+        corsHeaders,
+    );
 }
 
 async function handleRecipientId(
@@ -321,13 +343,17 @@ async function handleRecipientId(
     cfg: NetworkConfig,
     corsHeaders: Record<string, string>,
 ): Promise<Response> {
-    assertAddress(address, "vesting address");
-    assertAddress(recipient, "recipient");
+    assertAddress(address, 'vesting address');
+    assertAddress(recipient, 'recipient');
 
-    return json({
-        recipientId: await recipientId(cfg, address, recipient),
-        fetchedAt: Date.now(),
-    }, 200, corsHeaders);
+    return json(
+        {
+            recipientId: await recipientId(cfg, address, recipient),
+            fetchedAt: Date.now(),
+        },
+        200,
+        corsHeaders,
+    );
 }
 
 async function handleTokenMetadata(
@@ -335,7 +361,7 @@ async function handleTokenMetadata(
     cfg: NetworkConfig,
     corsHeaders: Record<string, string>,
 ): Promise<Response> {
-    assertAddress(token, "token address");
+    assertAddress(token, 'token address');
 
     return json(await readTokenContract(cfg, token), 200, corsHeaders);
 }
@@ -346,13 +372,17 @@ async function handleTokenBalance(
     cfg: NetworkConfig,
     corsHeaders: Record<string, string>,
 ): Promise<Response> {
-    assertAddress(token, "token address");
-    assertAddress(owner, "owner");
+    assertAddress(token, 'token address');
+    assertAddress(owner, 'owner');
 
-    return json({
-        balance: (await getTokenBalance(cfg, token, owner)).toString(),
-        fetchedAt: Date.now(),
-    }, 200, corsHeaders);
+    return json(
+        {
+            balance: (await getTokenBalance(cfg, token, owner)).toString(),
+            fetchedAt: Date.now(),
+        },
+        200,
+        corsHeaders,
+    );
 }
 
 async function handleTokenAllowance(
@@ -362,48 +392,46 @@ async function handleTokenAllowance(
     cfg: NetworkConfig,
     corsHeaders: Record<string, string>,
 ): Promise<Response> {
-    assertAddress(token, "token address");
-    assertAddress(owner, "owner");
-    assertAddress(spender, "spender");
+    assertAddress(token, 'token address');
+    assertAddress(owner, 'owner');
+    assertAddress(spender, 'spender');
 
-    return json({
-        allowance: (await getTokenAllowance(cfg, token, owner, spender)).toString(),
-        fetchedAt: Date.now(),
-    }, 200, corsHeaders);
+    return json(
+        {
+            allowance: (await getTokenAllowance(cfg, token, owner, spender)).toString(),
+            fetchedAt: Date.now(),
+        },
+        200,
+        corsHeaders,
+    );
 }
 
-async function getVestingContract(
-    cfg: NetworkConfig,
-    address: string,
-): Promise<VestingContract> {
+async function getVestingContract(cfg: NetworkConfig, address: string): Promise<VestingContract> {
     const metadata = await readVestingContract(cfg, address);
-    const tokenBalance = await getTokenBalance(cfg, metadata.token, address)
-        .catch((error) => {
-            console.warn(`[Indexer] Failed to fetch token balance for ${address}:`, error);
-            return 0n;
-        });
+    const tokenBalance = await getTokenBalance(cfg, metadata.token, address).catch((error) => {
+        console.warn(`[Indexer] Failed to fetch token balance for ${address}:`, error);
+        return 0n;
+    });
 
     return {
         address,
-        name: sanitizeString(metadata.name || "Unknown Distribution", 50),
-        description: sanitizeString(metadata.description || "", 200),
+        name: sanitizeString(metadata.name || 'Unknown Distribution', 50),
+        description: sanitizeString(metadata.description || '', 200),
         token: metadata.token,
         merkleRoot: metadata.merkleRoot,
-        tokenSymbol: sanitizeString(metadata.tokenSymbol || "XLM", 10),
+        tokenSymbol: sanitizeString(metadata.tokenSymbol || 'XLM', 10),
         tokenDecimals: metadata.tokenDecimals,
         owner: metadata.owner,
-        vestingStart: "0",
-        cliffDuration: "0",
-        vestingDuration: "0",
-        vestingPeriod: "0",
+        vestingStart: '0',
+        cliffDuration: '0',
+        vestingDuration: '0',
+        vestingPeriod: '0',
         tokenBalance: tokenBalance.toString(),
         metadataCid: metadata.metadataCid,
     };
 }
 
-async function fetchDeploymentInfos(
-    cfg: NetworkConfig,
-): Promise<DeploymentInfo[]> {
+async function fetchDeploymentInfos(cfg: NetworkConfig): Promise<DeploymentInfo[]> {
     const count = await getDeploymentCount(cfg);
     return fetchDeploymentInfoRanges(count, (start, limit) =>
         getDeploymentInfos(cfg, start, limit),
@@ -426,13 +454,10 @@ async function fetchDeploymentInfoRanges(
 ): Promise<DeploymentInfo[]> {
     if (count === 0) return [];
 
-    const chunks = Array.from(
-        { length: Math.ceil(count / FACTORY_RANGE_LIMIT) },
-        (_, chunk) => {
-            const start = chunk * FACTORY_RANGE_LIMIT;
-            return readRange(start, Math.min(FACTORY_RANGE_LIMIT, count - start));
-        },
-    );
+    const chunks = Array.from({ length: Math.ceil(count / FACTORY_RANGE_LIMIT) }, (_, chunk) => {
+        const start = chunk * FACTORY_RANGE_LIMIT;
+        return readRange(start, Math.min(FACTORY_RANGE_LIMIT, count - start));
+    });
     const results = await Promise.all(chunks);
     return results.flat();
 }
@@ -440,18 +465,20 @@ async function fetchDeploymentInfoRanges(
 async function readVestingContract(
     cfg: NetworkConfig,
     address: string,
-): Promise<VestingSummary & {
-    tokenSymbol: string;
-    tokenDecimals: number;
-}> {
-    const summary = parseVestingSummary(await simulate(cfg, address, "summary"));
+): Promise<
+    VestingSummary & {
+        tokenSymbol: string;
+        tokenDecimals: number;
+    }
+> {
+    const summary = parseVestingSummary(await simulate(cfg, address, 'summary'));
     const tokenAddress = summary.token;
-    let tokenSymbol = "XLM";
+    let tokenSymbol = 'XLM';
     let tokenDecimals = 7;
     try {
         const [symbol, decimals] = await Promise.all([
-            simulate(cfg, tokenAddress, "symbol"),
-            simulate(cfg, tokenAddress, "decimals"),
+            simulate(cfg, tokenAddress, 'symbol'),
+            simulate(cfg, tokenAddress, 'decimals'),
         ]);
         tokenSymbol = String(scValToNative(symbol));
         tokenDecimals = Number(scValToNative(decimals));
@@ -471,7 +498,7 @@ async function getTokenBalance(
     tokenAddress: string,
     owner: string,
 ): Promise<bigint> {
-    return scValToBigInt(await simulate(cfg, tokenAddress, "balance", [scAddress(owner)]));
+    return scValToBigInt(await simulate(cfg, tokenAddress, 'balance', [scAddress(owner)]));
 }
 
 async function readTokenContract(
@@ -485,9 +512,9 @@ async function readTokenContract(
     logoUrl: string | null;
 }> {
     const [name, symbol, decimals] = await Promise.all([
-        simulate(cfg, tokenAddress, "name").catch(() => null),
-        simulate(cfg, tokenAddress, "symbol").catch(() => null),
-        simulate(cfg, tokenAddress, "decimals").catch(() => null),
+        simulate(cfg, tokenAddress, 'name').catch(() => null),
+        simulate(cfg, tokenAddress, 'symbol').catch(() => null),
+        simulate(cfg, tokenAddress, 'decimals').catch(() => null),
     ]);
 
     return {
@@ -505,10 +532,9 @@ async function getTokenAllowance(
     owner: string,
     spender: string,
 ): Promise<bigint> {
-    return scValToBigInt(await simulate(cfg, tokenAddress, "allowance", [
-        scAddress(owner),
-        scAddress(spender),
-    ]));
+    return scValToBigInt(
+        await simulate(cfg, tokenAddress, 'allowance', [scAddress(owner), scAddress(spender)]),
+    );
 }
 
 async function recipientId(
@@ -516,7 +542,7 @@ async function recipientId(
     contractAddress: string,
     recipient: string,
 ): Promise<`0x${string}`> {
-    const result = await simulate(cfg, contractAddress, "recipient_id", [scAddress(recipient)]);
+    const result = await simulate(cfg, contractAddress, 'recipient_id', [scAddress(recipient)]);
     return bytesToHex(scValToNative(result));
 }
 
@@ -525,14 +551,14 @@ async function isEpochClaimed(
     contractAddress: string,
     epochCommitment: string,
 ): Promise<boolean> {
-    const result = await simulate(cfg, contractAddress, "is_claimed", [
+    const result = await simulate(cfg, contractAddress, 'is_claimed', [
         scBytesN32(epochCommitment),
     ]);
     return Boolean(scValToNative(result));
 }
 
 async function predictVestingAddress(cfg: NetworkConfig, salt: string): Promise<string> {
-    const result = await simulate(cfg, cfg.factoryAddress, "predict_vesting_address", [
+    const result = await simulate(cfg, cfg.factoryAddress, 'predict_vesting_address', [
         scBytesN32(salt),
     ]);
     return StellarSdkAddress.fromScVal(result).toString();
@@ -544,7 +570,7 @@ async function getLatestLedgerSequence(cfg: NetworkConfig): Promise<number> {
 }
 
 async function getDeploymentCount(cfg: NetworkConfig): Promise<number> {
-    const result = await simulate(cfg, cfg.factoryAddress, "get_deployment_count");
+    const result = await simulate(cfg, cfg.factoryAddress, 'get_deployment_count');
     return Number(scValToNative(result));
 }
 
@@ -553,7 +579,7 @@ async function getDeploymentInfos(
     start: number,
     limit: number,
 ): Promise<DeploymentInfo[]> {
-    const result = await simulate(cfg, cfg.factoryAddress, "get_deployment_infos", [
+    const result = await simulate(cfg, cfg.factoryAddress, 'get_deployment_infos', [
         scU32(start),
         scU32(limit),
     ]);
@@ -561,7 +587,7 @@ async function getDeploymentInfos(
 }
 
 async function getOwnerDeploymentCount(cfg: NetworkConfig, owner: string): Promise<number> {
-    const result = await simulate(cfg, cfg.factoryAddress, "get_owner_deployment_count", [
+    const result = await simulate(cfg, cfg.factoryAddress, 'get_owner_deployment_count', [
         scAddress(owner),
     ]);
     return Number(scValToNative(result));
@@ -573,7 +599,7 @@ async function getOwnerDeploymentInfos(
     start: number,
     limit: number,
 ): Promise<DeploymentInfo[]> {
-    const result = await simulate(cfg, cfg.factoryAddress, "get_owner_deployment_infos", [
+    const result = await simulate(cfg, cfg.factoryAddress, 'get_owner_deployment_infos', [
         scAddress(owner),
         scU32(start),
         scU32(limit),
@@ -587,7 +613,7 @@ async function simulate(
     method: string,
     args: xdr.ScVal[] = [],
 ): Promise<xdr.ScVal> {
-    const tx = new TransactionBuilder(new Account(SIMULATION_SOURCE, "0"), {
+    const tx = new TransactionBuilder(new Account(SIMULATION_SOURCE, '0'), {
         fee: BASE_FEE,
         networkPassphrase: cfg.networkPassphrase,
     })
@@ -597,23 +623,23 @@ async function simulate(
 
     const result = await new rpc.Server(cfg.rpcUrl).simulateTransaction(tx);
     if (rpc.Api.isSimulationError(result)) {
-        throw new HttpError(502, "rpc_simulation_error", result.error);
+        throw new HttpError(502, 'rpc_simulation_error', result.error);
     }
     if (!result.result) {
-        throw new HttpError(502, "rpc_empty_result", `No simulation result for ${method}`);
+        throw new HttpError(502, 'rpc_empty_result', `No simulation result for ${method}`);
     }
     return result.result.retval;
 }
 
 function parseVestingSummary(value: xdr.ScVal): VestingSummary {
-    const fields = scMap(value, "vesting summary");
-    const metadataCid = scString(scMapField(fields, "metadata_cid"));
+    const fields = scMap(value, 'vesting summary');
+    const metadataCid = scString(scMapField(fields, 'metadata_cid'));
     return {
-        name: scString(scMapField(fields, "name")),
-        description: scString(scMapField(fields, "description")),
-        owner: StellarSdkAddress.fromScVal(scMapField(fields, "owner")).toString(),
-        token: StellarSdkAddress.fromScVal(scMapField(fields, "token")).toString(),
-        merkleRoot: bytesToHex(scValToNative(scMapField(fields, "merkle_root"))),
+        name: scString(scMapField(fields, 'name')),
+        description: scString(scMapField(fields, 'description')),
+        owner: StellarSdkAddress.fromScVal(scMapField(fields, 'owner')).toString(),
+        token: StellarSdkAddress.fromScVal(scMapField(fields, 'token')).toString(),
+        merkleRoot: bytesToHex(scValToNative(scMapField(fields, 'merkle_root'))),
         metadataCid: metadataCid.length > 0 ? metadataCid : null,
     };
 }
@@ -625,10 +651,10 @@ function parseDeploymentInfoVec(value: xdr.ScVal): DeploymentInfo[] {
 }
 
 function parseDeploymentInfo(value: xdr.ScVal): DeploymentInfo {
-    const fields = scMap(value, "deployment info");
-    const metadataCid = scString(scMapField(fields, "metadata_cid"));
+    const fields = scMap(value, 'deployment info');
+    const metadataCid = scString(scMapField(fields, 'metadata_cid'));
     return {
-        address: StellarSdkAddress.fromScVal(scMapField(fields, "address")).toString(),
+        address: StellarSdkAddress.fromScVal(scMapField(fields, 'address')).toString(),
         metadataCid: metadataCid.length > 0 ? metadataCid : null,
     };
 }
@@ -636,7 +662,7 @@ function parseDeploymentInfo(value: xdr.ScVal): DeploymentInfo {
 function scMap(value: xdr.ScVal, label: string): Map<string, xdr.ScVal> {
     const entries = value.map();
     if (!entries) {
-        throw new HttpError(502, "invalid_contract_response", `Invalid ${label}`);
+        throw new HttpError(502, 'invalid_contract_response', `Invalid ${label}`);
     }
 
     const fields = new Map<string, xdr.ScVal>();
@@ -650,15 +676,15 @@ function scMap(value: xdr.ScVal, label: string): Map<string, xdr.ScVal> {
 function scMapField(fields: Map<string, xdr.ScVal>, key: string): xdr.ScVal {
     const value = fields.get(key);
     if (!value) {
-        throw new HttpError(502, "invalid_contract_response", `Missing contract field: ${key}`);
+        throw new HttpError(502, 'invalid_contract_response', `Missing contract field: ${key}`);
     }
     return value;
 }
 
 function scString(value: xdr.ScVal): string {
     const native = scValToNative(value);
-    if (typeof native === "string") return native;
-    if (Buffer.isBuffer(native)) return native.toString("utf8");
+    if (typeof native === 'string') return native;
+    if (Buffer.isBuffer(native)) return native.toString('utf8');
     return String(native);
 }
 
@@ -674,8 +700,8 @@ async function fetchIpfsJson(cid: string): Promise<unknown> {
 
     throw new HttpError(
         502,
-        "ipfs_gateway_error",
-        `All IPFS gateways failed for ${cid}: ${errors.join("; ")}`,
+        'ipfs_gateway_error',
+        `All IPFS gateways failed for ${cid}: ${errors.join('; ')}`,
     );
 }
 
@@ -685,7 +711,7 @@ async function fetchJsonFromGateway(gateway: string, cid: string): Promise<unkno
 
     try {
         const response = await fetch(`${gateway}/${cid}`, {
-            headers: { Accept: "application/json" },
+            headers: { Accept: 'application/json' },
             signal: controller.signal,
         });
         if (!response.ok) {
@@ -700,18 +726,19 @@ async function fetchJsonFromGateway(gateway: string, cid: string): Promise<unkno
 function getNetworkConfig(env: Env, network: string): NetworkConfig {
     const envMap = env as Record<string, string | undefined>;
     const id = network.toLowerCase();
-    const prefix = `STELLAR_${id.toUpperCase().replace(/[^A-Z0-9]/g, "_")}_`;
-    const rpcUrl = envMap[`${prefix}RPC_URL`] ?? (id === "testnet" ? env.STELLAR_RPC_URL : undefined);
+    const prefix = `STELLAR_${id.toUpperCase().replace(/[^A-Z0-9]/g, '_')}_`;
+    const rpcUrl =
+        envMap[`${prefix}RPC_URL`] ?? (id === 'testnet' ? env.STELLAR_RPC_URL : undefined);
     const factoryAddress =
         envMap[`${prefix}FACTORY_ADDRESS`] ??
-        (id === "testnet" ? env.STELLAR_FACTORY_ADDRESS : undefined);
+        (id === 'testnet' ? env.STELLAR_FACTORY_ADDRESS : undefined);
     const networkPassphrase =
         envMap[`${prefix}NETWORK_PASSPHRASE`] ??
-        (id === "testnet" ? env.STELLAR_NETWORK_PASSPHRASE : undefined) ??
+        (id === 'testnet' ? env.STELLAR_NETWORK_PASSPHRASE : undefined) ??
         defaultPassphrase(id);
 
     if (!rpcUrl || !factoryAddress || !networkPassphrase) {
-        throw new HttpError(500, "network_not_configured", `Network is not configured: ${network}`);
+        throw new HttpError(500, 'network_not_configured', `Network is not configured: ${network}`);
     }
 
     return {
@@ -723,8 +750,8 @@ function getNetworkConfig(env: Env, network: string): NetworkConfig {
 }
 
 function defaultPassphrase(network: string): string | undefined {
-    if (network === "testnet") return TESTNET_PASSPHRASE;
-    if (network === "mainnet") return MAINNET_PASSPHRASE;
+    if (network === 'testnet') return TESTNET_PASSPHRASE;
+    if (network === 'mainnet') return MAINNET_PASSPHRASE;
     return undefined;
 }
 
@@ -732,7 +759,7 @@ function assertAddress(value: string, label: string): void {
     try {
         StellarSdkAddress.fromString(value);
     } catch {
-        throw new HttpError(400, "invalid_address", `Invalid ${label}`);
+        throw new HttpError(400, 'invalid_address', `Invalid ${label}`);
     }
 }
 
@@ -741,7 +768,7 @@ function scAddress(address: string): xdr.ScVal {
 }
 
 function scU32(value: number): xdr.ScVal {
-    return nativeToScVal(value, { type: "u32" });
+    return nativeToScVal(value, { type: 'u32' });
 }
 
 function scBytesN32(hex: string): xdr.ScVal {
@@ -754,21 +781,21 @@ function scValToBigInt(value: xdr.ScVal): bigint {
 }
 
 function bytesToHex(bytes: Buffer | Uint8Array): `0x${string}` {
-    return `0x${Buffer.from(bytes).toString("hex")}`;
+    return `0x${Buffer.from(bytes).toString('hex')}`;
 }
 
 function normalizeHex(value: string): string {
-    return value.startsWith("0x") ? value.slice(2) : value;
+    return value.startsWith('0x') ? value.slice(2) : value;
 }
 
 function hexToBuffer(value: string, expectedBytes?: number): Buffer {
     const hex = normalizeHex(value);
     if (!/^[0-9a-fA-F]*$/.test(hex) || hex.length % 2 !== 0) {
-        throw new HttpError(400, "invalid_hex", "Invalid hex string");
+        throw new HttpError(400, 'invalid_hex', 'Invalid hex string');
     }
-    const out = Buffer.from(hex, "hex");
+    const out = Buffer.from(hex, 'hex');
     if (expectedBytes !== undefined && out.length !== expectedBytes) {
-        throw new HttpError(400, "invalid_hex", `Expected ${expectedBytes} bytes`);
+        throw new HttpError(400, 'invalid_hex', `Expected ${expectedBytes} bytes`);
     }
     return out;
 }
@@ -777,28 +804,28 @@ function validateHex32(value: string, label: string): void {
     try {
         hexToBuffer(value, 32);
     } catch {
-        throw new HttpError(400, "invalid_hex", `Invalid ${label}`);
+        throw new HttpError(400, 'invalid_hex', `Invalid ${label}`);
     }
 }
 
 function sanitizeString(str: string, maxLength: number): string {
-    if (!str) return "";
-    const clean = str.replace(/[\x00-\x1F\x7F-\x9F]/g, "");
+    if (!str) return '';
+    const clean = str.replace(/[\x00-\x1F\x7F-\x9F]/g, '');
     return clean.length > maxLength ? clean.substring(0, maxLength) : clean;
 }
 
 function validateCid(raw: string): string {
-    const cid = raw.startsWith("ipfs://") ? raw.slice("ipfs://".length) : raw;
+    const cid = raw.startsWith('ipfs://') ? raw.slice('ipfs://'.length) : raw;
     const cidV0 = /^Qm[1-9A-HJ-NP-Za-km-z]{44}$/;
     const cidV1Base32 = /^b[a-z2-7]{40,}$/i;
     if (
         cid.length === 0 ||
-        cid.includes("/") ||
-        cid.includes("?") ||
-        cid.includes("#") ||
+        cid.includes('/') ||
+        cid.includes('?') ||
+        cid.includes('#') ||
         (!cidV0.test(cid) && !cidV1Base32.test(cid))
     ) {
-        throw new HttpError(400, "invalid_cid", "Invalid IPFS CID");
+        throw new HttpError(400, 'invalid_cid', 'Invalid IPFS CID');
     }
     return cid;
 }
@@ -807,44 +834,40 @@ function decodeSegment(raw: string): string {
     try {
         return decodeURIComponent(raw).trim();
     } catch {
-        throw new HttpError(400, "invalid_path", "Invalid URL path segment");
+        throw new HttpError(400, 'invalid_path', 'Invalid URL path segment');
     }
 }
 
 function readMaxContracts(url: URL, env: Env): number {
     const configuredMax = Number(env.MAX_CONTRACTS) || 100;
-    const requested = Number(url.searchParams.get("maxContracts") || "50");
+    const requested = Number(url.searchParams.get('maxContracts') || '50');
     if (!Number.isFinite(requested) || requested <= 0) return 50;
     return Math.min(Math.floor(requested), configuredMax);
 }
 
 function buildCorsHeaders(origin: string | null, env: Env): Record<string, string> {
-    const allowed = (env.ALLOWED_ORIGINS || "")
-        .split(",")
+    const allowed = (env.ALLOWED_ORIGINS || '')
+        .split(',')
         .map((o) => o.trim())
         .filter(Boolean);
 
-    const allowOrigin = origin && allowed.includes(origin) ? origin : allowed[0] || "*";
+    const allowOrigin = origin && allowed.includes(origin) ? origin : allowed[0] || '*';
 
     return {
-        "Access-Control-Allow-Origin": allowOrigin,
-        "Access-Control-Allow-Methods": "GET, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type, Authorization",
-        "Access-Control-Max-Age": "86400",
-        Vary: "Origin",
+        'Access-Control-Allow-Origin': allowOrigin,
+        'Access-Control-Allow-Methods': 'GET, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        'Access-Control-Max-Age': '86400',
+        Vary: 'Origin',
     };
 }
 
-function json(
-    body: unknown,
-    status: number,
-    extraHeaders: Record<string, string> = {},
-): Response {
+function json(body: unknown, status: number, extraHeaders: Record<string, string> = {}): Response {
     return new Response(JSON.stringify(body), {
         status,
         headers: {
-            "Content-Type": "application/json",
-            "Cache-Control": "no-store",
+            'Content-Type': 'application/json',
+            'Cache-Control': 'no-store',
             ...extraHeaders,
         },
     });

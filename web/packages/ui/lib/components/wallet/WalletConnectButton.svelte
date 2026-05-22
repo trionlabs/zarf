@@ -9,11 +9,19 @@
   Uses Zen design tokens
 -->
 <script lang="ts">
-    import { onMount } from "svelte";
-    import { walletStore } from "../../stores/walletStore.svelte";
-    import { Copy, Check, ExternalLink, RefreshCw, LogOut, ChevronDown, Wallet } from "lucide-svelte";
-    import ZenButton from "../ui/ZenButton.svelte";
-    import ZenSpinner from "../ui/ZenSpinner.svelte";
+    import { onMount } from 'svelte';
+    import { walletStore } from '../../stores/walletStore.svelte';
+    import {
+        Copy,
+        Check,
+        ExternalLink,
+        RefreshCw,
+        LogOut,
+        ChevronDown,
+        Wallet,
+    } from 'lucide-svelte';
+    import ZenButton from '../ui/ZenButton.svelte';
+    import ZenSpinner from '../ui/ZenSpinner.svelte';
 
     let mounted = $state(false);
     let copied = $state(false);
@@ -25,7 +33,7 @@
     });
 
     const statusIndicatorClass = $derived(
-        walletStore.isWrongNetwork ? "bg-zen-warning animate-pulse" : "bg-zen-success",
+        walletStore.isWrongNetwork ? 'bg-zen-warning animate-pulse' : 'bg-zen-success',
     );
 
     const explorerUrl = $derived.by(() => {
@@ -43,8 +51,8 @@
 
     $effect(() => {
         if (isOpen) {
-            document.addEventListener("click", handleClickOutside);
-            return () => document.removeEventListener("click", handleClickOutside);
+            document.addEventListener('click', handleClickOutside);
+            return () => document.removeEventListener('click', handleClickOutside);
         }
     });
 
@@ -73,7 +81,7 @@
             copied = true;
             setTimeout(() => (copied = false), 2000);
         } catch (e) {
-            console.warn("Clipboard API not available");
+            console.warn('Clipboard API not available');
         }
     }
 </script>
@@ -93,10 +101,14 @@
         >
             <span class="w-2 h-2 rounded-full {statusIndicatorClass}"></span>
             <span class="font-mono text-xs text-zen-fg">{walletStore.shortAddress}</span>
-            <span class="px-1.5 py-0.5 rounded text-[10px] font-medium bg-zen-fg/5 text-zen-fg-muted">
+            <span
+                class="px-1.5 py-0.5 rounded text-[10px] font-medium bg-zen-fg/5 text-zen-fg-muted"
+            >
                 {walletStore.networkName}
             </span>
-            <ChevronDown class="w-3 h-3 text-zen-fg-subtle transition-transform {isOpen ? 'rotate-180' : ''}" />
+            <ChevronDown
+                class="w-3 h-3 text-zen-fg-subtle transition-transform {isOpen ? 'rotate-180' : ''}"
+            />
         </button>
 
         <!-- Dropdown Menu -->
@@ -106,7 +118,10 @@
             >
                 <!-- Balance Section -->
                 <div class="px-4 py-3 bg-zen-fg/5">
-                    <span class="text-[10px] uppercase tracking-wider text-zen-fg-subtle font-medium">Total Balance</span>
+                    <span
+                        class="text-[10px] uppercase tracking-wider text-zen-fg-subtle font-medium"
+                        >Total Balance</span
+                    >
                     <div class="text-lg font-bold text-zen-fg mt-0.5">
                         {#if walletStore.formattedBalance}
                             {walletStore.formattedBalance}
@@ -125,9 +140,16 @@
 
                 <!-- Network -->
                 <div class="px-4 py-2 border-b border-zen-border-subtle">
-                    <span class="text-[10px] uppercase tracking-wider text-zen-fg-subtle font-medium">Network</span>
+                    <span
+                        class="text-[10px] uppercase tracking-wider text-zen-fg-subtle font-medium"
+                        >Network</span
+                    >
                     <div class="mt-1 flex items-center gap-2">
-                        <span class="w-2 h-2 rounded-full {walletStore.isWrongNetwork ? 'bg-zen-warning' : 'bg-zen-success'}"></span>
+                        <span
+                            class="w-2 h-2 rounded-full {walletStore.isWrongNetwork
+                                ? 'bg-zen-warning'
+                                : 'bg-zen-success'}"
+                        ></span>
                         <span class="text-sm text-zen-fg-muted">{walletStore.networkName}</span>
                     </div>
                     {#if walletStore.isWrongNetwork}

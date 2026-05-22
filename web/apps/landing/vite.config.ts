@@ -20,14 +20,14 @@ export default defineConfig({
     server: {
         port: 5173,
         fs: {
-            allow: ['../..']
-        }
+            allow: ['../..'],
+        },
     },
     resolve: {
         conditions: ['browser', 'module', 'import', 'default'],
     },
     optimizeDeps: {
-        exclude: ['@zarf/ui']
+        exclude: ['@zarf/ui'],
     },
     define: {
         global: 'globalThis',

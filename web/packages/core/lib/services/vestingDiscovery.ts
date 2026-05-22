@@ -6,10 +6,7 @@
  */
 
 import type { StellarContractId } from '../types';
-import {
-    fetchIndexerJson,
-    indexerNetworkPath,
-} from '../utils/indexerClient';
+import { fetchIndexerJson, indexerNetworkPath } from '../utils/indexerClient';
 
 export interface DiscoveredVesting {
     address: StellarContractId;
@@ -38,9 +35,7 @@ export async function discoverAllVestings(): Promise<DiscoveredVesting[]> {
     }
 }
 
-export async function getCidForVesting(
-    address: StellarContractId,
-): Promise<string | null> {
+export async function getCidForVesting(address: StellarContractId): Promise<string | null> {
     try {
         const indexed = await fetchIndexerJson<IndexerVestingContract>(
             indexerNetworkPath(`/vestings/${encodeURIComponent(address)}`),

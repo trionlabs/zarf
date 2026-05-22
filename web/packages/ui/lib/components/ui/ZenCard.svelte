@@ -1,13 +1,13 @@
 <script lang="ts">
-    import type { Snippet } from "svelte";
+    import type { Snippet } from 'svelte';
 
     interface Props {
         children?: Snippet;
         class?: string;
-        variant?: "glass" | "elevated" | "bordered";
+        variant?: 'glass' | 'elevated' | 'bordered';
         interactive?: boolean;
-        padding?: "none" | "sm" | "md" | "lg";
-        radius?: "none" | "md" | "lg" | "xl" | "2xl" | "3xl";
+        padding?: 'none' | 'sm' | 'md' | 'lg';
+        radius?: 'none' | 'md' | 'lg' | 'xl' | '2xl' | '3xl';
         onclick?: (e: MouseEvent) => void;
         onkeydown?: (e: KeyboardEvent) => void;
         role?: string;
@@ -16,11 +16,11 @@
 
     let {
         children,
-        class: className = "",
-        variant = "glass",
+        class: className = '',
+        variant = 'glass',
         interactive = false,
-        padding = "none",
-        radius = "2xl",
+        padding = 'none',
+        radius = '2xl',
         ...rest
     }: Props = $props();
 
@@ -43,30 +43,32 @@
     };
 
     const radiusClasses = {
-        none: "rounded-none",
-        md: "rounded-md",
-        lg: "rounded-lg",
-        xl: "rounded-xl",
-        "2xl": "rounded-2xl",
-        "3xl": "rounded-3xl",
+        none: 'rounded-none',
+        md: 'rounded-md',
+        lg: 'rounded-lg',
+        xl: 'rounded-xl',
+        '2xl': 'rounded-2xl',
+        '3xl': 'rounded-3xl',
     } as const;
 
     const paddingClasses = {
-        none: "",
-        sm: "p-4",
-        md: "p-6",
-        lg: "p-8",
+        none: '',
+        sm: 'p-4',
+        md: 'p-6',
+        lg: 'p-8',
     } as const;
 
     const interactiveClasses = $derived(
         interactive
-            ? "cursor-pointer transition-all duration-300 hover:border-zen-border-strong hover:shadow-[var(--zen-shadow-lg)]"
-            : ""
+            ? 'cursor-pointer transition-all duration-300 hover:border-zen-border-strong hover:shadow-[var(--zen-shadow-lg)]'
+            : '',
     );
 </script>
 
 <div
-    class="group w-full {radiusClasses[radius]} {paddingClasses[padding]} {variantClasses[variant]} {interactiveClasses} {className}"
+    class="group w-full {radiusClasses[radius]} {paddingClasses[padding]} {variantClasses[
+        variant
+    ]} {interactiveClasses} {className}"
     {...rest}
 >
     {@render children?.()}

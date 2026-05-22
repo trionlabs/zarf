@@ -46,9 +46,8 @@ export async function fetchTokenMetadata(
         return {
             success: false,
             data: null,
-            error: error instanceof Error
-                ? error.message
-                : 'Failed to fetch Stellar token metadata.',
+            error:
+                error instanceof Error ? error.message : 'Failed to fetch Stellar token metadata.',
         };
     }
 }

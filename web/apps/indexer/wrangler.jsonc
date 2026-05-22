@@ -5,17 +5,17 @@
     "main": "src/index.ts",
     "compatibility_date": "2025-01-15",
     "vars": {
-        "ALLOWED_ORIGINS": "http://localhost:5173,http://localhost:5174,http://localhost:5175,https://create.zarf.to,https://claim.zarf.to"
+        "ALLOWED_ORIGINS": "http://localhost:5173,http://localhost:5174,http://localhost:5175,https://create.zarf.to,https://claim.zarf.to",
     },
     "observability": {
-        "enabled": true
+        "enabled": true,
     },
     "routes": [
         {
             "pattern": "indexer.zarf.to",
-            "custom_domain": true
-        }
-    ]
+            "custom_domain": true,
+        },
+    ],
     // Required per network:
     //   wrangler deploy --var STELLAR_TESTNET_RPC_URL:"https://..."
     //   wrangler deploy --var STELLAR_TESTNET_FACTORY_ADDRESS:"C..."

@@ -1,6 +1,6 @@
 <script lang="ts">
-    import type { Snippet } from "svelte";
-    import { X } from "lucide-svelte";
+    import type { Snippet } from 'svelte';
+    import { X } from 'lucide-svelte';
 
     interface Props {
         open?: boolean;
@@ -12,7 +12,7 @@
         closeOnEscape?: boolean;
         showCloseButton?: boolean;
         class?: string;
-        size?: "sm" | "md" | "lg" | "xl" | "full";
+        size?: 'sm' | 'md' | 'lg' | 'xl' | 'full';
     }
 
     let {
@@ -24,16 +24,16 @@
         closeOnBackdrop = true,
         closeOnEscape = true,
         showCloseButton = true,
-        class: className = "",
-        size = "md",
+        class: className = '',
+        size = 'md',
     }: Props = $props();
 
     const sizeClasses = {
-        sm: "max-w-sm",
-        md: "max-w-lg",
-        lg: "max-w-2xl",
-        xl: "max-w-4xl",
-        full: "max-w-[calc(100vw-2rem)] max-h-[calc(100vh-2rem)]",
+        sm: 'max-w-sm',
+        md: 'max-w-lg',
+        lg: 'max-w-2xl',
+        xl: 'max-w-4xl',
+        full: 'max-w-[calc(100vw-2rem)] max-h-[calc(100vh-2rem)]',
     };
 
     function handleBackdropClick() {
@@ -43,7 +43,7 @@
     }
 
     function handleKeydown(e: KeyboardEvent) {
-        if (open && closeOnEscape && e.key === "Escape") {
+        if (open && closeOnEscape && e.key === 'Escape') {
             onclose?.();
         }
     }
@@ -111,7 +111,9 @@
 
             <!-- Actions -->
             {#if actions}
-                <div class="px-6 py-4 flex items-center justify-end gap-3 border-t border-zen-border-subtle">
+                <div
+                    class="px-6 py-4 flex items-center justify-end gap-3 border-t border-zen-border-subtle"
+                >
                     {@render actions()}
                 </div>
             {/if}

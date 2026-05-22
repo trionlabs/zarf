@@ -9,10 +9,7 @@
 
 import { hashEmail } from '@zarf/core/utils/email';
 import type { StellarContractId } from '@zarf/core/types';
-import {
-    getCidForVesting,
-    type DiscoveredVesting,
-} from '@zarf/core/services/vestingDiscovery';
+import { getCidForVesting, type DiscoveredVesting } from '@zarf/core/services/vestingDiscovery';
 import { fetchIpfsJson, IpfsFetchError } from '@zarf/core/utils/ipfsFetch';
 
 type FilterableDistribution = StellarContractId | DiscoveredVesting;
@@ -40,7 +37,7 @@ export const computeUserEmailHash = hashEmail;
  */
 export async function isEmailInDistribution(
     distribution: FilterableDistribution,
-    userEmailHash: string
+    userEmailHash: string,
 ): Promise<boolean> {
     const address = distributionAddress(distribution);
     try {
@@ -57,14 +54,15 @@ export async function isEmailInDistribution(
 
         // Normalize hashes for comparison (ensure consistent 0x prefix and lowercase)
         const normalizedUserHash = userEmailHash.toLowerCase();
-        const normalizedDistHashes = data.emailHashes.map((h) =>
-            h.toLowerCase()
-        );
+        const normalizedDistHashes = data.emailHashes.map((h) => h.toLowerCase());
 
         return normalizedDistHashes.includes(normalizedUserHash);
     } catch (error) {
         if (error instanceof IpfsFetchError) {
-            console.warn(`[EmailFilter] Skipping distribution with unreadable IPFS metadata:`, error.message);
+            console.warn(
+                `[EmailFilter] Skipping distribution with unreadable IPFS metadata:`,
+                error.message,
+            );
             return false;
         }
 
@@ -84,7 +82,7 @@ async function fetchDistribution(
     const cid =
         typeof distribution === 'string'
             ? await getCidForVesting(distribution as StellarContractId)
-            : distribution.metadataCid ?? (await getCidForVesting(distribution.address));
+            : (distribution.metadataCid ?? (await getCidForVesting(distribution.address)));
     if (!cid) return null;
     return await fetchIpfsJson<DistributionWithHashes>(cid);
 }
@@ -99,7 +97,7 @@ async function fetchDistribution(
  */
 export async function filterDistributionsByEmail(
     distributions: FilterableDistribution[],
-    email: string
+    email: string,
 ): Promise<StellarContractId[]> {
     // No email = no distributions (security: don't leak distribution list)
     if (!email) {
@@ -119,11 +117,9 @@ export async function filterDistributionsByEmail(
             const address = distributionAddress(distribution);
             const isEligible = await isEmailInDistribution(distribution, userEmailHash);
             return { address, eligible: isEligible };
-        })
+        }),
     );
 
     // Return only eligible addresses
-    return results
-        .filter((r) => r.eligible)
-        .map((r) => r.address);
+    return results.filter((r) => r.eligible).map((r) => r.address);
 }

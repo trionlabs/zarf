@@ -60,10 +60,7 @@ export class FactoryDeployService {
         this.salt = config.salt ?? randomSalt();
     }
 
-    private async withRetry<T>(
-        operation: () => Promise<T>,
-        step: FactoryDeployStep,
-    ): Promise<T> {
+    private async withRetry<T>(operation: () => Promise<T>, step: FactoryDeployStep): Promise<T> {
         let lastError: unknown;
 
         for (let attempt = 0; attempt <= this.MAX_RETRIES; attempt++) {
@@ -72,8 +69,9 @@ export class FactoryDeployService {
             } catch (error) {
                 lastError = error;
                 const message = error instanceof Error ? error.message : String(error);
-                const retryable =
-                    /rate limit|too many|network|fetch|timeout|temporar/i.test(message);
+                const retryable = /rate limit|too many|network|fetch|timeout|temporar/i.test(
+                    message,
+                );
 
                 if (retryable && attempt < this.MAX_RETRIES) {
                     const delayMs = this.INITIAL_RETRY_DELAY * 2 ** attempt;
@@ -96,11 +94,12 @@ export class FactoryDeployService {
         this.onProgress({ step: 'approve', message: 'Checking token allowance...' });
 
         const allowance = await this.withRetry(
-            () => getTokenAllowance(
-                this.config.tokenAddress,
-                this.config.owner,
-                this.config.factoryAddress,
-            ),
+            () =>
+                getTokenAllowance(
+                    this.config.tokenAddress,
+                    this.config.owner,
+                    this.config.factoryAddress,
+                ),
             'approve',
         );
 
@@ -117,22 +116,23 @@ export class FactoryDeployService {
         const expirationLedger = latestLedger + 100_000;
 
         return this.withRetry(
-            () => approveTokenAllowance(
-                {
-                    tokenAddress: this.config.tokenAddress,
-                    owner: this.config.owner,
-                    spender: this.config.factoryAddress,
-                    amount: this.config.totalAmount,
-                    expirationLedger,
-                },
-                (txHash) => {
-                    this.onProgress({
-                        step: 'approve',
-                        message: 'Waiting for approval confirmation...',
-                        txHash,
-                    });
-                },
-            ),
+            () =>
+                approveTokenAllowance(
+                    {
+                        tokenAddress: this.config.tokenAddress,
+                        owner: this.config.owner,
+                        spender: this.config.factoryAddress,
+                        amount: this.config.totalAmount,
+                        expirationLedger,
+                    },
+                    (txHash) => {
+                        this.onProgress({
+                            step: 'approve',
+                            message: 'Waiting for approval confirmation...',
+                            txHash,
+                        });
+                    },
+                ),
             'approve',
         );
     }
@@ -147,27 +147,28 @@ export class FactoryDeployService {
         });
 
         return this.withRetry(
-            () => createAndFundVesting(
-                {
-                    factoryAddress: this.config.factoryAddress,
-                    owner: this.config.owner,
-                    tokenAddress: this.config.tokenAddress,
-                    salt: this.salt,
-                    name: this.config.name,
-                    description: this.config.description,
-                    merkleRoot: this.config.merkleRoot,
-                    recipientCount: this.config.recipientCount,
-                    totalAmount: this.config.totalAmount,
-                    metadataCid: this.config.metadataCid,
-                },
-                (txHash) => {
-                    this.onProgress({
-                        step: 'create',
-                        message: 'Waiting for deployment confirmation...',
-                        txHash,
-                    });
-                },
-            ),
+            () =>
+                createAndFundVesting(
+                    {
+                        factoryAddress: this.config.factoryAddress,
+                        owner: this.config.owner,
+                        tokenAddress: this.config.tokenAddress,
+                        salt: this.salt,
+                        name: this.config.name,
+                        description: this.config.description,
+                        merkleRoot: this.config.merkleRoot,
+                        recipientCount: this.config.recipientCount,
+                        totalAmount: this.config.totalAmount,
+                        metadataCid: this.config.metadataCid,
+                    },
+                    (txHash) => {
+                        this.onProgress({
+                            step: 'create',
+                            message: 'Waiting for deployment confirmation...',
+                            txHash,
+                        });
+                    },
+                ),
             'create',
         );
     }
@@ -219,7 +220,10 @@ function sanitizeError(error: unknown): string {
         customRules: [
             { match: 'InvalidRecipientCount', message: 'No recipients were provided.' },
             { match: 'InvalidAmount', message: 'Distribution amount must be greater than zero.' },
-            { match: /allowance|transfer_from|insufficient/i, message: 'Token approval or funding failed.' },
+            {
+                match: /allowance|transfer_from|insufficient/i,
+                message: 'Token approval or funding failed.',
+            },
         ],
         fallback: 'Stellar transaction failed. Please try again.',
     });

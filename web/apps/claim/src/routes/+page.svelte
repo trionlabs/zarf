@@ -1,26 +1,26 @@
 <script lang="ts">
-    import { onMount } from "svelte";
-    import type { StellarContractId } from "@zarf/core/types";
-    import { authStore } from "@zarf/ui/stores/authStore.svelte";
+    import { onMount } from 'svelte';
+    import type { StellarContractId } from '@zarf/core/types';
+    import { authStore } from '@zarf/ui/stores/authStore.svelte';
     import {
         extractTokenFromUrl,
         extractStateFromUrl,
         clearUrlFragment,
         decodeJwt,
-    } from "@zarf/ui/utils/googleAuth";
-    import ImportContractInput from "$lib/components/claim/ImportContractInput.svelte";
-    import LoginPrompt from "$lib/components/claim/LoginPrompt.svelte";
-    import PageHeader from "@zarf/ui/components/ui/PageHeader.svelte";
-    import ZenBadge from "@zarf/ui/components/ui/ZenBadge.svelte";
-    import ZenButton from "@zarf/ui/components/ui/ZenButton.svelte";
-    import { filterDistributionsByEmail } from "$lib/services/emailFilter";
+    } from '@zarf/ui/utils/googleAuth';
+    import ImportContractInput from '$lib/components/claim/ImportContractInput.svelte';
+    import LoginPrompt from '$lib/components/claim/LoginPrompt.svelte';
+    import PageHeader from '@zarf/ui/components/ui/PageHeader.svelte';
+    import ZenBadge from '@zarf/ui/components/ui/ZenBadge.svelte';
+    import ZenButton from '@zarf/ui/components/ui/ZenButton.svelte';
+    import { filterDistributionsByEmail } from '$lib/services/emailFilter';
     import {
         discoverAllVestings,
         type DiscoveredVesting,
-    } from "@zarf/core/services/vestingDiscovery";
+    } from '@zarf/core/services/vestingDiscovery';
 
-    import { page } from "$app/state";
-    import { goto } from "$app/navigation";
+    import { page } from '$app/state';
+    import { goto } from '$app/navigation';
 
     let isAuthenticating = $state(false);
     let isFiltering = $state(false);
@@ -51,10 +51,7 @@
         }
     });
 
-    async function filterDistributions(
-        email: string,
-        vestings: DiscoveredVesting[],
-    ) {
+    async function filterDistributions(email: string, vestings: DiscoveredVesting[]) {
         isFiltering = true;
         hasFiltered = false;
 
@@ -62,7 +59,7 @@
             const eligible = await filterDistributionsByEmail(vestings, email);
             filteredAddresses = eligible;
         } catch (error) {
-            console.error("[Claim] Failed to filter distributions:", error);
+            console.error('[Claim] Failed to filter distributions:', error);
             // Fall back to showing all on error
             filteredAddresses = vestings.map((vesting) => vesting.address);
         } finally {
@@ -74,11 +71,9 @@
     onMount(async () => {
         try {
             const vestings = await discoverAllVestings();
-            discoveredVestings = Array.from(
-                new Map(vestings.map((v) => [v.address, v])).values(),
-            );
+            discoveredVestings = Array.from(new Map(vestings.map((v) => [v.address, v])).values());
         } catch (e) {
-            console.warn("[Claim] Chain discovery failed", e);
+            console.warn('[Claim] Chain discovery failed', e);
         }
     });
 
@@ -103,15 +98,15 @@
                 if (oauthState?.address) {
                     // Preserve address in URL for the claim flow
                     const url = new URL(window.location.href);
-                    url.searchParams.set("address", oauthState.address);
-                    url.hash = ""; // Clear hash (token)
+                    url.searchParams.set('address', oauthState.address);
+                    url.hash = ''; // Clear hash (token)
                     goto(url.pathname + url.search, { replaceState: true });
                 } else {
                     // Just clear URL fragment for aesthetics & security
                     clearUrlFragment();
                 }
             } catch (err) {
-                console.error("[Claim] Auth failed:", err);
+                console.error('[Claim] Auth failed:', err);
                 clearUrlFragment();
             } finally {
                 isAuthenticating = false;
@@ -119,18 +114,18 @@
         }
     });
 
-    import { claimStore } from "$lib/stores/claimStore.svelte";
-    import ClaimStep1Identify from "$lib/components/claim/steps/ClaimStep1Identify.svelte";
-    import ClaimStep2Timeline from "$lib/components/claim/steps/ClaimStep2Timeline.svelte";
+    import { claimStore } from '$lib/stores/claimStore.svelte';
+    import ClaimStep1Identify from '$lib/components/claim/steps/ClaimStep1Identify.svelte';
+    import ClaimStep2Timeline from '$lib/components/claim/steps/ClaimStep2Timeline.svelte';
 
     // 2. State for import flow
     // derived from URL to survive redirects/reloads
-    let importedAddress = $derived(page.url.searchParams.get("address"));
+    let importedAddress = $derived(page.url.searchParams.get('address'));
     let currentStep = $derived(claimStore.currentStep);
 
     function handleImport(address: string) {
         const url = new URL(window.location.href);
-        url.searchParams.set("address", address);
+        url.searchParams.set('address', address);
         goto(url.toString(), { replaceState: true });
     }
 
@@ -138,10 +133,7 @@
     let lastAddress = $state<string | null>(null);
     $effect(() => {
         if (importedAddress !== lastAddress) {
-            console.log(
-                "[Claim] Context Changed, Reseting Store:",
-                importedAddress,
-            );
+            console.log('[Claim] Context Changed, Reseting Store:', importedAddress);
             claimStore.reset();
             lastAddress = importedAddress;
         }
@@ -158,8 +150,7 @@
         {#snippet extra()}
             {#if importedAddress}
                 <ZenBadge variant="primary" class="font-mono gap-1 pl-1 pr-2">
-                    <span class="w-2 h-2 rounded-full bg-zen-primary animate-pulse"
-                    ></span>
+                    <span class="w-2 h-2 rounded-full bg-zen-primary animate-pulse"></span>
                     {importedAddress.slice(0, 6)}...{importedAddress.slice(-4)}
                 </ZenBadge>
             {/if}
@@ -200,7 +191,7 @@
                     onclick={() => {
                         // Debug Reset
                         claimStore.reset();
-                        goto("/");
+                        goto('/');
                     }}
                 >
                     Reset Flow

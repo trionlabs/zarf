@@ -1,33 +1,24 @@
 <script lang="ts">
-    import { wizardStore } from "$lib/stores/wizardStore.svelte";
-    import { goto } from "$app/navigation";
-    import { onMount } from "svelte";
-    import { fade, slide } from "svelte/transition";
-    import {
-        ArrowRight,
-        ArrowLeft,
-        Sparkles,
-        Check,
-        X,
-        Eye,
-        Calendar,
-        Users,
-    } from "lucide-svelte";
-    import type { Recipient, Distribution } from "$lib/stores/types";
-    import type { DurationUnit } from "@zarf/core/utils/vesting";
-    import { CREATION_STEPS } from "@zarf/core/constants/wizard";
+    import { wizardStore } from '$lib/stores/wizardStore.svelte';
+    import { goto } from '$app/navigation';
+    import { onMount } from 'svelte';
+    import { fade, slide } from 'svelte/transition';
+    import { ArrowRight, ArrowLeft, Sparkles, Check, X, Eye, Calendar, Users } from 'lucide-svelte';
+    import type { Recipient, Distribution } from '$lib/stores/types';
+    import type { DurationUnit } from '@zarf/core/utils/vesting';
+    import { CREATION_STEPS } from '@zarf/core/constants/wizard';
 
     // Sub-components
-    import DistributionIdentity from "$lib/components/wizard/steps/DistributionIdentity.svelte";
-    import DistributionSchedule from "$lib/components/wizard/steps/DistributionSchedule.svelte";
-    import DistributionRecipients from "$lib/components/wizard/steps/DistributionRecipients.svelte";
-    import VestingTimeline from "$lib/components/wizard/VestingTimeline.svelte"; // Import Chart
-    import ZenButton from "@zarf/ui/components/ui/ZenButton.svelte";
+    import DistributionIdentity from '$lib/components/wizard/steps/DistributionIdentity.svelte';
+    import DistributionSchedule from '$lib/components/wizard/steps/DistributionSchedule.svelte';
+    import DistributionRecipients from '$lib/components/wizard/steps/DistributionRecipients.svelte';
+    import VestingTimeline from '$lib/components/wizard/VestingTimeline.svelte'; // Import Chart
+    import ZenButton from '@zarf/ui/components/ui/ZenButton.svelte';
 
     onMount(() => {
         // Guard: Redirect if no token entered
         if (!wizardStore.tokenDetails.tokenAddress) {
-            goto("/wizard/step-0");
+            goto('/wizard/step-0');
             return;
         }
         wizardStore.goToStep(1);
@@ -37,18 +28,18 @@
     let creationStep = $state(0);
 
     // Form Data
-    let name = $state("");
-    let description = $state("");
+    let name = $state('');
+    let description = $state('');
     let usRestricted = $state(false);
     let euRestricted = $state(false);
 
     let poolAmount = $state<number>(0);
-    let poolInputValue = $state<string>("");
+    let poolInputValue = $state<string>('');
 
-    let cliffDate = $state<string>(new Date().toISOString().split("T")[0]);
-    let cliffTime = $state<string>("12:00");
+    let cliffDate = $state<string>(new Date().toISOString().split('T')[0]);
+    let cliffTime = $state<string>('12:00');
     let duration = $state<number>(12);
-    let durationUnit = $state<DurationUnit>("months");
+    let durationUnit = $state<DurationUnit>('months');
 
     let recipients = $state<Recipient[]>([]);
     let csvFileName = $state<string | null>(null);
@@ -57,20 +48,13 @@
     let validationErrors = $state<string[]>([]);
 
     const totalAmount = $derived(
-        recipients.reduce(
-            (sum: number, r: Recipient) => sum + r.amount,
-            0,
-        ),
+        recipients.reduce((sum: number, r: Recipient) => sum + r.amount, 0),
     );
 
     // --- Validation ---
     const isStep0Valid = $derived(name.length >= 3);
-    const isStep1Valid = $derived(
-        cliffDate !== "" && duration >= 0 && poolAmount > 0,
-    );
-    const isBudgetMatch = $derived(
-        poolAmount > 0 && totalAmount === poolAmount,
-    );
+    const isStep1Valid = $derived(cliffDate !== '' && duration >= 0 && poolAmount > 0);
+    const isBudgetMatch = $derived(poolAmount > 0 && totalAmount === poolAmount);
     const isStep2Valid = $derived(
         recipients.length > 0 && isBudgetMatch && validationErrors.length === 0,
     );
@@ -95,12 +79,12 @@
 
     // --- Actions ---
     function resetForm() {
-        name = "";
-        description = "";
-        cliffDate = "";
+        name = '';
+        description = '';
+        cliffDate = '';
         duration = 12;
         poolAmount = 0;
-        poolInputValue = "";
+        poolInputValue = '';
         recipients = [];
         csvFileName = null;
         csvError = null;
@@ -113,14 +97,14 @@
 
     function cancelCreation() {
         resetForm();
-        goto("/distributions");
+        goto('/distributions');
     }
 
     function saveDistribution() {
         if (!isFormValid) return;
         const regulatoryRules: string[] = [];
-        if (usRestricted) regulatoryRules.push("US_RESTRICTED");
-        if (euRestricted) regulatoryRules.push("EU_RESTRICTED");
+        if (usRestricted) regulatoryRules.push('US_RESTRICTED');
+        if (euRestricted) regulatoryRules.push('EU_RESTRICTED');
 
         const newDist: Distribution = {
             id: crypto.randomUUID(),
@@ -136,7 +120,7 @@
             recipients,
             csvFilename: csvFileName,
             regulatoryRules,
-            state: "created",
+            state: 'created',
             createdAt: new Date().toISOString(),
         };
 
@@ -144,7 +128,7 @@
         wizardStore.clearEditingState();
 
         // Redirect to distributions page after saving
-        goto("/distributions");
+        goto('/distributions');
     }
 
     // Initialize editing state on mount
@@ -163,7 +147,7 @@
         <div class="flex items-center justify-between mb-4">
             <button
                 class="flex items-center gap-2 text-sm text-zen-fg-subtle hover:text-zen-fg transition-colors"
-                onclick={() => goto("/wizard/step-0")}
+                onclick={() => goto('/wizard/step-0')}
             >
                 <ArrowLeft class="w-4 h-4" />
                 <span>Change Token</span>
@@ -188,7 +172,7 @@
         <!-- Form Content -->
         <div class="flex-1 relative">
             {#if creationStep === 0}
-                <div in:slide={{ duration: 200, axis: "x" }}>
+                <div in:slide={{ duration: 200, axis: 'x' }}>
                     <DistributionIdentity
                         bind:name
                         bind:description
@@ -197,7 +181,7 @@
                     />
                 </div>
             {:else if creationStep === 1}
-                <div in:slide={{ duration: 300, axis: "x" }}>
+                <div in:slide={{ duration: 300, axis: 'x' }}>
                     <DistributionSchedule
                         bind:poolAmount
                         bind:poolInputValue
@@ -208,7 +192,7 @@
                     />
                 </div>
             {:else if creationStep === 2}
-                <div in:slide={{ duration: 200, axis: "x" }}>
+                <div in:slide={{ duration: 200, axis: 'x' }}>
                     <DistributionRecipients
                         bind:recipients
                         bind:csvFileName
@@ -218,8 +202,7 @@
                         {totalAmount}
                         {poolAmount}
                         unlockEvents={duration}
-                        tokenSymbol={wizardStore.tokenDetails.tokenSymbol ||
-                            "TOKENS"}
+                        tokenSymbol={wizardStore.tokenDetails.tokenSymbol || 'TOKENS'}
                     />
                 </div>
             {/if}
@@ -227,20 +210,16 @@
 
         <!-- Action Bar -->
         <div
-            class="mt-12 pt-6 border-t border-zen-border-subtle flex items-center {creationStep >
-            0
+            class="mt-12 pt-6 border-t border-zen-border-subtle flex items-center {creationStep > 0
                 ? 'justify-between'
                 : 'justify-end'}"
         >
             {#if creationStep > 0}
-                <ZenButton variant="ghost" onclick={() => creationStep--}>
-                    Back
-                </ZenButton>
+                <ZenButton variant="ghost" onclick={() => creationStep--}>Back</ZenButton>
             {/if}
 
             {#if creationStep < 2}
-                {@const isCurrentStepValid =
-                    creationStep === 0 ? isStep0Valid : isStep1Valid}
+                {@const isCurrentStepValid = creationStep === 0 ? isStep0Valid : isStep1Valid}
                 <ZenButton
                     variant="primary"
                     size="lg"
@@ -262,9 +241,7 @@
                         <Sparkles class="w-4 h-4 mr-2" /> Launch Distribution
                     </ZenButton>
                     {#if !isFormValid}
-                        <span
-                            class="text-[10px] text-zen-fg-muted font-medium px-1 animate-pulse"
-                        >
+                        <span class="text-[10px] text-zen-fg-muted font-medium px-1 animate-pulse">
                             Complete requirements to launch
                         </span>
                     {/if}
@@ -318,9 +295,7 @@
                 </div>
 
                 <!-- Title Preview -->
-                <h3
-                    class="text-xl font-bold leading-tight mb-2 min-h-[1.75rem] transition-all"
-                >
+                <h3 class="text-xl font-bold leading-tight mb-2 min-h-[1.75rem] transition-all">
                     {#if name}
                         {name}
                     {:else}
@@ -329,15 +304,11 @@
                 </h3>
 
                 <!-- Description Preview -->
-                <p
-                    class="text-sm text-zen-fg/60 min-h-[3rem] line-clamp-2"
-                >
+                <p class="text-sm text-zen-fg/60 min-h-[3rem] line-clamp-2">
                     {#if description}
                         {description}
                     {:else}
-                        <span class="opacity-20 italic"
-                            >No description provided yet...</span
-                        >
+                        <span class="opacity-20 italic">No description provided yet...</span>
                     {/if}
                 </p>
             </div>
@@ -357,8 +328,7 @@
                         {duration}
                         {durationUnit}
                         totalTokens={poolAmount}
-                        tokenSymbol={wizardStore.tokenDetails.tokenSymbol ||
-                            undefined}
+                        tokenSymbol={wizardStore.tokenDetails.tokenSymbol || undefined}
                     />
                 {:else}
                     <!-- Fallback Placeholder for Step 0 -->
@@ -366,9 +336,7 @@
                         class="h-40 flex flex-col items-center justify-center text-center opacity-40 bg-zen-fg/[0.02] rounded-2xl"
                     >
                         <Calendar class="w-8 h-8 mb-2 opacity-50" />
-                        <span class="text-xs font-medium"
-                            >Schedule not configured</span
-                        >
+                        <span class="text-xs font-medium">Schedule not configured</span>
                     </div>
                 {/if}
             </div>
@@ -382,6 +350,5 @@
                 </div>
             {/if}
         </div>
-
     </div>
 </div>

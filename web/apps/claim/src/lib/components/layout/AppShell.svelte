@@ -1,6 +1,6 @@
 <script lang="ts">
-    import ZarfNavbar from "@zarf/ui/components/layout/ZarfNavbar.svelte";
-    import { page } from "$app/state";
+    import ZarfNavbar from '@zarf/ui/components/layout/ZarfNavbar.svelte';
+    import { page } from '$app/state';
 
     let { children } = $props();
 </script>
@@ -12,7 +12,8 @@
     <ZarfNavbar showEmail={true} showWalletBadge={true}>
         <a
             href="/"
-            class="text-xs font-medium transition-colors hover:text-zen-fg {page.url.pathname === '/'
+            class="text-xs font-medium transition-colors hover:text-zen-fg {page.url.pathname ===
+            '/'
                 ? 'text-zen-fg'
                 : 'text-zen-fg-muted'}"
         >

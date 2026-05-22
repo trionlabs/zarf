@@ -1,9 +1,9 @@
 /**
  * Google OAuth OIDC Authentication Utilities
- * 
+ *
  * This module handles Google OAuth 2.0 implicit flow for obtaining JWTs.
  * Used for email-based whitelist verification with privacy preservation.
- * 
+ *
  * @module auth/googleAuth
  */
 
@@ -38,10 +38,10 @@ function assertBrowser(): void {
 /**
  * Encodes OAuth state object for URL transmission.
  * Used to preserve context (e.g., contractAddress) through OAuth redirect.
- * 
+ *
  * @param state - State object to encode
  * @returns URL-safe encoded string, or null if state is empty
- * 
+ *
  * @example
  * ```typescript
  * const encoded = encodeOAuthState({ address: 'C...' });
@@ -51,7 +51,7 @@ function assertBrowser(): void {
 export function encodeOAuthState(state: OAuthState): string | null {
     // Filter out undefined/null values
     const filtered = Object.fromEntries(
-        Object.entries(state).filter(([, v]) => v !== undefined && v !== null)
+        Object.entries(state).filter(([, v]) => v !== undefined && v !== null),
     );
 
     if (Object.keys(filtered).length === 0) {
@@ -65,10 +65,10 @@ export function encodeOAuthState(state: OAuthState): string | null {
 /**
  * Decodes OAuth state from URL parameter.
  * Safely parses the state with error handling.
- * 
+ *
  * @param stateParam - State string from URLSearchParams.get() (already decoded)
  * @returns Decoded state object, or null if invalid/empty
- * 
+ *
  * @example
  * ```typescript
  * const params = new URLSearchParams(window.location.hash.substring(1));
@@ -105,14 +105,14 @@ export function decodeOAuthState(stateParam: string | null): OAuthState | null {
 /**
  * Initiates Google OAuth login using implicit flow.
  * Redirects user to Google's authentication page.
- * 
+ *
  * @param clientId - Google OAuth Client ID from console.cloud.google.com
  * @param redirectUri - Redirect URI (must match Google Console config exactly)
  * @param state - Optional state for preserving context through redirect
  * @param nonce - Optional nonce for replay protection (auto-generated if not provided)
- * 
+ *
  * @throws {Error} If called during SSR (server-side rendering)
- * 
+ *
  * @example
  * ```typescript
  * const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
@@ -124,7 +124,7 @@ export function initiateGoogleLogin(
     clientId: string,
     redirectUri: string,
     state: string | null = null,
-    nonce: string | null = null
+    nonce: string | null = null,
 ): void {
     assertBrowser();
 
@@ -146,17 +146,17 @@ export function initiateGoogleLogin(
 /**
  * Convenience wrapper for initiateGoogleLogin using environment variables.
  * Preserves contractAddress through OAuth redirect via state parameter.
- * 
+ *
  * @param contractAddress - Optional contract address to preserve through redirect
- * 
+ *
  * @throws {Error} If VITE_GOOGLE_CLIENT_ID is not defined
  * @throws {Error} If called during SSR
- * 
+ *
  * @example
  * ```typescript
  * // Basic usage
  * redirectToGoogle();
- * 
+ *
  * // With contract address preservation
  * redirectToGoogle('C...');
  * ```
@@ -194,11 +194,11 @@ export function redirectToGoogle(contractAddress?: string): void {
 /**
  * Extracts the id_token from URL fragment after OAuth redirect.
  * Google returns the token in the URL hash (#id_token=...).
- * 
+ *
  * @returns The JWT id_token string, or null if not found
- * 
+ *
  * @throws {Error} If called during SSR
- * 
+ *
  * @example
  * ```typescript
  * onMount(() => {
@@ -221,11 +221,11 @@ export function extractTokenFromUrl(): string | null {
 
 /**
  * Extracts OAuth state from URL fragment after redirect.
- * 
+ *
  * @returns Decoded OAuthState object, or null if not found/invalid
- * 
+ *
  * @throws {Error} If called during SSR
- * 
+ *
  * @example
  * ```typescript
  * const state = extractStateFromUrl();
@@ -246,9 +246,9 @@ export function extractStateFromUrl(): OAuthState | null {
 /**
  * Clears the URL fragment (removes token from URL bar for security).
  * Call this after extracting the token to clean up the URL.
- * 
+ *
  * @throws {Error} If called during SSR
- * 
+ *
  * @example
  * ```typescript
  * const token = extractTokenFromUrl();
@@ -261,11 +261,7 @@ export function extractStateFromUrl(): OAuthState | null {
 export function clearUrlFragment(): void {
     assertBrowser();
 
-    history.replaceState(
-        null,
-        '',
-        window.location.pathname + window.location.search
-    );
+    history.replaceState(null, '', window.location.pathname + window.location.search);
 }
 
 // ============================================================================
@@ -274,16 +270,16 @@ export function clearUrlFragment(): void {
 
 /**
  * Decodes a JWT without verification.
- * 
+ *
  * WARNING: This does NOT verify the signature. Verification happens in the
  * ZK circuit (Noir) using the public key. This function is only for extracting
  * claims for display purposes.
- * 
+ *
  * @param jwt - The JWT string (format: header.payload.signature)
  * @returns Decoded header and payload
- * 
+ *
  * @throws {Error} If JWT format is invalid (not 3 parts)
- * 
+ *
  * @example
  * ```typescript
  * const token = extractTokenFromUrl();
@@ -311,7 +307,9 @@ export function decodeJwt(jwt: string): DecodedJWT {
 
         return { header, payload };
     } catch (error) {
-        throw new Error(`Failed to decode JWT: ${error instanceof Error ? error.message : 'unknown error'}`);
+        throw new Error(
+            `Failed to decode JWT: ${error instanceof Error ? error.message : 'unknown error'}`,
+        );
     }
 }
 
@@ -322,11 +320,11 @@ export function decodeJwt(jwt: string): DecodedJWT {
 /**
  * Fetches Google's public keys (JWKs) for JWT verification.
  * These keys rotate periodically, so fetch fresh for each verification.
- * 
+ *
  * @returns Array of Google's public keys in JWK format
- * 
+ *
  * @throws {Error} If fetch fails or response is invalid
- * 
+ *
  * @example
  * ```typescript
  * const keys = await fetchGooglePublicKeys();
@@ -352,32 +350,29 @@ export async function fetchGooglePublicKeys(): Promise<GooglePublicKey[]> {
         return data.keys as GooglePublicKey[];
     } catch (error) {
         throw new Error(
-            `Failed to fetch Google public keys: ${error instanceof Error ? error.message : 'unknown error'}`
+            `Failed to fetch Google public keys: ${error instanceof Error ? error.message : 'unknown error'}`,
         );
     }
 }
 
 /**
  * Finds the correct public key for a JWT based on its Key ID (kid).
- * 
+ *
  * @param keys - Array of JWKs from fetchGooglePublicKeys()
  * @param kid - Key ID from JWT header
  * @returns The matching public key, or null if not found
- * 
+ *
  * @example
  * ```typescript
  * const keys = await fetchGooglePublicKeys();
  * const decoded = decodeJwt(myToken);
  * const publicKey = findKeyById(keys, decoded.header.kid);
- * 
+ *
  * if (!publicKey) {
  *   throw new Error('Could not find matching public key');
  * }
  * ```
  */
-export function findKeyById(
-    keys: GooglePublicKey[],
-    kid: string
-): GooglePublicKey | null {
+export function findKeyById(keys: GooglePublicKey[], kid: string): GooglePublicKey | null {
     return keys.find((key) => key.kid === kid) || null;
 }

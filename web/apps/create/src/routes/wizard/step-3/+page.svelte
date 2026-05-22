@@ -1,20 +1,20 @@
 <script lang="ts">
-    import { wizardStore } from "$lib/stores/wizardStore.svelte";
-    import { deployStore } from "$lib/stores/deployStore.svelte";
-    import { goto } from "$app/navigation";
-    import { onMount } from "svelte";
-    import { Check, Copy, ArrowRight } from "lucide-svelte";
-    import ZenButton from "@zarf/ui/components/ui/ZenButton.svelte";
-    import { fly } from "svelte/transition";
+    import { wizardStore } from '$lib/stores/wizardStore.svelte';
+    import { deployStore } from '$lib/stores/deployStore.svelte';
+    import { goto } from '$app/navigation';
+    import { onMount } from 'svelte';
+    import { Check, Copy, ArrowRight } from 'lucide-svelte';
+    import ZenButton from '@zarf/ui/components/ui/ZenButton.svelte';
+    import { fly } from 'svelte/transition';
 
-    let contractAddress = $state("");
+    let contractAddress = $state('');
     let copied = $state(false);
 
     onMount(() => {
         wizardStore.goToStep(2);
         // Update with real address after hydration. Source of truth is deployStore;
         // wizardStore no longer mirrors deployment results.
-        contractAddress = deployStore.contractAddress ?? "";
+        contractAddress = deployStore.contractAddress ?? '';
     });
 
     function copyToClipboard() {
@@ -26,13 +26,11 @@
 
     function handleFinish() {
         wizardStore.reset();
-        goto("/");
+        goto('/');
     }
 </script>
 
-<div
-    class="h-full flex flex-col justify-center items-center max-w-3xl mx-auto py-12 text-center"
->
+<div class="h-full flex flex-col justify-center items-center max-w-3xl mx-auto py-12 text-center">
     <div
         class="w-20 h-20 bg-zen-success/10 text-zen-success rounded-full flex items-center justify-center mb-6"
         in:fly={{ y: 20, duration: 600 }}
@@ -59,13 +57,12 @@
         in:fly={{ y: 20, duration: 600, delay: 300 }}
     >
         <div class="flex flex-col gap-2">
-            <span
-                class="text-xs font-bold uppercase tracking-[0.2em] opacity-40"
+            <span class="text-xs font-bold uppercase tracking-[0.2em] opacity-40"
                 >Contract Address</span
             >
             <div class="flex items-center justify-center gap-3">
                 <span class="font-mono text-lg">
-                    {contractAddress || "Not available"}
+                    {contractAddress || 'Not available'}
                 </span>
                 <button
                     class="p-2 rounded-full hover:bg-zen-fg/5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
@@ -85,12 +82,7 @@
 
     <!-- Actions -->
     <div class="flex gap-4" in:fly={{ y: 20, duration: 600, delay: 500 }}>
-        <ZenButton
-            variant="primary"
-            size="lg"
-            class="px-10 h-12 text-base"
-            onclick={handleFinish}
-        >
+        <ZenButton variant="primary" size="lg" class="px-10 h-12 text-base" onclick={handleFinish}>
             All Done
             <ArrowRight class="w-4 h-4 ml-2" />
         </ZenButton>

@@ -1,13 +1,13 @@
 <script lang="ts">
-    import type { Snippet } from "svelte";
-    import type { HTMLButtonAttributes } from "svelte/elements";
+    import type { Snippet } from 'svelte';
+    import type { HTMLButtonAttributes } from 'svelte/elements';
 
     interface Props extends HTMLButtonAttributes {
         children?: Snippet;
         iconLeft?: Snippet;
         iconRight?: Snippet;
-        variant?: "primary" | "secondary" | "ghost" | "danger";
-        size?: "xs" | "sm" | "md" | "lg";
+        variant?: 'primary' | 'secondary' | 'ghost' | 'danger';
+        size?: 'xs' | 'sm' | 'md' | 'lg';
         loading?: boolean;
     }
 
@@ -15,11 +15,11 @@
         children,
         iconLeft,
         iconRight,
-        variant = "primary",
-        size = "md",
+        variant = 'primary',
+        size = 'md',
         loading = false,
         disabled,
-        class: className = "",
+        class: className = '',
         popover, // Destructure popover to exclude it from rest
         ...rest
     }: Props = $props();
@@ -29,17 +29,17 @@
      * 4px base unit scale matching design tokens
      */
     const sizeClasses = {
-        xs: "px-2.5 py-1 text-xs gap-1",
-        sm: "px-4 py-2 text-xs gap-1.5", // Previously px-3 py-1.5
-        md: "px-6 py-3 text-sm gap-2", // Previously px-5 py-2.5
-        lg: "px-8 py-4 text-base gap-2.5", // Previously px-6 py-3
+        xs: 'px-2.5 py-1 text-xs gap-1',
+        sm: 'px-4 py-2 text-xs gap-1.5', // Previously px-3 py-1.5
+        md: 'px-6 py-3 text-sm gap-2', // Previously px-5 py-2.5
+        lg: 'px-8 py-4 text-base gap-2.5', // Previously px-6 py-3
     } as const;
 
     const spinnerSizes = {
-        xs: "w-3 h-3",
-        sm: "w-4 h-4",
-        md: "w-4 h-4",
-        lg: "w-5 h-5",
+        xs: 'w-3 h-3',
+        sm: 'w-4 h-4',
+        md: 'w-4 h-4',
+        lg: 'w-5 h-5',
     } as const;
 
     /**
@@ -116,9 +116,7 @@
 </script>
 
 <button
-    class="{baseClasses} {sizeClasses[size]} {variantClasses[
-        variant
-    ]} {className}"
+    class="{baseClasses} {sizeClasses[size]} {variantClasses[variant]} {className}"
     data-variant={variant}
     disabled={isDisabled}
     aria-busy={loading || undefined}
@@ -126,10 +124,7 @@
 >
     <!-- Loading overlay: absolutely positioned to preserve button dimensions -->
     {#if loading}
-        <span
-            class="absolute inset-0 flex items-center justify-center"
-            aria-hidden="true"
-        >
+        <span class="absolute inset-0 flex items-center justify-center" aria-hidden="true">
             <svg
                 class="animate-spin {spinnerSizes[size]}"
                 xmlns="http://www.w3.org/2000/svg"

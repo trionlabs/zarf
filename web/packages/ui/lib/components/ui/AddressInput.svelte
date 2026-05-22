@@ -1,10 +1,10 @@
 <script lang="ts">
-    import { Search, AlertCircle, Loader2 } from "lucide-svelte";
-    import type { ComponentType } from "svelte";
+    import { Search, AlertCircle, Loader2 } from 'lucide-svelte';
+    import type { ComponentType } from 'svelte';
 
     let {
         value = $bindable(),
-        placeholder = "0x...",
+        placeholder = '0x...',
         error = null,
         onInput = () => {},
         isLoading = false,
@@ -34,8 +34,8 @@
             border-[0.5px] transition-all duration-300
             bg-zen-bg
             {hasError
-                ? 'border-zen-error/50'
-                : 'border-zen-border hover:border-zen-border-strong focus-within:border-zen-primary/50'}
+            ? 'border-zen-error/50'
+            : 'border-zen-border hover:border-zen-border-strong focus-within:border-zen-primary/50'}
             shadow-sm hover:shadow-md focus-within:shadow-md
         "
     >
@@ -61,7 +61,7 @@
             "
             bind:value
             oninput={onInput}
-            onkeydown={(e) => e.key === "Enter" && onAction()}
+            onkeydown={(e) => e.key === 'Enter' && onAction()}
         />
 
         <!-- Action Button -->

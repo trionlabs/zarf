@@ -106,7 +106,10 @@ async function initialize() {
         console.log('[Worker] Noir initialized');
 
         // 5. Init UltraHonkBackend - single thread for worker context
-        postMessage({ type: 'PROGRESS', message: 'Initializing Prover Backend (may take 10-20s)...' });
+        postMessage({
+            type: 'PROGRESS',
+            message: 'Initializing Prover Backend (may take 10-20s)...',
+        });
         console.log('[Worker] Creating UltraHonkBackend...');
         cachedBackend = new UltraHonkBackend(cachedCircuit.bytecode, { threads: 1 });
         console.log('[Worker] Backend initialized successfully');
@@ -116,7 +119,10 @@ async function initialize() {
         console.log('[Worker] Fully initialized');
     } catch (error: any) {
         console.error('[Worker] Initialization failed:', error);
-        postMessage({ type: 'ERROR', message: `Initialization failed: ${error.message || String(error)}` });
+        postMessage({
+            type: 'ERROR',
+            message: `Initialization failed: ${error.message || String(error)}`,
+        });
         throw error;
     }
 }
@@ -149,9 +155,11 @@ async function generateProof(payload: ProofRequest['payload']) {
     const proof = await cachedBackend.generateProof(witness, { keccak: true });
 
     // 5. Format Output
-    const proofHex = '0x' + Array.from(proof.proof)
-        .map((b: any) => b.toString(16).padStart(2, '0'))
-        .join('');
+    const proofHex =
+        '0x' +
+        Array.from(proof.proof)
+            .map((b: any) => b.toString(16).padStart(2, '0'))
+            .join('');
 
     // Extract critical public inputs to return for verification/logging
     // [19] = unlock_time (Input)
@@ -171,13 +179,13 @@ async function generateProof(payload: ProofRequest['payload']) {
             identityCommitment,
             merkleRoot: toHex(merkleRoot),
             recipient: proofRecipient,
-            amount: BigInt(amount)
+            amount: BigInt(amount),
         },
         // Convenience duplicates
         identityCommitment,
         merkleRoot: toHex(merkleRoot),
         recipient: proofRecipient,
-        amount: BigInt(amount)
+        amount: BigInt(amount),
     };
 }
 

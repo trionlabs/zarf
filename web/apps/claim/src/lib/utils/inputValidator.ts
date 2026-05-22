@@ -10,7 +10,7 @@ import { isValidAddress } from '@zarf/core/utils/address';
 
 export interface ClaimData {
     email: string;
-    emailHash: string;  // Pedersen hash of email - needed for contract queries (getClaimable)
+    emailHash: string; // Pedersen hash of email - needed for contract queries (getClaimable)
     salt: string;
     amount: string;
     merkleProof: {
@@ -27,7 +27,11 @@ const HEX_REGEX = /^0x[a-fA-F0-9]+$/;
  * Validate the uploaded claim data JSON.
  * @param json - Parsed JSON object
  */
-export function validateClaimData(json: any): { success: boolean; data?: ClaimData; error?: string } {
+export function validateClaimData(json: any): {
+    success: boolean;
+    data?: ClaimData;
+    error?: string;
+} {
     if (!json || typeof json !== 'object') {
         return { success: false, error: 'Invalid JSON object' };
     }
@@ -48,7 +52,11 @@ export function validateClaimData(json: any): { success: boolean; data?: ClaimDa
     }
 
     // 4. Amount
-    if (!json.amount || typeof json.amount !== 'string' || (!HEX_REGEX.test(json.amount) && isNaN(Number(json.amount)))) {
+    if (
+        !json.amount ||
+        typeof json.amount !== 'string' ||
+        (!HEX_REGEX.test(json.amount) && isNaN(Number(json.amount)))
+    ) {
         return { success: false, error: 'Invalid amount. Must be a hex string or number string.' };
     }
 
@@ -58,7 +66,11 @@ export function validateClaimData(json: any): { success: boolean; data?: ClaimDa
     }
 
     // 6. Merkle Root
-    if (!json.merkleRoot || typeof json.merkleRoot !== 'string' || !HEX_REGEX.test(json.merkleRoot)) {
+    if (
+        !json.merkleRoot ||
+        typeof json.merkleRoot !== 'string' ||
+        !HEX_REGEX.test(json.merkleRoot)
+    ) {
         return { success: false, error: 'Invalid merkleRoot. Must be a 0x-prefixed hex string.' };
     }
 
@@ -67,7 +79,10 @@ export function validateClaimData(json: any): { success: boolean; data?: ClaimDa
         return { success: false, error: 'Missing merkleProof object.' };
     }
     if (!Array.isArray(json.merkleProof.siblings) || !Array.isArray(json.merkleProof.indices)) {
-        return { success: false, error: 'Invalid merkleProof. Must contain "siblings" and "indices" arrays.' };
+        return {
+            success: false,
+            error: 'Invalid merkleProof. Must contain "siblings" and "indices" arrays.',
+        };
     }
     if (json.merkleProof.siblings.length !== json.merkleProof.indices.length) {
         return { success: false, error: 'Mismatch in merkleProof siblings/indices length.' };

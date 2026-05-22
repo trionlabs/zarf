@@ -1,12 +1,12 @@
 <script lang="ts">
-    import { deployStore } from "../../../stores/deployStore.svelte";
-    import { fly } from "svelte/transition";
-    import { Key } from "lucide-svelte";
+    import { deployStore } from '../../../stores/deployStore.svelte';
+    import { fly } from 'svelte/transition';
+    import { Key } from 'lucide-svelte';
 
-    import ZenCard from "@zarf/ui/components/ui/ZenCard.svelte";
-    import ZenButton from "@zarf/ui/components/ui/ZenButton.svelte";
-    import ZenAlert from "@zarf/ui/components/ui/ZenAlert.svelte";
-    import ZenCheckbox from "@zarf/ui/components/ui/ZenCheckbox.svelte";
+    import ZenCard from '@zarf/ui/components/ui/ZenCard.svelte';
+    import ZenButton from '@zarf/ui/components/ui/ZenButton.svelte';
+    import ZenAlert from '@zarf/ui/components/ui/ZenAlert.svelte';
+    import ZenCheckbox from '@zarf/ui/components/ui/ZenCheckbox.svelte';
 
     let merkleResult = $derived(deployStore.merkleResult);
     let isBackupDownloaded = $derived(deployStore.isBackupDownloaded);
@@ -27,19 +27,16 @@
                 }
             });
 
-            let csvContent = "email,pin\n";
+            let csvContent = 'email,pin\n';
             userMap.forEach((pin, email) => {
                 csvContent += `${email},${pin}\n`;
             });
 
             backupError = null;
-            downloadFile(csvContent, "secrets.csv", "text/csv");
+            downloadFile(csvContent, 'secrets.csv', 'text/csv');
             deployStore.setBackupDownloaded(true);
         } catch (e) {
-            backupError =
-                e instanceof Error
-                    ? e.message
-                    : "Could not generate secrets.csv";
+            backupError = e instanceof Error ? e.message : 'Could not generate secrets.csv';
             deployStore.setBackupDownloaded(false);
         }
     }
@@ -47,7 +44,7 @@
     function downloadFile(content: string, filename: string, type: string) {
         const blob = new Blob([content], { type });
         const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
+        const a = document.createElement('a');
         a.href = url;
         a.download = filename;
         document.body.appendChild(a);
@@ -67,8 +64,8 @@
         <h2 class="text-2xl font-bold">Backup Distribution Data</h2>
         <ZenAlert variant="warning">
             {#snippet title()}CRITICAL STEP: Prevent Data Loss{/snippet}
-            You MUST save the <b>secrets.csv</b>. It contains the PIN
-            codes required for users. If lost, funds are
+            You MUST save the <b>secrets.csv</b>. It contains the PIN codes required for users. If
+            lost, funds are
             <b>permanently locked</b>.
         </ZenAlert>
     </div>
@@ -88,14 +85,9 @@
                 </div>
                 <h3 class="font-bold text-lg mb-2">Private Secrets</h3>
                 <p class="text-xs text-zen-fg-muted mb-4">
-                    Save this <b>secrets.csv</b> SECURELY. Send each user their PIN
-                    code privately.
+                    Save this <b>secrets.csv</b> SECURELY. Send each user their PIN code privately.
                 </p>
-                <ZenButton
-                    variant="danger"
-                    size="sm"
-                    onclick={downloadPrivateSecrets}
-                >
+                <ZenButton variant="danger" size="sm" onclick={downloadPrivateSecrets}>
                     Download Secrets
                 </ZenButton>
             </div>

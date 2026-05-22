@@ -4,10 +4,7 @@
 
 import type { StellarAddress, StellarContractId } from '../types';
 import { getActiveStellarNetworkId } from '../config/runtime';
-import {
-    fetchIndexerJson,
-    indexerNetworkPath,
-} from '../utils/indexerClient';
+import { fetchIndexerJson, indexerNetworkPath } from '../utils/indexerClient';
 
 export interface OnChainVestingContract {
     address: StellarContractId;

@@ -1,10 +1,10 @@
 /**
  * Theme Store - Application Theme Management
- * 
+ *
  * Manages binary dark/light theme selection.
  * Maps to DaisyUI themes: light='wireframe', dark='glass-porcelain'
  * Persists to localStorage and applies to document root.
- * 
+ *
  * @module stores/themeStore
  */
 
@@ -17,7 +17,7 @@ const DEFAULT_THEME: Theme = 'dark';
 // DaisyUI theme mapping
 const THEME_MAP: Record<Theme, string> = {
     light: 'paper-porcelain',
-    dark: 'glass-porcelain'
+    dark: 'glass-porcelain',
 };
 
 // ============================================================================
@@ -99,11 +99,17 @@ function reset() {
 
 export const themeStore = {
     // Getters (read-only)
-    get current() { return currentTheme; },
+    get current() {
+        return currentTheme;
+    },
 
     // Derived getters
-    get isDark() { return isDark; },
-    get isLight() { return isLight; },
+    get isDark() {
+        return isDark;
+    },
+    get isLight() {
+        return isLight;
+    },
 
     // Mutation methods
     setTheme,
@@ -111,5 +117,5 @@ export const themeStore = {
     reset,
 
     // Lifecycle
-    restore
+    restore,
 };

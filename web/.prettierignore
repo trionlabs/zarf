@@ -1,0 +1,10 @@
+node_modules
+.svelte-kit
+build
+dist
+.wrangler
+.output
+.vercel
+.netlify
+pnpm-lock.yaml
+*.md

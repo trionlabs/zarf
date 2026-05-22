@@ -50,9 +50,9 @@ describe('computeLeaf (golden snapshot)', () => {
     it('hashes (email, amount, salt, unlockTime) deterministically', async () => {
         const leaf = await computeLeaf(
             'alice@example.com',
-            10n ** 18n,                // 1e18 wei
+            10n ** 18n, // 1e18 wei
             0x1234n,
-            1_700_086_400,             // unix seconds
+            1_700_086_400, // unix seconds
         );
         expect(leaf.toString()).toMatchInlineSnapshot(
             `"7673146463851840154926809133587151323101606115910987893633764370302781377969"`,

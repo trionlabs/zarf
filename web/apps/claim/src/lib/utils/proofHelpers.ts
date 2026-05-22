@@ -36,17 +36,12 @@ async function processDistributionData(data: unknown): Promise<bigint[]> {
 
     const leavesMap = new Map<number, bigint>();
     let maxIndex = -1;
-    const metadataEntries = Object.entries(doc.commitments).flatMap(
-        ([commitment, meta]) => {
-            if (Array.isArray(meta) && meta.length === 0) {
-                throw new Error(`Invalid commitment metadata for key ${commitment}`);
-            }
-            return (Array.isArray(meta) ? meta : [meta]).map((entry) => [
-                commitment,
-                entry,
-            ] as const);
-        },
-    );
+    const metadataEntries = Object.entries(doc.commitments).flatMap(([commitment, meta]) => {
+        if (Array.isArray(meta) && meta.length === 0) {
+            throw new Error(`Invalid commitment metadata for key ${commitment}`);
+        }
+        return (Array.isArray(meta) ? meta : [meta]).map((entry) => [commitment, entry] as const);
+    });
 
     for (const [commitment, meta] of metadataEntries) {
         try {
@@ -73,11 +68,7 @@ async function processDistributionData(data: unknown): Promise<bigint[]> {
         ) {
             throw new Error(`Invalid commitment unlockTime for key ${commitment}`);
         }
-        if (
-            typeof entry.index !== 'number' ||
-            !Number.isInteger(entry.index) ||
-            entry.index < 0
-        ) {
+        if (typeof entry.index !== 'number' || !Number.isInteger(entry.index) || entry.index < 0) {
             throw new Error(`Invalid commitment index for key ${commitment}`);
         }
         if (leavesMap.has(entry.index)) {
@@ -102,25 +93,30 @@ async function processDistributionData(data: unknown): Promise<bigint[]> {
 
 /**
  * Helper to Find User's Leaf and generate a valid Path for the Proof.
- * 
+ *
  * @param userLeaf - The leaf computed from user's Identity + Amount
  * @param publicLeaves - The list of other leaves
  */
-export async function getProofForLeaf(userLeaf: bigint, publicLeaves: bigint[]): Promise<{
+export async function getProofForLeaf(
+    userLeaf: bigint,
+    publicLeaves: bigint[],
+): Promise<{
     proof: MerkleProof;
     root: bigint;
 }> {
     const leaves = [...publicLeaves];
 
     // Check if exists
-    const index = leaves.findIndex(l => l === userLeaf);
+    const index = leaves.findIndex((l) => l === userLeaf);
 
     if (index === -1) {
-        throw new Error("Your identity verification generated a leaf that is NOT in the distribution list. Please check your credentials.");
+        throw new Error(
+            'Your identity verification generated a leaf that is NOT in the distribution list. Please check your credentials.',
+        );
     }
 
     // Build the tree (re-verify root)
-    // Note: In a heavily optimized app, we might download the ready-made proof from the JSON 
+    // Note: In a heavily optimized app, we might download the ready-made proof from the JSON
     // instead of rebuilding the tree client-side. But for now, ensuring correctness by rebuilding is safer.
     const { buildMerkleTree, getMerkleProof } = await import('@zarf/core/crypto/merkleTree');
     const tree = await buildMerkleTree(leaves);
@@ -130,6 +126,6 @@ export async function getProofForLeaf(userLeaf: bigint, publicLeaves: bigint[]):
 
     return {
         proof,
-        root: tree.root
+        root: tree.root,
     };
 }

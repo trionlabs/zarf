@@ -5,7 +5,7 @@
 
 export function safeStringify(value: any): string {
     return JSON.stringify(value, (_, v) =>
-        typeof v === 'bigint' ? { __type: 'bigint', value: v.toString() } : v
+        typeof v === 'bigint' ? { __type: 'bigint', value: v.toString() } : v,
     );
 }
 

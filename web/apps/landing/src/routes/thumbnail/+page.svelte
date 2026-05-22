@@ -1,6 +1,6 @@
 <script lang="ts">
-    import { onMount } from "svelte";
-    import ZarfLogo from "@zarf/ui/components/brand/ZarfLogo.svelte";
+    import { onMount } from 'svelte';
+    import ZarfLogo from '@zarf/ui/components/brand/ZarfLogo.svelte';
 
     let mounted = $state(false);
     let container: HTMLDivElement;
@@ -10,7 +10,7 @@
 
     onMount(() => {
         mounted = true;
-        if (container) container.setAttribute("data-theme", "dark");
+        if (container) container.setAttribute('data-theme', 'dark');
     });
 </script>
 
@@ -30,9 +30,7 @@
     ></div>
 
     <!-- SPOTLIGHT EFFECT -->
-    <div
-        class="absolute inset-0 pointer-events-none z-10 wave-grid-spotlight opacity-50"
-    ></div>
+    <div class="absolute inset-0 pointer-events-none z-10 wave-grid-spotlight opacity-50"></div>
 
     <!-- 1. HEADER: BRANDING -->
     <div
@@ -40,17 +38,13 @@
             ? 'opacity-100 translate-y-0'
             : 'opacity-0 -translate-y-2'} transition-all duration-1000"
     >
-        <div
-            class="flex items-center gap-3 opacity-100 origin-top-left scale-125"
-        >
+        <div class="flex items-center gap-3 opacity-100 origin-top-left scale-125">
             <ZarfLogo size="lg" />
         </div>
     </div>
 
     <!-- 2. MAIN CONTENT (Restored to "Like the Attachment") -->
-    <div
-        class="absolute top-1/2 left-20 right-20 -translate-y-1/2 z-30 pointer-events-none"
-    >
+    <div class="absolute top-1/2 left-20 right-20 -translate-y-1/2 z-30 pointer-events-none">
         <div class="max-w-4xl">
             <!-- Overline -->
             <h2
@@ -97,8 +91,7 @@
     >
         <!-- Platform Badge -->
         <div class="flex items-center gap-3 opacity-60">
-            <span
-                class="text-xs font-semibold text-white/50 uppercase tracking-widest"
+            <span class="text-xs font-semibold text-white/50 uppercase tracking-widest"
                 >Powered by</span
             >
             <div class="h-px w-8 bg-white/20"></div>
@@ -109,10 +102,7 @@
                     class="h-4 w-4"
                     style="filter: invert(1);"
                 />
-                <span
-                    class="text-xs font-bold text-white tracking-widest uppercase"
-                    >Stellar</span
-                >
+                <span class="text-xs font-bold text-white tracking-widest uppercase">Stellar</span>
             </div>
         </div>
 

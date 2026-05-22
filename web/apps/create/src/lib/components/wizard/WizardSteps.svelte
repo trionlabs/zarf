@@ -1,12 +1,12 @@
 <script lang="ts">
-    import { onMount } from "svelte";
-    import { page } from "$app/stores";
-    import { wizardStore } from "../../stores/wizardStore.svelte";
+    import { onMount } from 'svelte';
+    import { page } from '$app/stores';
+    import { wizardStore } from '../../stores/wizardStore.svelte';
 
     const steps = [
-        { label: "Token", path: "/wizard/step-0" },
-        { label: "Create", path: "/wizard/step-1" },
-        { label: "Deploy", path: "/wizard/deploy" },
+        { label: 'Token', path: '/wizard/step-0' },
+        { label: 'Create', path: '/wizard/step-1' },
+        { label: 'Deploy', path: '/wizard/deploy' },
     ];
 
     let mounted = $state(false);
@@ -37,7 +37,7 @@
 
     // Progress percentage
     const progressPercent = $derived(((effectiveStepIndex + 1) / steps.length) * 100);
-    const currentStepLabel = $derived(steps[effectiveStepIndex]?.label || "");
+    const currentStepLabel = $derived(steps[effectiveStepIndex]?.label || '');
 </script>
 
 <!-- Minimal Progress Bar -->
@@ -53,7 +53,8 @@
 
         <!-- Step Label -->
         <div class="text-xs font-mono text-zen-fg-muted whitespace-nowrap">
-            Step {effectiveStepIndex + 1} of {steps.length} · <span class="text-zen-fg font-medium uppercase tracking-wider">{currentStepLabel}</span>
+            Step {effectiveStepIndex + 1} of {steps.length} ·
+            <span class="text-zen-fg font-medium uppercase tracking-wider">{currentStepLabel}</span>
         </div>
     </div>
 </div>

@@ -1,8 +1,8 @@
 <script lang="ts">
-    import { Copy, Check } from "lucide-svelte";
-    import { getContractExplorerUrl } from "@zarf/core/contracts";
-    import { getStellarConfig } from "@zarf/core/config/runtime";
-    import { networkStore } from "../../stores/networkStore.svelte";
+    import { Copy, Check } from 'lucide-svelte';
+    import { getContractExplorerUrl } from '@zarf/core/contracts';
+    import { getStellarConfig } from '@zarf/core/config/runtime';
+    import { networkStore } from '../../stores/networkStore.svelte';
 
     interface ContractInfo {
         name: string;
@@ -15,11 +15,11 @@
         networkStore.activeId;
         const cfg = getStellarConfig();
         return [
-            { name: "Vesting", address: cfg.vestingAddress ?? "" },
-            { name: "Token", address: cfg.tokenAddress ?? "" },
-            { name: "Factory", address: cfg.factoryAddress ?? "" },
-            { name: "JWK Registry", address: cfg.jwkRegistryAddress ?? "" },
-            { name: "Verifier", address: cfg.verifierAddress ?? "" },
+            { name: 'Vesting', address: cfg.vestingAddress ?? '' },
+            { name: 'Token', address: cfg.tokenAddress ?? '' },
+            { name: 'Factory', address: cfg.factoryAddress ?? '' },
+            { name: 'JWK Registry', address: cfg.jwkRegistryAddress ?? '' },
+            { name: 'Verifier', address: cfg.verifierAddress ?? '' },
         ];
     });
 
@@ -35,11 +35,11 @@
     }
 
     function explorerHref(addr: string): string {
-        if (!addr) return "#";
+        if (!addr) return '#';
         try {
             return getContractExplorerUrl(addr);
         } catch {
-            return "#";
+            return '#';
         }
     }
 </script>
@@ -53,7 +53,7 @@
         onclick={() => (isOpen = !isOpen)}
     >
         <span class="font-bold opacity-70">Stellar Contracts Debug Bar</span>
-        <span class="opacity-50">{isOpen ? "▼" : "▲"}</span>
+        <span class="opacity-50">{isOpen ? '▼' : '▲'}</span>
     </button>
 
     {#if isOpen}
@@ -62,8 +62,7 @@
         >
             {#each displayContracts as c}
                 <div class="flex flex-col overflow-hidden group">
-                    <span
-                        class="text-[10px] uppercase opacity-50 font-bold tracking-wider"
+                    <span class="text-[10px] uppercase opacity-50 font-bold tracking-wider"
                         >{c.name}</span
                     >
                     <div class="flex items-center gap-2">

@@ -1,5 +1,5 @@
 <script lang="ts">
-    import type { Snippet, ComponentType } from "svelte";
+    import type { Snippet, ComponentType } from 'svelte';
 
     interface Props {
         children?: Snippet;
@@ -18,7 +18,7 @@
         active = false,
         onclick,
         href,
-        class: className = "",
+        class: className = '',
     }: Props = $props();
 
     const baseClasses = `
@@ -30,22 +30,14 @@
         hover:text-zen-fg
     `;
 
-    const activeClasses = active
-        ? "bg-zen-fg/10 text-zen-fg font-medium"
-        : "";
+    const activeClasses = active ? 'bg-zen-fg/10 text-zen-fg font-medium' : '';
 
-    const disabledClasses = disabled
-        ? "opacity-50 cursor-not-allowed pointer-events-none"
-        : "";
+    const disabledClasses = disabled ? 'opacity-50 cursor-not-allowed pointer-events-none' : '';
 </script>
 
 <li role="menuitem">
     {#if href && !disabled}
-        <a
-            {href}
-            class="{baseClasses} {activeClasses} {className}"
-            {onclick}
-        >
+        <a {href} class="{baseClasses} {activeClasses} {className}" {onclick}>
             {#if Icon}
                 <Icon class="w-4 h-4 shrink-0" />
             {/if}

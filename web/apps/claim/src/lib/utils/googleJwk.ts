@@ -31,7 +31,7 @@ export async function fetchGoogleJwks(): Promise<GoogleJwkSet> {
     const now = Date.now();
 
     // Return cached if still valid
-    if (cachedJwks && (now - cacheTimestamp) < CACHE_DURATION) {
+    if (cachedJwks && now - cacheTimestamp < CACHE_DURATION) {
         console.log('[GoogleJWK] Using cached keys');
         return cachedJwks;
     }
@@ -73,7 +73,7 @@ export async function getPublicKeyForJwt(jwt: string): Promise<GoogleJwk> {
     console.log(`[GoogleJWK] Looking for key with kid: ${kid}`);
 
     const jwks = await fetchGoogleJwks();
-    const key = jwks.keys.find(k => k.kid === kid);
+    const key = jwks.keys.find((k) => k.kid === kid);
 
     if (!key) {
         throw new Error(`No matching Google public key found for kid: ${kid}`);

@@ -1,6 +1,6 @@
 <script lang="ts">
-    import { themeStore } from "../../stores/themeStore.svelte";
-    import { Moon, Sun } from "lucide-svelte";
+    import { themeStore } from '../../stores/themeStore.svelte';
+    import { Moon, Sun } from 'lucide-svelte';
 
     function toggle() {
         themeStore.toggleTheme();

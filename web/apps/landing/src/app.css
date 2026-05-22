@@ -1,12 +1,12 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 @source "../../../packages/ui/lib/components/**/*.svelte";
 @source "./**/*.svelte";
 
 /* Zen Design System - provides color tokens and themes */
-@import "@zarf/ui/styles/index.css";
+@import '@zarf/ui/styles/index.css';
 
 @theme {
-  --font-sans: "Saira", ui-sans-serif, system-ui, sans-serif;
+    --font-sans: 'Saira', ui-sans-serif, system-ui, sans-serif;
 }
 
 /* ============================================
@@ -127,8 +127,16 @@
     pointer-events: none;
     background-size: 40px 40px;
     background-image:
-        linear-gradient(to right, color-mix(in oklch, var(--color-base-content) 5%, transparent) 1px, transparent 1px),
-        linear-gradient(to bottom, color-mix(in oklch, var(--color-base-content) 5%, transparent) 1px, transparent 1px);
+        linear-gradient(
+            to right,
+            color-mix(in oklch, var(--color-base-content) 5%, transparent) 1px,
+            transparent 1px
+        ),
+        linear-gradient(
+            to bottom,
+            color-mix(in oklch, var(--color-base-content) 5%, transparent) 1px,
+            transparent 1px
+        );
     -webkit-mask-image: linear-gradient(to bottom, transparent 0%, transparent 70%, black 100%);
     mask-image: linear-gradient(to bottom, transparent 0%, transparent 70%, black 100%);
     opacity: 0.4;
@@ -152,10 +160,20 @@
    ANIMATIONS
    ============================================ */
 @keyframes wave-expanding {
-    0% { transform: translate(-50%, -50%) scale(0.6); opacity: 0; }
-    20% { opacity: 0.4; }
-    50% { opacity: 0.2; }
-    100% { transform: translate(-50%, -50%) scale(2.2); opacity: 0; }
+    0% {
+        transform: translate(-50%, -50%) scale(0.6);
+        opacity: 0;
+    }
+    20% {
+        opacity: 0.4;
+    }
+    50% {
+        opacity: 0.2;
+    }
+    100% {
+        transform: translate(-50%, -50%) scale(2.2);
+        opacity: 0;
+    }
 }
 
 .wave-container-mask {
@@ -172,8 +190,8 @@
 }
 
 /* Preserve landing's warm highlights (override neutral UI package defaults) */
-[data-theme="glass-porcelain"],
-[data-theme="dark"] {
+[data-theme='glass-porcelain'],
+[data-theme='dark'] {
     --zen-highlight-bg: oklch(25% 0.02 80);
     --zen-highlight-fg: oklch(80% 0.08 80);
 
@@ -184,16 +202,16 @@
 }
 
 /* Dark theme grain */
-[data-theme="dark"] .landing-grain,
-[data-theme="glass-porcelain"] .landing-grain {
+[data-theme='dark'] .landing-grain,
+[data-theme='glass-porcelain'] .landing-grain {
     opacity: 0.35;
     mix-blend-mode: overlay;
     filter: contrast(130%) brightness(115%) grayscale(100%);
 }
 
 /* Light theme grain */
-[data-theme="light"] .landing-grain,
-[data-theme="paper-porcelain"] .landing-grain {
+[data-theme='light'] .landing-grain,
+[data-theme='paper-porcelain'] .landing-grain {
     opacity: 0.06;
     mix-blend-mode: multiply;
     filter: contrast(115%) brightness(95%) grayscale(100%);

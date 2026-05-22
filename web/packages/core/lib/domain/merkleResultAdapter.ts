@@ -64,7 +64,9 @@ export function buildFactoryDeployInputs(
     root: bigint,
 ): FactoryDeployInputs {
     if (claims.length === 0) {
-        throw new Error('merkle result: empty claims (cannot deploy a distribution with no recipients)');
+        throw new Error(
+            'merkle result: empty claims (cannot deploy a distribution with no recipients)',
+        );
     }
     let total = 0n;
 
@@ -73,10 +75,14 @@ export function buildFactoryDeployInputs(
         try {
             commitmentToHash(c.identityCommitment);
         } catch (e) {
-            throw new Error(`merkle claim #${i} (leafIndex=${c.leafIndex ?? '?'}): ${(e as Error).message}`);
+            throw new Error(
+                `merkle claim #${i} (leafIndex=${c.leafIndex ?? '?'}): ${(e as Error).message}`,
+            );
         }
         if (typeof c.amount !== 'bigint' || c.amount <= 0n) {
-            throw new Error(`merkle claim #${i}: amount must be a positive bigint (got ${typeof c.amount} ${c.amount})`);
+            throw new Error(
+                `merkle claim #${i}: amount must be a positive bigint (got ${typeof c.amount} ${c.amount})`,
+            );
         }
         total += c.amount;
     }

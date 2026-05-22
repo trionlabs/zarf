@@ -1,11 +1,11 @@
 <script lang="ts">
-    import type { Snippet } from "svelte";
+    import type { Snippet } from 'svelte';
 
     interface Props {
         trigger?: Snippet;
         children?: Snippet;
         open?: boolean;
-        position?: "bottom-start" | "bottom-end" | "top-start" | "top-end";
+        position?: 'bottom-start' | 'bottom-end' | 'top-start' | 'top-end';
         class?: string;
     }
 
@@ -13,26 +13,26 @@
         trigger,
         children,
         open = $bindable(false),
-        position = "bottom-start",
-        class: className = "",
+        position = 'bottom-start',
+        class: className = '',
     }: Props = $props();
 
     const positionClasses = {
-        "bottom-start": "top-full left-0 mt-1",
-        "bottom-end": "top-full right-0 mt-1",
-        "top-start": "bottom-full left-0 mb-1",
-        "top-end": "bottom-full right-0 mb-1",
+        'bottom-start': 'top-full left-0 mt-1',
+        'bottom-end': 'top-full right-0 mt-1',
+        'top-start': 'bottom-full left-0 mb-1',
+        'top-end': 'bottom-full right-0 mb-1',
     };
 
     function handleClickOutside(e: MouseEvent) {
         const target = e.target as HTMLElement;
-        if (!target.closest(".zen-dropdown")) {
+        if (!target.closest('.zen-dropdown')) {
             open = false;
         }
     }
 
     function handleKeydown(e: KeyboardEvent) {
-        if (e.key === "Escape") {
+        if (e.key === 'Escape') {
             open = false;
         }
     }
@@ -42,7 +42,12 @@
 
 <div class="relative inline-block zen-dropdown {className}">
     <!-- Trigger -->
-    <div onclick={() => (open = !open)} role="button" tabindex="0" onkeydown={(e) => e.key === "Enter" && (open = !open)}>
+    <div
+        onclick={() => (open = !open)}
+        role="button"
+        tabindex="0"
+        onkeydown={(e) => e.key === 'Enter' && (open = !open)}
+    >
         {@render trigger?.()}
     </div>
 

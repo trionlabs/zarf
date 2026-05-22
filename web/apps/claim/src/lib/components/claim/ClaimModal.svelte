@@ -1,9 +1,9 @@
 <script lang="ts">
-    import { claimStore } from "../../stores/claimStore.svelte";
-    import { X } from "lucide-svelte";
-    import ClaimStep3Wallet from "./steps/ClaimStep3Wallet.svelte";
-    import ClaimStep4Proof from "./steps/ClaimStep4Proof.svelte";
-    import ClaimStep5Submit from "./steps/ClaimStep5Submit.svelte";
+    import { claimStore } from '../../stores/claimStore.svelte';
+    import { X } from 'lucide-svelte';
+    import ClaimStep3Wallet from './steps/ClaimStep3Wallet.svelte';
+    import ClaimStep4Proof from './steps/ClaimStep4Proof.svelte';
+    import ClaimStep5Submit from './steps/ClaimStep5Submit.svelte';
 
     let { contractAddress } = $props<{ contractAddress: string }>();
 

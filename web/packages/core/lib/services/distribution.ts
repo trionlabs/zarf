@@ -60,14 +60,21 @@ export function validateDistributionData(raw: unknown): DistributionData {
     const d = raw as Record<string, unknown>;
 
     if (typeof d.merkleRoot !== 'string' || !d.merkleRoot.startsWith('0x')) {
-        throw new Error('distribution: missing or invalid merkleRoot (must be 0x-prefixed hex string)');
+        throw new Error(
+            'distribution: missing or invalid merkleRoot (must be 0x-prefixed hex string)',
+        );
     }
 
     if (typeof d.schedule !== 'object' || d.schedule === null) {
         throw new Error('distribution: missing schedule');
     }
     const s = d.schedule as Record<string, unknown>;
-    for (const k of ['vestingStart', 'cliffDuration', 'vestingDuration', 'vestingPeriod'] as const) {
+    for (const k of [
+        'vestingStart',
+        'cliffDuration',
+        'vestingDuration',
+        'vestingPeriod',
+    ] as const) {
         const v = s[k];
         if (typeof v !== 'number' || !Number.isFinite(v)) {
             throw new Error(`distribution: schedule.${k} must be a finite number`);
@@ -88,16 +95,24 @@ export function validateDistributionData(raw: unknown): DistributionData {
         try {
             BigInt(m.amount);
         } catch {
-            throw new Error(`distribution: commitments['${key}']${suffix}.amount must be a bigint string`);
+            throw new Error(
+                `distribution: commitments['${key}']${suffix}.amount must be a bigint string`,
+            );
         }
         if (typeof m.unlockTime !== 'number' || !Number.isFinite(m.unlockTime)) {
-            throw new Error(`distribution: commitments['${key}']${suffix}.unlockTime must be a finite number`);
+            throw new Error(
+                `distribution: commitments['${key}']${suffix}.unlockTime must be a finite number`,
+            );
         }
         if (m.unlockTime < 0) {
-            throw new Error(`distribution: commitments['${key}']${suffix}.unlockTime must be non-negative`);
+            throw new Error(
+                `distribution: commitments['${key}']${suffix}.unlockTime must be non-negative`,
+            );
         }
         if (typeof m.index !== 'number' || !Number.isInteger(m.index) || m.index < 0) {
-            throw new Error(`distribution: commitments['${key}']${suffix}.index must be a non-negative integer`);
+            throw new Error(
+                `distribution: commitments['${key}']${suffix}.index must be a non-negative integer`,
+            );
         }
     };
 

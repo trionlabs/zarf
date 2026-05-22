@@ -1,6 +1,6 @@
 <script lang="ts">
-    import type { HTMLInputAttributes } from "svelte/elements";
-    import { Check } from "lucide-svelte";
+    import type { HTMLInputAttributes } from 'svelte/elements';
+    import { Check } from 'lucide-svelte';
 
     interface Props extends HTMLInputAttributes {
         label?: string;
@@ -10,21 +10,19 @@
     let {
         label,
         checked = $bindable(false),
-        class: className = "",
+        class: className = '',
         disabled,
         ...rest
     }: Props = $props();
 </script>
 
-<label class="flex items-center gap-2 cursor-pointer group {disabled ? 'opacity-50 cursor-not-allowed' : ''}">
+<label
+    class="flex items-center gap-2 cursor-pointer group {disabled
+        ? 'opacity-50 cursor-not-allowed'
+        : ''}"
+>
     <div class="relative">
-        <input
-            type="checkbox"
-            class="sr-only peer"
-            bind:checked
-            {disabled}
-            {...rest}
-        />
+        <input type="checkbox" class="sr-only peer" bind:checked {disabled} {...rest} />
         <div
             class="
                 w-4 h-4 rounded
@@ -47,7 +45,9 @@
         </div>
     </div>
     {#if label}
-        <span class="text-xs text-zen-fg-muted group-hover:text-zen-fg transition-colors select-none">
+        <span
+            class="text-xs text-zen-fg-muted group-hover:text-zen-fg transition-colors select-none"
+        >
             {label}
         </span>
     {/if}

@@ -1,13 +1,11 @@
 <script lang="ts">
-    import ZarfNavbar from "@zarf/ui/components/layout/ZarfNavbar.svelte";
-    import { page } from "$app/state";
+    import ZarfNavbar from '@zarf/ui/components/layout/ZarfNavbar.svelte';
+    import { page } from '$app/state';
 
     let { children } = $props();
 </script>
 
-<div
-    class="min-h-screen font-sans selection:bg-zen-primary-muted selection:text-zen-fg"
->
+<div class="min-h-screen font-sans selection:bg-zen-primary-muted selection:text-zen-fg">
     <!-- Common Shared Navbar -->
     <ZarfNavbar showWallet={true}>
         <a

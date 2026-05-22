@@ -1,5 +1,5 @@
 <script lang="ts">
-    import type { Snippet } from "svelte";
+    import type { Snippet } from 'svelte';
 
     interface Props {
         children?: Snippet;
@@ -16,13 +16,15 @@
         hint,
         error = null,
         required = false,
-        class: className = "",
+        class: className = '',
     }: Props = $props();
 </script>
 
 <div class="w-full {className}">
     {#if label}
-        <label class="block pb-1 pl-1 text-xs font-bold uppercase tracking-widest text-zen-fg-subtle">
+        <label
+            class="block pb-1 pl-1 text-xs font-bold uppercase tracking-widest text-zen-fg-subtle"
+        >
             {label}
             {#if required}
                 <span class="text-zen-error">*</span>

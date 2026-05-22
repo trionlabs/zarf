@@ -54,12 +54,10 @@ let state = $state<WizardState>(structuredClone(initialState));
 const totalRecipientsAmount = $derived(
     state.distributions.reduce((total, dist) => {
         return total + dist.recipients.reduce((sum, r) => sum + r.amount, 0);
-    }, 0)
+    }, 0),
 );
 
-const totalDistributionCount = $derived(
-    state.distributions.length
-);
+const totalDistributionCount = $derived(state.distributions.length);
 
 // ============================================================================
 // Editing State (for live preview in StatsPanel during creation)
@@ -68,9 +66,9 @@ const totalDistributionCount = $derived(
 
 let editingPoolAmount = $state<number>(0);
 let editingVestingDuration = $state<number>(0);
-let editingDurationUnit = $state<string>(""); // 'weeks' | 'months' | 'quarters' | 'years'
+let editingDurationUnit = $state<string>(''); // 'weeks' | 'months' | 'quarters' | 'years'
 let editingRecipientCount = $state<number>(0);
-let editingCliffDate = $state<string>("");
+let editingCliffDate = $state<string>('');
 
 // ============================================================================
 // Persistence Helpers
@@ -118,19 +116,19 @@ function addDistribution(distribution: Distribution) {
     const newDist = {
         ...distribution,
         state: distribution.state || 'created',
-        createdAt: distribution.createdAt || new Date().toISOString()
+        createdAt: distribution.createdAt || new Date().toISOString(),
     };
     state.distributions.push(newDist);
     persist();
 }
 
 function removeDistribution(id: string) {
-    state.distributions = state.distributions.filter(d => d.id !== id);
+    state.distributions = state.distributions.filter((d) => d.id !== id);
     persist();
 }
 
 function updateDistribution(id: string, updates: Partial<Distribution>) {
-    const index = state.distributions.findIndex(d => d.id === id);
+    const index = state.distributions.findIndex((d) => d.id === id);
     if (index !== -1) {
         state.distributions[index] = { ...state.distributions[index], ...updates };
         persist();
@@ -141,13 +139,13 @@ function updateDistribution(id: string, updates: Partial<Distribution>) {
  * Transitions a distribution to 'launched' state after successful deposit
  */
 function moveDistributionToLaunched(id: string, txHash: string) {
-    const index = state.distributions.findIndex(d => d.id === id);
+    const index = state.distributions.findIndex((d) => d.id === id);
     if (index !== -1) {
         state.distributions[index] = {
             ...state.distributions[index],
             state: 'launched',
             launchedAt: new Date().toISOString(),
-            depositTxHash: txHash
+            depositTxHash: txHash,
         };
         persist();
     }
@@ -157,12 +155,12 @@ function moveDistributionToLaunched(id: string, txHash: string) {
  * Transitions a distribution to 'cancelled' state
  */
 function cancelDistribution(id: string) {
-    const index = state.distributions.findIndex(d => d.id === id);
+    const index = state.distributions.findIndex((d) => d.id === id);
     if (index !== -1) {
         state.distributions[index] = {
             ...state.distributions[index],
             state: 'cancelled',
-            cancelledAt: new Date().toISOString()
+            cancelledAt: new Date().toISOString(),
         };
         persist();
     }
@@ -202,18 +200,38 @@ function reset() {
 
 export const wizardStore = {
     // Getters
-    get currentStep() { return state.currentStep; },
-    get tokenDetails() { return state.tokenDetails; },
-    get distributions() { return state.distributions; },
-    get editingPoolAmount() { return editingPoolAmount; },
-    get editingVestingDuration() { return editingVestingDuration; },
-    get editingDurationUnit() { return editingDurationUnit; },
-    get editingRecipientCount() { return editingRecipientCount; },
-    get editingCliffDate() { return editingCliffDate; },
+    get currentStep() {
+        return state.currentStep;
+    },
+    get tokenDetails() {
+        return state.tokenDetails;
+    },
+    get distributions() {
+        return state.distributions;
+    },
+    get editingPoolAmount() {
+        return editingPoolAmount;
+    },
+    get editingVestingDuration() {
+        return editingVestingDuration;
+    },
+    get editingDurationUnit() {
+        return editingDurationUnit;
+    },
+    get editingRecipientCount() {
+        return editingRecipientCount;
+    },
+    get editingCliffDate() {
+        return editingCliffDate;
+    },
 
     // Derived
-    get totalRecipientsAmount() { return totalRecipientsAmount; },
-    get totalDistributionCount() { return totalDistributionCount; },
+    get totalRecipientsAmount() {
+        return totalRecipientsAmount;
+    },
+    get totalDistributionCount() {
+        return totalDistributionCount;
+    },
 
     // Actions
     setTokenDetails,
@@ -228,18 +246,28 @@ export const wizardStore = {
     reset,
     restore,
     // Editing State Setters (for live preview)
-    setEditingPoolAmount(amount: number) { editingPoolAmount = amount; },
-    setEditingVestingDuration(months: number) { editingVestingDuration = months; },
-    setEditingRecipientCount(count: number) { editingRecipientCount = count; },
-    setEditingCliffDate(date: string) { editingCliffDate = date; },
+    setEditingPoolAmount(amount: number) {
+        editingPoolAmount = amount;
+    },
+    setEditingVestingDuration(months: number) {
+        editingVestingDuration = months;
+    },
+    setEditingRecipientCount(count: number) {
+        editingRecipientCount = count;
+    },
+    setEditingCliffDate(date: string) {
+        editingCliffDate = date;
+    },
 
     /** Reset all editing states - call when cancelling or saving a distribution */
     clearEditingState() {
         editingPoolAmount = 0;
         editingVestingDuration = 0;
-        editingDurationUnit = "";
+        editingDurationUnit = '';
         editingRecipientCount = 0;
-        editingCliffDate = "";
+        editingCliffDate = '';
     },
-    setEditingDurationUnit(unit: string) { editingDurationUnit = unit; },
+    setEditingDurationUnit(unit: string) {
+        editingDurationUnit = unit;
+    },
 };

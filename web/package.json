@@ -1,36 +1,36 @@
 {
-	"name": "@zarf/workspace",
-	"version": "0.0.1",
-	"packageManager": "pnpm@10.23.0",
-	"private": true,
-	"type": "module",
-	"scripts": {
-		"dev:landing": "pnpm --filter @zarf/landing dev",
-		"dev:create": "pnpm --filter @zarf/create dev",
-		"dev:claim": "pnpm --filter @zarf/claim dev",
-		"dev:jwk-rotation": "pnpm --filter @zarf/jwk-rotation dev",
-		"dev:indexer": "pnpm --filter @zarf/indexer dev",
-		"build": "pnpm build:all",
-		"build:landing": "pnpm --filter @zarf/landing build",
-		"build:create": "pnpm --filter @zarf/create build",
-		"build:claim": "pnpm --filter @zarf/claim build",
-		"build:all": "pnpm -r build",
-		"deploy:landing": "pnpm --filter @zarf/landing run deploy",
-		"deploy:create": "pnpm --filter @zarf/create run deploy",
-		"deploy:claim": "pnpm --filter @zarf/claim run deploy",
-		"deploy:pin-proxy": "pnpm --filter @zarf/pin-proxy run deploy",
-		"deploy:jwk-rotation": "pnpm --filter @zarf/jwk-rotation run deploy",
-		"deploy:indexer": "pnpm --filter @zarf/indexer run deploy",
-		"deploy:all": "pnpm deploy:landing && pnpm deploy:create && pnpm deploy:claim && pnpm deploy:pin-proxy && pnpm deploy:jwk-rotation && pnpm deploy:indexer",
-		"check:type-forks": "node scripts/check-type-forks.mjs"
-	},
-	"pnpm": {
-		"overrides": {
-			"rollup": "npm:@rollup/wasm-node",
-			"buffer": "^6.0.3"
-		},
-		"onlyBuiltDependencies": [
-			"esbuild"
-		]
-	}
+  "name": "@zarf/workspace",
+  "version": "0.0.1",
+  "packageManager": "pnpm@10.23.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev:landing": "pnpm --filter @zarf/landing dev",
+    "dev:create": "pnpm --filter @zarf/create dev",
+    "dev:claim": "pnpm --filter @zarf/claim dev",
+    "dev:jwk-rotation": "pnpm --filter @zarf/jwk-rotation dev",
+    "dev:indexer": "pnpm --filter @zarf/indexer dev",
+    "build": "pnpm build:all",
+    "build:landing": "pnpm --filter @zarf/landing build",
+    "build:create": "pnpm --filter @zarf/create build",
+    "build:claim": "pnpm --filter @zarf/claim build",
+    "build:all": "pnpm -r build",
+    "deploy:landing": "pnpm --filter @zarf/landing run deploy",
+    "deploy:create": "pnpm --filter @zarf/create run deploy",
+    "deploy:claim": "pnpm --filter @zarf/claim run deploy",
+    "deploy:pin-proxy": "pnpm --filter @zarf/pin-proxy run deploy",
+    "deploy:jwk-rotation": "pnpm --filter @zarf/jwk-rotation run deploy",
+    "deploy:indexer": "pnpm --filter @zarf/indexer run deploy",
+    "deploy:all": "pnpm deploy:landing && pnpm deploy:create && pnpm deploy:claim && pnpm deploy:pin-proxy && pnpm deploy:jwk-rotation && pnpm deploy:indexer",
+    "check:type-forks": "node scripts/check-type-forks.mjs"
+  },
+  "pnpm": {
+    "overrides": {
+      "rollup": "npm:@rollup/wasm-node",
+      "buffer": "^6.0.3"
+    },
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
+  }
 }
