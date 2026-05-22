@@ -10,7 +10,10 @@
  * use the StrKey-backed exports in address.ts. Those are still required
  * before signing or building a transaction. Shape validation only
  * confirms "looks like a Stellar address"; bad checksums slip through
- * and surface at the transaction-build step instead.
+ * and surface at the transaction-build step instead. Strict CRC is
+ * also enforced at the indexer for read paths (see assertAddress in
+ * web/apps/indexer/src/index.ts), so /vestings/:address-style routes
+ * reject malformed inputs server-side regardless of what passed here.
  *
  * SEP-0023 StrKey: 1 version char + 55 base32 chars = 56 total.
  * G... = ed25519 account ID
