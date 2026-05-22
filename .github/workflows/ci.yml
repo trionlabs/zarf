@@ -55,6 +55,14 @@ jobs:
   web:
     name: Web, Core, and Workers
     runs-on: ubuntu-latest
+    # Minimum Stellar config so the SvelteKit `analyse` pass can evaluate
+    # `+layout.ts`'s `coreInit` import without throwing. These are public
+    # testnet defaults — CI does not deploy, so no secrets are needed.
+    env:
+      VITE_STELLAR_DEFAULT_NETWORK: testnet
+      VITE_STELLAR_TESTNET_RPC_URL: https://soroban-testnet.stellar.org
+      VITE_STELLAR_TESTNET_HORIZON_URL: https://horizon-testnet.stellar.org
+      VITE_STELLAR_TESTNET_FACTORY_ADDRESS: CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB7
     steps:
       - name: Checkout
         uses: actions/checkout@v4
