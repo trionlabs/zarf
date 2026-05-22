@@ -1,6 +1,5 @@
 <script lang="ts">
     import { onMount } from 'svelte';
-    import { goto } from '$app/navigation';
     import { extractStateFromUrl } from '$lib/utils/oauth';
     import ThemeToggle from '@zarf/ui/components/layout/ThemeToggle.svelte';
     import Tooltip from '@zarf/ui/components/ui/Tooltip.svelte';
@@ -10,7 +9,6 @@
     import UseCases from '@zarf/ui/components/landing/UseCases.svelte';
     import ZarfLogo from '@zarf/ui/components/brand/ZarfLogo.svelte';
     import ZenButton from '@zarf/ui/components/ui/ZenButton.svelte';
-    import { Zap } from 'lucide-svelte';
     import { dev } from '@zarf/core/utils/log';
 
     const DEBUG = import.meta.env.DEV;

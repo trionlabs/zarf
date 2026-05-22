@@ -2,15 +2,7 @@
     import { wizardStore } from '$lib/stores/wizardStore.svelte';
     import { goto } from '$app/navigation';
     import { onMount } from 'svelte';
-    import { browser } from '$app/environment';
-    import {
-        ArrowRight,
-        Clipboard,
-        CheckCircle,
-        Loader2,
-        AlertCircle,
-        Search,
-    } from 'lucide-svelte';
+    import { ArrowRight, Clipboard, Loader2, AlertCircle } from 'lucide-svelte';
     import { fetchTokenMetadata, type TokenMetadata } from '$lib/services/tokenMetadata';
     import { isValidContractAddressShape as isValidContractAddress } from '@zarf/core/utils/addressShape';
     import { fade, fly } from 'svelte/transition';

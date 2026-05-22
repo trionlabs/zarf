@@ -1,5 +1,5 @@
 import { browser } from '$app/environment';
-import type { ZKProof, MerkleClaim, MerkleTreeData } from '@zarf/ui/types';
+import type { ZKProof, MerkleClaim } from '@zarf/ui/types';
 import { toastStore } from '@zarf/ui/stores/toastStore.svelte';
 import { getActiveStellarNetworkId } from '@zarf/core/config/runtime';
 import { devTag, warn } from '@zarf/core/utils/log';

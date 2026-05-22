@@ -9,10 +9,9 @@
     import { browser } from '$app/environment';
     import { page } from '$app/state';
     import AppShell from '@zarf/ui/components/layout/AppShell.svelte';
-    import { LayoutGrid, PlusCircle, X } from 'lucide-svelte';
+    import { LayoutGrid, PlusCircle } from 'lucide-svelte';
     import WalletSelectionModal from '@zarf/ui/components/wallet/WalletSelectionModal.svelte';
     import ZenAlert from '@zarf/ui/components/ui/ZenAlert.svelte';
-    import ZenButton from '@zarf/ui/components/ui/ZenButton.svelte';
 
     let { children } = $props();
 

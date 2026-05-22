@@ -1,14 +1,5 @@
 <script lang="ts">
-    import {
-        Check,
-        Download,
-        AlertTriangle,
-        FileText,
-        X,
-        Mail,
-        Users,
-        ArrowRight,
-    } from 'lucide-svelte';
+    import { Check, Download, AlertTriangle, FileText, X } from 'lucide-svelte';
     import { readCSVFile, generateSampleCSV } from '../../../csv/csvProcessor';
     import type { Recipient } from '../../../stores/types';
     import ZenButton from '@zarf/ui/components/ui/ZenButton.svelte';

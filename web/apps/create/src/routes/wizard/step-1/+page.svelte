@@ -3,7 +3,7 @@
     import { goto } from '$app/navigation';
     import { onMount } from 'svelte';
     import { fade, slide } from 'svelte/transition';
-    import { ArrowRight, ArrowLeft, Sparkles, Check, X, Eye, Calendar, Users } from 'lucide-svelte';
+    import { ArrowRight, ArrowLeft, Sparkles, Eye, Calendar } from 'lucide-svelte';
     import type { Recipient, Distribution } from '$lib/stores/types';
     import type { DurationUnit } from '@zarf/core/utils/vesting';
     import { CREATION_STEPS } from '@zarf/core/constants/wizard';

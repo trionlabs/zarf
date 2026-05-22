@@ -6,7 +6,6 @@
     import { deployStore } from '$lib/stores/deployStore.svelte';
     import ZenButton from '@zarf/ui/components/ui/ZenButton.svelte';
     import ZenSpinner from '@zarf/ui/components/ui/ZenSpinner.svelte';
-    import type { Distribution } from '$lib/stores/types';
     import { Check } from 'lucide-svelte';
 
     import DeployStep1 from '$lib/components/wizard/deploy/DeployStep1.svelte';

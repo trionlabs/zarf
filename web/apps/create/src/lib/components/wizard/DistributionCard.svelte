@@ -1,7 +1,7 @@
 <script lang="ts">
     import { goto } from '$app/navigation';
     import { browser } from '$app/environment';
-    import { Rocket, Trash2, Copy, Ban, Calendar } from 'lucide-svelte';
+    import { Rocket, Trash2, Copy, Calendar } from 'lucide-svelte';
     import { wizardStore } from '../../stores/wizardStore.svelte';
     import type { Distribution } from '../../stores/types';
     import ZenCard from '@zarf/ui/components/ui/ZenCard.svelte';

@@ -1,7 +1,6 @@
 <script lang="ts">
     import { wizardStore } from '../../../stores/wizardStore.svelte';
     import { PERCENTAGE_PRESETS } from '@zarf/core/constants/wizard';
-    import ZenButton from '@zarf/ui/components/ui/ZenButton.svelte';
     import ZenNumberInput from '@zarf/ui/components/ui/ZenNumberInput.svelte';
 
     let { poolAmount = $bindable(), poolInputValue = $bindable() } = $props<{

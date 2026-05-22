@@ -1,6 +1,6 @@
 <script lang="ts">
     import { onDestroy } from 'svelte';
-    import { toastStore, type Toast, type ToastType } from '../../stores/toastStore.svelte';
+    import { toastStore, type ToastType } from '../../stores/toastStore.svelte';
     import { fly } from 'svelte/transition';
     import { CheckCircle, AlertCircle, Info, AlertTriangle, X } from 'lucide-svelte';
 

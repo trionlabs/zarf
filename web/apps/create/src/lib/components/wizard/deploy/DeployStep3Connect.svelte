@@ -7,7 +7,6 @@
     import { formatTokenAmount, parseTokenAmount } from '@zarf/core/utils/amount';
     import {
         Wallet,
-        Loader2,
         CheckCircle2,
         AlertCircle,
         LogOut,

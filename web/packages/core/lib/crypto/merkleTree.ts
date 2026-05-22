@@ -13,7 +13,7 @@ import { browser } from '../utils/ssr';
 // This ensures Buffer is available before bb.js loads
 
 import type { Barretenberg } from '@aztec/bb.js';
-import type { WhitelistEntry, MerkleTreeData, MerkleProof, MerkleClaim, Schedule } from '../types';
+import type { MerkleTreeData, MerkleProof, MerkleClaim, Schedule } from '../types';
 import { TREE_DEPTH, MAX_EMAIL_LENGTH } from '../constants';
 
 // ============================================================================

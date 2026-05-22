@@ -1,4 +1,4 @@
-import type { Distribution, Recipient, MerkleTreeData } from './types';
+import type { Distribution, MerkleTreeData } from './types';
 import type { StellarAddress, StellarContractId } from '@zarf/core/types';
 import { getActiveStellarNetworkId } from '@zarf/core/config/runtime';
 import { safeParse, safeStringify } from '@zarf/core/utils/json';

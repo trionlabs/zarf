@@ -4,7 +4,6 @@
     import {
         X,
         Calendar,
-        Clock,
         Users,
         Coins,
         Trash2,
