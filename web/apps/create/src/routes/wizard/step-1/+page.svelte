@@ -78,28 +78,6 @@
     });
 
     // --- Actions ---
-    function resetForm() {
-        name = '';
-        description = '';
-        cliffDate = '';
-        duration = 12;
-        poolAmount = 0;
-        poolInputValue = '';
-        recipients = [];
-        csvFileName = null;
-        csvError = null;
-        validationErrors = [];
-        usRestricted = false;
-        euRestricted = false;
-        creationStep = 0;
-        wizardStore.clearEditingState();
-    }
-
-    function cancelCreation() {
-        resetForm();
-        goto('/distributions');
-    }
-
     function saveDistribution() {
         if (!isFormValid) return;
         const regulatoryRules: string[] = [];
@@ -209,7 +187,6 @@
                         bind:csvError
                         bind:isProcessingCSV
                         bind:validationErrors
-                        {totalAmount}
                         {poolAmount}
                         unlockEvents={duration}
                         tokenSymbol={wizardStore.tokenDetails.tokenSymbol || 'TOKENS'}

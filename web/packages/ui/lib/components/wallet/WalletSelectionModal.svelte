@@ -23,7 +23,7 @@
         try {
             await walletStore.connect();
             // Modal closes automatically via store logic on success
-        } catch (e) {
+        } catch {
             // Error handling is done in store
         }
     }

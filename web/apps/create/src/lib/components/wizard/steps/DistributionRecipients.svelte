@@ -8,9 +8,9 @@
         recipients = $bindable(),
         csvFileName = $bindable(),
         csvError = $bindable(),
+        // eslint-disable-next-line no-useless-assignment -- $bindable() default through-prop write the parser cannot see
         isProcessingCSV = $bindable(),
         validationErrors = $bindable([]),
-        totalAmount,
         poolAmount = 0, // The total available in the distribution pool
         unlockEvents = 1, // Number of unlock events in the vesting schedule
         tokenSymbol = 'TOKENS',
@@ -20,13 +20,10 @@
         csvError: string | null;
         isProcessingCSV: boolean;
         validationErrors?: string[];
-        totalAmount: number;
         poolAmount?: number;
         unlockEvents?: number;
         tokenSymbol?: string;
     }>();
-
-    let showPreview = $state(true);
 
     // Derived stats
     let csvTotal = $derived(recipients.reduce((sum: number, r: Recipient) => sum + r.amount, 0));
@@ -73,7 +70,6 @@
             recipients = result.entries;
             validationErrors = result.errors;
             csvFileName = file.name;
-            showPreview = true;
 
             // Note: validationErrors might contain duplicate warnings, but we still show the list.
             if (recipients.length === 0 && validationErrors.length > 0) {
@@ -106,7 +102,6 @@
         csvFileName = null;
         csvError = null;
         validationErrors = [];
-        showPreview = false;
     }
 </script>
 

@@ -110,10 +110,6 @@
         });
     };
 
-    const formatTime = (time: string) => {
-        return time + ' UTC';
-    };
-
     // Chart calculations
     const hasValidDates = $derived(cliffDate !== null && !isNaN(cliffDate.getTime()));
 

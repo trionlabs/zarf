@@ -35,11 +35,6 @@
     const showContinue = $derived(currentStep < 4);
     const backButtonText = $derived(currentStep === 1 ? 'Cancel' : 'Back');
 
-    const isStep1 = $derived(currentStep >= 1);
-    const isStep2 = $derived(currentStep >= 2);
-    const isStep3 = $derived(currentStep >= 3);
-    const isStep4 = $derived(currentStep >= 4);
-
     // Navigation Logic
     const continueDisabled = $derived.by(() => {
         if (currentStep === 1) return !canStep2;

@@ -194,7 +194,7 @@ async function init() {
 async function requestConnection() {
     try {
         await connect();
-    } catch (e) {
+    } catch {
         state.isModalOpen = true;
     }
 }

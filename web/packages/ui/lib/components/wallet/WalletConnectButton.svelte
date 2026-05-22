@@ -81,7 +81,7 @@
             await navigator.clipboard.writeText(walletStore.address);
             copied = true;
             setTimeout(() => (copied = false), 2000);
-        } catch (e) {
+        } catch {
             warn('Clipboard API not available');
         }
     }

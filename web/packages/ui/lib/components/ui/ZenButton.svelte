@@ -20,7 +20,7 @@
         loading = false,
         disabled,
         class: className = '',
-        popover, // Destructure popover to exclude it from rest
+        popover: _popover, // Destructure popover to exclude it from rest
         ...rest
     }: Props = $props();
 

@@ -10,7 +10,6 @@
     import ZenCard from '@zarf/ui/components/ui/ZenCard.svelte';
 
     // --- State ---
-    let mounted = $state(false);
     let tokenAddress = $state('');
     let tokenMetadata = $state<TokenMetadata | null>(null);
     let isFetching = $state(false);
@@ -36,8 +35,6 @@
             };
         }
 
-        mounted = true;
-
         return () => {
             if (debounceTimer) clearTimeout(debounceTimer);
         };
@@ -45,7 +42,6 @@
 
     // --- Derived ---
     const isAddressValid = $derived(isValidContractAddress(tokenAddress));
-    const canProceed = $derived(isAddressValid && tokenMetadata !== null && !isFetching);
 
     // --- Actions ---
     async function handlePaste() {
@@ -100,7 +96,7 @@
             } else {
                 error = result.error || 'Could not fetch token metadata';
             }
-        } catch (e) {
+        } catch {
             error = 'Network error while fetching metadata';
         } finally {
             isFetching = false;

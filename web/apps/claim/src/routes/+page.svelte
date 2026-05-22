@@ -22,7 +22,6 @@
     import { page } from '$app/state';
     import { goto } from '$app/navigation';
 
-    let isAuthenticating = $state(false);
     let isFiltering = $state(false);
     let hasFiltered = $state(false);
     let filteredAddresses = $state<StellarContractId[]>([]);
@@ -81,7 +80,6 @@
         // 1. Handle OAuth Redirect Callback
         const idToken = extractTokenFromUrl();
         if (idToken) {
-            isAuthenticating = true;
             try {
                 // Decode to get email for display/validation
                 const { payload } = decodeJwt(idToken);
@@ -121,8 +119,6 @@
             } catch (e) {
                 err('[Claim] Auth failed:', e);
                 clearUrlFragment();
-            } finally {
-                isAuthenticating = false;
             }
         }
     });
