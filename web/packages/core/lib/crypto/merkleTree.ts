@@ -297,9 +297,9 @@ export function generateSecureCode(): string {
 
     // Web Crypto is universally available in every runtime this module
     // reaches (modern browsers, Node 16+, Cloudflare workerd). No fallback
-    // path: any environment that wouldn't expose crypto.getRandomValues
-    // couldn't reach this line anyway — bb.js, Buffer polyfill, and the
-    // Pedersen WASM all assume the same baseline.
+    // path — an environment that wouldn't expose crypto.getRandomValues
+    // couldn't reach this line anyway, since bb.js, Buffer polyfill, and
+    // the Pedersen WASM all assume the same baseline.
     crypto.getRandomValues(randomValues);
 
     let result = '';

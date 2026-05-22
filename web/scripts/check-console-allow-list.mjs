@@ -187,7 +187,7 @@ const ALLOWLIST = {
                 reason: 'JSDoc example, not a real call',
             },
             {
-                content: '* console.log(decoded.payload.email); // user@example.com',
+                content: '* console.log(decoded.payload.email); // user@example.com — now trusted',
                 reason: 'JSDoc example, not a real call',
             },
             {
