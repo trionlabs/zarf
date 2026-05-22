@@ -1,5 +1,6 @@
 <script lang="ts">
     import { page } from '$app/state';
+    import { resolve } from '$app/paths';
     import { AlertTriangle, Home } from 'lucide-svelte';
     import ZarfLogo from '@zarf/ui/components/brand/ZarfLogo.svelte';
 
@@ -19,7 +20,7 @@
 </svelte:head>
 
 <section class="flex flex-col items-center justify-center min-h-screen gap-6 text-center px-6">
-    <a href="/" class="opacity-80 hover:opacity-100 transition-opacity">
+    <a href={resolve('/')} class="opacity-80 hover:opacity-100 transition-opacity">
         <ZarfLogo />
     </a>
 
@@ -38,7 +39,7 @@
     {/if}
 
     <a
-        href="/"
+        href={resolve('/')}
         class="inline-flex items-center gap-2 px-6 py-3 text-sm font-semibold rounded-full bg-zen-btn-primary-bg text-zen-btn-primary-text hover:bg-zen-btn-primary-bg-hover transition-colors"
     >
         <Home class="w-4 h-4" aria-hidden="true" />
