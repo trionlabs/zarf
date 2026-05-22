@@ -538,6 +538,18 @@
                       "key": {
                         "vec": [
                           {
+                            "symbol": "MetadataCid"
+                          }
+                        ]
+                      },
+                      "val": {
+                        "string": "ipfs://real-zarf-proof-fixture"
+                      }
+                    },
+                    {
+                      "key": {
+                        "vec": [
+                          {
                             "symbol": "Name"
                           }
                         ]

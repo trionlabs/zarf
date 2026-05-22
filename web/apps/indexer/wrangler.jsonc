@@ -5,14 +5,7 @@
     "main": "src/index.ts",
     "compatibility_date": "2025-01-15",
     "vars": {
-        "ALLOWED_ORIGINS": "http://localhost:5173,http://localhost:5174,http://localhost:5175,https://create.zarf.to,https://claim.zarf.to",
-        "CACHE_NAMESPACE": "zarf-indexer:v1",
-        "DEPLOYMENTS_TTL_SECONDS": "60",
-        "OWNER_TTL_SECONDS": "60",
-        "VESTING_TTL_SECONDS": "120",
-        "IPFS_TTL_SECONDS": "86400",
-        "READ_TTL_SECONDS": "30",
-        "LEDGER_TTL_SECONDS": "5"
+        "ALLOWED_ORIGINS": "http://localhost:5173,http://localhost:5174,http://localhost:5175,https://create.zarf.to,https://claim.zarf.to"
     },
     "observability": {
         "enabled": true
@@ -33,8 +26,6 @@
     //   STELLAR_MAINNET_FACTORY_ADDRESS
     //   STELLAR_MAINNET_NETWORK_PASSPHRASE
     //
-    // Production deploy creates/binds a Workers KV namespace named
-    // INDEXER_KV_NAMESPACE_TITLE (defaults to zarf-indexer-cache).
-    // If no INDEXER_CACHE binding exists, the worker falls back to
-    // best-effort isolate memory cache.
+    // The worker does not use server-side cache. No Workers KV namespace is
+    // required for deploys.
 }

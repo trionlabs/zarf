@@ -70,6 +70,20 @@ fn creates_vesting_and_tracks_metadata() {
     assert_eq!(vesting_client.verifier(), verifier);
     assert_eq!(vesting_client.jwk_registry(), registry);
     assert_eq!(vesting_client.merkle_root(), root);
+    assert_eq!(vesting_client.metadata_cid(), cid);
+
+    let summary = vesting_client.summary();
+    assert_eq!(summary.owner, owner);
+    assert_eq!(summary.token, token_id);
+    assert_eq!(summary.verifier, verifier);
+    assert_eq!(summary.jwk_registry, registry);
+    assert_eq!(summary.name, String::from_str(&env, "Zarf"));
+    assert_eq!(
+        summary.description,
+        String::from_str(&env, "Factory deployed")
+    );
+    assert_eq!(summary.merkle_root, root);
+    assert_eq!(summary.metadata_cid, cid);
 
     assert_eq!(factory.get_deployment_count(), 1);
     assert_eq!(factory.get_deployment(&0), vesting);
@@ -81,9 +95,19 @@ fn creates_vesting_and_tracks_metadata() {
     assert_eq!(all.len(), 1);
     assert_eq!(all.get_unchecked(0), vesting);
 
+    let all_infos = factory.get_deployment_infos(&0, &10);
+    assert_eq!(all_infos.len(), 1);
+    assert_eq!(all_infos.get_unchecked(0).address, vesting);
+    assert_eq!(all_infos.get_unchecked(0).metadata_cid, cid);
+
     let owner_deployments = factory.get_owner_deployments(&owner, &0, &10);
     assert_eq!(owner_deployments.len(), 1);
     assert_eq!(owner_deployments.get_unchecked(0), vesting);
+
+    let owner_infos = factory.get_owner_deployment_infos(&owner, &0, &10);
+    assert_eq!(owner_infos.len(), 1);
+    assert_eq!(owner_infos.get_unchecked(0).address, vesting);
+    assert_eq!(owner_infos.get_unchecked(0).metadata_cid, cid);
 }
 
 #[test]
