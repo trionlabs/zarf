@@ -218,6 +218,7 @@
     <div class="max-w-xl mx-auto w-full pt-2">
         <label class="sr-only" for="contract-input">Manual Contract Address</label>
         <AddressInput
+            id="contract-input"
             bind:value={address}
             placeholder="Enter Stellar contract ID C..."
             {error}
