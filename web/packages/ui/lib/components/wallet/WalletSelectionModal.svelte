@@ -13,10 +13,10 @@
     import { X, Wallet } from 'lucide-svelte';
     import ZenButton from '../ui/ZenButton.svelte';
     import { focusTrap } from '../../actions/focusTrap';
-    import { uniqueId } from '../../utils/uniqueId';
 
-    const titleId = uniqueId('wallet-modal-title');
-    const descId = uniqueId('wallet-modal-desc');
+    const baseId = $props.id();
+    const titleId = `${baseId}-title`;
+    const descId = `${baseId}-desc`;
     let freighterBtn: HTMLButtonElement | undefined = $state();
 
     async function handleConnect() {
