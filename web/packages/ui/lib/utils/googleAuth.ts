@@ -9,15 +9,13 @@
 
 import type { DecodedJWT, GooglePublicKey, JWTHeader, JWTPayload, OAuthState } from '../types';
 import { warn } from '@zarf/core/utils/log';
+import { isValidContractAddressShape } from '@zarf/core/utils/addressShape';
 
-// Format-only Stellar contract address shape check. Used here for defensive
-// OAuth-state pre-validation; full StrKey CRC validation lives in
-// @zarf/core/utils/address and runs at form-submit time. Importing it here
-// would pull @stellar/stellar-sdk into the root-layout eager graph via
-// authStore, which is the entry point for both apps.
-function isContractAddressShape(address: string): boolean {
-    return /^C[A-Z2-7]{55}$/.test(address);
-}
+// Defensive OAuth-state pre-validation uses the shared SDK-free shape
+// check. Full StrKey CRC validation lives in @zarf/core/utils/address and
+// runs at form-submit time; addressShape is the SDK-free mirror so this
+// import does not pull @stellar/stellar-sdk into the root-layout eager
+// graph (authStore is the entry point for both apps).
 
 // ============================================================================
 // Constants
@@ -95,7 +93,7 @@ export function decodeOAuthState(stateParam: string | null): OAuthState | null {
         const decoded = JSON.parse(stateParam);
 
         // Validate address format if present
-        if (decoded.address && !isContractAddressShape(decoded.address)) {
+        if (decoded.address && !isValidContractAddressShape(decoded.address)) {
             warn('[OAuth] Invalid address in state, ignoring');
             delete decoded.address;
         }
@@ -191,7 +189,7 @@ export function redirectToGoogle(contractAddress?: string): void {
     // Build state with optional contract address
     const oauthState: OAuthState = {};
     if (contractAddress) {
-        if (isContractAddressShape(contractAddress)) {
+        if (isValidContractAddressShape(contractAddress)) {
             oauthState.address = contractAddress;
         } else {
             warn('[Auth] Invalid contract address format, not preserving');
