@@ -105,14 +105,31 @@ fn claim_checks_registry_root_recipient_time_and_transfers() {
         (
             owner.clone(),
             token_id.clone(),
-            verifier_id,
-            registry_id,
+            verifier_id.clone(),
+            registry_id.clone(),
             String::from_str(&env, "Zarf"),
             String::from_str(&env, "Private vesting"),
             root.clone(),
+            String::from_str(&env, "ipfs://claim-list"),
         ),
     );
     let vesting = ZarfVestingContractClient::new(&env, &vesting_id);
+
+    let summary = vesting.summary();
+    assert_eq!(summary.owner, owner);
+    assert_eq!(summary.token, token_id);
+    assert_eq!(summary.verifier, verifier_id);
+    assert_eq!(summary.jwk_registry, registry_id);
+    assert_eq!(summary.name, String::from_str(&env, "Zarf"));
+    assert_eq!(
+        summary.description,
+        String::from_str(&env, "Private vesting")
+    );
+    assert_eq!(summary.merkle_root, root);
+    assert_eq!(
+        summary.metadata_cid,
+        String::from_str(&env, "ipfs://claim-list")
+    );
 
     token_admin.mint(&vesting_id, &amount);
     let recipient_field = vesting.recipient_id(&recipient);

@@ -13,6 +13,7 @@ import {
 
 export interface DiscoveredVesting {
     address: StellarContractId;
+    metadataCid?: string | null;
 }
 
 interface IndexerVestingsResult {

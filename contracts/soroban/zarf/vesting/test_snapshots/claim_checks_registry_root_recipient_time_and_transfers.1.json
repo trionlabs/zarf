@@ -105,6 +105,7 @@
     ],
     [],
     [],
+    [],
     [
       [
         "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
@@ -495,6 +496,18 @@
                       },
                       "val": {
                         "bytes": "0707070707070707070707070707070707070707070707070707070707070707"
+                      }
+                    },
+                    {
+                      "key": {
+                        "vec": [
+                          {
+                            "symbol": "MetadataCid"
+                          }
+                        ]
+                      },
+                      "val": {
+                        "string": "ipfs://claim-list"
                       }
                     },
                     {

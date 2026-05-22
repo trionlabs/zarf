@@ -116,6 +116,7 @@ fn real_zarf_proof_claims_through_real_ultrahonk_verifier() {
             String::from_str(&env, "Zarf"),
             String::from_str(&env, "Real Zarf proof fixture"),
             merkle_root,
+            String::from_str(&env, "ipfs://real-zarf-proof-fixture"),
         ),
     );
     let vesting = ZarfVestingContractClient::new(&env, &vesting_id);
