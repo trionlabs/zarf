@@ -100,7 +100,8 @@
         try {
             const { readVestingContract } = await import('@zarf/core/contracts');
             await readVestingContract(addr);
-            onImport(address);
+            address = addr;
+            onImport(addr);
         } catch {
             error = 'Could not find a valid Zarf Vesting contract';
         } finally {
