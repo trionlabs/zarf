@@ -10,6 +10,16 @@
 import type { DecodedJWT, GooglePublicKey, JWTHeader, JWTPayload, OAuthState } from '../types';
 import { warn } from '@zarf/core/utils/log';
 import { isValidContractAddressShape } from '@zarf/core/utils/addressShape';
+import {
+    GOOGLE_ISSUERS as CORE_GOOGLE_ISSUERS,
+    validateGoogleClaims as coreValidateGoogleClaims,
+} from '@zarf/core/utils/googleClaims';
+
+// Re-export the validator from core so existing `@zarf/ui` imports continue
+// to work without a touch. The validator was moved to core for testability
+// under @zarf/core/vitest; its UI-package location was incidental.
+export const GOOGLE_ISSUERS = CORE_GOOGLE_ISSUERS;
+export const validateGoogleClaims = coreValidateGoogleClaims;
 
 // ============================================================================
 // Constants
@@ -275,13 +285,8 @@ export function clearUrlFragment(): void {
 // JWT Utilities
 // ============================================================================
 
-/**
- * Google OIDC accepts both bare and full-URL issuers in the wild; the
- * spec lists `https://accounts.google.com` but tokens issued via newer
- * flows sometimes carry the bare form. Accepting both matches what the
- * google-auth-library and Firebase SDKs do.
- */
-const GOOGLE_ISSUERS = new Set(['https://accounts.google.com', 'accounts.google.com']);
+// GOOGLE_ISSUERS and validateGoogleClaims now live in @zarf/core/utils/googleClaims
+// and are re-exported from the top of this file for backward compatibility.
 
 /**
  * sessionStorage key for the per-request OAuth nonce. Survives the
@@ -324,49 +329,6 @@ export function consumeStoredNonce(): string | null {
     const nonce = sessionStorage.getItem(OAUTH_NONCE_STORAGE_KEY);
     if (nonce) sessionStorage.removeItem(OAUTH_NONCE_STORAGE_KEY);
     return nonce;
-}
-
-/**
- * Asserts a decoded Google JWT's `iss`, `aud`, and (optionally) `nonce`
- * claims.
- *
- * Pairs with {@link decodeJwt} — decode produces the payload, validate
- * gates it against the expected issuer + audience before any caller
- * trusts the email / sub / exp fields. Callers should validate at the
- * earliest point a token enters the trust boundary (OAuth callback,
- * session restore from storage). Throwing here aborts the trust path
- * and is caught by the caller's existing error handler.
- *
- * `expectedNonce`: when non-null, the payload's `nonce` claim must
- * match exactly. Pass {@link consumeStoredNonce}'s return value at
- * fresh-OAuth-callback sites; pass `null`/undefined at session-restore
- * sites where the original validation already happened and no live
- * OAuth handshake is in flight.
- *
- * Does NOT verify the JWT signature — that still happens in the Noir
- * circuit. This function only checks the structured claims an attacker
- * with a forged-but-unsigned token could lie about, which is enough
- * to reject the trivial "wrong-Google-app JWT" + replay attack classes.
- *
- * @throws {Error} If iss is not a Google issuer
- * @throws {Error} If aud does not match the configured client ID
- * @throws {Error} If expectedNonce is non-null and payload.nonce mismatches
- */
-export function validateGoogleClaims(
-    payload: JWTPayload,
-    opts: { clientId: string; expectedNonce?: string | null },
-): void {
-    if (!GOOGLE_ISSUERS.has(payload.iss)) {
-        throw new Error(`Invalid JWT issuer: ${payload.iss}`);
-    }
-    if (payload.aud !== opts.clientId) {
-        throw new Error('JWT audience does not match expected client ID');
-    }
-    if (opts.expectedNonce != null) {
-        if (payload.nonce !== opts.expectedNonce) {
-            throw new Error('JWT nonce does not match the stored OAuth nonce');
-        }
-    }
 }
 
 /**

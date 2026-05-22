@@ -87,13 +87,18 @@
                 // Gate the token's claims against the configured Google
                 // client — rejects forged or wrong-app JWTs at the trust
                 // boundary before any caller reads payload.email.
-                // expectedNonce closes the OAuth replay window: a token
-                // captured from a different login attempt won't match
-                // the stored nonce. null is tolerated (e.g. a direct
-                // visit to the callback URL with no pending flow).
+                // A non-null nonce is mandatory at fresh callback: a cold
+                // tab with no stored nonce means the token was injected
+                // (not initiated by this tab), so we refuse before any
+                // claim is trusted.
+                const storedNonce = consumeStoredNonce();
+                if (storedNonce === null) {
+                    throw new Error('OAuth callback without pending flow');
+                }
                 validateGoogleClaims(payload, {
                     clientId: import.meta.env.VITE_GOOGLE_CLIENT_ID ?? '',
-                    expectedNonce: consumeStoredNonce(),
+                    mode: 'callback',
+                    expectedNonce: storedNonce,
                 });
 
                 // Store in AuthStore (Session only)

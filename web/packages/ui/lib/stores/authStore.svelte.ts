@@ -89,7 +89,7 @@ function restoreGmailSession(clientId: string) {
     if (jwt) {
         try {
             const { payload } = decodeJwt(jwt);
-            validateGoogleClaims(payload, { clientId });
+            validateGoogleClaims(payload, { clientId, mode: 'restore' });
             const now = Math.floor(Date.now() / 1000);
 
             if (payload.exp < now) {
