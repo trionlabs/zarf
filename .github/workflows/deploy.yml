@@ -67,8 +67,6 @@ jobs:
       STELLAR_MAINNET_RPC_URL: ${{ vars.STELLAR_MAINNET_RPC_URL || secrets.STELLAR_MAINNET_RPC_URL || vars.VITE_STELLAR_MAINNET_RPC_URL || secrets.VITE_STELLAR_MAINNET_RPC_URL }}
       STELLAR_MAINNET_FACTORY_ADDRESS: ${{ vars.STELLAR_MAINNET_FACTORY_ADDRESS || secrets.STELLAR_MAINNET_FACTORY_ADDRESS || vars.VITE_STELLAR_MAINNET_FACTORY_ADDRESS || secrets.VITE_STELLAR_MAINNET_FACTORY_ADDRESS }}
       STELLAR_MAINNET_NETWORK_PASSPHRASE: ${{ vars.STELLAR_MAINNET_NETWORK_PASSPHRASE || secrets.STELLAR_MAINNET_NETWORK_PASSPHRASE }}
-      INDEXER_KV_NAMESPACE_ID: ${{ vars.INDEXER_KV_NAMESPACE_ID || secrets.INDEXER_KV_NAMESPACE_ID }}
-      INDEXER_KV_NAMESPACE_TITLE: ${{ vars.INDEXER_KV_NAMESPACE_TITLE || 'zarf-indexer-cache' }}
       PINATA_JWT: ${{ secrets.PINATA_JWT }}
       REGISTRY_OWNER_SECRET: ${{ secrets.REGISTRY_OWNER_SECRET }}
       ADMIN_TOKEN: ${{ secrets.ADMIN_TOKEN }}
@@ -194,133 +192,11 @@ jobs:
             exit 1
           fi
 
-      - name: Prepare indexer KV binding
-        if: ${{ matrix.app == 'indexer' }}
-        run: |
-          node <<'NODE'
-          const fs = require("node:fs");
-
-          function readConfiguredAccountId() {
-            const config = fs.readFileSync("apps/indexer/wrangler.jsonc", "utf8");
-            return config.match(/"account_id"\s*:\s*"([^"]+)"/)?.[1] ?? "";
-          }
-
-          const accountId = readConfiguredAccountId() || process.env.CLOUDFLARE_ACCOUNT_ID;
-          const token = process.env.CLOUDFLARE_API_TOKEN;
-          const namespaceId = process.env.INDEXER_KV_NAMESPACE_ID;
-          const title = process.env.INDEXER_KV_NAMESPACE_TITLE || "zarf-indexer-cache";
-
-          function fail(message) {
-            console.error(`::error title=Indexer KV setup failed::${message}`);
-            console.error(message);
-            process.exit(1);
-          }
-
-          if (!accountId || !token) {
-            fail("Missing Cloudflare account/API token for KV setup");
-          }
-
-          const api = `https://api.cloudflare.com/client/v4/accounts/${accountId}/storage/kv/namespaces`;
-          const headers = {
-            Authorization: `Bearer ${token}`,
-            Accept: "application/json",
-            "Content-Type": "application/json",
-          };
-
-          async function cf(path = "", init = {}) {
-            const response = await fetch(`${api}${path}`, { ...init, headers });
-            const body = await response.json().catch(() => null);
-            if (!response.ok || !body?.success) {
-              const details = body?.errors
-                ?.map((error) => error?.message)
-                .filter(Boolean)
-                .join("; ");
-              if (details) console.error(`::error title=Cloudflare KV API failed::${details}`);
-              console.error(JSON.stringify(body, null, 2));
-              throw new Error(`Cloudflare API request failed: HTTP ${response.status}`);
-            }
-            return body;
-          }
-
-          async function findNamespace() {
-            let page = 1;
-            while (true) {
-              const body = await cf(`?per_page=100&page=${page}`);
-              const found = body.result.find((namespace) => namespace.title === title);
-              if (found) return found;
-
-              const info = body.result_info;
-              if (!info || page >= info.total_pages) return null;
-              page += 1;
-            }
-          }
-
-          async function main() {
-            const namespace = namespaceId
-              ? { id: namespaceId, title }
-              : (await findNamespace()) ?? (await cf("", {
-                method: "POST",
-                body: JSON.stringify({ title }),
-              })).result;
-
-            const config = {
-              $schema: "../../node_modules/wrangler/config-schema.json",
-              name: "zarf-indexer",
-              account_id: accountId,
-              main: "src/index.ts",
-              compatibility_date: "2025-01-15",
-              vars: {
-                ALLOWED_ORIGINS:
-                  "http://localhost:5173,http://localhost:5174,http://localhost:5175,https://create.zarf.to,https://claim.zarf.to",
-                CACHE_NAMESPACE: "zarf-indexer:v1",
-                DEPLOYMENTS_TTL_SECONDS: "60",
-                OWNER_TTL_SECONDS: "60",
-                VESTING_TTL_SECONDS: "120",
-                IPFS_TTL_SECONDS: "86400",
-                READ_TTL_SECONDS: "30",
-                LEDGER_TTL_SECONDS: "5",
-              },
-              kv_namespaces: [
-                {
-                  binding: "INDEXER_CACHE",
-                  id: namespace.id,
-                },
-              ],
-              observability: {
-                enabled: true,
-              },
-              routes: [
-                {
-                  pattern: "indexer.zarf.to",
-                  custom_domain: true,
-                },
-              ],
-            };
-
-            fs.writeFileSync(
-              "apps/indexer/wrangler.generated.json",
-              `${JSON.stringify(config, null, 2)}\n`,
-            );
-
-            console.log(`Prepared KV namespace ${title} (${namespace.id})`);
-          }
-
-          main().catch((error) => {
-            console.error(error);
-            process.exit(1);
-          });
-          NODE
-        working-directory: web
-
       - name: Deploy ${{ matrix.app }}
         env:
           PACKAGE_NAME: ${{ matrix.package }}
         run: |
-          if [ "${{ matrix.app }}" = "indexer" ]; then
-            pnpm --filter "$PACKAGE_NAME" exec wrangler deploy --config wrangler.generated.json
-          else
-            pnpm --filter "$PACKAGE_NAME" run deploy
-          fi
+          pnpm --filter "$PACKAGE_NAME" run deploy
         working-directory: web
 
       - name: Sync Worker runtime secrets
@@ -416,7 +292,7 @@ jobs:
             if HEALTH="$health" node <<'NODE'
           const health = JSON.parse(process.env.HEALTH);
 
-          if (health.ok && health.hasKv) {
+          if (health.ok) {
             process.exit(0);
           }
 

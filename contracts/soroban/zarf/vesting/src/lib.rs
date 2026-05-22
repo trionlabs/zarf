@@ -44,7 +44,21 @@ pub enum DataKey {
     Name,
     Description,
     MerkleRoot,
+    MetadataCid,
     Claimed(BytesN<32>),
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct VestingSummary {
+    pub owner: Address,
+    pub token: Address,
+    pub verifier: Address,
+    pub jwk_registry: Address,
+    pub name: String,
+    pub description: String,
+    pub merkle_root: BytesN<32>,
+    pub metadata_cid: String,
 }
 
 #[contractevent(topics = ["owner_set"])]
@@ -90,6 +104,7 @@ impl ZarfVestingContract {
         name: String,
         description: String,
         merkle_root: BytesN<32>,
+        metadata_cid: String,
     ) {
         let store = env.storage().instance();
         store.set(&DataKey::Owner, &owner);
@@ -99,6 +114,7 @@ impl ZarfVestingContract {
         store.set(&DataKey::Name, &name);
         store.set(&DataKey::Description, &description);
         store.set(&DataKey::MerkleRoot, &merkle_root);
+        store.set(&DataKey::MetadataCid, &metadata_cid);
     }
 
     pub fn owner(env: Env) -> Result<Address, Error> {
@@ -127,6 +143,23 @@ impl ZarfVestingContract {
 
     pub fn merkle_root(env: Env) -> Result<BytesN<32>, Error> {
         Self::get_instance(&env, DataKey::MerkleRoot)
+    }
+
+    pub fn metadata_cid(env: Env) -> Result<String, Error> {
+        Self::get_instance(&env, DataKey::MetadataCid)
+    }
+
+    pub fn summary(env: Env) -> Result<VestingSummary, Error> {
+        Ok(VestingSummary {
+            owner: Self::get_instance(&env, DataKey::Owner)?,
+            token: Self::get_instance(&env, DataKey::Token)?,
+            verifier: Self::get_instance(&env, DataKey::Verifier)?,
+            jwk_registry: Self::get_instance(&env, DataKey::JwkRegistry)?,
+            name: Self::get_instance(&env, DataKey::Name)?,
+            description: Self::get_instance(&env, DataKey::Description)?,
+            merkle_root: Self::get_instance(&env, DataKey::MerkleRoot)?,
+            metadata_cid: Self::get_instance(&env, DataKey::MetadataCid)?,
+        })
     }
 
     pub fn transfer_ownership(env: Env, new_owner: Address) -> Result<(), Error> {

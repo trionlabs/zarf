@@ -16,7 +16,10 @@
     import ZenBadge from '@zarf/ui/components/ui/ZenBadge.svelte';
     import ZenButton from '@zarf/ui/components/ui/ZenButton.svelte';
     import { filterDistributionsByEmail } from '$lib/services/emailFilter';
-    import { discoverAllVestings } from '@zarf/core/services/vestingDiscovery';
+    import {
+        discoverAllVestings,
+        type DiscoveredVesting,
+    } from '@zarf/core/services/vestingDiscovery';
     import { dev, warn, err } from '@zarf/core/utils/log';
 
     import { page } from '$app/state';
@@ -25,7 +28,7 @@
     let isFiltering = $state(false);
     let hasFiltered = $state(false);
     let filteredAddresses = $state<StellarContractId[]>([]);
-    let discoveredAddresses = $state<StellarContractId[]>([]);
+    let discoveredVestings = $state<DiscoveredVesting[]>([]);
 
     // Track if user is authenticated
     let isAuthenticated = $derived(authStore.isAuthenticated);
@@ -41,8 +44,8 @@
         }
 
         // Filter when authenticated with email and have addresses
-        if (discoveredAddresses.length > 0) {
-            filterDistributions(userEmail, discoveredAddresses);
+        if (discoveredVestings.length > 0) {
+            filterDistributions(userEmail, discoveredVestings);
         } else {
             // No addresses to filter
             hasFiltered = true;
@@ -50,17 +53,17 @@
         }
     });
 
-    async function filterDistributions(email: string, addresses: StellarContractId[]) {
+    async function filterDistributions(email: string, vestings: DiscoveredVesting[]) {
         isFiltering = true;
         hasFiltered = false;
 
         try {
-            const eligible = await filterDistributionsByEmail(addresses, email);
+            const eligible = await filterDistributionsByEmail(vestings, email);
             filteredAddresses = eligible;
         } catch (error) {
             err('[Claim] Failed to filter distributions:', error);
             // Fall back to showing all on error
-            filteredAddresses = addresses;
+            filteredAddresses = vestings.map((vesting) => vesting.address);
         } finally {
             isFiltering = false;
             hasFiltered = true;
@@ -70,7 +73,7 @@
     onMount(async () => {
         try {
             const vestings = await discoverAllVestings();
-            discoveredAddresses = Array.from(new Set(vestings.map((v) => v.address)));
+            discoveredVestings = Array.from(new Map(vestings.map((v) => [v.address, v])).values());
         } catch (e) {
             warn('[Claim] Chain discovery failed', e);
         }

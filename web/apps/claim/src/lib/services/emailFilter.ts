@@ -9,9 +9,11 @@
 
 import { hashEmail } from '@zarf/core/utils/email';
 import type { StellarContractId } from '@zarf/core/types';
-import { getCidForVesting } from '@zarf/core/services/vestingDiscovery';
+import { getCidForVesting, type DiscoveredVesting } from '@zarf/core/services/vestingDiscovery';
 import { fetchIpfsJson, IpfsFetchError } from '@zarf/core/utils/ipfsFetch';
 import { warn, err } from '@zarf/core/utils/log';
+
+type FilterableDistribution = StellarContractId | DiscoveredVesting;
 
 /**
  * Distribution data structure with optional emailHashes
@@ -35,11 +37,12 @@ export const computeUserEmailHash = hashEmail;
  * @returns true if email is in the distribution, false otherwise
  */
 export async function isEmailInDistribution(
-    address: string,
+    distribution: FilterableDistribution,
     userEmailHash: string,
 ): Promise<boolean> {
+    const address = distributionAddress(distribution);
     try {
-        const data = await fetchDistribution(address);
+        const data = await fetchDistribution(distribution);
         if (!data) {
             warn(`[EmailFilter] Distribution not found: ${address}`);
             return false;
@@ -70,8 +73,17 @@ export async function isEmailInDistribution(
     }
 }
 
-async function fetchDistribution(address: string): Promise<DistributionWithHashes | null> {
-    const cid = await getCidForVesting(address as StellarContractId);
+function distributionAddress(distribution: FilterableDistribution): StellarContractId {
+    return typeof distribution === 'string' ? distribution : distribution.address;
+}
+
+async function fetchDistribution(
+    distribution: FilterableDistribution,
+): Promise<DistributionWithHashes | null> {
+    const cid =
+        typeof distribution === 'string'
+            ? await getCidForVesting(distribution as StellarContractId)
+            : (distribution.metadataCid ?? (await getCidForVesting(distribution.address)));
     if (!cid) return null;
     return await fetchIpfsJson<DistributionWithHashes>(cid);
 }
@@ -85,7 +97,7 @@ async function fetchDistribution(address: string): Promise<DistributionWithHashe
  * @returns Filtered array of addresses where user is eligible
  */
 export async function filterDistributionsByEmail(
-    addresses: StellarContractId[],
+    distributions: FilterableDistribution[],
     email: string,
 ): Promise<StellarContractId[]> {
     // No email = no distributions (security: don't leak distribution list)
@@ -93,7 +105,7 @@ export async function filterDistributionsByEmail(
         return [];
     }
 
-    if (addresses.length === 0) {
+    if (distributions.length === 0) {
         return [];
     }
 
@@ -102,9 +114,10 @@ export async function filterDistributionsByEmail(
 
     // Check each distribution in parallel
     const results = await Promise.all(
-        addresses.map(async (addr) => {
-            const isEligible = await isEmailInDistribution(addr, userEmailHash);
-            return { address: addr, eligible: isEligible };
+        distributions.map(async (distribution) => {
+            const address = distributionAddress(distribution);
+            const isEligible = await isEmailInDistribution(distribution, userEmailHash);
+            return { address, eligible: isEligible };
         }),
     );
 

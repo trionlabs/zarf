@@ -11,6 +11,7 @@ import { warn } from '../utils/log';
 
 export interface DiscoveredVesting {
     address: StellarContractId;
+    metadataCid?: string | null;
 }
 
 interface IndexerVestingsResult {

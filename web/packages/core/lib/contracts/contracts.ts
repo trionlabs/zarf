@@ -82,7 +82,7 @@ interface IndexerLatestLedger {
 }
 
 interface IndexerVestings {
-    vestings: Array<{ address: StellarContractId }>;
+    vestings: Array<{ address: StellarContractId; metadataCid?: string | null }>;
     total: number;
 }
 

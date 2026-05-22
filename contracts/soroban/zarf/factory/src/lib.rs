@@ -45,6 +45,13 @@ pub struct VestingCreated {
     pub metadata_cid: String,
 }
 
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DeploymentInfo {
+    pub address: Address,
+    pub metadata_cid: String,
+}
+
 #[contractimpl]
 impl ZarfVestingFactoryContract {
     pub fn __constructor(
@@ -108,6 +115,7 @@ impl ZarfVestingFactoryContract {
             name,
             description,
             merkle_root,
+            metadata_cid.clone(),
         )?;
         Self::track_deployment(
             &env,
@@ -145,6 +153,7 @@ impl ZarfVestingFactoryContract {
             name,
             description,
             merkle_root,
+            metadata_cid.clone(),
         )?;
 
         token::TokenClient::new(&env, &token).transfer_from(
@@ -181,6 +190,18 @@ impl ZarfVestingFactoryContract {
         Self::range(&env, start, limit, None)
     }
 
+    pub fn get_deployment_info(env: Env, index: u32) -> Result<DeploymentInfo, Error> {
+        Self::deployment_info(&env, DataKey::DeploymentAt(index))
+    }
+
+    pub fn get_deployment_infos(
+        env: Env,
+        start: u32,
+        limit: u32,
+    ) -> Result<Vec<DeploymentInfo>, Error> {
+        Self::range_infos(&env, start, limit, None)
+    }
+
     pub fn get_owner_deployment_count(env: Env, owner: Address) -> u32 {
         Self::owner_deployment_count(&env, &owner)
     }
@@ -201,6 +222,23 @@ impl ZarfVestingFactoryContract {
         Self::range(&env, start, limit, Some(owner))
     }
 
+    pub fn get_owner_deployment_info(
+        env: Env,
+        owner: Address,
+        index: u32,
+    ) -> Result<DeploymentInfo, Error> {
+        Self::deployment_info(&env, DataKey::OwnerDeploymentAt(owner, index))
+    }
+
+    pub fn get_owner_deployment_infos(
+        env: Env,
+        owner: Address,
+        start: u32,
+        limit: u32,
+    ) -> Result<Vec<DeploymentInfo>, Error> {
+        Self::range_infos(&env, start, limit, Some(owner))
+    }
+
     pub fn vesting_metadata_cid(env: Env, vesting: Address) -> Result<String, Error> {
         env.storage()
             .persistent()
@@ -217,6 +255,7 @@ impl ZarfVestingFactoryContract {
         name: String,
         description: String,
         merkle_root: BytesN<32>,
+        metadata_cid: String,
     ) -> Result<Address, Error> {
         let wasm_hash = Self::get_instance::<BytesN<32>>(env, DataKey::VestingWasmHash)?;
         let verifier = Self::get_instance::<Address>(env, DataKey::Verifier)?;
@@ -231,6 +270,7 @@ impl ZarfVestingFactoryContract {
                 name,
                 description,
                 merkle_root,
+                metadata_cid,
             ),
         ))
     }
@@ -343,5 +383,48 @@ impl ZarfVestingFactoryContract {
             out.push_back(deployment);
         }
         Ok(out)
+    }
+
+    fn range_infos(
+        env: &Env,
+        start: u32,
+        limit: u32,
+        owner: Option<Address>,
+    ) -> Result<Vec<DeploymentInfo>, Error> {
+        if limit > 100 {
+            return Err(Error::InvalidLimit);
+        }
+
+        let count = match &owner {
+            Some(owner) => Self::owner_deployment_count(env, owner),
+            None => Self::deployment_count(env),
+        };
+        let mut out = Vec::new(env);
+        let end = core::cmp::min(start.saturating_add(limit), count);
+        for index in start..end {
+            let key = match owner.clone() {
+                Some(owner) => DataKey::OwnerDeploymentAt(owner, index),
+                None => DataKey::DeploymentAt(index),
+            };
+            out.push_back(Self::deployment_info(env, key)?);
+        }
+        Ok(out)
+    }
+
+    fn deployment_info(env: &Env, key: DataKey) -> Result<DeploymentInfo, Error> {
+        let address: Address = env
+            .storage()
+            .persistent()
+            .get(&key)
+            .ok_or(Error::NotInitialized)?;
+        let metadata_cid = env
+            .storage()
+            .persistent()
+            .get(&DataKey::MetadataCid(address.clone()))
+            .ok_or(Error::NotInitialized)?;
+        Ok(DeploymentInfo {
+            address,
+            metadata_cid,
+        })
     }
 }

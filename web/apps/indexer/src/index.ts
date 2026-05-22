@@ -27,15 +27,7 @@ import {
 import { Buffer } from 'buffer';
 
 interface Env {
-    INDEXER_CACHE?: KVNamespace;
     ALLOWED_ORIGINS?: string;
-    CACHE_NAMESPACE?: string;
-    DEPLOYMENTS_TTL_SECONDS?: string;
-    OWNER_TTL_SECONDS?: string;
-    VESTING_TTL_SECONDS?: string;
-    IPFS_TTL_SECONDS?: string;
-    READ_TTL_SECONDS?: string;
-    LEDGER_TTL_SECONDS?: string;
     MAX_CONTRACTS?: string;
 
     STELLAR_RPC_URL?: string;
@@ -75,20 +67,18 @@ interface VestingContract {
     metadataCid: string | null;
 }
 
-interface CacheEntry {
-    value: string;
-    expiresAt: number;
+interface VestingSummary {
+    name: string;
+    description: string;
+    token: string;
+    merkleRoot: string;
+    owner: string;
+    metadataCid: string | null;
 }
 
-interface DeploymentIndexState {
-    count: number;
-    addresses: string[];
-    updatedAt: number;
-}
-
-interface CachedValue<T> {
-    value: T;
-    status: 'HIT' | 'MISS' | 'BYPASS';
+interface DeploymentInfo {
+    address: string;
+    metadataCid: string | null;
 }
 
 class HttpError extends Error {
@@ -112,9 +102,7 @@ const IPFS_READ_GATEWAYS = [
     'https://w3s.link/ipfs',
 ];
 const GATEWAY_TIMEOUT_MS = 5_000;
-const INDEX_STATE_MEMORY_TTL_MS = 30_000;
-
-const memoryCache = new Map<string, CacheEntry>();
+const FACTORY_RANGE_LIMIT = 100;
 
 export default {
     async fetch(request: Request, env: Env): Promise<Response> {
@@ -135,8 +123,7 @@ export default {
                 return json(
                     {
                         ok: true,
-                        cache: env.INDEXER_CACHE ? 'kv' : 'memory',
-                        hasKv: Boolean(env.INDEXER_CACHE),
+                        cache: 'none',
                     },
                     200,
                     corsHeaders,
@@ -149,41 +136,41 @@ export default {
             }
 
             if (parts[1] === 'ipfs' && parts.length === 3) {
-                return handleIpfsRead(parts[2], url, env, corsHeaders);
+                return handleIpfsRead(parts[2], corsHeaders);
             }
 
             if (parts.length === 4 && parts[2] === 'ledger' && parts[3] === 'latest') {
                 const network = decodeSegment(parts[1]);
                 const cfg = getNetworkConfig(env, network);
-                return handleLatestLedger(url, env, cfg, corsHeaders);
+                return handleLatestLedger(cfg, corsHeaders);
             }
 
             if (parts.length === 5 && parts[2] === 'factory' && parts[3] === 'predict') {
                 const network = decodeSegment(parts[1]);
                 const cfg = getNetworkConfig(env, network);
                 const salt = decodeSegment(parts[4]);
-                return handlePredictVestingAddress(salt, url, env, cfg, corsHeaders);
+                return handlePredictVestingAddress(salt, cfg, corsHeaders);
             }
 
             if (parts.length >= 3 && parts[2] === 'vestings') {
                 const network = decodeSegment(parts[1]);
                 const cfg = getNetworkConfig(env, network);
                 if (parts.length === 3) {
-                    return handleAllVestings(url, env, cfg, corsHeaders);
+                    return handleAllVestings(cfg, corsHeaders);
                 }
                 if (parts.length === 4) {
                     const address = decodeSegment(parts[3]);
-                    return handleVesting(address, url, env, cfg, corsHeaders);
+                    return handleVesting(address, cfg, corsHeaders);
                 }
                 if (parts.length === 6 && parts[4] === 'claimed') {
                     const address = decodeSegment(parts[3]);
                     const commitment = decodeSegment(parts[5]);
-                    return handleEpochClaimed(address, commitment, url, env, cfg, corsHeaders);
+                    return handleEpochClaimed(address, commitment, cfg, corsHeaders);
                 }
                 if (parts.length === 6 && parts[4] === 'recipient-id') {
                     const address = decodeSegment(parts[3]);
                     const recipient = decodeSegment(parts[5]);
-                    return handleRecipientId(address, recipient, url, env, cfg, corsHeaders);
+                    return handleRecipientId(address, recipient, cfg, corsHeaders);
                 }
             }
 
@@ -192,16 +179,16 @@ export default {
                 const cfg = getNetworkConfig(env, network);
                 const token = decodeSegment(parts[3]);
                 if (parts.length === 4) {
-                    return handleTokenMetadata(token, url, env, cfg, corsHeaders);
+                    return handleTokenMetadata(token, cfg, corsHeaders);
                 }
                 if (parts.length === 6 && parts[4] === 'balances') {
                     const owner = decodeSegment(parts[5]);
-                    return handleTokenBalance(token, owner, url, env, cfg, corsHeaders);
+                    return handleTokenBalance(token, owner, cfg, corsHeaders);
                 }
                 if (parts.length === 7 && parts[4] === 'allowances') {
                     const owner = decodeSegment(parts[5]);
                     const spender = decodeSegment(parts[6]);
-                    return handleTokenAllowance(token, owner, spender, url, env, cfg, corsHeaders);
+                    return handleTokenAllowance(token, owner, spender, cfg, corsHeaders);
                 }
             }
 
@@ -229,23 +216,22 @@ export default {
 };
 
 async function handleAllVestings(
-    url: URL,
-    env: Env,
     cfg: NetworkConfig,
     corsHeaders: Record<string, string>,
 ): Promise<Response> {
-    const ttl = ttlSeconds(env.DEPLOYMENTS_TTL_SECONDS, 60);
-    const cacheKey = `${cachePrefix(env, cfg)}:vestings:all`;
-    const result = await cachedJson(env, cacheKey, ttl, wantsRefresh(url), async () => {
-        const addresses = await fetchDeploymentAddresses(env, cfg);
-        return {
-            vestings: addresses.map((address) => ({ address })),
-            total: addresses.length,
+    const deployments = await fetchDeploymentInfos(cfg);
+    return json(
+        {
+            vestings: deployments.map(({ address, metadataCid }) => ({
+                address,
+                metadataCid,
+            })),
+            total: deployments.length,
             fetchedAt: Date.now(),
-        };
-    });
-
-    return cachedResponse(result, ttl, corsHeaders);
+        },
+        200,
+        corsHeaders,
+    );
 }
 
 async function handleOwnerVestings(
@@ -258,213 +244,151 @@ async function handleOwnerVestings(
     assertAddress(owner, 'owner');
 
     const maxContracts = readMaxContracts(url, env);
-    const ttl = ttlSeconds(env.OWNER_TTL_SECONDS, 60);
-    const cacheKey = `${cachePrefix(env, cfg)}:owner:${owner}:vestings:${maxContracts}`;
-    const result = await cachedJson(env, cacheKey, ttl, wantsRefresh(url), async () => {
-        const addresses = await fetchOwnerDeploymentAddresses(env, cfg, owner);
-        const contracts = await Promise.all(
-            addresses.slice(0, maxContracts).map(async (address) => {
-                try {
-                    return await getVestingContract(env, cfg, address, wantsRefresh(url));
-                } catch (error) {
-                    console.warn(`[Indexer] Failed to read vesting ${address}:`, error);
-                    return null;
-                }
-            }),
-        );
+    const deployments = await fetchOwnerDeploymentInfos(cfg, owner);
+    const contracts = await Promise.all(
+        deployments.slice(0, maxContracts).map(async ({ address }) => {
+            try {
+                return await getVestingContract(cfg, address);
+            } catch (error) {
+                console.warn(`[Indexer] Failed to read vesting ${address}:`, error);
+                return null;
+            }
+        }),
+    );
 
-        return {
+    return json(
+        {
             contracts: contracts.filter(
                 (contract): contract is VestingContract => contract !== null,
             ),
-            total: addresses.length,
+            total: deployments.length,
             fetchedAt: Date.now(),
-        };
-    });
-
-    return cachedResponse(result, ttl, corsHeaders);
+        },
+        200,
+        corsHeaders,
+    );
 }
 
 async function handleVesting(
     address: string,
-    url: URL,
-    env: Env,
     cfg: NetworkConfig,
     corsHeaders: Record<string, string>,
 ): Promise<Response> {
     assertAddress(address, 'vesting address');
 
-    const ttl = ttlSeconds(env.VESTING_TTL_SECONDS, 120);
-    const result = await getVestingContractCached(env, cfg, address, ttl, wantsRefresh(url));
-    return cachedResponse(result, ttl, corsHeaders);
+    return json(await getVestingContract(cfg, address), 200, corsHeaders);
 }
 
 async function handleIpfsRead(
     rawCid: string,
-    url: URL,
-    env: Env,
     corsHeaders: Record<string, string>,
 ): Promise<Response> {
     const cid = validateCid(decodeSegment(rawCid));
-    const ttl = ttlSeconds(env.IPFS_TTL_SECONDS, 86_400);
-    const result = await cachedJson(
-        env,
-        `${cacheNamespace(env)}:ipfs:${cid}`,
-        ttl,
-        wantsRefresh(url),
-        () => fetchIpfsJson(cid),
-    );
-
-    return cachedResponse(result, ttl, corsHeaders);
+    return json(await fetchIpfsJson(cid), 200, corsHeaders);
 }
 
 async function handleLatestLedger(
-    url: URL,
-    env: Env,
     cfg: NetworkConfig,
     corsHeaders: Record<string, string>,
 ): Promise<Response> {
-    const ttl = ttlSeconds(env.LEDGER_TTL_SECONDS, 5);
-    const result = await cachedJson(
-        env,
-        `${cachePrefix(env, cfg)}:ledger:latest`,
-        ttl,
-        wantsRefresh(url),
-        async () => ({ sequence: await getLatestLedgerSequence(cfg), fetchedAt: Date.now() }),
+    return json(
+        {
+            sequence: await getLatestLedgerSequence(cfg),
+            fetchedAt: Date.now(),
+        },
+        200,
+        corsHeaders,
     );
-
-    return cachedResponse(result, ttl, corsHeaders);
 }
 
 async function handlePredictVestingAddress(
     salt: string,
-    url: URL,
-    env: Env,
     cfg: NetworkConfig,
     corsHeaders: Record<string, string>,
 ): Promise<Response> {
     validateHex32(salt, 'salt');
 
-    const ttl = ttlSeconds(env.READ_TTL_SECONDS, 60);
-    const result = await cachedJson(
-        env,
-        `${cachePrefix(env, cfg)}:factory:predict:${normalizeHex(salt)}`,
-        ttl,
-        wantsRefresh(url),
-        async () => ({
+    return json(
+        {
             address: await predictVestingAddress(cfg, salt),
             fetchedAt: Date.now(),
-        }),
+        },
+        200,
+        corsHeaders,
     );
-
-    return cachedResponse(result, ttl, corsHeaders);
 }
 
 async function handleEpochClaimed(
     address: string,
     commitment: string,
-    url: URL,
-    env: Env,
     cfg: NetworkConfig,
     corsHeaders: Record<string, string>,
 ): Promise<Response> {
     assertAddress(address, 'vesting address');
     validateHex32(commitment, 'epoch commitment');
 
-    const ttl = ttlSeconds(env.READ_TTL_SECONDS, 30);
-    const result = await cachedJson(
-        env,
-        `${cachePrefix(env, cfg)}:vesting:${address}:claimed:${normalizeHex(commitment)}`,
-        ttl,
-        wantsRefresh(url),
-        async () => ({
+    return json(
+        {
             claimed: await isEpochClaimed(cfg, address, commitment),
             fetchedAt: Date.now(),
-        }),
+        },
+        200,
+        corsHeaders,
     );
-
-    return cachedResponse(result, ttl, corsHeaders);
 }
 
 async function handleRecipientId(
     address: string,
     recipient: string,
-    url: URL,
-    env: Env,
     cfg: NetworkConfig,
     corsHeaders: Record<string, string>,
 ): Promise<Response> {
     assertAddress(address, 'vesting address');
     assertAddress(recipient, 'recipient');
 
-    const ttl = ttlSeconds(env.READ_TTL_SECONDS, 60);
-    const result = await cachedJson(
-        env,
-        `${cachePrefix(env, cfg)}:vesting:${address}:recipient-id:${recipient}`,
-        ttl,
-        wantsRefresh(url),
-        async () => ({
+    return json(
+        {
             recipientId: await recipientId(cfg, address, recipient),
             fetchedAt: Date.now(),
-        }),
+        },
+        200,
+        corsHeaders,
     );
-
-    return cachedResponse(result, ttl, corsHeaders);
 }
 
 async function handleTokenMetadata(
     token: string,
-    url: URL,
-    env: Env,
     cfg: NetworkConfig,
     corsHeaders: Record<string, string>,
 ): Promise<Response> {
     assertAddress(token, 'token address');
 
-    const ttl = ttlSeconds(env.READ_TTL_SECONDS, 300);
-    const result = await cachedJson(
-        env,
-        `${cachePrefix(env, cfg)}:token:${token}:metadata`,
-        ttl,
-        wantsRefresh(url),
-        () => readTokenContract(cfg, token),
-    );
-
-    return cachedResponse(result, ttl, corsHeaders);
+    return json(await readTokenContract(cfg, token), 200, corsHeaders);
 }
 
 async function handleTokenBalance(
     token: string,
     owner: string,
-    url: URL,
-    env: Env,
     cfg: NetworkConfig,
     corsHeaders: Record<string, string>,
 ): Promise<Response> {
     assertAddress(token, 'token address');
     assertAddress(owner, 'owner');
 
-    const ttl = ttlSeconds(env.READ_TTL_SECONDS, 30);
-    const result = await cachedJson(
-        env,
-        `${cachePrefix(env, cfg)}:token:${token}:balance:${owner}`,
-        ttl,
-        wantsRefresh(url),
-        async () => ({
+    return json(
+        {
             balance: (await getTokenBalance(cfg, token, owner)).toString(),
             fetchedAt: Date.now(),
-        }),
+        },
+        200,
+        corsHeaders,
     );
-
-    return cachedResponse(result, ttl, corsHeaders);
 }
 
 async function handleTokenAllowance(
     token: string,
     owner: string,
     spender: string,
-    url: URL,
-    env: Env,
     cfg: NetworkConfig,
     corsHeaders: Record<string, string>,
 ): Promise<Response> {
@@ -472,159 +396,83 @@ async function handleTokenAllowance(
     assertAddress(owner, 'owner');
     assertAddress(spender, 'spender');
 
-    const ttl = ttlSeconds(env.READ_TTL_SECONDS, 20);
-    const result = await cachedJson(
-        env,
-        `${cachePrefix(env, cfg)}:token:${token}:allowance:${owner}:${spender}`,
-        ttl,
-        wantsRefresh(url),
-        async () => ({
+    return json(
+        {
             allowance: (await getTokenAllowance(cfg, token, owner, spender)).toString(),
             fetchedAt: Date.now(),
-        }),
-    );
-
-    return cachedResponse(result, ttl, corsHeaders);
-}
-
-async function getVestingContract(
-    env: Env,
-    cfg: NetworkConfig,
-    address: string,
-    refresh: boolean,
-): Promise<VestingContract> {
-    const ttl = ttlSeconds(env.VESTING_TTL_SECONDS, 120);
-    return (await getVestingContractCached(env, cfg, address, ttl, refresh)).value;
-}
-
-async function getVestingContractCached(
-    env: Env,
-    cfg: NetworkConfig,
-    address: string,
-    ttl: number,
-    refresh: boolean,
-): Promise<CachedValue<VestingContract>> {
-    return cachedJson(
-        env,
-        `${cachePrefix(env, cfg)}:vesting:${address}`,
-        ttl,
-        refresh,
-        async () => {
-            const metadata = await readVestingContract(cfg, address);
-            const [metadataCid, tokenBalance] = await Promise.all([
-                getCidForVesting(cfg, address),
-                getTokenBalance(cfg, metadata.token, address).catch((error) => {
-                    console.warn(`[Indexer] Failed to fetch token balance for ${address}:`, error);
-                    return 0n;
-                }),
-            ]);
-
-            return {
-                address,
-                name: sanitizeString(metadata.name || 'Unknown Distribution', 50),
-                description: sanitizeString(metadata.description || '', 200),
-                token: metadata.token,
-                merkleRoot: metadata.merkleRoot,
-                tokenSymbol: sanitizeString(metadata.tokenSymbol || 'XLM', 10),
-                tokenDecimals: metadata.tokenDecimals,
-                owner: metadata.owner,
-                vestingStart: '0',
-                cliffDuration: '0',
-                vestingDuration: '0',
-                vestingPeriod: '0',
-                tokenBalance: tokenBalance.toString(),
-                metadataCid,
-            };
         },
+        200,
+        corsHeaders,
     );
 }
 
-async function fetchDeploymentAddresses(env: Env, cfg: NetworkConfig): Promise<string[]> {
-    return fetchAppendOnlyIndex({
-        env,
-        key: `${cachePrefix(env, cfg)}:vestings:index-state`,
-        readCount: () => getDeploymentCount(cfg),
-        readAddress: (index) => getDeployment(cfg, index),
+async function getVestingContract(cfg: NetworkConfig, address: string): Promise<VestingContract> {
+    const metadata = await readVestingContract(cfg, address);
+    const tokenBalance = await getTokenBalance(cfg, metadata.token, address).catch((error) => {
+        console.warn(`[Indexer] Failed to fetch token balance for ${address}:`, error);
+        return 0n;
     });
+
+    return {
+        address,
+        name: sanitizeString(metadata.name || 'Unknown Distribution', 50),
+        description: sanitizeString(metadata.description || '', 200),
+        token: metadata.token,
+        merkleRoot: metadata.merkleRoot,
+        tokenSymbol: sanitizeString(metadata.tokenSymbol || 'XLM', 10),
+        tokenDecimals: metadata.tokenDecimals,
+        owner: metadata.owner,
+        vestingStart: '0',
+        cliffDuration: '0',
+        vestingDuration: '0',
+        vestingPeriod: '0',
+        tokenBalance: tokenBalance.toString(),
+        metadataCid: metadata.metadataCid,
+    };
 }
 
-async function fetchOwnerDeploymentAddresses(
-    env: Env,
+async function fetchDeploymentInfos(cfg: NetworkConfig): Promise<DeploymentInfo[]> {
+    const count = await getDeploymentCount(cfg);
+    return fetchDeploymentInfoRanges(count, (start, limit) =>
+        getDeploymentInfos(cfg, start, limit),
+    );
+}
+
+async function fetchOwnerDeploymentInfos(
     cfg: NetworkConfig,
     owner: string,
-): Promise<string[]> {
-    return fetchAppendOnlyIndex({
-        env,
-        key: `${cachePrefix(env, cfg)}:owner:${owner}:vestings:index-state`,
-        readCount: () => getOwnerDeploymentCount(cfg, owner),
-        readAddress: (index) => getOwnerDeployment(cfg, owner, index),
-    });
+): Promise<DeploymentInfo[]> {
+    const count = await getOwnerDeploymentCount(cfg, owner);
+    return fetchDeploymentInfoRanges(count, (start, limit) =>
+        getOwnerDeploymentInfos(cfg, owner, start, limit),
+    );
 }
 
-async function fetchAppendOnlyIndex(params: {
-    env: Env;
-    key: string;
-    readCount: () => Promise<number>;
-    readAddress: (index: number) => Promise<string>;
-}): Promise<string[]> {
-    const { env, key, readCount, readAddress } = params;
-    const currentCount = await readCount();
-    if (currentCount === 0) {
-        await writeIndexState(env, key, {
-            count: 0,
-            addresses: [],
-            updatedAt: Date.now(),
-        });
-        return [];
-    }
+async function fetchDeploymentInfoRanges(
+    count: number,
+    readRange: (start: number, limit: number) => Promise<DeploymentInfo[]>,
+): Promise<DeploymentInfo[]> {
+    if (count === 0) return [];
 
-    const cached = await readIndexState(env, key);
-    const cachedAddresses =
-        cached && cached.count <= currentCount
-            ? cached.addresses.slice(0, Math.min(cached.count, cached.addresses.length))
-            : [];
-
-    if (cachedAddresses.length >= currentCount) {
-        return cachedAddresses.slice(0, currentCount);
-    }
-
-    const nextAddresses = await Promise.all(
-        Array.from({ length: currentCount - cachedAddresses.length }, (_, offset) =>
-            readAddress(cachedAddresses.length + offset),
-        ),
-    );
-    const addresses = [...cachedAddresses, ...nextAddresses];
-
-    await writeIndexState(env, key, {
-        count: currentCount,
-        addresses,
-        updatedAt: Date.now(),
+    const chunks = Array.from({ length: Math.ceil(count / FACTORY_RANGE_LIMIT) }, (_, chunk) => {
+        const start = chunk * FACTORY_RANGE_LIMIT;
+        return readRange(start, Math.min(FACTORY_RANGE_LIMIT, count - start));
     });
-
-    return addresses;
+    const results = await Promise.all(chunks);
+    return results.flat();
 }
 
 async function readVestingContract(
     cfg: NetworkConfig,
     address: string,
-): Promise<{
-    name: string;
-    description: string;
-    owner: string;
-    token: string;
-    merkleRoot: string;
-    tokenSymbol: string;
-    tokenDecimals: number;
-}> {
-    const [name, description, owner, token, merkleRoot] = await Promise.all([
-        simulate(cfg, address, 'name'),
-        simulate(cfg, address, 'description'),
-        simulate(cfg, address, 'owner'),
-        simulate(cfg, address, 'token'),
-        simulate(cfg, address, 'merkle_root'),
-    ]);
-
-    const tokenAddress = StellarSdkAddress.fromScVal(token).toString();
+): Promise<
+    VestingSummary & {
+        tokenSymbol: string;
+        tokenDecimals: number;
+    }
+> {
+    const summary = parseVestingSummary(await simulate(cfg, address, 'summary'));
+    const tokenAddress = summary.token;
     let tokenSymbol = 'XLM';
     let tokenDecimals = 7;
     try {
@@ -639,11 +487,7 @@ async function readVestingContract(
     }
 
     return {
-        name: String(scValToNative(name)),
-        description: String(scValToNative(description)),
-        owner: StellarSdkAddress.fromScVal(owner).toString(),
-        token: tokenAddress,
-        merkleRoot: bytesToHex(scValToNative(merkleRoot)),
+        ...summary,
         tokenSymbol,
         tokenDecimals,
     };
@@ -730,9 +574,16 @@ async function getDeploymentCount(cfg: NetworkConfig): Promise<number> {
     return Number(scValToNative(result));
 }
 
-async function getDeployment(cfg: NetworkConfig, index: number): Promise<string> {
-    const result = await simulate(cfg, cfg.factoryAddress, 'get_deployment', [scU32(index)]);
-    return StellarSdkAddress.fromScVal(result).toString();
+async function getDeploymentInfos(
+    cfg: NetworkConfig,
+    start: number,
+    limit: number,
+): Promise<DeploymentInfo[]> {
+    const result = await simulate(cfg, cfg.factoryAddress, 'get_deployment_infos', [
+        scU32(start),
+        scU32(limit),
+    ]);
+    return parseDeploymentInfoVec(result);
 }
 
 async function getOwnerDeploymentCount(cfg: NetworkConfig, owner: string): Promise<number> {
@@ -742,31 +593,18 @@ async function getOwnerDeploymentCount(cfg: NetworkConfig, owner: string): Promi
     return Number(scValToNative(result));
 }
 
-async function getOwnerDeployment(
+async function getOwnerDeploymentInfos(
     cfg: NetworkConfig,
     owner: string,
-    index: number,
-): Promise<string> {
-    const result = await simulate(cfg, cfg.factoryAddress, 'get_owner_deployment', [
+    start: number,
+    limit: number,
+): Promise<DeploymentInfo[]> {
+    const result = await simulate(cfg, cfg.factoryAddress, 'get_owner_deployment_infos', [
         scAddress(owner),
-        scU32(index),
+        scU32(start),
+        scU32(limit),
     ]);
-    return StellarSdkAddress.fromScVal(result).toString();
-}
-
-async function getCidForVesting(
-    cfg: NetworkConfig,
-    vestingAddress: string,
-): Promise<string | null> {
-    try {
-        const result = await simulate(cfg, cfg.factoryAddress, 'vesting_metadata_cid', [
-            scAddress(vestingAddress),
-        ]);
-        const cid = String(scValToNative(result));
-        return cid.length > 0 ? cid : null;
-    } catch {
-        return null;
-    }
+    return parseDeploymentInfoVec(result);
 }
 
 async function simulate(
@@ -791,6 +629,63 @@ async function simulate(
         throw new HttpError(502, 'rpc_empty_result', `No simulation result for ${method}`);
     }
     return result.result.retval;
+}
+
+function parseVestingSummary(value: xdr.ScVal): VestingSummary {
+    const fields = scMap(value, 'vesting summary');
+    const metadataCid = scString(scMapField(fields, 'metadata_cid'));
+    return {
+        name: scString(scMapField(fields, 'name')),
+        description: scString(scMapField(fields, 'description')),
+        owner: StellarSdkAddress.fromScVal(scMapField(fields, 'owner')).toString(),
+        token: StellarSdkAddress.fromScVal(scMapField(fields, 'token')).toString(),
+        merkleRoot: bytesToHex(scValToNative(scMapField(fields, 'merkle_root'))),
+        metadataCid: metadataCid.length > 0 ? metadataCid : null,
+    };
+}
+
+function parseDeploymentInfoVec(value: xdr.ScVal): DeploymentInfo[] {
+    const values = value.vec();
+    if (!values) return [];
+    return values.map(parseDeploymentInfo);
+}
+
+function parseDeploymentInfo(value: xdr.ScVal): DeploymentInfo {
+    const fields = scMap(value, 'deployment info');
+    const metadataCid = scString(scMapField(fields, 'metadata_cid'));
+    return {
+        address: StellarSdkAddress.fromScVal(scMapField(fields, 'address')).toString(),
+        metadataCid: metadataCid.length > 0 ? metadataCid : null,
+    };
+}
+
+function scMap(value: xdr.ScVal, label: string): Map<string, xdr.ScVal> {
+    const entries = value.map();
+    if (!entries) {
+        throw new HttpError(502, 'invalid_contract_response', `Invalid ${label}`);
+    }
+
+    const fields = new Map<string, xdr.ScVal>();
+    for (const entry of entries) {
+        const key = scString(entry.key());
+        fields.set(key, entry.val());
+    }
+    return fields;
+}
+
+function scMapField(fields: Map<string, xdr.ScVal>, key: string): xdr.ScVal {
+    const value = fields.get(key);
+    if (!value) {
+        throw new HttpError(502, 'invalid_contract_response', `Missing contract field: ${key}`);
+    }
+    return value;
+}
+
+function scString(value: xdr.ScVal): string {
+    const native = scValToNative(value);
+    if (typeof native === 'string') return native;
+    if (Buffer.isBuffer(native)) return native.toString('utf8');
+    return String(native);
 }
 
 async function fetchIpfsJson(cid: string): Promise<unknown> {
@@ -825,133 +720,6 @@ async function fetchJsonFromGateway(gateway: string, cid: string): Promise<unkno
         return await response.json();
     } finally {
         clearTimeout(timer);
-    }
-}
-
-async function cachedJson<T>(
-    env: Env,
-    key: string,
-    ttl: number,
-    refresh: boolean,
-    loader: () => Promise<T>,
-): Promise<CachedValue<T>> {
-    if (!refresh) {
-        const cached = await readCache<T>(env, key);
-        if (cached !== null) {
-            return { value: cached, status: 'HIT' };
-        }
-    }
-
-    const value = await loader();
-    await writeCache(env, key, value, ttl);
-    return { value, status: refresh ? 'BYPASS' : 'MISS' };
-}
-
-async function readCache<T>(env: Env, key: string): Promise<T | null> {
-    const now = Date.now();
-    const memory = memoryCache.get(key);
-    if (memory && memory.expiresAt > now) {
-        return JSON.parse(memory.value) as T;
-    }
-    if (memory) memoryCache.delete(key);
-
-    if (!env.INDEXER_CACHE) return null;
-
-    try {
-        const result = await env.INDEXER_CACHE.get(key);
-        if (!result) return null;
-        memoryCache.set(key, {
-            value: result,
-            expiresAt: now + 10_000,
-        });
-        return JSON.parse(result) as T;
-    } catch (error) {
-        console.warn('[Indexer] KV read failed:', error);
-        return null;
-    }
-}
-
-async function readIndexState(env: Env, key: string): Promise<DeploymentIndexState | null> {
-    const now = Date.now();
-    const memory = memoryCache.get(key);
-    if (memory && memory.expiresAt > now) {
-        return parseIndexState(memory.value);
-    }
-    if (memory) memoryCache.delete(key);
-
-    if (!env.INDEXER_CACHE) return null;
-
-    try {
-        const result = await env.INDEXER_CACHE.get(key);
-        if (!result) return null;
-
-        memoryCache.set(key, {
-            value: result,
-            expiresAt: now + INDEX_STATE_MEMORY_TTL_MS,
-        });
-
-        return parseIndexState(result);
-    } catch (error) {
-        console.warn('[Indexer] KV index-state read failed:', error);
-        return null;
-    }
-}
-
-async function writeIndexState(env: Env, key: string, value: DeploymentIndexState): Promise<void> {
-    const serialized = JSON.stringify(value);
-    memoryCache.set(key, {
-        value: serialized,
-        expiresAt: Date.now() + INDEX_STATE_MEMORY_TTL_MS,
-    });
-
-    if (!env.INDEXER_CACHE) return;
-
-    try {
-        await env.INDEXER_CACHE.put(key, serialized);
-    } catch (error) {
-        console.warn('[Indexer] KV index-state write failed:', error);
-    }
-}
-
-function parseIndexState(raw: string): DeploymentIndexState | null {
-    try {
-        const value = JSON.parse(raw) as Partial<DeploymentIndexState>;
-        if (
-            typeof value.count !== 'number' ||
-            !Number.isInteger(value.count) ||
-            value.count < 0 ||
-            !Array.isArray(value.addresses)
-        ) {
-            return null;
-        }
-
-        return {
-            count: value.count,
-            addresses: value.addresses.filter(
-                (address): address is string => typeof address === 'string',
-            ),
-            updatedAt: typeof value.updatedAt === 'number' ? value.updatedAt : 0,
-        };
-    } catch {
-        return null;
-    }
-}
-
-async function writeCache(env: Env, key: string, value: unknown, ttl: number): Promise<void> {
-    const serialized = JSON.stringify(value);
-    memoryCache.set(key, {
-        value: serialized,
-        expiresAt: Date.now() + ttl * 1_000,
-    });
-
-    if (!env.INDEXER_CACHE) return;
-
-    try {
-        await env.INDEXER_CACHE.put(key, serialized, {
-            expirationTtl: ttl,
-        });
-    } catch (error) {
-        console.warn('[Indexer] KV write failed:', error);
     }
 }
 
@@ -1077,37 +845,6 @@ function readMaxContracts(url: URL, env: Env): number {
     return Math.min(Math.floor(requested), configuredMax);
 }
 
-function wantsRefresh(url: URL): boolean {
-    const value = url.searchParams.get('refresh');
-    return value === '1' || value === 'true';
-}
-
-function ttlSeconds(raw: string | undefined, fallback: number): number {
-    const value = Number(raw);
-    if (!Number.isFinite(value) || value <= 0) return fallback;
-    return Math.floor(value);
-}
-
-function cacheNamespace(env: Env): string {
-    return env.CACHE_NAMESPACE || 'zarf-indexer:v1';
-}
-
-function cachePrefix(env: Env, cfg: NetworkConfig): string {
-    return `${cacheNamespace(env)}:${cfg.id}:${cfg.factoryAddress}`;
-}
-
-function cachedResponse<T>(
-    result: CachedValue<T>,
-    ttl: number,
-    corsHeaders: Record<string, string>,
-): Response {
-    return json(result.value, 200, {
-        ...corsHeaders,
-        'Cache-Control': `public, max-age=${Math.min(ttl, 60)}`,
-        'X-Zarf-Cache': result.status,
-    });
-}
-
 function buildCorsHeaders(origin: string | null, env: Env): Record<string, string> {
     const allowed = (env.ALLOWED_ORIGINS || '')
         .split(',')
@@ -1130,6 +867,7 @@ function json(body: unknown, status: number, extraHeaders: Record<string, string
         status,
         headers: {
             'Content-Type': 'application/json',
+            'Cache-Control': 'no-store',
             ...extraHeaders,
         },
     });
