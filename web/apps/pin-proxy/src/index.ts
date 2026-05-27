@@ -43,6 +43,7 @@ interface PinataResponse {
 const PINATA_PIN_URL = 'https://api.pinata.cloud/pinning/pinJSONToIPFS';
 const PIN_AUTH_VERSION = 'zarf-pin-v1';
 const PIN_AUTH_MAX_AGE_MS = 5 * 60 * 1000;
+const SEP53_MESSAGE_PREFIX = 'Stellar Signed Message:\n';
 const HEX_32 = /^0x[0-9a-fA-F]{64}$/;
 const IPFS_READ_GATEWAYS = [
     'https://gateway.pinata.cloud/ipfs',
@@ -249,7 +250,7 @@ async function validatePinAuth(
     });
 
     const verified = Keypair.fromPublicKey(owner).verify(
-        Buffer.from(new TextEncoder().encode(message)),
+        await sep53MessageHash(message),
         signatureBytes,
     );
     return verified ? null : { status: 401, reason: 'invalid_signature' };
@@ -275,6 +276,14 @@ async function sha256Hex(value: string): Promise<string> {
     return Array.from(new Uint8Array(digest))
         .map((byte) => byte.toString(16).padStart(2, '0'))
         .join('');
+}
+
+async function sep53MessageHash(message: string): Promise<Buffer> {
+    const digest = await crypto.subtle.digest(
+        'SHA-256',
+        new TextEncoder().encode(`${SEP53_MESSAGE_PREFIX}${message}`),
+    );
+    return Buffer.from(digest);
 }
 
 function decodeSignature(raw: string): Buffer | null {
