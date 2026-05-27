@@ -8,12 +8,14 @@ use soroban_sdk::{
 
 const FIELD_BYTES: u32 = 32;
 const PUBKEY_LIMBS: u32 = 18;
-const PUBLIC_INPUT_FIELDS: u32 = 23;
+const PUBLIC_INPUT_FIELDS: u32 = 25;
 const ROOT_INDEX: u32 = PUBKEY_LIMBS;
 const UNLOCK_TIME_INDEX: u32 = PUBKEY_LIMBS + 1;
 const EPOCH_COMMITMENT_INDEX: u32 = PUBKEY_LIMBS + 2;
 const RECIPIENT_INDEX: u32 = PUBKEY_LIMBS + 3;
 const AMOUNT_INDEX: u32 = PUBKEY_LIMBS + 4;
+const AUDIENCE_HASH_INDEX: u32 = PUBKEY_LIMBS + 5;
+const JWT_EXP_INDEX: u32 = PUBKEY_LIMBS + 6;
 const BN254_SCALAR_MODULUS: [u8; 32] = [
     0x30, 0x64, 0x4e, 0x72, 0xe1, 0x31, 0xa0, 0x29, 0xb8, 0x50, 0x45, 0xb6, 0x81, 0x81, 0x58, 0x5d,
     0x28, 0x33, 0xe8, 0x48, 0x79, 0xb9, 0x70, 0x91, 0x43, 0xe1, 0xf5, 0x93, 0xf0, 0x00, 0x00, 0x01,
@@ -38,6 +40,9 @@ pub enum Error {
     NotInitialized = 10,
     MerkleRootAlreadySet = 11,
     MerkleRootFunded = 12,
+    InvalidAudience = 13,
+    JwtExpired = 14,
+    TokenTransferMismatch = 15,
 }
 
 #[contracttype]
@@ -50,6 +55,7 @@ pub enum DataKey {
     Name,
     Description,
     MerkleRoot,
+    AudienceHash,
     MetadataCid,
     Claimed(BytesN<32>),
 }
@@ -64,6 +70,7 @@ pub struct VestingSummary {
     pub name: String,
     pub description: String,
     pub merkle_root: BytesN<32>,
+    pub audience_hash: BytesN<32>,
     pub metadata_cid: String,
 }
 
@@ -110,8 +117,12 @@ impl ZarfVestingContract {
         name: String,
         description: String,
         merkle_root: BytesN<32>,
+        audience_hash: BytesN<32>,
         metadata_cid: String,
-    ) {
+    ) -> Result<(), Error> {
+        Self::validate_initial_root(&merkle_root)?;
+        Self::validate_nonzero_field(&audience_hash)?;
+
         let store = env.storage().instance();
         store.set(&DataKey::Owner, &owner);
         store.set(&DataKey::Token, &token);
@@ -120,7 +131,9 @@ impl ZarfVestingContract {
         store.set(&DataKey::Name, &name);
         store.set(&DataKey::Description, &description);
         store.set(&DataKey::MerkleRoot, &merkle_root);
+        store.set(&DataKey::AudienceHash, &audience_hash);
         store.set(&DataKey::MetadataCid, &metadata_cid);
+        Ok(())
     }
 
     pub fn owner(env: Env) -> Result<Address, Error> {
@@ -151,6 +164,10 @@ impl ZarfVestingContract {
         Self::get_instance(&env, DataKey::MerkleRoot)
     }
 
+    pub fn audience_hash(env: Env) -> Result<BytesN<32>, Error> {
+        Self::get_instance(&env, DataKey::AudienceHash)
+    }
+
     pub fn metadata_cid(env: Env) -> Result<String, Error> {
         Self::get_instance(&env, DataKey::MetadataCid)
     }
@@ -164,6 +181,7 @@ impl ZarfVestingContract {
             name: Self::get_instance(&env, DataKey::Name)?,
             description: Self::get_instance(&env, DataKey::Description)?,
             merkle_root: Self::get_instance(&env, DataKey::MerkleRoot)?,
+            audience_hash: Self::get_instance(&env, DataKey::AudienceHash)?,
             metadata_cid: Self::get_instance(&env, DataKey::MetadataCid)?,
         })
     }
@@ -194,13 +212,6 @@ impl ZarfVestingContract {
             return Err(Error::MerkleRootAlreadySet);
         }
 
-        let token_address = Self::get_instance::<Address>(&env, DataKey::Token)?;
-        let contract_address = env.current_contract_address();
-        let balance = token::TokenClient::new(&env, &token_address).balance(&contract_address);
-        if balance > 0 {
-            return Err(Error::MerkleRootFunded);
-        }
-
         env.storage()
             .instance()
             .set(&DataKey::MerkleRoot, &merkle_root);
@@ -217,14 +228,22 @@ impl ZarfVestingContract {
         if Self::is_zero_root(&merkle_root) {
             return Err(Error::InvalidMerkleRoot);
         }
+        if !Self::is_canonical_field(&merkle_root) {
+            return Err(Error::InvalidMerkleRoot);
+        }
         let token_address = Self::get_instance::<Address>(&env, DataKey::Token)?;
         let contract_address = env.current_contract_address();
-        token::TokenClient::new(&env, &token_address).transfer_from(
-            &contract_address,
-            &owner,
-            &contract_address,
-            &amount,
-        );
+        let token_client = token::TokenClient::new(&env, &token_address);
+        let before_balance = token_client.balance(&contract_address);
+        token_client.transfer_from(&contract_address, &owner, &contract_address, &amount);
+        let after_balance = token_client.balance(&contract_address);
+        if after_balance
+            != before_balance
+                .checked_add(amount)
+                .ok_or(Error::TokenTransferMismatch)?
+        {
+            return Err(Error::TokenTransferMismatch);
+        }
         Deposited { amount }.publish(&env);
         Ok(())
     }
@@ -259,6 +278,9 @@ impl ZarfVestingContract {
         }
 
         let stored_root = Self::get_instance::<BytesN<32>>(&env, DataKey::MerkleRoot)?;
+        if Self::is_zero_root(&stored_root) || !Self::is_canonical_field(&stored_root) {
+            return Err(Error::InvalidMerkleRoot);
+        }
         let proof_root = Self::field_at(&env, &public_inputs, ROOT_INDEX)?;
         if proof_root != stored_root {
             return Err(Error::InvalidMerkleRoot);
@@ -274,6 +296,17 @@ impl ZarfVestingContract {
             Self::field_to_u64(&Self::field_at(&env, &public_inputs, UNLOCK_TIME_INDEX)?)?;
         if env.ledger().timestamp() < unlock_time {
             return Err(Error::EpochLocked);
+        }
+
+        let expected_audience = Self::get_instance::<BytesN<32>>(&env, DataKey::AudienceHash)?;
+        let proof_audience = Self::field_at(&env, &public_inputs, AUDIENCE_HASH_INDEX)?;
+        if proof_audience != expected_audience {
+            return Err(Error::InvalidAudience);
+        }
+
+        let jwt_exp = Self::field_to_u64(&Self::field_at(&env, &public_inputs, JWT_EXP_INDEX)?)?;
+        if env.ledger().timestamp() > jwt_exp {
+            return Err(Error::JwtExpired);
         }
 
         let epoch_commitment = Self::field_at(&env, &public_inputs, EPOCH_COMMITMENT_INDEX)?;
@@ -295,12 +328,28 @@ impl ZarfVestingContract {
         }
 
         let token_address = Self::get_instance::<Address>(&env, DataKey::Token)?;
+        let token_client = token::TokenClient::new(&env, &token_address);
+        let contract_address = env.current_contract_address();
+        let before_contract_balance = token_client.balance(&contract_address);
+        let before_recipient_balance = token_client.balance(&recipient);
         let to: MuxedAddress = (&recipient).into();
-        token::TokenClient::new(&env, &token_address).transfer(
-            &env.current_contract_address(),
-            &to,
-            &amount,
-        );
+        token_client.transfer(&contract_address, &to, &amount);
+        let after_contract_balance = token_client.balance(&contract_address);
+        let after_recipient_balance = token_client.balance(&recipient);
+        if after_contract_balance
+            != before_contract_balance
+                .checked_sub(amount)
+                .ok_or(Error::TokenTransferMismatch)?
+            || after_recipient_balance
+                != before_recipient_balance
+                    .checked_add(amount)
+                    .ok_or(Error::TokenTransferMismatch)?
+        {
+            env.storage()
+                .persistent()
+                .set(&DataKey::Claimed(epoch_commitment.clone()), &false);
+            return Err(Error::TokenTransferMismatch);
+        }
 
         Claimed {
             epoch_commitment,
@@ -329,6 +378,20 @@ impl ZarfVestingContract {
 
     fn is_zero_root(root: &BytesN<32>) -> bool {
         root.to_array().iter().all(|byte| *byte == 0)
+    }
+
+    fn validate_initial_root(root: &BytesN<32>) -> Result<(), Error> {
+        if !Self::is_zero_root(root) && !Self::is_canonical_field(root) {
+            return Err(Error::InvalidMerkleRoot);
+        }
+        Ok(())
+    }
+
+    fn validate_nonzero_field(field: &BytesN<32>) -> Result<(), Error> {
+        if Self::is_zero_root(field) || !Self::is_canonical_field(field) {
+            return Err(Error::InvalidAudience);
+        }
+        Ok(())
     }
 
     fn validate_public_inputs_canonical(env: &Env, public_inputs: &Bytes) -> Result<(), Error> {

@@ -154,8 +154,41 @@ fn non_canonical_field(env: &Env, add: u8) -> BytesN<32> {
     BytesN::from_array(env, &raw)
 }
 
+fn audience_hash(env: &Env) -> BytesN<32> {
+    BytesN::from_array(env, &[6_u8; 32])
+}
+
+fn other_audience_hash(env: &Env) -> BytesN<32> {
+    BytesN::from_array(env, &[11_u8; 32])
+}
+
 fn append_field(bytes: &mut Bytes, field: &BytesN<32>) {
     bytes.extend_from_array(&field.to_array());
+}
+
+fn public_inputs_with_jwt(
+    env: &Env,
+    limbs: &Vec<BytesN<32>>,
+    root: &BytesN<32>,
+    unlock_time: u64,
+    epoch_commitment: &BytesN<32>,
+    recipient_field: &BytesN<32>,
+    amount: i128,
+    audience_hash: &BytesN<32>,
+    jwt_exp: u64,
+) -> Bytes {
+    let mut public_inputs = Bytes::new(env);
+    for limb in limbs.iter() {
+        append_field(&mut public_inputs, &limb);
+    }
+    append_field(&mut public_inputs, root);
+    append_field(&mut public_inputs, &field_from_u64(env, unlock_time));
+    append_field(&mut public_inputs, epoch_commitment);
+    append_field(&mut public_inputs, recipient_field);
+    append_field(&mut public_inputs, &field_from_i128(env, amount));
+    append_field(&mut public_inputs, audience_hash);
+    append_field(&mut public_inputs, &field_from_u64(env, jwt_exp));
+    public_inputs
 }
 
 fn public_inputs(
@@ -167,16 +200,17 @@ fn public_inputs(
     recipient_field: &BytesN<32>,
     amount: i128,
 ) -> Bytes {
-    let mut public_inputs = Bytes::new(env);
-    for limb in limbs.iter() {
-        append_field(&mut public_inputs, &limb);
-    }
-    append_field(&mut public_inputs, root);
-    append_field(&mut public_inputs, &field_from_u64(env, unlock_time));
-    append_field(&mut public_inputs, epoch_commitment);
-    append_field(&mut public_inputs, recipient_field);
-    append_field(&mut public_inputs, &field_from_i128(env, amount));
-    public_inputs
+    public_inputs_with_jwt(
+        env,
+        limbs,
+        root,
+        unlock_time,
+        epoch_commitment,
+        recipient_field,
+        amount,
+        &audience_hash(env),
+        1_700_003_600,
+    )
 }
 
 struct ClaimCase {
@@ -185,6 +219,7 @@ struct ClaimCase {
     vesting_id: Address,
     limbs: Vec<BytesN<32>>,
     root: BytesN<32>,
+    audience_hash: BytesN<32>,
     epoch_commitment: BytesN<32>,
     recipient_field: BytesN<32>,
     amount: i128,
@@ -222,6 +257,7 @@ fn setup_claim_case(env: &Env, verifier_id: Address, funded_amount: i128) -> Cla
             String::from_str(env, "Zarf"),
             String::from_str(env, "Private vesting"),
             root.clone(),
+            audience_hash(env),
             String::from_str(env, "ipfs://claim-list"),
         ),
     );
@@ -254,6 +290,7 @@ fn setup_claim_case(env: &Env, verifier_id: Address, funded_amount: i128) -> Cla
         funded_amount,
         public_inputs,
         proof,
+        audience_hash: audience_hash(env),
     }
 }
 
@@ -326,6 +363,7 @@ fn claim_checks_registry_root_recipient_time_and_transfers() {
             String::from_str(&env, "Zarf"),
             String::from_str(&env, "Private vesting"),
             root.clone(),
+            audience_hash(&env),
             String::from_str(&env, "ipfs://claim-list"),
         ),
     );
@@ -342,6 +380,7 @@ fn claim_checks_registry_root_recipient_time_and_transfers() {
         String::from_str(&env, "Private vesting")
     );
     assert_eq!(summary.merkle_root, root);
+    assert_eq!(summary.audience_hash, audience_hash(&env));
     assert_eq!(
         summary.metadata_cid,
         String::from_str(&env, "ipfs://claim-list")
@@ -400,6 +439,7 @@ fn claim_rejects_non_canonical_public_input_field() {
             String::from_str(&env, "Zarf"),
             String::from_str(&env, "Private vesting"),
             root.clone(),
+            audience_hash(&env),
             String::from_str(&env, "ipfs://claim-list"),
         ),
     );
@@ -522,6 +562,42 @@ fn claim_negative_matrix_rejects_without_state_changes() {
         )
     });
 
+    expect_claim_rejection(VestingError::InvalidAudience, |env, case| {
+        (
+            public_inputs_with_jwt(
+                env,
+                &case.limbs,
+                &case.root,
+                1_699_999_999,
+                &case.epoch_commitment,
+                &case.recipient_field,
+                case.amount,
+                &other_audience_hash(env),
+                1_700_003_600,
+            ),
+            case.proof.clone(),
+            case.epoch_commitment.clone(),
+        )
+    });
+
+    expect_claim_rejection(VestingError::JwtExpired, |env, case| {
+        (
+            public_inputs_with_jwt(
+                env,
+                &case.limbs,
+                &case.root,
+                1_699_999_999,
+                &case.epoch_commitment,
+                &case.recipient_field,
+                case.amount,
+                &case.audience_hash,
+                1_699_999_999,
+            ),
+            case.proof.clone(),
+            case.epoch_commitment.clone(),
+        )
+    });
+
     expect_claim_rejection(VestingError::InvalidProof, |env, case| {
         (
             case.public_inputs.clone(),
@@ -604,6 +680,7 @@ fn claim_guard_blocks_reentrant_verifier_callback() {
             String::from_str(&env, "Zarf"),
             String::from_str(&env, "Private vesting"),
             root.clone(),
+            audience_hash(&env),
             String::from_str(&env, "ipfs://claim-list"),
         ),
     );
@@ -665,6 +742,7 @@ fn failed_verifier_does_not_leave_claimed_guard() {
             String::from_str(&env, "Zarf"),
             String::from_str(&env, "Private vesting"),
             root.clone(),
+            audience_hash(&env),
             String::from_str(&env, "ipfs://claim-list"),
         ),
     );
@@ -695,6 +773,90 @@ fn failed_verifier_does_not_leave_claimed_guard() {
 }
 
 #[test]
+#[should_panic]
+fn constructor_rejects_non_canonical_merkle_root() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let owner = Address::generate(&env);
+    let token_asset = env.register_stellar_asset_contract_v2(owner.clone());
+    let token_id = token_asset.address();
+    let verifier_id = env.register(MockVerifier, ());
+    let registry_id = env.register(JwkRegistryContract, (owner.clone(),));
+
+    let _ = env.register(
+        ZarfVestingContract,
+        (
+            owner,
+            token_id,
+            verifier_id,
+            registry_id,
+            String::from_str(&env, "Zarf"),
+            String::from_str(&env, "Private vesting"),
+            non_canonical_field(&env, 1),
+            audience_hash(&env),
+            String::from_str(&env, "ipfs://claim-list"),
+        ),
+    );
+}
+
+#[test]
+#[should_panic]
+fn constructor_rejects_zero_audience_hash() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let owner = Address::generate(&env);
+    let token_asset = env.register_stellar_asset_contract_v2(owner.clone());
+    let token_id = token_asset.address();
+    let verifier_id = env.register(MockVerifier, ());
+    let registry_id = env.register(JwkRegistryContract, (owner.clone(),));
+
+    let _ = env.register(
+        ZarfVestingContract,
+        (
+            owner,
+            token_id,
+            verifier_id,
+            registry_id,
+            String::from_str(&env, "Zarf"),
+            String::from_str(&env, "Private vesting"),
+            BytesN::from_array(&env, &[7_u8; 32]),
+            BytesN::from_array(&env, &[0_u8; 32]),
+            String::from_str(&env, "ipfs://claim-list"),
+        ),
+    );
+}
+
+#[test]
+#[should_panic]
+fn constructor_rejects_non_canonical_audience_hash() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let owner = Address::generate(&env);
+    let token_asset = env.register_stellar_asset_contract_v2(owner.clone());
+    let token_id = token_asset.address();
+    let verifier_id = env.register(MockVerifier, ());
+    let registry_id = env.register(JwkRegistryContract, (owner.clone(),));
+
+    let _ = env.register(
+        ZarfVestingContract,
+        (
+            owner,
+            token_id,
+            verifier_id,
+            registry_id,
+            String::from_str(&env, "Zarf"),
+            String::from_str(&env, "Private vesting"),
+            BytesN::from_array(&env, &[7_u8; 32]),
+            non_canonical_field(&env, 1),
+            String::from_str(&env, "ipfs://claim-list"),
+        ),
+    );
+}
+
+#[test]
 fn set_merkle_root_is_one_time_before_funding_only() {
     let env = Env::default();
     env.mock_all_auths();
@@ -718,6 +880,7 @@ fn set_merkle_root_is_one_time_before_funding_only() {
             String::from_str(&env, "Zarf"),
             String::from_str(&env, "Private vesting"),
             zero_root.clone(),
+            audience_hash(&env),
             String::from_str(&env, "ipfs://claim-list"),
         ),
     );
@@ -736,7 +899,7 @@ fn set_merkle_root_is_one_time_before_funding_only() {
 }
 
 #[test]
-fn set_merkle_root_rejects_funded_zero_root_contract() {
+fn set_merkle_root_allows_unsolicited_dust_before_root_finalization() {
     let env = Env::default();
     env.mock_all_auths();
 
@@ -759,6 +922,7 @@ fn set_merkle_root_rejects_funded_zero_root_contract() {
             String::from_str(&env, "Zarf"),
             String::from_str(&env, "Private vesting"),
             zero_root,
+            audience_hash(&env),
             String::from_str(&env, "ipfs://claim-list"),
         ),
     );
@@ -766,9 +930,10 @@ fn set_merkle_root_rejects_funded_zero_root_contract() {
     token_admin.mint(&vesting_id, &1);
 
     match vesting.try_set_merkle_root(&root) {
-        Err(Ok(VestingError::MerkleRootFunded)) => {}
-        other => panic!("unexpected funded set_merkle_root result: {:?}", other),
+        Ok(Ok(())) => {}
+        other => panic!("unexpected dusted set_merkle_root result: {:?}", other),
     }
+    assert_eq!(vesting.merkle_root(), root);
 }
 
 #[test]
@@ -793,6 +958,7 @@ fn set_merkle_root_rejects_zero_root() {
             String::from_str(&env, "Zarf"),
             String::from_str(&env, "Private vesting"),
             zero_root.clone(),
+            audience_hash(&env),
             String::from_str(&env, "ipfs://claim-list"),
         ),
     );
@@ -826,6 +992,7 @@ fn deposit_rejects_zero_merkle_root() {
             String::from_str(&env, "Zarf"),
             String::from_str(&env, "Private vesting"),
             zero_root,
+            audience_hash(&env),
             String::from_str(&env, "ipfs://claim-list"),
         ),
     );
@@ -860,6 +1027,7 @@ fn owner_methods_require_auth_without_mock_all_auths() {
             String::from_str(&env, "Zarf"),
             String::from_str(&env, "Private vesting"),
             zero_root.clone(),
+            audience_hash(&env),
             String::from_str(&env, "ipfs://claim-list"),
         ),
     );

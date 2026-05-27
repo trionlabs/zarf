@@ -9,8 +9,8 @@ import type { JWTPayload } from '../types';
 export const GOOGLE_ISSUERS = new Set(['https://accounts.google.com', 'accounts.google.com']);
 
 /**
- * Asserts a decoded Google JWT's `iss`, `aud`, and (mode-dependent)
- * `nonce` claims at the trust boundary.
+ * Asserts a decoded Google JWT's `iss`, `aud`, `exp`, `email_verified`,
+ * and (mode-dependent) `nonce` claims at the trust boundary.
  *
  * Discriminated by `mode`:
  *
@@ -43,6 +43,12 @@ export function validateGoogleClaims(
     }
     if (payload.aud !== opts.clientId) {
         throw new Error('JWT audience does not match expected client ID');
+    }
+    if (payload.email_verified !== true) {
+        throw new Error('JWT email is not verified by Google');
+    }
+    if (!Number.isFinite(payload.exp) || payload.exp <= Math.floor(Date.now() / 1000)) {
+        throw new Error('JWT is expired');
     }
     if (opts.mode === 'callback') {
         if (payload.nonce !== opts.expectedNonce) {

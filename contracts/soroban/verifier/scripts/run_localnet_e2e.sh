@@ -7,12 +7,27 @@ NETWORK_NAME="${STELLAR_NETWORK_NAME:-local}"
 SOURCE_ACCOUNT="${STELLAR_SOURCE_ACCOUNT:-alice}"
 RPC_URL="${STELLAR_RPC_URL:-http://localhost:8000/soroban/rpc}"
 NETWORK_PASSPHRASE="${STELLAR_NETWORK_PASSPHRASE:-Standalone Network ; February 2017}"
-DATASET_DIR="${ULTRAHONK_DATASET:-$ROOT_DIR/tests/simple_circuit/target}"
+DATASET_DIR="${ULTRAHONK_DATASET:-$ROOT_DIR/tests/zarf/target}"
+VK_HASH_PATH="${ULTRAHONK_VK_HASH:-$ROOT_DIR/tests/zarf/vk_hash.hex}"
 
 cleanup() {
   stellar container stop "$CONTAINER_NAME" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
+
+read_vk_hash() {
+  local path="$1"
+  if [[ -f "$path" ]]; then
+    xxd -p -c 256 "$path"
+  elif [[ -f "$path.hex" ]]; then
+    tr -d '\n' <"$path.hex" | sed 's/^0x//'
+  elif [[ -f "$(dirname "$path")/../vk_hash.hex" ]]; then
+    tr -d '\n' <"$(dirname "$path")/../vk_hash.hex" | sed 's/^0x//'
+  else
+    echo "Missing VK hash at $path or matching .hex sidecar" >&2
+    return 1
+  fi
+}
 
 echo "Starting Stellar quickstart container..."
 stellar container start -t future --name "$CONTAINER_NAME" --limits unlimited
@@ -60,20 +75,26 @@ if [[ "$FUND_OK" -ne 1 ]]; then
   exit 1
 fi
 
-echo "Building Noir circuits (vk + proof)..."
-bash "$ROOT_DIR/tests/build_circuits.sh"
+if [[ "${ULTRAHONK_DATASET:-}" ]]; then
+  echo "Building Noir circuits (vk + proof)..."
+  bash "$ROOT_DIR/tests/build_circuits.sh"
+else
+  echo "Using checked-in Zarf bb v2 fixture..."
+fi
 
 echo "Building contract..."
 rustup target add wasm32v1-none >/dev/null 2>&1 || true
 stellar contract build
 
 echo "Deploying contract..."
+VK_HASH=$(read_vk_hash "$VK_HASH_PATH")
 DEPLOY_OUTPUT=$(stellar contract deploy \
   --wasm "$ROOT_DIR/target/wasm32v1-none/release/rs_soroban_ultrahonk.wasm" \
   --source "$SOURCE_ACCOUNT" \
   --network "$NETWORK_NAME" \
   -- \
-  --vk_bytes-file-path "$DATASET_DIR/vk")
+  --vk_bytes-file-path "$DATASET_DIR/vk" \
+  --vk_hash "$VK_HASH")
 echo "$DEPLOY_OUTPUT"
 CONTRACT_ID=$(echo "$DEPLOY_OUTPUT" | tail -n 1 | tr -d '[:space:]')
 if [[ -z "$CONTRACT_ID" ]]; then

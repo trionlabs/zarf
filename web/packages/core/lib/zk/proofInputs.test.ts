@@ -67,6 +67,7 @@ const fixtureClaim: ClaimData = {
     merkleRoot: '0xabc',
     recipient: '0x742d35cc6634c0532925a3b844bc9e7595f0bcb1',
     unlockTime: '0x65f1d3a0',
+    audience: 'test-client-id.apps.googleusercontent.com',
 };
 
 const fixtureJwt: NoirJwtResult = {
@@ -84,6 +85,9 @@ describe('buildCircuitInputs', () => {
             0x61, 0x6c, 0x69, 0x63, 0x65, 0x40, 0x65, 0x78, 0x61, 0x6d, 0x70, 0x6c, 0x65, 0x2e,
             0x63, 0x6f, 0x6d,
         ];
+        const audienceBytes = Array.from(
+            new TextEncoder().encode('test-client-id.apps.googleusercontent.com'),
+        );
         const pad = <T>(head: T[], n: number, fill: T) => [
             ...head,
             ...Array<T>(n - head.length).fill(fill),
@@ -95,6 +99,7 @@ describe('buildCircuitInputs', () => {
             redc_params_limbs: ['0x1', '0x2'],
             signature_limbs: ['0xa'],
             expected_email: { storage: pad(emailBytes, 64, 0), len: 17 },
+            expected_audience: { storage: pad(audienceBytes, 128, 0), len: audienceBytes.length },
             secret: '0x123456789abcdef',
             amount: '0xde0b6b3a7640000',
             merkle_siblings: pad(['0xaa', '0xbb', '0xcc'], 20, '0x0'),

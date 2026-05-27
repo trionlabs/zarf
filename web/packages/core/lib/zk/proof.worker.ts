@@ -166,8 +166,12 @@ async function generateProof(payload: ProofRequest['payload']) {
     // [20] = identity_commitment (Output)
     // [21] = recipient (Output)
     // [22] = amount (Output)
+    // [23] = audience_hash (Output)
+    // [24] = jwt_exp (Output)
     const identityCommitment = proof.publicInputs[20];
     const proofRecipient = proof.publicInputs[21];
+    const audienceHash = proof.publicInputs[23];
+    const jwtExp = proof.publicInputs[24];
 
     // Note: Amount is also an output now (index 22), but we have it in inputs too.
     // Using input amount for consistency is safer unless we want to verify circuit output.
@@ -180,12 +184,16 @@ async function generateProof(payload: ProofRequest['payload']) {
             merkleRoot: toHex(merkleRoot),
             recipient: proofRecipient,
             amount: BigInt(amount),
+            audienceHash,
+            jwtExp: BigInt(jwtExp),
         },
         // Convenience duplicates
         identityCommitment,
         merkleRoot: toHex(merkleRoot),
         recipient: proofRecipient,
         amount: BigInt(amount),
+        audienceHash,
+        jwtExp: BigInt(jwtExp),
     };
 }
 

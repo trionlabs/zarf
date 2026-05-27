@@ -6,6 +6,11 @@ use zarf_vesting_factory_soroban::{
 const VESTING_WASM: &[u8] =
     include_bytes!("../../vesting/target/wasm32v1-none/release/zarf_vesting_soroban.wasm");
 
+const BN254_SCALAR_MODULUS_TEST: [u8; 32] = [
+    0x30, 0x64, 0x4e, 0x72, 0xe1, 0x31, 0xa0, 0x29, 0xb8, 0x50, 0x45, 0xb6, 0x81, 0x81, 0x58, 0x5d,
+    0x28, 0x33, 0xe8, 0x48, 0x79, 0xb9, 0x70, 0x91, 0x43, 0xe1, 0xf5, 0x93, 0xf0, 0x00, 0x00, 0x01,
+];
+
 mod vesting {
     soroban_sdk::contractimport!(
         file = "../vesting/target/wasm32v1-none/release/zarf_vesting_soroban.wasm"
@@ -14,6 +19,14 @@ mod vesting {
 
 fn test_salt(env: &Env, n: u8) -> BytesN<32> {
     BytesN::from_array(env, &[n; 32])
+}
+
+fn audience_hash(env: &Env) -> BytesN<32> {
+    BytesN::from_array(env, &[6_u8; 32])
+}
+
+fn non_canonical_field(env: &Env) -> BytesN<32> {
+    BytesN::from_array(env, &BN254_SCALAR_MODULUS_TEST)
 }
 
 fn setup(
@@ -52,7 +65,7 @@ fn creates_vesting_and_tracks_metadata() {
     let root = BytesN::from_array(&env, &[8_u8; 32]);
     let cid = String::from_str(&env, "ipfs://metadata");
 
-    let predicted = factory.predict_vesting_address(&salt);
+    let predicted = factory.predict_vesting_address(&owner, &salt);
     let vesting = factory.create_vesting(
         &owner,
         &token_id,
@@ -60,6 +73,7 @@ fn creates_vesting_and_tracks_metadata() {
         &String::from_str(&env, "Zarf"),
         &String::from_str(&env, "Factory deployed"),
         &root,
+        &audience_hash(&env),
         &2,
         &300,
         &cid,
@@ -85,6 +99,7 @@ fn creates_vesting_and_tracks_metadata() {
         String::from_str(&env, "Factory deployed")
     );
     assert_eq!(summary.merkle_root, root);
+    assert_eq!(summary.audience_hash, audience_hash(&env));
     assert_eq!(summary.metadata_cid, cid);
 
     assert_eq!(factory.get_deployment_count(), 1);
@@ -133,6 +148,7 @@ fn create_and_fund_vesting_consumes_factory_allowance() {
         &String::from_str(&env, "Funded Zarf"),
         &String::from_str(&env, "Factory deployed and funded"),
         &root,
+        &audience_hash(&env),
         &1,
         &amount,
         &String::from_str(&env, "ipfs://funded"),
@@ -156,7 +172,7 @@ fn failed_funding_does_not_track_deployment() {
 
     let salt = test_salt(&env, 11);
     let root = BytesN::from_array(&env, &[10_u8; 32]);
-    let predicted = factory.predict_vesting_address(&salt);
+    let predicted = factory.predict_vesting_address(&owner, &salt);
     let result = factory.try_create_and_fund_vesting(
         &owner,
         &token_id,
@@ -164,6 +180,7 @@ fn failed_funding_does_not_track_deployment() {
         &String::from_str(&env, "Funded Zarf"),
         &String::from_str(&env, "Factory deployed and funded"),
         &root,
+        &audience_hash(&env),
         &1,
         &amount,
         &String::from_str(&env, "ipfs://funded"),
@@ -181,6 +198,237 @@ fn failed_funding_does_not_track_deployment() {
 }
 
 #[test]
+fn same_salt_is_owner_scoped() {
+    let env = Env::default();
+    let (factory, _factory_id, _verifier, _registry, token_id) = setup(&env);
+
+    let owner_a = Address::generate(&env);
+    let owner_b = Address::generate(&env);
+    let salt = test_salt(&env, 14);
+    let root_a = BytesN::from_array(&env, &[10_u8; 32]);
+    let root_b = BytesN::from_array(&env, &[11_u8; 32]);
+
+    let predicted_a = factory.predict_vesting_address(&owner_a, &salt);
+    let predicted_b = factory.predict_vesting_address(&owner_b, &salt);
+    assert_ne!(predicted_a, predicted_b);
+
+    let vesting_a = factory.create_vesting(
+        &owner_a,
+        &token_id,
+        &salt,
+        &String::from_str(&env, "Zarf A"),
+        &String::from_str(&env, "Factory deployed"),
+        &root_a,
+        &audience_hash(&env),
+        &1,
+        &100,
+        &String::from_str(&env, "ipfs://metadata-a"),
+    );
+    let vesting_b = factory.create_vesting(
+        &owner_b,
+        &token_id,
+        &salt,
+        &String::from_str(&env, "Zarf B"),
+        &String::from_str(&env, "Factory deployed"),
+        &root_b,
+        &audience_hash(&env),
+        &1,
+        &100,
+        &String::from_str(&env, "ipfs://metadata-b"),
+    );
+
+    assert_eq!(vesting_a, predicted_a);
+    assert_eq!(vesting_b, predicted_b);
+    assert_eq!(factory.get_owner_deployment_count(&owner_a), 1);
+    assert_eq!(factory.get_owner_deployment_count(&owner_b), 1);
+}
+
+#[test]
+fn same_owner_same_salt_second_deploy_reverts_without_tracking() {
+    let env = Env::default();
+    let (factory, _factory_id, _verifier, _registry, token_id) = setup(&env);
+
+    let owner = Address::generate(&env);
+    let salt = test_salt(&env, 16);
+    let root = BytesN::from_array(&env, &[10_u8; 32]);
+    let metadata = String::from_str(&env, "ipfs://metadata");
+
+    let first = factory.create_vesting(
+        &owner,
+        &token_id,
+        &salt,
+        &String::from_str(&env, "Zarf"),
+        &String::from_str(&env, "Factory deployed"),
+        &root,
+        &audience_hash(&env),
+        &1,
+        &100,
+        &metadata,
+    );
+
+    let result = factory.try_create_vesting(
+        &owner,
+        &token_id,
+        &salt,
+        &String::from_str(&env, "Zarf duplicate"),
+        &String::from_str(&env, "Factory deployed"),
+        &root,
+        &audience_hash(&env),
+        &1,
+        &100,
+        &String::from_str(&env, "ipfs://duplicate"),
+    );
+
+    assert!(result.is_err(), "duplicate salt unexpectedly deployed");
+    assert_eq!(factory.get_deployment_count(), 1);
+    assert_eq!(factory.get_owner_deployment_count(&owner), 1);
+    assert_eq!(factory.get_deployment(&0), first);
+    assert_eq!(factory.vesting_metadata_cid(&first), metadata);
+}
+
+#[test]
+fn funded_vesting_requires_nonzero_canonical_merkle_root() {
+    let env = Env::default();
+    let (factory, _factory_id, _verifier, _registry, token_id) = setup(&env);
+
+    let owner = Address::generate(&env);
+    let zero_root = BytesN::from_array(&env, &[0_u8; 32]);
+    let result = factory.try_create_and_fund_vesting(
+        &owner,
+        &token_id,
+        &test_salt(&env, 15),
+        &String::from_str(&env, "Funded Zarf"),
+        &String::from_str(&env, "Factory deployed and funded"),
+        &zero_root,
+        &audience_hash(&env),
+        &1,
+        &100,
+        &String::from_str(&env, "ipfs://funded"),
+    );
+
+    match result {
+        Err(Ok(FactoryError::InvalidMerkleRoot)) => {}
+        other => panic!("unexpected zero root result: {:?}", other),
+    }
+    assert_eq!(factory.get_deployment_count(), 0);
+}
+
+#[test]
+fn create_vesting_rejects_non_canonical_root_and_bad_audience_without_tracking() {
+    let env = Env::default();
+    let (factory, _factory_id, _verifier, _registry, token_id) = setup(&env);
+
+    let owner = Address::generate(&env);
+    let good_root = BytesN::from_array(&env, &[10_u8; 32]);
+    let zero_audience = BytesN::from_array(&env, &[0_u8; 32]);
+
+    let bad_root = factory.try_create_vesting(
+        &owner,
+        &token_id,
+        &test_salt(&env, 17),
+        &String::from_str(&env, "Zarf"),
+        &String::from_str(&env, "Factory deployed"),
+        &non_canonical_field(&env),
+        &audience_hash(&env),
+        &1,
+        &100,
+        &String::from_str(&env, "ipfs://metadata"),
+    );
+    match bad_root {
+        Err(Ok(FactoryError::InvalidMerkleRoot)) => {}
+        other => panic!("unexpected non-canonical root result: {:?}", other),
+    }
+
+    let zero_aud = factory.try_create_vesting(
+        &owner,
+        &token_id,
+        &test_salt(&env, 18),
+        &String::from_str(&env, "Zarf"),
+        &String::from_str(&env, "Factory deployed"),
+        &good_root,
+        &zero_audience,
+        &1,
+        &100,
+        &String::from_str(&env, "ipfs://metadata"),
+    );
+    match zero_aud {
+        Err(Ok(FactoryError::InvalidAudience)) => {}
+        other => panic!("unexpected zero audience result: {:?}", other),
+    }
+
+    let bad_aud = factory.try_create_vesting(
+        &owner,
+        &token_id,
+        &test_salt(&env, 19),
+        &String::from_str(&env, "Zarf"),
+        &String::from_str(&env, "Factory deployed"),
+        &good_root,
+        &non_canonical_field(&env),
+        &1,
+        &100,
+        &String::from_str(&env, "ipfs://metadata"),
+    );
+    match bad_aud {
+        Err(Ok(FactoryError::InvalidAudience)) => {}
+        other => panic!("unexpected non-canonical audience result: {:?}", other),
+    }
+
+    assert_eq!(factory.get_deployment_count(), 0);
+    assert_eq!(factory.get_owner_deployment_count(&owner), 0);
+}
+
+#[test]
+fn funded_create_rejects_invalid_root_or_audience_without_token_movement() {
+    let env = Env::default();
+    let (factory, factory_id, _verifier, _registry, token_id) = setup(&env);
+
+    let owner = Address::generate(&env);
+    let amount = 500_i128;
+    let token_admin = token::StellarAssetClient::new(&env, &token_id);
+    let token_client = token::TokenClient::new(&env, &token_id);
+    token_admin.mint(&owner, &amount);
+    token_client.approve(&owner, &factory_id, &amount, &1000);
+
+    let invalid_root = factory.try_create_and_fund_vesting(
+        &owner,
+        &token_id,
+        &test_salt(&env, 20),
+        &String::from_str(&env, "Funded Zarf"),
+        &String::from_str(&env, "Factory deployed and funded"),
+        &non_canonical_field(&env),
+        &audience_hash(&env),
+        &1,
+        &amount,
+        &String::from_str(&env, "ipfs://funded"),
+    );
+    match invalid_root {
+        Err(Ok(FactoryError::InvalidMerkleRoot)) => {}
+        other => panic!("unexpected funded invalid root result: {:?}", other),
+    }
+
+    let invalid_audience = factory.try_create_and_fund_vesting(
+        &owner,
+        &token_id,
+        &test_salt(&env, 21),
+        &String::from_str(&env, "Funded Zarf"),
+        &String::from_str(&env, "Factory deployed and funded"),
+        &BytesN::from_array(&env, &[10_u8; 32]),
+        &non_canonical_field(&env),
+        &1,
+        &amount,
+        &String::from_str(&env, "ipfs://funded"),
+    );
+    match invalid_audience {
+        Err(Ok(FactoryError::InvalidAudience)) => {}
+        other => panic!("unexpected funded invalid audience result: {:?}", other),
+    }
+
+    assert_eq!(token_client.balance(&owner), amount);
+    assert_eq!(factory.get_deployment_count(), 0);
+    assert_eq!(factory.get_owner_deployment_count(&owner), 0);
+}
+
+#[test]
 fn invalid_factory_metadata_rejects_without_tracking() {
     let env = Env::default();
     let (factory, _factory_id, _verifier, _registry, token_id) = setup(&env);
@@ -195,6 +443,7 @@ fn invalid_factory_metadata_rejects_without_tracking() {
         &String::from_str(&env, "Zarf"),
         &String::from_str(&env, "Factory deployed"),
         &root,
+        &audience_hash(&env),
         &0,
         &300,
         &String::from_str(&env, "ipfs://metadata"),
@@ -230,6 +479,7 @@ fn create_vesting_requires_owner_auth_without_mock_all_auths() {
         &String::from_str(&env, "Zarf"),
         &String::from_str(&env, "Factory deployed"),
         &BytesN::from_array(&env, &[8_u8; 32]),
+        &audience_hash(&env),
         &1,
         &300,
         &String::from_str(&env, "ipfs://metadata"),

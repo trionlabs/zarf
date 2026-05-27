@@ -68,6 +68,7 @@ describe('planDeploy', () => {
         },
         totalAmount: 1000n,
         merkleRoot: ('0x' + '01'.repeat(32)) as `0x${string}`,
+        audienceHash: ('0x' + '02'.repeat(32)) as `0x${string}`,
         recipientCount: 1,
         allocationsTotal: 1000n,
         metadataCid: 'bafkreitestcid',

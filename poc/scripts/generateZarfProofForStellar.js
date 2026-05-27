@@ -22,6 +22,7 @@ import { keccak_256 } from '@noble/hashes/sha3.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const TREE_DEPTH = 20;
+const MAX_AUDIENCE_LENGTH = 128;
 const crypto = webcrypto;
 const DEFAULT_OUT_DIR = '/tmp/zarf-stellar-artifacts';
 
@@ -136,6 +137,14 @@ function bytesToHex(bytes) {
 function keccak256(bytes) {
   return bytesToHex(keccak_256(bytes));
 }
+function proofSettings() {
+  return {
+    ipaAccumulation: false,
+    oracleHashType: 'keccak',
+    disableZk: true,
+    optimizedSolidityVerifier: false,
+  };
+}
 function parseArgs(argv) {
   const args = {};
   for (let i = 0; i < argv.length; i++) {
@@ -159,6 +168,7 @@ async function main() {
   const outDir = args['out-dir'] ?? args.outDir ?? DEFAULT_OUT_DIR;
 
   const testEmail = args.email ?? 'alice@example.com';
+  const testAudience = args.audience ?? 'test-client-id';
   const testAmount = BigInt(args.amount ?? '1000');
   const testSecret = args.secret ? BigInt(args.secret) : BigInt(Fr.random().toString());
   const testUnlockTime = BigInt(args['unlock-time'] ?? args.unlockTime ?? '0');
@@ -171,7 +181,12 @@ async function main() {
   const publicKeyJWK = await exportKeyToJWK(publicKey);
 
   console.log('2. JWT...');
-  const jwt = await createJWT(privateKey, { email: testEmail });
+  const jwt = await createJWT(privateKey, {
+    email: testEmail,
+    aud: testAudience,
+    email_verified: true,
+    nonce: args.nonce ?? 'test-nonce',
+  });
 
   console.log('3. JWT inputs (RSA limbs, signature, base64 offset)...');
   const jwtInputs = await generateInputs({ jwt, pubkey: publicKeyJWK, maxSignedDataLength: 1024 });
@@ -179,6 +194,8 @@ async function main() {
   console.log('4. Compute identity_commitment + leaf (new formula)...');
   const emailBytes = stringToBytes(testEmail.toLowerCase().trim(), 64);
   const emailHash = await pedersenHashBytes(emailBytes);
+  const audienceBytes = stringToBytes(testAudience, MAX_AUDIENCE_LENGTH);
+  const audienceHash = await pedersenHashBytes(audienceBytes);
   const secretHash = await pedersenHashFields([BigInt(testSecret)]);
   const identityCommitment = await pedersenHashFields([emailHash, secretHash]);
   const leaf = await pedersenHashFields([identityCommitment, testAmount, testUnlockTime]);
@@ -199,6 +216,7 @@ async function main() {
     redc_params_limbs: jwtInputs.redc_params_limbs,
     signature_limbs: jwtInputs.signature_limbs,
     expected_email: { storage: emailBytesArr, len: testEmail.length },
+    expected_audience: { storage: Array.from(audienceBytes), len: testAudience.length },
     amount: fieldHex(testAmount),
     merkle_siblings: merkleProof.siblings.map((s) => toHex(s)),
     merkle_path_indices: merkleProof.indices.map((i) => toHex(i)),
@@ -220,13 +238,35 @@ async function main() {
   console.log(`   proof: ${proofData.proof.length} bytes (${proofData.proof.length / 32} fields)`);
   console.log(`   public inputs: ${proofData.publicInputs.length}`);
 
+  console.log('   verify proof with bb.js...');
+  const verified = await backend.verifyProof(proofData, { keccak: true });
+  if (!verified) {
+    throw new Error('generated proof failed bb.js verification');
+  }
+
   console.log('10. Get VK...');
-  const vk = await backend.getVerificationKey({ keccak: true });
+  const vkResult = await backend.api.circuitComputeVk({
+    circuit: {
+      name: 'circuit',
+      bytecode: Buffer.from(backend.acirUncompressedBytecode),
+    },
+    settings: proofSettings(),
+  });
+  const vk = vkResult.bytes;
+  const vkHashHex = bytesToHex(vkResult.hash);
   console.log(`    vk: ${vk.length} bytes`);
+  console.log(`    vk_hash: ${vkHashHex}`);
+  if (args['solidity-out']) {
+    const verifierSolidity = await backend.getSolidityVerifier(vk);
+    writeFileSync(args['solidity-out'], verifierSolidity);
+    console.log(`    solidity verifier: ${args['solidity-out']}`);
+  }
 
   // Write raw bytes
   writeFileSync(`${outDir}/proof`, proofData.proof);
   writeFileSync(`${outDir}/vk`, vk);
+  writeFileSync(`${outDir}/vk_hash`, vkResult.hash);
+  writeFileSync(`${outDir}/vk_hash.hex`, `${vkHashHex}\n`);
   // public_inputs: concat each Fr as 32 bytes BE
   const piBytes = new Uint8Array(proofData.publicInputs.length * 32);
   proofData.publicInputs.forEach((piHex, i) => {
@@ -239,6 +279,9 @@ async function main() {
   writeFileSync(`${outDir}/public_inputs`, piBytes);
 
   const publicInputsHex = proofData.publicInputs.map(fieldHex);
+  if (fieldHex(audienceHash) !== publicInputsHex[23]) {
+    throw new Error('audience hash public input mismatch');
+  }
   const metadata = {
     email: testEmail,
     amount: testAmount.toString(),
@@ -248,6 +291,9 @@ async function main() {
     epoch_commitment: publicInputsHex[20],
     proof_recipient: publicInputsHex[21],
     proof_amount: publicInputsHex[22],
+    audience_hash: publicInputsHex[23],
+    jwt_exp: publicInputsHex[24],
+    vk_hash: vkHashHex,
     key_hash: keccak256(piBytes.slice(0, 18 * 32)),
     proof_hex: bytesToHex(proofData.proof),
     public_inputs_hex: bytesToHex(piBytes),
@@ -262,6 +308,7 @@ async function main() {
   console.log(`  public_inputs: ${piBytes.length} bytes (${proofData.publicInputs.length} fields)`);
   console.log(`  merkle_root: ${metadata.merkle_root}`);
   console.log(`  key_hash: ${metadata.key_hash}`);
+  console.log(`  audience_hash: ${metadata.audience_hash}`);
   console.log(`  recipient: ${metadata.proof_recipient}`);
 
   // Compare to yugocabrio expected

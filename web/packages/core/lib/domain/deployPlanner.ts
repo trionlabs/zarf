@@ -89,6 +89,8 @@ export interface DeployPlanInputs {
     totalAmount: bigint;
     /** Pre-validated factory inputs from `buildFactoryDeployInputs`. */
     merkleRoot: HexString;
+    /** Pedersen hash of the Google OAuth client ID accepted by the proof. */
+    audienceHash: HexString;
     recipientCount: number;
     /** Sum of amounts; used for the integrity check. */
     allocationsTotal: bigint;
@@ -101,6 +103,7 @@ export interface PlannedDeployConfig {
     factoryAddress: StellarContractId;
     tokenAddress: StellarContractId;
     merkleRoot: HexString;
+    audienceHash: HexString;
     recipientCount: number;
     cliffSeconds: bigint;
     vestingSeconds: bigint;
@@ -140,6 +143,7 @@ export function planDeploy(inputs: DeployPlanInputs, now: Date = new Date()): Pl
         factoryAddress: inputs.factoryAddress,
         tokenAddress: inputs.tokenAddress,
         merkleRoot: inputs.merkleRoot,
+        audienceHash: inputs.audienceHash,
         recipientCount: inputs.recipientCount,
         cliffSeconds,
         vestingSeconds,
