@@ -13,8 +13,8 @@ import { browser } from '../utils/ssr';
 // This ensures Buffer is available before bb.js loads
 
 import type { Barretenberg } from '@aztec/bb.js';
-import type { MerkleTreeData, MerkleProof, MerkleClaim, Schedule } from '../types';
-import { TREE_DEPTH, MAX_EMAIL_LENGTH } from '../constants';
+import type { HexString, MerkleTreeData, MerkleProof, MerkleClaim, Schedule } from '../types';
+import { TREE_DEPTH, MAX_EMAIL_LENGTH, MAX_AUDIENCE_LENGTH } from '../constants';
 
 // ============================================================================
 // Barretenberg Singleton
@@ -120,6 +120,20 @@ export async function pedersenHashBytes(bytes: Uint8Array): Promise<bigint> {
     const hash = await bb.pedersenHash(fields, 0);
 
     return BigInt(hash.toString());
+}
+
+export function fieldToHex32(value: bigint): HexString {
+    if (value < 0n || value > (1n << 256n) - 1n) {
+        throw new RangeError('field value must fit in 32 bytes');
+    }
+    return `0x${value.toString(16).padStart(64, '0')}` as HexString;
+}
+
+export async function hashAudience(audience: string): Promise<HexString> {
+    if (!audience) throw new Error('Google OAuth client ID is required');
+    return fieldToHex32(
+        await pedersenHashBytes(stringToBytes(audience, MAX_AUDIENCE_LENGTH)),
+    );
 }
 
 /**

@@ -86,12 +86,6 @@ impl JwkRegistryContract {
         Ok(key_hash)
     }
 
-    pub fn register_key_hash(env: Env, kid: String, key_hash: BytesN<32>) -> BytesN<32> {
-        Self::require_owner(&env);
-        Self::store_key(&env, kid, key_hash.clone());
-        key_hash
-    }
-
     fn store_key(env: &Env, kid: String, key_hash: BytesN<32>) {
         if !Self::is_valid_key_hash(env.clone(), key_hash.clone()) {
             let count = Self::key_count(env);

@@ -6,7 +6,7 @@ use crate::{
     sumcheck::verify_sumcheck,
     transcript::generate_transcript,
     types::PAIRING_POINTS_SIZE,
-    utils::{load_proof, load_vk_from_bytes, proof_bytes_for_log_n},
+    utils::{load_proof, load_vk_from_bytes, load_vk_from_bytes_with_hash, proof_bytes_for_log_n},
 };
 use soroban_sdk::{Bytes, Env};
 
@@ -37,6 +37,16 @@ impl UltraHonkVerifier {
         load_vk_from_bytes(vk_bytes)
             .map(|vk| Self::new_with_vk(env, vk))
             .ok_or(VerifyError::InvalidInput("vk parse error"))
+    }
+
+    pub fn new_with_vk_hash(
+        env: &Env,
+        vk_bytes: &Bytes,
+        vk_hash: [u8; 32],
+    ) -> Result<Self, VerifyError> {
+        let vk = load_vk_from_bytes_with_hash(vk_bytes, vk_hash)
+            .ok_or(VerifyError::InvalidInput("vk parse error"))?;
+        Ok(Self::new_with_vk(env, vk))
     }
 
     /// Expose a reference to the parsed VK for debugging/inspection.

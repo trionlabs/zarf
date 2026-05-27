@@ -323,13 +323,14 @@ export async function createAndFundVesting(
         name: string;
         description: string;
         merkleRoot: `0x${string}`;
+        audienceHash: `0x${string}`;
         recipientCount: number;
         totalAmount: bigint;
         metadataCid: string;
     },
     onSubmitted?: (hash: TransactionHash) => void,
 ): Promise<{ hash: TransactionHash; vestingAddress: StellarContractId }> {
-    const predicted = await predictVestingAddress(params.factoryAddress, params.salt);
+    const predicted = await predictVestingAddress(params.factoryAddress, params.owner, params.salt);
     const { hash } = await invoke(
         params.owner,
         params.factoryAddress,
@@ -341,6 +342,7 @@ export async function createAndFundVesting(
             scString(params.name),
             scString(params.description),
             scBytesN32(params.merkleRoot),
+            scBytesN32(params.audienceHash),
             scU32(params.recipientCount),
             scI128(params.totalAmount),
             scString(params.metadataCid),
@@ -352,10 +354,13 @@ export async function createAndFundVesting(
 
 export async function predictVestingAddress(
     _factoryAddress: StellarContractId,
+    owner: StellarAddress,
     salt: `0x${string}`,
 ): Promise<StellarContractId> {
     const indexed = await fetchIndexerJson<IndexerPrediction>(
-        indexerNetworkPath(`/factory/predict/${encodeURIComponent(salt)}`),
+        indexerNetworkPath(
+            `/factory/predict/${encodeURIComponent(owner)}/${encodeURIComponent(salt)}`,
+        ),
     );
     return indexed.address;
 }

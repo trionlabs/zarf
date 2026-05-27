@@ -1,7 +1,7 @@
 use rs_soroban_ultrahonk::UltraHonkVerifierContract;
 use soroban_sdk::{
     testutils::{Address as _, Ledger},
-    token, Address, Bytes, BytesN, Env, String,
+    token, Address, Bytes, BytesN, Env, String, Vec,
 };
 use std::rc::Rc;
 use zarf_jwk_registry::{JwkRegistryContract, JwkRegistryContractClient};
@@ -13,6 +13,7 @@ const PUBKEY_LIMBS: u32 = 18;
 const ROOT_INDEX: u32 = 18;
 const EPOCH_COMMITMENT_INDEX: u32 = 20;
 const AMOUNT_INDEX: u32 = 22;
+const AUDIENCE_HASH_INDEX: u32 = 23;
 
 fn field_at(env: &Env, public_inputs: &Bytes, index: u32) -> BytesN<32> {
     let start = index * FIELD_BYTES;
@@ -21,6 +22,24 @@ fn field_at(env: &Env, public_inputs: &Bytes, index: u32) -> BytesN<32> {
         .slice(start..start + FIELD_BYTES)
         .copy_into_slice(&mut raw);
     BytesN::from_array(env, &raw)
+}
+
+fn bytesn_from_hex(env: &Env, hex: &str) -> BytesN<32> {
+    let hex = hex.trim().strip_prefix("0x").unwrap_or(hex.trim());
+    assert_eq!(hex.len(), 64, "expected 32-byte hex string");
+    let mut raw = [0_u8; 32];
+    for i in 0..32 {
+        raw[i] = u8::from_str_radix(&hex[i * 2..i * 2 + 2], 16).expect("valid hex");
+    }
+    BytesN::from_array(env, &raw)
+}
+
+fn pubkey_limbs(env: &Env, public_inputs: &Bytes) -> Vec<BytesN<32>> {
+    let mut limbs = Vec::new(env);
+    for index in 0..PUBKEY_LIMBS {
+        limbs.push_back(field_at(env, public_inputs, index));
+    }
+    limbs
 }
 
 fn field_to_i128(field: &BytesN<32>) -> i128 {
@@ -75,6 +94,10 @@ fn real_zarf_proof_claims_through_real_ultrahonk_verifier() {
     });
 
     let vk = Bytes::from_slice(&env, include_bytes!("fixtures/zarf-stellar-recipient/vk"));
+    let vk_hash = bytesn_from_hex(
+        &env,
+        include_str!("fixtures/zarf-stellar-recipient/vk_hash.hex"),
+    );
     let proof = Bytes::from_slice(
         &env,
         include_bytes!("fixtures/zarf-stellar-recipient/proof"),
@@ -92,17 +115,17 @@ fn real_zarf_proof_claims_through_real_ultrahonk_verifier() {
     let token_admin = token::StellarAssetClient::new(&env, &token_id);
     let token = token::TokenClient::new(&env, &token_id);
 
-    let verifier_id = env.register(UltraHonkVerifierContract, (vk,));
+    let verifier_id = env.register(UltraHonkVerifierContract, (vk, vk_hash));
     let registry_id = env.register(JwkRegistryContract, (owner.clone(),));
     let registry = JwkRegistryContractClient::new(&env, &registry_id);
 
-    let key_hash = env
-        .crypto()
-        .keccak256(&public_inputs.slice(0..PUBKEY_LIMBS * FIELD_BYTES))
-        .to_bytes();
-    registry.register_key_hash(&String::from_str(&env, "test-key-id"), &key_hash);
+    registry.register_key(
+        &String::from_str(&env, "test-key-id"),
+        &pubkey_limbs(&env, &public_inputs),
+    );
 
     let merkle_root = field_at(&env, &public_inputs, ROOT_INDEX);
+    let audience_hash = field_at(&env, &public_inputs, AUDIENCE_HASH_INDEX);
     let epoch_commitment = field_at(&env, &public_inputs, EPOCH_COMMITMENT_INDEX);
     let amount = field_to_i128(&field_at(&env, &public_inputs, AMOUNT_INDEX));
 
@@ -116,6 +139,7 @@ fn real_zarf_proof_claims_through_real_ultrahonk_verifier() {
             String::from_str(&env, "Zarf"),
             String::from_str(&env, "Real Zarf proof fixture"),
             merkle_root,
+            audience_hash,
             String::from_str(&env, "ipfs://real-zarf-proof-fixture"),
         ),
     );

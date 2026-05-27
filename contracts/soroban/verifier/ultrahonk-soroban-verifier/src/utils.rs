@@ -32,6 +32,7 @@ fn read_bytes<const N: usize>(bytes: &Bytes, idx: &mut u32) -> [u8; N] {
 }
 
 pub fn proof_fields_for_log_n(log_n: usize) -> usize {
+    assert!(is_supported_log_n(log_n), "unsupported proof log_n");
     // bb v2 UltraKeccakHonk proof layout:
     // pairing points + 8 witness commitments + sumcheck + evaluations
     // + Gemini folds/evaluations + Shplonk/KZG commitments.
@@ -46,6 +47,10 @@ pub fn proof_fields_for_log_n(log_n: usize) -> usize {
 
 pub fn proof_bytes_for_log_n(log_n: usize) -> usize {
     proof_fields_for_log_n(log_n) * 32
+}
+
+pub fn is_supported_log_n(log_n: usize) -> bool {
+    log_n > 0 && log_n <= CONST_PROOF_SIZE_LOG_N
 }
 
 /// Load a bb v2 UltraKeccakHonk proof from a byte array.
@@ -137,8 +142,13 @@ pub fn load_proof(proof_bytes: &Bytes, log_n: usize) -> Proof {
     }
 }
 
-/// Load a VerificationKey.
+/// Load a VerificationKey and derive its byte hash with the local Keccak helper.
 pub fn load_vk_from_bytes(bytes: &Bytes) -> Option<VerificationKey> {
+    load_vk_from_bytes_with_hash(bytes, hash32(bytes))
+}
+
+/// Load a VerificationKey with a caller-supplied canonical hash.
+pub fn load_vk_from_bytes_with_hash(bytes: &Bytes, vk_hash: [u8; 32]) -> Option<VerificationKey> {
     const HEADER_WORDS: usize = 3;
     const NUM_POINTS: usize = 28;
     const EXPECTED_LEN: usize = HEADER_WORDS * 32 + NUM_POINTS * 64;
@@ -163,7 +173,17 @@ pub fn load_vk_from_bytes(bytes: &Bytes) -> Option<VerificationKey> {
     let log_circuit_size = read_word_u64(bytes, &mut idx);
     let public_inputs_size = read_word_u64(bytes, &mut idx);
     let public_inputs_offset = read_word_u64(bytes, &mut idx);
+    if log_circuit_size == 0 || log_circuit_size > CONST_PROOF_SIZE_LOG_N as u64 {
+        return None;
+    }
+    if public_inputs_size < PAIRING_POINTS_SIZE as u64 {
+        return None;
+    }
     let circuit_size = 1u64.checked_shl(log_circuit_size as u32)?;
+    let public_inputs_end = public_inputs_offset.checked_add(public_inputs_size)?;
+    if public_inputs_offset >= circuit_size || public_inputs_end > circuit_size {
+        return None;
+    }
 
     let qm = read_point(bytes, &mut idx)?;
     let qc = read_point(bytes, &mut idx)?;
@@ -195,7 +215,7 @@ pub fn load_vk_from_bytes(bytes: &Bytes) -> Option<VerificationKey> {
     let lagrange_last = read_point(bytes, &mut idx)?;
 
     Some(VerificationKey {
-        vk_hash: hash32(bytes),
+        vk_hash,
         circuit_size,
         log_circuit_size,
         public_inputs_size,

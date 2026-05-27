@@ -3,7 +3,6 @@ import tailwindcss from '@tailwindcss/vite';
 import { defineConfig } from 'vite';
 import wasm from 'vite-plugin-wasm';
 import topLevelAwait from 'vite-plugin-top-level-await';
-import { nodePolyfills } from 'vite-plugin-node-polyfills';
 import { viteStaticCopy } from 'vite-plugin-static-copy';
 import { visualizer } from 'rollup-plugin-visualizer';
 import type { Plugin } from 'vite';
@@ -88,11 +87,6 @@ export default defineConfig({
         sveltekit(),
         wasm(),
         topLevelAwait(),
-        nodePolyfills({
-            include: ['crypto', 'stream', 'util', 'events', 'buffer'],
-            globals: { Buffer: 'build', global: false, process: false },
-            protocolImports: true,
-        }),
         viteStaticCopy({
             targets: [
                 { src: '../../packages/core/static/circuits/*', dest: 'circuits' },
@@ -135,6 +129,7 @@ export default defineConfig({
         },
     },
     build: {
+        target: 'esnext',
         commonjsOptions: {
             transformMixedEsModules: true,
         },
@@ -180,10 +175,6 @@ export default defineConfig({
             pinoNamedShim(),
             wasm(),
             topLevelAwait(),
-            nodePolyfills({
-                include: ['buffer', 'crypto', 'stream', 'util', 'events'],
-                globals: { Buffer: 'build', global: false, process: false },
-            }),
         ],
     },
     server: {
@@ -210,7 +201,6 @@ export default defineConfig({
             '@noir-lang/noir_js',
             '@noir-lang/acvm_js',
             '@noir-lang/noirc_abi',
-            /vite-plugin-node-polyfills/,
         ],
     },
     // Global polyfill for "global is not defined" errors

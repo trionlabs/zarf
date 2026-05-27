@@ -5,7 +5,9 @@
 // in ~250 ms — fine for a small smoke suite.
 
 import { describe, expect, it } from 'vitest';
-import { stringToBytes, computeLeaf, computeIdentityCommitment } from './merkleTree';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { stringToBytes, computeLeaf, computeIdentityCommitment, hashAudience } from './merkleTree';
 
 describe('stringToBytes', () => {
     it('encodes ASCII into a fixed-length byte array, zero-padded', () => {
@@ -57,5 +59,23 @@ describe('computeLeaf (golden snapshot)', () => {
         expect(leaf.toString()).toMatchInlineSnapshot(
             `"7673146463851840154926809133587151323101606115910987893633764370302781377969"`,
         );
+    }, 30_000);
+});
+
+describe('Zarf proof fixture public input layout', () => {
+    it('locks the 25-field layout and audience hash index', async () => {
+        const fixtureRoot = resolve(
+            process.cwd(),
+            '../../../contracts/soroban/zarf/vesting/tests/fixtures/zarf-stellar-recipient',
+        );
+        const publicInputs = readFileSync(resolve(fixtureRoot, 'public_inputs'));
+        const metadata = JSON.parse(readFileSync(resolve(fixtureRoot, 'metadata.json'), 'utf8')) as {
+            audience_hash: `0x${string}`;
+        };
+
+        expect(publicInputs).toHaveLength(25 * 32);
+        const audienceHashField = `0x${publicInputs.subarray(23 * 32, 24 * 32).toString('hex')}`;
+        expect(audienceHashField).toBe(metadata.audience_hash);
+        expect(await hashAudience('test-client-id')).toBe(metadata.audience_hash);
     }, 30_000);
 });

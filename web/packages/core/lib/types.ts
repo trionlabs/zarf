@@ -150,6 +150,8 @@ export interface ZKPublicInputs {
     merkleRoot: string; // Merkle root (hex)
     recipient: string; // Recipient field element used by the Stellar circuit
     amount: bigint; // Claimed amount
+    audienceHash: string; // Pedersen hash of JWT audience claim
+    jwtExp: bigint; // JWT expiration timestamp from the signed token
 }
 
 /**
@@ -164,6 +166,8 @@ export interface ZKProof {
     merkleRoot: string;
     recipient: string;
     amount: bigint;
+    audienceHash: string;
+    jwtExp: bigint;
 }
 
 /**

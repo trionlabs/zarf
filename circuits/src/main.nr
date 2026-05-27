@@ -5,17 +5,55 @@ use std::hash::pedersen_hash;
 global MAX_DATA_LENGTH: u32 = 1024;
 // Max email length (e.g., "alice@example.com")
 global MAX_EMAIL_LENGTH: u32 = 64;
+// Max Google OAuth client ID length.
+global MAX_AUDIENCE_LENGTH: u32 = 128;
+// Max accepted issuer length: "https://accounts.google.com"
+global MAX_ISSUER_LENGTH: u32 = 27;
 // Merkle tree depth (supports 2^20 = 1M users)
 global TREE_DEPTH: u32 = 20;
 
-/// Compute Pedersen hash of email bytes (1 byte = 1 Field)
-fn hash_email(email: BoundedVec<u8, MAX_EMAIL_LENGTH>) -> Field {
-    let storage = email.storage();
-    let mut fields: [Field; MAX_EMAIL_LENGTH] = [0; MAX_EMAIL_LENGTH];
-    for i in 0..MAX_EMAIL_LENGTH {
+/// Compute Pedersen hash of bounded bytes (1 byte = 1 Field)
+fn hash_bounded_bytes<let MAX_LENGTH: u32>(value: BoundedVec<u8, MAX_LENGTH>) -> Field {
+    let storage = value.storage();
+    let mut fields: [Field; MAX_LENGTH] = [0; MAX_LENGTH];
+    for i in 0..MAX_LENGTH {
         fields[i] = storage[i] as Field;
     }
     pedersen_hash(fields)
+}
+
+fn google_issuer_full() -> BoundedVec<u8, MAX_ISSUER_LENGTH> {
+    let mut issuer: BoundedVec<u8, MAX_ISSUER_LENGTH> = BoundedVec::new();
+    for byte in "https://accounts.google.com".as_bytes() {
+        issuer.push(byte);
+    }
+    issuer
+}
+
+fn google_issuer_bare() -> BoundedVec<u8, MAX_ISSUER_LENGTH> {
+    let mut issuer: BoundedVec<u8, MAX_ISSUER_LENGTH> = BoundedVec::new();
+    for byte in "accounts.google.com".as_bytes() {
+        issuer.push(byte);
+    }
+    issuer
+}
+
+fn assert_google_issuer(issuer: BoundedVec<u8, MAX_ISSUER_LENGTH>) {
+    assert(
+        (issuer == google_issuer_full()) | (issuer == google_issuer_bare()),
+        "invalid issuer",
+    );
+}
+
+fn assert_expected_audience(
+    actual: BoundedVec<u8, MAX_AUDIENCE_LENGTH>,
+    expected: BoundedVec<u8, MAX_AUDIENCE_LENGTH>,
+) {
+    assert(actual == expected, "invalid audience");
+}
+
+fn assert_verified_email(email_verified: bool) {
+    assert(email_verified == true, "email not verified");
 }
 
 /// Compute leaf hash: pedersen(identity_commitment, amount, unlock_time)
@@ -63,6 +101,7 @@ fn main(
     redc_params_limbs: [u128; 18],
     signature_limbs: [u128; 18],
     expected_email: BoundedVec<u8, MAX_EMAIL_LENGTH>,
+    expected_audience: BoundedVec<u8, MAX_AUDIENCE_LENGTH>,
     // Private inputs - Merkle proof
     amount: Field,
     merkle_siblings: [Field; TREE_DEPTH],
@@ -76,7 +115,7 @@ fn main(
     merkle_root: pub Field,
     // New Public Input for Discrete Vesting (ADR-023)
     unlock_time: pub Field,
-) -> pub (Field, Field, Field) {
+) -> pub (Field, Field, Field, Field, Field) {
     // 1. Initialize and verify the JWT
     let jwt: JWT<MAX_DATA_LENGTH> = JWT::init(
         data,
@@ -87,11 +126,19 @@ fn main(
     );
     jwt.verify();
 
-    // 2. Verify the email claim in JWT matches private expected_email
+    // 2. Verify JWT claims that bind the proof to Google, this app, and a verified email.
+    let issuer: BoundedVec<u8, MAX_ISSUER_LENGTH> = jwt.get_claim_string("iss".as_bytes());
+    assert_google_issuer(issuer);
+    let audience: BoundedVec<u8, MAX_AUDIENCE_LENGTH> = jwt.get_claim_string("aud".as_bytes());
+    assert_expected_audience(audience, expected_audience);
+    let email_verified = jwt.get_claim_bool("email_verified".as_bytes());
+    assert_verified_email(email_verified);
     jwt.assert_claim_string("email".as_bytes(), expected_email);
+    let jwt_exp: u64 = jwt.get_claim_number("exp".as_bytes());
 
     // 3. Compute email hash (intermediate value, NOT exposed publicly)
-    let email_hash = hash_email(expected_email);
+    let email_hash = hash_bounded_bytes(expected_email);
+    let audience_hash = hash_bounded_bytes(expected_audience);
 
     // 4. Compute secret hash (ADR-012)
     let secret_hash = hash_secret(secret);
@@ -110,11 +157,11 @@ fn main(
     let computed_root = verify_merkle_proof(leaf, merkle_siblings, merkle_path_indices);
     assert(computed_root == merkle_root, "Merkle proof verification failed");
 
-    // 8. Return identity_commitment, recipient AND amount as public outputs
+    // 8. Return identity_commitment, recipient, amount, audience_hash, and JWT exp as public outputs
     // identity_commitment replaces email_hash (ADR-012 privacy upgrade)
     // Contract verifies msg.sender == recipient to prevent front-running
-    // Contract needs amount to transfer tokens
-    (identity_commitment, recipient, amount)
+    // Contract needs amount to transfer tokens and JWT claims to bind the proof
+    (identity_commitment, recipient, amount, audience_hash, jwt_exp as Field)
 }
 
 #[test]
@@ -125,9 +172,55 @@ fn test_hash_email() {
     for b in test_bytes {
         email.push(b);
     }
-    let hash = hash_email(email);
+    let hash = hash_bounded_bytes(email);
     // Just check it doesn't panic
     assert(hash != 0);
+}
+
+#[test]
+fn test_google_issuer_accepts_full_and_bare_forms() {
+    assert_google_issuer(google_issuer_full());
+    assert_google_issuer(google_issuer_bare());
+}
+
+#[test(should_fail_with = "invalid issuer")]
+fn test_google_issuer_rejects_unknown_issuer() {
+    let mut issuer: BoundedVec<u8, MAX_ISSUER_LENGTH> = BoundedVec::new();
+    for byte in "https://evil.example.com".as_bytes() {
+        issuer.push(byte);
+    }
+    assert_google_issuer(issuer);
+}
+
+#[test]
+fn test_expected_audience_accepts_exact_match() {
+    let mut actual: BoundedVec<u8, MAX_AUDIENCE_LENGTH> = BoundedVec::new();
+    for byte in "test-client-id".as_bytes() {
+        actual.push(byte);
+    }
+    let mut expected: BoundedVec<u8, MAX_AUDIENCE_LENGTH> = BoundedVec::new();
+    for byte in "test-client-id".as_bytes() {
+        expected.push(byte);
+    }
+    assert_expected_audience(actual, expected);
+}
+
+#[test(should_fail_with = "invalid audience")]
+fn test_expected_audience_rejects_mismatch() {
+    let mut actual: BoundedVec<u8, MAX_AUDIENCE_LENGTH> = BoundedVec::new();
+    for byte in "wrong-client-id".as_bytes() {
+        actual.push(byte);
+    }
+    let mut expected: BoundedVec<u8, MAX_AUDIENCE_LENGTH> = BoundedVec::new();
+    for byte in "test-client-id".as_bytes() {
+        expected.push(byte);
+    }
+    assert_expected_audience(actual, expected);
+}
+
+#[test(should_fail_with = "email not verified")]
+fn test_email_verified_rejects_false() {
+    assert_verified_email(false);
 }
 
 #[test]
@@ -148,7 +241,7 @@ fn test_identity_commitment() {
         email.push(b);
     }
     
-    let email_hash = hash_email(email);
+    let email_hash = hash_bounded_bytes(email);
     let secret: Field = 98765432;
     let secret_hash = hash_secret(secret);
     
@@ -167,7 +260,7 @@ fn test_identity_unlinkability() {
         email.push(b);
     }
     
-    let email_hash = hash_email(email);
+    let email_hash = hash_bounded_bytes(email);
     
     // Two different secrets
     let secret1: Field = 11111111;

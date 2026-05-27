@@ -13,6 +13,7 @@ AMOUNT=${AMOUNT:-1000}
 RECIPIENT_COUNT=${RECIPIENT_COUNT:-1}
 UNLOCK_TIME=${UNLOCK_TIME:-0}
 SECRET=${SECRET:-0x586b396d5032714c}
+AUDIENCE=${AUDIENCE:-test-client-id}
 METADATA_CID=${METADATA_CID:-ipfs://zarf-stellar-factory-e2e}
 SALT=${SALT:-$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")}
 
@@ -22,9 +23,24 @@ VESTING_WASM="$ZARF_DIR/vesting/target/wasm32v1-none/release/zarf_vesting_soroba
 FACTORY_WASM="$ZARF_DIR/factory/target/wasm32v1-none/release/zarf_vesting_factory_soroban.wasm"
 PROOF_SCRIPT="$ROOT_DIR/poc/scripts/generateZarfProofForStellar.js"
 VK_PATH=${VK_PATH:-$VERIFIER_DIR/tests/zarf/target/vk}
+VK_HASH_PATH=${VK_HASH_PATH:-$VERIFIER_DIR/tests/zarf/target/vk_hash}
 
 last_nonempty_line() {
   awk 'NF { line = $0 } END { print line }'
+}
+
+read_vk_hash() {
+  local path="$1"
+  if [[ -f "$path" ]]; then
+    xxd -p -c 256 "$path"
+  elif [[ -f "$path.hex" ]]; then
+    tr -d '\n' <"$path.hex" | sed 's/^0x//'
+  elif [[ -f "$(dirname "$path")/../vk_hash.hex" ]]; then
+    tr -d '\n' <"$(dirname "$path")/../vk_hash.hex" | sed 's/^0x//'
+  else
+    echo "Missing VK hash at $path or matching .hex sidecar" >&2
+    return 1
+  fi
 }
 
 json_field() {
@@ -41,13 +57,15 @@ TOKEN_ID=$(stellar contract id asset --asset native --network "$NETWORK")
 
 if [[ -z "${VERIFIER_ID:-}" ]]; then
   echo "Deploying UltraHonk verifier..."
+  VK_HASH=$(read_vk_hash "$VK_HASH_PATH")
   VERIFIER_ID=$(
     stellar contract deploy \
       --wasm "$VERIFIER_WASM" \
       --source "$SOURCE" \
       --network "$NETWORK" \
       -- \
-      --vk_bytes-file-path "$VK_PATH" | last_nonempty_line
+      --vk_bytes-file-path "$VK_PATH" \
+      --vk_hash "$VK_HASH" | last_nonempty_line
   )
 fi
 
@@ -100,23 +118,28 @@ node "$PROOF_SCRIPT" \
   --out-dir "$OUT_DIR" \
   --amount "$AMOUNT" \
   --unlock-time "$UNLOCK_TIME" \
+  --audience "$AUDIENCE" \
   --secret "$SECRET"
 
 ROOT=$(json_field merkle_root)
-KEY_HASH=$(json_field key_hash)
+AUDIENCE_HASH=$(json_field audience_hash)
 EPOCH=$(json_field epoch_commitment)
 ROOT_BYTES=${ROOT#0x}
-KEY_HASH_BYTES=${KEY_HASH#0x}
+AUDIENCE_HASH_BYTES=${AUDIENCE_HASH#0x}
 EPOCH_BYTES=${EPOCH#0x}
+PUBKEY_LIMBS=$(
+  node -e "const fs=require('fs'); const b=fs.readFileSync(process.argv[1]); const limbs=[]; for (let i=0;i<18;i++) limbs.push(b.subarray(i*32,(i+1)*32).toString('hex')); console.log(JSON.stringify(limbs));" \
+    "$OUT_DIR/public_inputs"
+)
 
-echo "Registering proof JWK key hash..."
+echo "Registering proof JWK public key..."
 stellar contract invoke \
   --id "$REGISTRY_ID" \
   --source "$SOURCE" \
   --network "$NETWORK" \
-  -- register_key_hash \
+  -- register_key \
   --kid '"test-key-id"' \
-  --key_hash "$KEY_HASH_BYTES"
+  --pubkey_limbs "$PUBKEY_LIMBS"
 
 LATEST_LEDGER=$(stellar ledger latest --network "$NETWORK" | awk '/Sequence:/ { print $2 }')
 EXPIRATION_LEDGER=$((LATEST_LEDGER + 5000))
@@ -145,6 +168,7 @@ VESTING_ID=$(
     --name '"Zarf"' \
     --description '"Zarf Stellar factory e2e"' \
     --merkle_root "$ROOT_BYTES" \
+    --audience_hash "$AUDIENCE_HASH_BYTES" \
     --recipient_count "$RECIPIENT_COUNT" \
     --total_amount "$AMOUNT" \
     --metadata_cid "\"$METADATA_CID\"" | last_nonempty_line | tr -d '"'

@@ -19,6 +19,6 @@
     "buffer": "^6.0.3",
     "clsx": "^2.1.1",
     "lucide-svelte": "^0.563.0",
-    "tailwind-merge": "^3.4.0"
+    "tailwind-merge": "^3.6.0"
   }
 }

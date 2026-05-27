@@ -1,11 +1,15 @@
 use soroban_sdk::{testutils::Address as _, Address, BytesN, Env, String, Vec};
-use zarf_jwk_registry::{JwkRegistryContract, JwkRegistryContractClient};
+use zarf_jwk_registry::{Error as RegistryError, JwkRegistryContract, JwkRegistryContractClient};
 
 fn limbs(env: &Env) -> Vec<BytesN<32>> {
+    limbs_with_len(env, 18)
+}
+
+fn limbs_with_len(env: &Env, len: u32) -> Vec<BytesN<32>> {
     let mut limbs = Vec::new(env);
-    for i in 0..18 {
+    for i in 0..len {
         let mut raw = [0_u8; 32];
-        raw[31] = i + 1;
+        raw[31] = (i + 1) as u8;
         limbs.push_back(BytesN::from_array(env, &raw));
     }
     limbs
@@ -39,24 +43,6 @@ fn owner_can_register_and_revoke_key() {
 }
 
 #[test]
-fn owner_can_register_precomputed_key_hash() {
-    let env = Env::default();
-    env.mock_all_auths();
-
-    let owner = Address::generate(&env);
-    let id = env.register(JwkRegistryContract, (owner.clone(),));
-    let client = JwkRegistryContractClient::new(&env, &id);
-    let kid = String::from_str(&env, "google-key-hash");
-    let key_hash = BytesN::from_array(&env, &[42_u8; 32]);
-
-    let registered = client.register_key_hash(&kid, &key_hash);
-    assert_eq!(registered, key_hash);
-    assert!(client.is_valid_key_hash(&key_hash));
-    assert!(client.is_kid_registered(&kid));
-    assert_eq!(client.get_registered_key_count(), 1);
-}
-
-#[test]
 fn key_mutations_require_owner_auth_without_mock_all_auths() {
     let env = Env::default();
 
@@ -71,9 +57,25 @@ fn key_mutations_require_owner_auth_without_mock_all_auths() {
     assert!(!client.is_valid_key_hash(&key_hash));
     assert!(!client.is_kid_registered(&kid));
     assert_eq!(client.get_registered_key_count(), 0);
+}
 
-    assert!(client.try_register_key_hash(&kid, &key_hash).is_err());
-    assert!(!client.is_valid_key_hash(&key_hash));
-    assert!(!client.is_kid_registered(&kid));
-    assert_eq!(client.get_registered_key_count(), 0);
+#[test]
+fn register_key_rejects_wrong_limb_lengths_without_state_changes() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let owner = Address::generate(&env);
+    let id = env.register(JwkRegistryContract, (owner.clone(),));
+    let client = JwkRegistryContractClient::new(&env, &id);
+
+    for (kid, len) in [("short-key", 17_u32), ("long-key", 19_u32)] {
+        let result =
+            client.try_register_key(&String::from_str(&env, kid), &limbs_with_len(&env, len));
+        match result {
+            Err(Ok(RegistryError::InvalidKeyLength)) => {}
+            other => panic!("unexpected key length result for {kid}: {:?}", other),
+        }
+        assert!(!client.is_kid_registered(&String::from_str(&env, kid)));
+        assert_eq!(client.get_registered_key_count(), 0);
+    }
 }

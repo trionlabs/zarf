@@ -8,6 +8,7 @@
 
 export const PIN_LENGTH = 8;
 export const MAX_EMAIL_LENGTH = 64;
+export const MAX_AUDIENCE_LENGTH = 128;
 
 // ===================================
 // ZK / Crypto Constants

@@ -29,6 +29,7 @@ export interface FactoryDeployConfig {
     factoryAddress: StellarContractId;
     tokenAddress: StellarContractId;
     merkleRoot: HexString;
+    audienceHash: HexString;
     recipientCount: number;
     totalAmount: bigint;
     owner: StellarAddress;
@@ -166,6 +167,7 @@ export class FactoryDeployService {
                         name: this.config.name,
                         description: this.config.description,
                         merkleRoot: this.config.merkleRoot,
+                        audienceHash: this.config.audienceHash,
                         recipientCount: this.config.recipientCount,
                         totalAmount: this.config.totalAmount,
                         metadataCid: this.config.metadataCid,

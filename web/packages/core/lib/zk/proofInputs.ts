@@ -6,8 +6,13 @@
  * behavior (including byte layout) is exactly what was inlined before.
  */
 
-import { TREE_DEPTH, MAX_EMAIL_LENGTH, MAX_SIGNED_DATA_LENGTH } from '../constants';
-export { TREE_DEPTH, MAX_EMAIL_LENGTH, MAX_SIGNED_DATA_LENGTH };
+import {
+    TREE_DEPTH,
+    MAX_EMAIL_LENGTH,
+    MAX_AUDIENCE_LENGTH,
+    MAX_SIGNED_DATA_LENGTH,
+} from '../constants';
+export { TREE_DEPTH, MAX_EMAIL_LENGTH, MAX_AUDIENCE_LENGTH, MAX_SIGNED_DATA_LENGTH };
 
 /**
  * Result of `noir-jwt`'s `generateInputs`. Treated as an opaque
@@ -40,6 +45,8 @@ export interface ClaimData {
     recipient: string;
     /** Hex string '0x...' (ADR-023) */
     unlockTime: string;
+    /** Google OAuth client ID expected in the JWT `aud` claim. */
+    audience: string;
 }
 
 /**
@@ -124,7 +131,8 @@ export function padEmail(email: string, length: number = MAX_EMAIL_LENGTH) {
  * value place to lock down with characterization tests.
  */
 export function buildCircuitInputs(claimData: ClaimData, jwtInputs: NoirJwtResult) {
-    const { email, salt, amount, merkleProof, merkleRoot, recipient, unlockTime } = claimData;
+    const { email, salt, amount, merkleProof, merkleRoot, recipient, unlockTime, audience } =
+        claimData;
     const { siblings, indices } = padMerkleProof(merkleProof.siblings, merkleProof.indices);
     const expected_email = padEmail(email);
 
@@ -138,6 +146,7 @@ export function buildCircuitInputs(claimData: ClaimData, jwtInputs: NoirJwtResul
         redc_params_limbs: jwtInputs.redc_params_limbs,
         signature_limbs: jwtInputs.signature_limbs,
         expected_email,
+        expected_audience: padEmail(audience, MAX_AUDIENCE_LENGTH),
         // Merkle proof data
         // Hash Chain secret is ALREADY a field element hex string.
         secret: salt,

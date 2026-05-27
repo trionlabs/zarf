@@ -2,6 +2,32 @@ use soroban_sdk::{testutils::Ledger, Bytes, Env};
 use std::{fs, path::Path};
 use ultrahonk_soroban_verifier::UltraHonkVerifier;
 
+fn parse_hash_hex(hex: &str) -> Result<[u8; 32], String> {
+    let hex = hex.trim().strip_prefix("0x").unwrap_or(hex.trim());
+    if hex.len() != 64 {
+        return Err("vk_hash hex must be 32 bytes".to_string());
+    }
+    let mut out = [0_u8; 32];
+    for i in 0..32 {
+        out[i] = u8::from_str_radix(&hex[i * 2..i * 2 + 2], 16).map_err(|e| e.to_string())?;
+    }
+    Ok(out)
+}
+
+fn read_vk_hash(path: &Path) -> Result<[u8; 32], String> {
+    if let Ok(bytes) = fs::read(path.join("vk_hash")) {
+        return bytes
+            .try_into()
+            .map_err(|_| "vk_hash must be 32 bytes".to_string());
+    }
+    let hex_path = path
+        .parent()
+        .ok_or_else(|| "missing vk_hash path parent".to_string())?
+        .join("vk_hash.hex");
+    let hex = fs::read_to_string(hex_path).map_err(|e| e.to_string())?;
+    parse_hash_hex(&hex)
+}
+
 fn run(dir: &str) -> Result<(), String> {
     let path = Path::new(dir);
     let env = Env::default();
@@ -15,7 +41,9 @@ fn run(dir: &str) -> Result<(), String> {
     // Use binary VK
     let vk_bytes = fs::read(path.join("vk")).map_err(|e| e.to_string())?;
     let vk = Bytes::from_slice(&env, &vk_bytes);
-    let verifier = UltraHonkVerifier::new(&env, &vk).map_err(|e| format!("{e:?}"))?;
+    let vk_hash = read_vk_hash(path)?;
+    let verifier =
+        UltraHonkVerifier::new_with_vk_hash(&env, &vk, vk_hash).map_err(|e| format!("{e:?}"))?;
 
     // Public inputs bytes
     let public_inputs = fs::read(path.join("public_inputs")).map_err(|e| e.to_string())?;

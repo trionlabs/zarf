@@ -9,6 +9,7 @@ const basePayload: JWTPayload = {
     exp: 9999999999,
     iat: 1700000000,
     sub: '1234567890',
+    email_verified: true,
     nonce: 'nonce-abc',
 };
 
@@ -99,6 +100,28 @@ describe('validateGoogleClaims — issuer + audience (both modes)', () => {
                 expectedNonce: 'nonce-abc',
             }),
         ).toThrow(/audience does not match/);
+    });
+
+    it('rejects unverified emails', () => {
+        const unverified = { ...basePayload, email_verified: false };
+        expect(() =>
+            validateGoogleClaims(unverified, {
+                clientId,
+                mode: 'callback',
+                expectedNonce: 'nonce-abc',
+            }),
+        ).toThrow(/email is not verified/);
+    });
+
+    it('rejects expired tokens', () => {
+        const expired = { ...basePayload, exp: 1 };
+        expect(() =>
+            validateGoogleClaims(expired, {
+                clientId,
+                mode: 'callback',
+                expectedNonce: 'nonce-abc',
+            }),
+        ).toThrow(/expired/);
     });
 });
 

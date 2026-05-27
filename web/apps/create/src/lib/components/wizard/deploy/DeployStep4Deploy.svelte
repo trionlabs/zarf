@@ -94,6 +94,9 @@
         let config: ReturnType<typeof planDeploy>;
         try {
             const factoryInputs = buildFactoryDeployInputs(merkleResult.claims, merkleResult.root);
+            const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID ?? '';
+            const { hashAudience } = await import('@zarf/core/crypto/merkleTree');
+            const audienceHash = await hashAudience(clientId);
 
             // Pinning is done in Step 1 (Prepare). If the CID is missing
             // here, the user shouldn't have been allowed past that step.
@@ -116,6 +119,7 @@
                     schedule: distribution.schedule,
                     totalAmount: parseTokenAmount(String(distribution.amount), tokenDecimals),
                     merkleRoot: factoryInputs.merkleRoot,
+                    audienceHash,
                     recipientCount: factoryInputs.recipientCount,
                     allocationsTotal: factoryInputs.totalAllocation,
                     metadataCid,

@@ -145,11 +145,12 @@ export default {
                 return handleLatestLedger(cfg, corsHeaders);
             }
 
-            if (parts.length === 5 && parts[2] === 'factory' && parts[3] === 'predict') {
+            if (parts.length === 6 && parts[2] === 'factory' && parts[3] === 'predict') {
                 const network = decodeSegment(parts[1]);
                 const cfg = getNetworkConfig(env, network);
-                const salt = decodeSegment(parts[4]);
-                return handlePredictVestingAddress(salt, cfg, corsHeaders);
+                const owner = decodeSegment(parts[4]);
+                const salt = decodeSegment(parts[5]);
+                return handlePredictVestingAddress(owner, salt, cfg, corsHeaders);
             }
 
             if (parts.length >= 3 && parts[2] === 'vestings') {
@@ -302,15 +303,17 @@ async function handleLatestLedger(
 }
 
 async function handlePredictVestingAddress(
+    owner: string,
     salt: string,
     cfg: NetworkConfig,
     corsHeaders: Record<string, string>,
 ): Promise<Response> {
+    assertAddress(owner, 'owner');
     validateHex32(salt, 'salt');
 
     return json(
         {
-            address: await predictVestingAddress(cfg, salt),
+            address: await predictVestingAddress(cfg, owner, salt),
             fetchedAt: Date.now(),
         },
         200,
@@ -557,8 +560,9 @@ async function isEpochClaimed(
     return Boolean(scValToNative(result));
 }
 
-async function predictVestingAddress(cfg: NetworkConfig, salt: string): Promise<string> {
+async function predictVestingAddress(cfg: NetworkConfig, owner: string, salt: string): Promise<string> {
     const result = await simulate(cfg, cfg.factoryAddress, 'predict_vesting_address', [
+        scAddress(owner),
         scBytesN32(salt),
     ]);
     return StellarSdkAddress.fromScVal(result).toString();

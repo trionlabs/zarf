@@ -92,8 +92,20 @@ function terminateWorker() {
     }
 }
 
+function decodeJwtPayload(jwt: string): { aud?: unknown; exp?: unknown } {
+    const parts = jwt.split('.');
+    if (parts.length !== 3) throw new Error(`Invalid JWT format: expected 3 parts, got ${parts.length}`);
+    const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const padded = base64.padEnd(Math.ceil(base64.length / 4) * 4, '=');
+    return JSON.parse(atob(padded)) as { aud?: unknown; exp?: unknown };
+}
+
 /** Convert a domain ZKClaimData (bigints) into the wire shape the worker expects (hex strings). */
-function toWireClaimData(c: ZKClaimData): ClaimData {
+function toWireClaimData(c: ZKClaimData, jwt: string): ClaimData {
+    const payload = decodeJwtPayload(jwt);
+    if (typeof payload.aud !== 'string' || payload.aud.length === 0) {
+        throw new Error('JWT audience claim is missing');
+    }
     return {
         email: c.email,
         salt: c.salt,
@@ -105,6 +117,7 @@ function toWireClaimData(c: ZKClaimData): ClaimData {
         merkleRoot: '0x' + c.merkleRoot.toString(16),
         recipient: c.recipient,
         unlockTime: '0x' + c.unlockTime.toString(16),
+        audience: payload.aud,
     };
 }
 
@@ -141,7 +154,7 @@ export async function generateClaimProof(
             payload: {
                 jwt,
                 publicKey,
-                claimData: toWireClaimData(claimData),
+                claimData: toWireClaimData(claimData, jwt),
             },
         });
     });

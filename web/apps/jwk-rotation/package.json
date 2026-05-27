@@ -11,12 +11,12 @@
   },
   "dependencies": {
     "@noble/hashes": "^1.8.0",
-    "@stellar/stellar-sdk": "^15.0.1",
+    "@stellar/stellar-sdk": "^15.1.0",
     "buffer": "^6.0.3"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20251218.0",
+    "@cloudflare/workers-types": "^4.20260527.1",
     "typescript": "^5.9.3",
-    "wrangler": "^4.61.0"
+    "wrangler": "^4.95.0"
   }
 }
