@@ -16,6 +16,7 @@ poc/public/circuits/zarf.json
 
 # contracts
 contracts/soroban/**/target/
+test_snapshots/
 
 # notes, backlogs, docs & ai
 docs/
