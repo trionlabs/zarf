@@ -283,6 +283,13 @@ importers:
         version: 4.61.0(@cloudflare/workers-types@4.20260128.0)
 
   apps/pin-proxy:
+    dependencies:
+      '@stellar/stellar-sdk':
+        specifier: ^15.0.1
+        version: 15.0.1
+      buffer:
+        specifier: ^6.0.3
+        version: 6.0.3
     devDependencies:
       '@cloudflare/workers-types':
         specifier: ^4.20251218.0

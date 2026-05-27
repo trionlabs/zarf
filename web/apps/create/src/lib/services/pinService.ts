@@ -10,6 +10,8 @@
 
 import type { ClaimListJson } from '@zarf/core/domain/claimListBuilder';
 import { serializeClaimList } from '@zarf/core/domain/claimListBuilder';
+import { signMessage } from '@zarf/core/contracts/wallet';
+import type { StellarAddress } from '@zarf/core/types';
 
 export class PinError extends Error {
     constructor(
@@ -27,6 +29,12 @@ interface PinResponse {
 }
 
 const DEFAULT_TIMEOUT_MS = 20_000;
+const PIN_AUTH_VERSION = 'zarf-pin-v1';
+
+interface PinClaimListOptions {
+    owner: StellarAddress;
+    timeoutMs?: number;
+}
 
 function getProxyUrl(): string {
     const url = import.meta.env.VITE_PIN_PROXY_URL;
@@ -36,7 +44,55 @@ function getProxyUrl(): string {
     return url.replace(/\/+$/, '');
 }
 
-async function postPin(body: string, timeoutMs: number): Promise<PinResponse> {
+function bytesToHex(bytes: ArrayBuffer): string {
+    return Array.from(new Uint8Array(bytes))
+        .map((b) => b.toString(16).padStart(2, '0'))
+        .join('');
+}
+
+async function sha256Hex(value: string): Promise<string> {
+    return bytesToHex(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value)));
+}
+
+function buildPinAuthMessage(input: {
+    owner: StellarAddress;
+    merkleRoot: string;
+    bodyHash: string;
+    issuedAt: number;
+}): string {
+    return [
+        PIN_AUTH_VERSION,
+        `owner:${input.owner}`,
+        `merkleRoot:${input.merkleRoot}`,
+        `bodyHash:${input.bodyHash}`,
+        `issuedAt:${input.issuedAt}`,
+    ].join('\n');
+}
+
+async function buildAuthHeaders(doc: ClaimListJson, body: string, owner: StellarAddress) {
+    const issuedAt = Date.now();
+    const bodyHash = await sha256Hex(body);
+    const message = buildPinAuthMessage({
+        owner,
+        merkleRoot: doc.merkleRoot,
+        bodyHash,
+        issuedAt,
+    });
+    const signature = await signMessage(message, owner);
+
+    return {
+        'X-Zarf-Owner': owner,
+        'X-Zarf-Issued-At': String(issuedAt),
+        'X-Zarf-Body-SHA256': bodyHash,
+        'X-Zarf-Signature': signature,
+    };
+}
+
+async function postPin(
+    body: string,
+    timeoutMs: number,
+    authHeaders: Record<string, string>,
+): Promise<PinResponse> {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -44,7 +100,7 @@ async function postPin(body: string, timeoutMs: number): Promise<PinResponse> {
     try {
         res = await fetch(`${getProxyUrl()}/pin`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', ...authHeaders },
             body,
             signal: controller.signal,
         });
@@ -88,18 +144,19 @@ async function postPin(body: string, timeoutMs: number): Promise<PinResponse> {
  */
 export async function pinClaimList(
     doc: ClaimListJson,
-    opts: { timeoutMs?: number } = {},
+    opts: PinClaimListOptions,
 ): Promise<{ cid: string }> {
     const body = serializeClaimList(doc);
     const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+    const authHeaders = await buildAuthHeaders(doc, body, opts.owner);
 
     try {
-        const res = await postPin(body, timeoutMs);
+        const res = await postPin(body, timeoutMs, authHeaders);
         return { cid: res.cid };
     } catch (err) {
         if (!(err instanceof PinError)) throw err;
         // Single retry on transient failure
-        const res = await postPin(body, timeoutMs);
+        const res = await postPin(body, timeoutMs, authHeaders);
         return { cid: res.cid };
     }
 }

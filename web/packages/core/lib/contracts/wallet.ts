@@ -59,6 +59,15 @@ function normalizeNetworkName(name?: string, passphrase?: string): string {
     return 'CUSTOM';
 }
 
+function bytesToBase64(bytes: Uint8Array): string {
+    let binary = '';
+    const chunkSize = 0x8000;
+    for (let i = 0; i < bytes.length; i += chunkSize) {
+        binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+    }
+    return btoa(binary);
+}
+
 export function formatAddress(address: string): string {
     if (!address) return '';
     return `${address.slice(0, 6)}...${address.slice(-6)}`;
@@ -196,4 +205,24 @@ export async function signTransaction(xdr: string, address: StellarAddress): Pro
     if (result.error) throw new Error(freighterErrorMessage(result.error));
     if (!result.signedTxXdr) throw new Error('Freighter did not return a signed transaction.');
     return result.signedTxXdr;
+}
+
+export async function signMessage(message: string, address: StellarAddress): Promise<string> {
+    assertBrowser();
+    const cfg = getStellarConfig();
+    const fr = await loadFreighter();
+    const result = await fr.signMessage(message, {
+        address,
+        networkPassphrase: cfg.networkPassphrase,
+    });
+
+    if (result.error) throw new Error(freighterErrorMessage(result.error));
+    if (!result.signedMessage) throw new Error('Freighter did not return a signed message.');
+    if (result.signerAddress && result.signerAddress !== address) {
+        throw new Error('Freighter signed with a different Stellar address.');
+    }
+
+    return typeof result.signedMessage === 'string'
+        ? result.signedMessage
+        : bytesToBase64(result.signedMessage);
 }
