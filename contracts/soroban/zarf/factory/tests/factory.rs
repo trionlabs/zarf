@@ -1,5 +1,7 @@
 use soroban_sdk::{testutils::Address as _, token, Address, BytesN, Env, String};
-use zarf_vesting_factory_soroban::{ZarfVestingFactoryContract, ZarfVestingFactoryContractClient};
+use zarf_vesting_factory_soroban::{
+    Error as FactoryError, ZarfVestingFactoryContract, ZarfVestingFactoryContractClient,
+};
 
 const VESTING_WASM: &[u8] =
     include_bytes!("../../vesting/target/wasm32v1-none/release/zarf_vesting_soroban.wasm");
@@ -139,4 +141,103 @@ fn create_and_fund_vesting_consumes_factory_allowance() {
     assert_eq!(token_client.balance(&vesting), amount);
     assert_eq!(factory.get_deployment_count(), 1);
     assert_eq!(factory.get_deployment(&0), vesting);
+}
+
+#[test]
+fn failed_funding_does_not_track_deployment() {
+    let env = Env::default();
+    let (factory, _factory_id, _verifier, _registry, token_id) = setup(&env);
+
+    let owner = Address::generate(&env);
+    let amount = 500_i128;
+    let token_admin = token::StellarAssetClient::new(&env, &token_id);
+    let token_client = token::TokenClient::new(&env, &token_id);
+    token_admin.mint(&owner, &amount);
+
+    let salt = test_salt(&env, 11);
+    let root = BytesN::from_array(&env, &[10_u8; 32]);
+    let predicted = factory.predict_vesting_address(&salt);
+    let result = factory.try_create_and_fund_vesting(
+        &owner,
+        &token_id,
+        &salt,
+        &String::from_str(&env, "Funded Zarf"),
+        &String::from_str(&env, "Factory deployed and funded"),
+        &root,
+        &1,
+        &amount,
+        &String::from_str(&env, "ipfs://funded"),
+    );
+
+    assert!(
+        result.is_err(),
+        "funding without allowance unexpectedly succeeded"
+    );
+    assert_eq!(token_client.balance(&owner), amount);
+    assert_eq!(token_client.balance(&predicted), 0);
+    assert_eq!(factory.get_deployment_count(), 0);
+    assert!(factory.try_get_deployment(&0).is_err());
+    assert!(factory.try_vesting_metadata_cid(&predicted).is_err());
+}
+
+#[test]
+fn invalid_factory_metadata_rejects_without_tracking() {
+    let env = Env::default();
+    let (factory, _factory_id, _verifier, _registry, token_id) = setup(&env);
+
+    let owner = Address::generate(&env);
+    let salt = test_salt(&env, 12);
+    let root = BytesN::from_array(&env, &[10_u8; 32]);
+    let result = factory.try_create_vesting(
+        &owner,
+        &token_id,
+        &salt,
+        &String::from_str(&env, "Zarf"),
+        &String::from_str(&env, "Factory deployed"),
+        &root,
+        &0,
+        &300,
+        &String::from_str(&env, "ipfs://metadata"),
+    );
+
+    match result {
+        Err(Ok(FactoryError::InvalidRecipientCount)) => {}
+        other => panic!("unexpected invalid metadata result: {:?}", other),
+    }
+    assert_eq!(factory.get_deployment_count(), 0);
+}
+
+#[test]
+fn create_vesting_requires_owner_auth_without_mock_all_auths() {
+    let env = Env::default();
+
+    let verifier = Address::generate(&env);
+    let registry = Address::generate(&env);
+    let owner = Address::generate(&env);
+    let token_asset = env.register_stellar_asset_contract_v2(owner.clone());
+    let token_id = token_asset.address();
+    let vesting_wasm_hash = env.deployer().upload_contract_wasm(VESTING_WASM);
+    let factory_id = env.register(
+        ZarfVestingFactoryContract,
+        (verifier, registry, vesting_wasm_hash),
+    );
+    let factory = ZarfVestingFactoryContractClient::new(&env, &factory_id);
+
+    let result = factory.try_create_vesting(
+        &owner,
+        &token_id,
+        &test_salt(&env, 13),
+        &String::from_str(&env, "Zarf"),
+        &String::from_str(&env, "Factory deployed"),
+        &BytesN::from_array(&env, &[8_u8; 32]),
+        &1,
+        &300,
+        &String::from_str(&env, "ipfs://metadata"),
+    );
+
+    assert!(
+        result.is_err(),
+        "unauthenticated create unexpectedly succeeded"
+    );
+    assert_eq!(factory.get_deployment_count(), 0);
 }

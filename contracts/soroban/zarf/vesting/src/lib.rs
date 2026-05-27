@@ -14,6 +14,10 @@ const UNLOCK_TIME_INDEX: u32 = PUBKEY_LIMBS + 1;
 const EPOCH_COMMITMENT_INDEX: u32 = PUBKEY_LIMBS + 2;
 const RECIPIENT_INDEX: u32 = PUBKEY_LIMBS + 3;
 const AMOUNT_INDEX: u32 = PUBKEY_LIMBS + 4;
+const BN254_SCALAR_MODULUS: [u8; 32] = [
+    0x30, 0x64, 0x4e, 0x72, 0xe1, 0x31, 0xa0, 0x29, 0xb8, 0x50, 0x45, 0xb6, 0x81, 0x81, 0x58, 0x5d,
+    0x28, 0x33, 0xe8, 0x48, 0x79, 0xb9, 0x70, 0x91, 0x43, 0xe1, 0xf5, 0x93, 0xf0, 0x00, 0x00, 0x01,
+];
 
 #[contract]
 pub struct ZarfVestingContract;
@@ -32,6 +36,8 @@ pub enum Error {
     InvalidPublicInputs = 8,
     InvalidAmount = 9,
     NotInitialized = 10,
+    MerkleRootAlreadySet = 11,
+    MerkleRootFunded = 12,
 }
 
 #[contracttype]
@@ -176,6 +182,25 @@ impl ZarfVestingContract {
 
     pub fn set_merkle_root(env: Env, merkle_root: BytesN<32>) -> Result<(), Error> {
         Self::require_owner(&env)?;
+        if Self::is_zero_root(&merkle_root) {
+            return Err(Error::InvalidMerkleRoot);
+        }
+        if !Self::is_canonical_field(&merkle_root) {
+            return Err(Error::InvalidMerkleRoot);
+        }
+
+        let current_root = Self::get_instance::<BytesN<32>>(&env, DataKey::MerkleRoot)?;
+        if !Self::is_zero_root(&current_root) {
+            return Err(Error::MerkleRootAlreadySet);
+        }
+
+        let token_address = Self::get_instance::<Address>(&env, DataKey::Token)?;
+        let contract_address = env.current_contract_address();
+        let balance = token::TokenClient::new(&env, &token_address).balance(&contract_address);
+        if balance > 0 {
+            return Err(Error::MerkleRootFunded);
+        }
+
         env.storage()
             .instance()
             .set(&DataKey::MerkleRoot, &merkle_root);
@@ -188,6 +213,10 @@ impl ZarfVestingContract {
             return Err(Error::InvalidAmount);
         }
         let owner = Self::require_owner(&env)?;
+        let merkle_root = Self::get_instance::<BytesN<32>>(&env, DataKey::MerkleRoot)?;
+        if Self::is_zero_root(&merkle_root) {
+            return Err(Error::InvalidMerkleRoot);
+        }
         let token_address = Self::get_instance::<Address>(&env, DataKey::Token)?;
         let contract_address = env.current_contract_address();
         token::TokenClient::new(&env, &token_address).transfer_from(
@@ -222,6 +251,7 @@ impl ZarfVestingContract {
         if public_inputs.len() != PUBLIC_INPUT_FIELDS * FIELD_BYTES {
             return Err(Error::InvalidPublicInputs);
         }
+        Self::validate_public_inputs_canonical(&env, &public_inputs)?;
 
         let key_hash = Self::pubkey_hash_from_public_inputs(&env, &public_inputs);
         if !Self::registry_has_key(&env, key_hash)? {
@@ -252,11 +282,17 @@ impl ZarfVestingContract {
         }
 
         let amount = Self::field_to_i128(&Self::field_at(&env, &public_inputs, AMOUNT_INDEX)?)?;
-        Self::verify_proof(&env, public_inputs, proof)?;
 
         env.storage()
             .persistent()
             .set(&DataKey::Claimed(epoch_commitment.clone()), &true);
+
+        if let Err(error) = Self::verify_proof(&env, public_inputs, proof) {
+            env.storage()
+                .persistent()
+                .set(&DataKey::Claimed(epoch_commitment), &false);
+            return Err(error);
+        }
 
         let token_address = Self::get_instance::<Address>(&env, DataKey::Token)?;
         let to: MuxedAddress = (&recipient).into();
@@ -289,6 +325,33 @@ impl ZarfVestingContract {
         let owner = Self::get_instance::<Address>(env, DataKey::Owner)?;
         owner.require_auth();
         Ok(owner)
+    }
+
+    fn is_zero_root(root: &BytesN<32>) -> bool {
+        root.to_array().iter().all(|byte| *byte == 0)
+    }
+
+    fn validate_public_inputs_canonical(env: &Env, public_inputs: &Bytes) -> Result<(), Error> {
+        for index in 0..PUBLIC_INPUT_FIELDS {
+            let field = Self::field_at(env, public_inputs, index)?;
+            if !Self::is_canonical_field(&field) {
+                return Err(Error::InvalidPublicInputs);
+            }
+        }
+        Ok(())
+    }
+
+    fn is_canonical_field(field: &BytesN<32>) -> bool {
+        let raw = field.to_array();
+        for i in 0..32 {
+            if raw[i] < BN254_SCALAR_MODULUS[i] {
+                return true;
+            }
+            if raw[i] > BN254_SCALAR_MODULUS[i] {
+                return false;
+            }
+        }
+        false
     }
 
     fn field_at(env: &Env, public_inputs: &Bytes, index: u32) -> Result<BytesN<32>, Error> {

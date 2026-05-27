@@ -1,19 +1,31 @@
 use soroban_sdk::{
-    contract, contracterror, contractimpl,
+    contract, contracterror, contractimpl, contracttype,
     testutils::{Address as _, Ledger},
-    token, Address, Bytes, BytesN, Env, String, Vec,
+    token, Address, Bytes, BytesN, ConversionError, Env, IntoVal, InvokeError, String, Symbol, Val,
+    Vec,
 };
 use zarf_jwk_registry::{JwkRegistryContract, JwkRegistryContractClient};
-use zarf_vesting_soroban::{ZarfVestingContract, ZarfVestingContractClient};
+use zarf_vesting_soroban::{Error as VestingError, ZarfVestingContract, ZarfVestingContractClient};
 
 #[contract]
 pub struct MockVerifier;
+
+#[contract]
+pub struct ReentrantVerifier;
 
 #[contracterror]
 #[repr(u32)]
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum MockVerifierError {
     Rejected = 1,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum ReentrantDataKey {
+    Vesting,
+    Recipient,
+    Attempts,
 }
 
 #[contractimpl]
@@ -30,11 +42,87 @@ impl MockVerifier {
     }
 }
 
+#[contractimpl]
+impl ReentrantVerifier {
+    pub fn set_target(env: Env, vesting: Address, recipient: Address) {
+        env.storage()
+            .instance()
+            .set(&ReentrantDataKey::Vesting, &vesting);
+        env.storage()
+            .instance()
+            .set(&ReentrantDataKey::Recipient, &recipient);
+        env.storage()
+            .instance()
+            .set(&ReentrantDataKey::Attempts, &0_u32);
+    }
+
+    pub fn attempts(env: Env) -> u32 {
+        env.storage()
+            .instance()
+            .get(&ReentrantDataKey::Attempts)
+            .unwrap_or(0_u32)
+    }
+
+    pub fn verify_proof(
+        env: Env,
+        public_inputs: Bytes,
+        proof: Bytes,
+    ) -> Result<(), MockVerifierError> {
+        if proof.is_empty() {
+            return Err(MockVerifierError::Rejected);
+        }
+
+        let attempts = Self::attempts(env.clone());
+        env.storage()
+            .instance()
+            .set(&ReentrantDataKey::Attempts, &(attempts + 1));
+
+        if attempts == 0 {
+            let vesting = env
+                .storage()
+                .instance()
+                .get::<ReentrantDataKey, Address>(&ReentrantDataKey::Vesting)
+                .expect("vesting target not set");
+            let recipient = env
+                .storage()
+                .instance()
+                .get::<ReentrantDataKey, Address>(&ReentrantDataKey::Recipient)
+                .expect("recipient target not set");
+            let mut args: Vec<Val> = Vec::new(&env);
+            args.push_back(proof.into_val(&env));
+            args.push_back(public_inputs.into_val(&env));
+            args.push_back(recipient.into_val(&env));
+            let _ = env.try_invoke_contract::<(), InvokeError>(
+                &vesting,
+                &Symbol::new(&env, "claim"),
+                args,
+            );
+        }
+
+        Ok(())
+    }
+}
+
+const BN254_SCALAR_MODULUS_TEST: [u8; 32] = [
+    0x30, 0x64, 0x4e, 0x72, 0xe1, 0x31, 0xa0, 0x29, 0xb8, 0x50, 0x45, 0xb6, 0x81, 0x81, 0x58, 0x5d,
+    0x28, 0x33, 0xe8, 0x48, 0x79, 0xb9, 0x70, 0x91, 0x43, 0xe1, 0xf5, 0x93, 0xf0, 0x00, 0x00, 0x01,
+];
+
 fn limbs(env: &Env) -> Vec<BytesN<32>> {
     let mut limbs = Vec::new(env);
     for i in 0..18 {
         let mut raw = [0_u8; 32];
         raw[31] = i + 1;
+        limbs.push_back(BytesN::from_array(env, &raw));
+    }
+    limbs
+}
+
+fn unregistered_limbs(env: &Env) -> Vec<BytesN<32>> {
+    let mut limbs = Vec::new(env);
+    for i in 0..18 {
+        let mut raw = [0_u8; 32];
+        raw[31] = i + 33;
         limbs.push_back(BytesN::from_array(env, &raw));
     }
     limbs
@@ -49,6 +137,20 @@ fn field_from_u64(env: &Env, value: u64) -> BytesN<32> {
 fn field_from_i128(env: &Env, value: i128) -> BytesN<32> {
     let mut raw = [0_u8; 32];
     raw[16..32].copy_from_slice(&value.to_be_bytes());
+    BytesN::from_array(env, &raw)
+}
+
+fn non_canonical_field(env: &Env, add: u8) -> BytesN<32> {
+    let mut raw = BN254_SCALAR_MODULUS_TEST;
+    let mut carry = add as u16;
+    for i in (0..32).rev() {
+        if carry == 0 {
+            break;
+        }
+        let sum = raw[i] as u16 + carry;
+        raw[i] = sum as u8;
+        carry = sum >> 8;
+    }
     BytesN::from_array(env, &raw)
 }
 
@@ -75,6 +177,120 @@ fn public_inputs(
     append_field(&mut public_inputs, recipient_field);
     append_field(&mut public_inputs, &field_from_i128(env, amount));
     public_inputs
+}
+
+struct ClaimCase {
+    recipient: Address,
+    token_id: Address,
+    vesting_id: Address,
+    limbs: Vec<BytesN<32>>,
+    root: BytesN<32>,
+    epoch_commitment: BytesN<32>,
+    recipient_field: BytesN<32>,
+    amount: i128,
+    funded_amount: i128,
+    public_inputs: Bytes,
+    proof: Bytes,
+}
+
+fn setup_claim_case(env: &Env, verifier_id: Address, funded_amount: i128) -> ClaimCase {
+    env.ledger()
+        .with_mut(|ledger| ledger.timestamp = 1_700_000_000);
+
+    let owner = Address::generate(env);
+    let recipient = Address::generate(env);
+    let root = BytesN::from_array(env, &[7_u8; 32]);
+    let epoch_commitment = BytesN::from_array(env, &[9_u8; 32]);
+    let amount = 123_i128;
+
+    let token_asset = env.register_stellar_asset_contract_v2(owner.clone());
+    let token_id = token_asset.address();
+    let token_admin = token::StellarAssetClient::new(env, &token_id);
+
+    let registry_id = env.register(JwkRegistryContract, (owner.clone(),));
+    let registry = JwkRegistryContractClient::new(env, &registry_id);
+    let limbs = limbs(env);
+    registry.register_key(&String::from_str(env, "google-key-1"), &limbs);
+
+    let vesting_id = env.register(
+        ZarfVestingContract,
+        (
+            owner,
+            token_id.clone(),
+            verifier_id,
+            registry_id,
+            String::from_str(env, "Zarf"),
+            String::from_str(env, "Private vesting"),
+            root.clone(),
+            String::from_str(env, "ipfs://claim-list"),
+        ),
+    );
+    if funded_amount > 0 {
+        token_admin.mint(&vesting_id, &funded_amount);
+    }
+
+    let vesting = ZarfVestingContractClient::new(env, &vesting_id);
+    let recipient_field = vesting.recipient_id(&recipient);
+    let public_inputs = public_inputs(
+        env,
+        &limbs,
+        &root,
+        1_699_999_999,
+        &epoch_commitment,
+        &recipient_field,
+        amount,
+    );
+    let proof = Bytes::from_array(env, &[1_u8; 32]);
+
+    ClaimCase {
+        recipient,
+        token_id,
+        vesting_id,
+        limbs,
+        root,
+        epoch_commitment,
+        recipient_field,
+        amount,
+        funded_amount,
+        public_inputs,
+        proof,
+    }
+}
+
+fn assert_vesting_error(
+    result: Result<Result<(), ConversionError>, Result<VestingError, InvokeError>>,
+    expected: VestingError,
+) {
+    match result {
+        Err(Ok(error)) if error == expected => {}
+        other => panic!("expected {:?}, got {:?}", expected, other),
+    }
+}
+
+fn assert_failed_claim_side_effects(env: &Env, case: &ClaimCase, epoch_commitment: &BytesN<32>) {
+    let token = token::TokenClient::new(env, &case.token_id);
+    let vesting = ZarfVestingContractClient::new(env, &case.vesting_id);
+    assert_eq!(token.balance(&case.recipient), 0);
+    assert_eq!(token.balance(&case.vesting_id), case.funded_amount);
+    assert!(!vesting.is_claimed(epoch_commitment));
+}
+
+fn expect_claim_rejection<F>(expected: VestingError, build: F)
+where
+    F: FnOnce(&Env, &ClaimCase) -> (Bytes, Bytes, BytesN<32>),
+{
+    let env = Env::default();
+    env.mock_all_auths();
+    let verifier_id = env.register(MockVerifier, ());
+    let case = setup_claim_case(&env, verifier_id, 123);
+    let vesting = ZarfVestingContractClient::new(&env, &case.vesting_id);
+    let (public_inputs, proof, epoch_commitment) = build(&env, &case);
+
+    assert_vesting_error(
+        vesting.try_claim(&proof, &public_inputs, &case.recipient),
+        expected,
+    );
+    assert_failed_claim_side_effects(&env, &case, &epoch_commitment);
 }
 
 #[test]
@@ -149,4 +365,508 @@ fn claim_checks_registry_root_recipient_time_and_transfers() {
     let token = token::TokenClient::new(&env, &token_id);
     assert_eq!(token.balance(&recipient), amount);
     assert!(vesting.is_claimed(&epoch_commitment));
+}
+
+#[test]
+fn claim_rejects_non_canonical_public_input_field() {
+    let env = Env::default();
+    env.mock_all_auths();
+    env.ledger()
+        .with_mut(|ledger| ledger.timestamp = 1_700_000_000);
+
+    let owner = Address::generate(&env);
+    let recipient = Address::generate(&env);
+    let root = BytesN::from_array(&env, &[7_u8; 32]);
+    let non_canonical_epoch = non_canonical_field(&env, 9);
+    let amount = 123_i128;
+
+    let token_asset = env.register_stellar_asset_contract_v2(owner.clone());
+    let token_id = token_asset.address();
+    let token_admin = token::StellarAssetClient::new(&env, &token_id);
+
+    let registry_id = env.register(JwkRegistryContract, (owner.clone(),));
+    let registry = JwkRegistryContractClient::new(&env, &registry_id);
+    let limbs = limbs(&env);
+    registry.register_key(&String::from_str(&env, "google-key-1"), &limbs);
+
+    let verifier_id = env.register(MockVerifier, ());
+    let vesting_id = env.register(
+        ZarfVestingContract,
+        (
+            owner.clone(),
+            token_id.clone(),
+            verifier_id,
+            registry_id,
+            String::from_str(&env, "Zarf"),
+            String::from_str(&env, "Private vesting"),
+            root.clone(),
+            String::from_str(&env, "ipfs://claim-list"),
+        ),
+    );
+    let vesting = ZarfVestingContractClient::new(&env, &vesting_id);
+    token_admin.mint(&vesting_id, &amount);
+
+    let recipient_field = vesting.recipient_id(&recipient);
+    let public_inputs = public_inputs(
+        &env,
+        &limbs,
+        &root,
+        1_699_999_999,
+        &non_canonical_epoch,
+        &recipient_field,
+        amount,
+    );
+    let proof = Bytes::from_array(&env, &[1_u8; 32]);
+
+    match vesting.try_claim(&proof, &public_inputs, &recipient) {
+        Err(Ok(VestingError::InvalidPublicInputs)) => {}
+        other => panic!("unexpected non-canonical claim result: {:?}", other),
+    }
+
+    let token = token::TokenClient::new(&env, &token_id);
+    assert_eq!(token.balance(&recipient), 0);
+    assert!(!vesting.is_claimed(&non_canonical_epoch));
+}
+
+#[test]
+fn claim_negative_matrix_rejects_without_state_changes() {
+    expect_claim_rejection(VestingError::InvalidPublicInputs, |env, case| {
+        (
+            Bytes::from_array(env, &[1_u8; 31]),
+            case.proof.clone(),
+            case.epoch_commitment.clone(),
+        )
+    });
+
+    expect_claim_rejection(VestingError::InvalidPubkey, |env, case| {
+        (
+            public_inputs(
+                env,
+                &unregistered_limbs(env),
+                &case.root,
+                1_699_999_999,
+                &case.epoch_commitment,
+                &case.recipient_field,
+                case.amount,
+            ),
+            case.proof.clone(),
+            case.epoch_commitment.clone(),
+        )
+    });
+
+    expect_claim_rejection(VestingError::InvalidMerkleRoot, |env, case| {
+        let wrong_root = BytesN::from_array(env, &[8_u8; 32]);
+        (
+            public_inputs(
+                env,
+                &case.limbs,
+                &wrong_root,
+                1_699_999_999,
+                &case.epoch_commitment,
+                &case.recipient_field,
+                case.amount,
+            ),
+            case.proof.clone(),
+            case.epoch_commitment.clone(),
+        )
+    });
+
+    expect_claim_rejection(VestingError::InvalidRecipient, |env, case| {
+        let other_recipient = Address::generate(env);
+        let vesting = ZarfVestingContractClient::new(env, &case.vesting_id);
+        let wrong_recipient_field = vesting.recipient_id(&other_recipient);
+        (
+            public_inputs(
+                env,
+                &case.limbs,
+                &case.root,
+                1_699_999_999,
+                &case.epoch_commitment,
+                &wrong_recipient_field,
+                case.amount,
+            ),
+            case.proof.clone(),
+            case.epoch_commitment.clone(),
+        )
+    });
+
+    expect_claim_rejection(VestingError::EpochLocked, |env, case| {
+        (
+            public_inputs(
+                env,
+                &case.limbs,
+                &case.root,
+                1_700_000_001,
+                &case.epoch_commitment,
+                &case.recipient_field,
+                case.amount,
+            ),
+            case.proof.clone(),
+            case.epoch_commitment.clone(),
+        )
+    });
+
+    expect_claim_rejection(VestingError::InvalidAmount, |env, case| {
+        (
+            public_inputs(
+                env,
+                &case.limbs,
+                &case.root,
+                1_699_999_999,
+                &case.epoch_commitment,
+                &case.recipient_field,
+                0,
+            ),
+            case.proof.clone(),
+            case.epoch_commitment.clone(),
+        )
+    });
+
+    expect_claim_rejection(VestingError::InvalidProof, |env, case| {
+        (
+            case.public_inputs.clone(),
+            Bytes::new(env),
+            case.epoch_commitment.clone(),
+        )
+    });
+}
+
+#[test]
+fn second_claim_is_rejected_without_double_transfer() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let verifier_id = env.register(MockVerifier, ());
+    let case = setup_claim_case(&env, verifier_id, 246);
+    let vesting = ZarfVestingContractClient::new(&env, &case.vesting_id);
+    let token = token::TokenClient::new(&env, &case.token_id);
+
+    vesting.claim(&case.proof, &case.public_inputs, &case.recipient);
+    assert_eq!(token.balance(&case.recipient), case.amount);
+    assert_eq!(token.balance(&case.vesting_id), case.amount);
+    assert!(vesting.is_claimed(&case.epoch_commitment));
+
+    assert_vesting_error(
+        vesting.try_claim(&case.proof, &case.public_inputs, &case.recipient),
+        VestingError::AlreadyClaimed,
+    );
+    assert_eq!(token.balance(&case.recipient), case.amount);
+    assert_eq!(token.balance(&case.vesting_id), case.amount);
+    assert!(vesting.is_claimed(&case.epoch_commitment));
+}
+
+#[test]
+fn insufficient_balance_claim_rolls_back_claim_guard() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let verifier_id = env.register(MockVerifier, ());
+    let case = setup_claim_case(&env, verifier_id, 122);
+    let vesting = ZarfVestingContractClient::new(&env, &case.vesting_id);
+    let token = token::TokenClient::new(&env, &case.token_id);
+
+    let result = vesting.try_claim(&case.proof, &case.public_inputs, &case.recipient);
+    assert!(result.is_err(), "underfunded claim unexpectedly succeeded");
+    assert_eq!(token.balance(&case.recipient), 0);
+    assert_eq!(token.balance(&case.vesting_id), 122);
+    assert!(!vesting.is_claimed(&case.epoch_commitment));
+}
+
+#[test]
+fn claim_guard_blocks_reentrant_verifier_callback() {
+    let env = Env::default();
+    env.mock_all_auths();
+    env.ledger()
+        .with_mut(|ledger| ledger.timestamp = 1_700_000_000);
+
+    let owner = Address::generate(&env);
+    let recipient = Address::generate(&env);
+    let root = BytesN::from_array(&env, &[7_u8; 32]);
+    let epoch_commitment = BytesN::from_array(&env, &[9_u8; 32]);
+    let amount = 123_i128;
+
+    let token_asset = env.register_stellar_asset_contract_v2(owner.clone());
+    let token_id = token_asset.address();
+    let token_admin = token::StellarAssetClient::new(&env, &token_id);
+
+    let registry_id = env.register(JwkRegistryContract, (owner.clone(),));
+    let registry = JwkRegistryContractClient::new(&env, &registry_id);
+    let limbs = limbs(&env);
+    registry.register_key(&String::from_str(&env, "google-key-1"), &limbs);
+
+    let verifier_id = env.register(ReentrantVerifier, ());
+    let verifier = ReentrantVerifierClient::new(&env, &verifier_id);
+    let vesting_id = env.register(
+        ZarfVestingContract,
+        (
+            owner.clone(),
+            token_id.clone(),
+            verifier_id,
+            registry_id,
+            String::from_str(&env, "Zarf"),
+            String::from_str(&env, "Private vesting"),
+            root.clone(),
+            String::from_str(&env, "ipfs://claim-list"),
+        ),
+    );
+    let vesting = ZarfVestingContractClient::new(&env, &vesting_id);
+    verifier.set_target(&vesting_id, &recipient);
+    token_admin.mint(&vesting_id, &(amount * 2));
+
+    let recipient_field = vesting.recipient_id(&recipient);
+    let public_inputs = public_inputs(
+        &env,
+        &limbs,
+        &root,
+        1_699_999_999,
+        &epoch_commitment,
+        &recipient_field,
+        amount,
+    );
+    let proof = Bytes::from_array(&env, &[1_u8; 32]);
+
+    vesting.claim(&proof, &public_inputs, &recipient);
+
+    let token = token::TokenClient::new(&env, &token_id);
+    assert_eq!(token.balance(&recipient), amount);
+    assert_eq!(token.balance(&vesting_id), amount);
+    assert_eq!(verifier.attempts(), 1);
+    assert!(vesting.is_claimed(&epoch_commitment));
+}
+
+#[test]
+fn failed_verifier_does_not_leave_claimed_guard() {
+    let env = Env::default();
+    env.mock_all_auths();
+    env.ledger()
+        .with_mut(|ledger| ledger.timestamp = 1_700_000_000);
+
+    let owner = Address::generate(&env);
+    let recipient = Address::generate(&env);
+    let root = BytesN::from_array(&env, &[7_u8; 32]);
+    let epoch_commitment = BytesN::from_array(&env, &[9_u8; 32]);
+    let amount = 123_i128;
+
+    let token_asset = env.register_stellar_asset_contract_v2(owner.clone());
+    let token_id = token_asset.address();
+    let token_admin = token::StellarAssetClient::new(&env, &token_id);
+
+    let registry_id = env.register(JwkRegistryContract, (owner.clone(),));
+    let registry = JwkRegistryContractClient::new(&env, &registry_id);
+    let limbs = limbs(&env);
+    registry.register_key(&String::from_str(&env, "google-key-1"), &limbs);
+
+    let verifier_id = env.register(MockVerifier, ());
+    let vesting_id = env.register(
+        ZarfVestingContract,
+        (
+            owner.clone(),
+            token_id.clone(),
+            verifier_id,
+            registry_id,
+            String::from_str(&env, "Zarf"),
+            String::from_str(&env, "Private vesting"),
+            root.clone(),
+            String::from_str(&env, "ipfs://claim-list"),
+        ),
+    );
+    let vesting = ZarfVestingContractClient::new(&env, &vesting_id);
+    token_admin.mint(&vesting_id, &amount);
+
+    let recipient_field = vesting.recipient_id(&recipient);
+    let public_inputs = public_inputs(
+        &env,
+        &limbs,
+        &root,
+        1_699_999_999,
+        &epoch_commitment,
+        &recipient_field,
+        amount,
+    );
+    let proof = Bytes::new(&env);
+
+    match vesting.try_claim(&proof, &public_inputs, &recipient) {
+        Err(Ok(VestingError::InvalidProof)) => {}
+        other => panic!("unexpected rejected proof result: {:?}", other),
+    }
+
+    let token = token::TokenClient::new(&env, &token_id);
+    assert_eq!(token.balance(&recipient), 0);
+    assert_eq!(token.balance(&vesting_id), amount);
+    assert!(!vesting.is_claimed(&epoch_commitment));
+}
+
+#[test]
+fn set_merkle_root_is_one_time_before_funding_only() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let owner = Address::generate(&env);
+    let zero_root = BytesN::from_array(&env, &[0_u8; 32]);
+    let root = BytesN::from_array(&env, &[1_u8; 32]);
+    let root2 = BytesN::from_array(&env, &[2_u8; 32]);
+
+    let token_asset = env.register_stellar_asset_contract_v2(owner.clone());
+    let token_id = token_asset.address();
+    let verifier_id = env.register(MockVerifier, ());
+    let registry_id = env.register(JwkRegistryContract, (owner.clone(),));
+    let vesting_id = env.register(
+        ZarfVestingContract,
+        (
+            owner.clone(),
+            token_id,
+            verifier_id,
+            registry_id,
+            String::from_str(&env, "Zarf"),
+            String::from_str(&env, "Private vesting"),
+            zero_root.clone(),
+            String::from_str(&env, "ipfs://claim-list"),
+        ),
+    );
+    let vesting = ZarfVestingContractClient::new(&env, &vesting_id);
+
+    match vesting.try_set_merkle_root(&root) {
+        Ok(Ok(())) => {}
+        other => panic!("unexpected set_merkle_root result: {:?}", other),
+    }
+    assert_eq!(vesting.merkle_root(), root);
+
+    match vesting.try_set_merkle_root(&root2) {
+        Err(Ok(VestingError::MerkleRootAlreadySet)) => {}
+        other => panic!("unexpected second set_merkle_root result: {:?}", other),
+    }
+}
+
+#[test]
+fn set_merkle_root_rejects_funded_zero_root_contract() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let owner = Address::generate(&env);
+    let zero_root = BytesN::from_array(&env, &[0_u8; 32]);
+    let root = BytesN::from_array(&env, &[3_u8; 32]);
+
+    let token_asset = env.register_stellar_asset_contract_v2(owner.clone());
+    let token_id = token_asset.address();
+    let token_admin = token::StellarAssetClient::new(&env, &token_id);
+    let verifier_id = env.register(MockVerifier, ());
+    let registry_id = env.register(JwkRegistryContract, (owner.clone(),));
+    let vesting_id = env.register(
+        ZarfVestingContract,
+        (
+            owner.clone(),
+            token_id,
+            verifier_id,
+            registry_id,
+            String::from_str(&env, "Zarf"),
+            String::from_str(&env, "Private vesting"),
+            zero_root,
+            String::from_str(&env, "ipfs://claim-list"),
+        ),
+    );
+    let vesting = ZarfVestingContractClient::new(&env, &vesting_id);
+    token_admin.mint(&vesting_id, &1);
+
+    match vesting.try_set_merkle_root(&root) {
+        Err(Ok(VestingError::MerkleRootFunded)) => {}
+        other => panic!("unexpected funded set_merkle_root result: {:?}", other),
+    }
+}
+
+#[test]
+fn set_merkle_root_rejects_zero_root() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let owner = Address::generate(&env);
+    let zero_root = BytesN::from_array(&env, &[0_u8; 32]);
+
+    let token_asset = env.register_stellar_asset_contract_v2(owner.clone());
+    let token_id = token_asset.address();
+    let verifier_id = env.register(MockVerifier, ());
+    let registry_id = env.register(JwkRegistryContract, (owner.clone(),));
+    let vesting_id = env.register(
+        ZarfVestingContract,
+        (
+            owner.clone(),
+            token_id,
+            verifier_id,
+            registry_id,
+            String::from_str(&env, "Zarf"),
+            String::from_str(&env, "Private vesting"),
+            zero_root.clone(),
+            String::from_str(&env, "ipfs://claim-list"),
+        ),
+    );
+    let vesting = ZarfVestingContractClient::new(&env, &vesting_id);
+
+    match vesting.try_set_merkle_root(&zero_root) {
+        Err(Ok(VestingError::InvalidMerkleRoot)) => {}
+        other => panic!("unexpected zero set_merkle_root result: {:?}", other),
+    }
+}
+
+#[test]
+fn deposit_rejects_zero_merkle_root() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let owner = Address::generate(&env);
+    let zero_root = BytesN::from_array(&env, &[0_u8; 32]);
+
+    let token_asset = env.register_stellar_asset_contract_v2(owner.clone());
+    let token_id = token_asset.address();
+    let verifier_id = env.register(MockVerifier, ());
+    let registry_id = env.register(JwkRegistryContract, (owner.clone(),));
+    let vesting_id = env.register(
+        ZarfVestingContract,
+        (
+            owner.clone(),
+            token_id,
+            verifier_id,
+            registry_id,
+            String::from_str(&env, "Zarf"),
+            String::from_str(&env, "Private vesting"),
+            zero_root,
+            String::from_str(&env, "ipfs://claim-list"),
+        ),
+    );
+    let vesting = ZarfVestingContractClient::new(&env, &vesting_id);
+
+    match vesting.try_deposit(&1) {
+        Err(Ok(VestingError::InvalidMerkleRoot)) => {}
+        other => panic!("unexpected zero-root deposit result: {:?}", other),
+    }
+}
+
+#[test]
+fn owner_methods_require_auth_without_mock_all_auths() {
+    let env = Env::default();
+
+    let owner = Address::generate(&env);
+    let new_owner = Address::generate(&env);
+    let zero_root = BytesN::from_array(&env, &[0_u8; 32]);
+    let root = BytesN::from_array(&env, &[4_u8; 32]);
+
+    let token_asset = env.register_stellar_asset_contract_v2(owner.clone());
+    let token_id = token_asset.address();
+    let verifier_id = env.register(MockVerifier, ());
+    let registry_id = env.register(JwkRegistryContract, (owner.clone(),));
+    let vesting_id = env.register(
+        ZarfVestingContract,
+        (
+            owner.clone(),
+            token_id,
+            verifier_id,
+            registry_id,
+            String::from_str(&env, "Zarf"),
+            String::from_str(&env, "Private vesting"),
+            zero_root.clone(),
+            String::from_str(&env, "ipfs://claim-list"),
+        ),
+    );
+    let vesting = ZarfVestingContractClient::new(&env, &vesting_id);
+
+    assert!(vesting.try_set_merkle_root(&root).is_err());
+    assert!(vesting.try_transfer_ownership(&new_owner).is_err());
+    assert_eq!(vesting.merkle_root(), zero_root);
+    assert_eq!(vesting.owner(), owner);
 }
