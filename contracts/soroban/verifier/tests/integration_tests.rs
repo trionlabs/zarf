@@ -68,6 +68,94 @@ fn verify_zarf_bb_v2_proof_succeeds() {
 }
 
 #[test]
+fn rejects_truncated_zarf_proof() {
+    let vk_bytes_raw: &[u8] = include_bytes!("zarf/target/vk");
+    let proof_bin: &[u8] = include_bytes!("zarf/target/proof");
+    let pub_inputs_bin: &[u8] = include_bytes!("zarf/target/public_inputs");
+
+    let env = Env::default();
+    env.cost_estimate().budget().reset_unlimited();
+
+    let vk_bytes = Bytes::from_slice(&env, vk_bytes_raw);
+    let proof_bytes = Bytes::from_slice(&env, &proof_bin[..proof_bin.len() - 1]);
+    let public_inputs = Bytes::from_slice(&env, pub_inputs_bin);
+
+    let client = register_client(&env, &vk_bytes);
+    assert!(
+        client
+            .try_verify_proof(&public_inputs, &proof_bytes)
+            .is_err(),
+        "truncated proof unexpectedly verified",
+    );
+}
+
+#[test]
+fn rejects_mutated_zarf_proof() {
+    let vk_bytes_raw: &[u8] = include_bytes!("zarf/target/vk");
+    let proof_bin: &[u8] = include_bytes!("zarf/target/proof");
+    let pub_inputs_bin: &[u8] = include_bytes!("zarf/target/public_inputs");
+
+    let env = Env::default();
+    env.cost_estimate().budget().reset_unlimited();
+
+    let mut mutated = proof_bin.to_vec();
+    mutated[0] ^= 1;
+    let vk_bytes = Bytes::from_slice(&env, vk_bytes_raw);
+    let proof_bytes = Bytes::from_slice(&env, &mutated);
+    let public_inputs = Bytes::from_slice(&env, pub_inputs_bin);
+
+    let client = register_client(&env, &vk_bytes);
+    assert!(
+        client
+            .try_verify_proof(&public_inputs, &proof_bytes)
+            .is_err(),
+        "mutated proof unexpectedly verified",
+    );
+}
+
+#[test]
+fn rejects_invalid_vk_bytes() {
+    let proof_bin: &[u8] = include_bytes!("zarf/target/proof");
+    let pub_inputs_bin: &[u8] = include_bytes!("zarf/target/public_inputs");
+
+    let env = Env::default();
+    env.cost_estimate().budget().reset_unlimited();
+
+    let vk_bytes = Bytes::from_slice(&env, &[1_u8; 32]);
+    let proof_bytes = Bytes::from_slice(&env, proof_bin);
+    let public_inputs = Bytes::from_slice(&env, pub_inputs_bin);
+
+    let client = register_client(&env, &vk_bytes);
+    assert!(
+        client
+            .try_verify_proof(&public_inputs, &proof_bytes)
+            .is_err(),
+        "invalid VK unexpectedly verified",
+    );
+}
+
+#[test]
+fn malformed_public_inputs_do_not_verify() {
+    let vk_bytes_raw: &[u8] = include_bytes!("zarf/target/vk");
+    let proof_bin: &[u8] = include_bytes!("zarf/target/proof");
+
+    let env = Env::default();
+    env.cost_estimate().budget().reset_unlimited();
+
+    let vk_bytes = Bytes::from_slice(&env, vk_bytes_raw);
+    let proof_bytes = Bytes::from_slice(&env, proof_bin);
+    let public_inputs = Bytes::from_slice(&env, &[1_u8; 31]);
+
+    let client = register_client(&env, &vk_bytes);
+    assert!(
+        client
+            .try_verify_proof(&public_inputs, &proof_bytes)
+            .is_err(),
+        "malformed public inputs unexpectedly verified",
+    );
+}
+
+#[test]
 #[ignore = "legacy bb v0.87 fixture; current verifier targets bb v2 proof/vk layout"]
 fn print_budget_for_deploy_and_verify() {
     let vk_bytes_raw: &[u8] = include_bytes!("simple_circuit/target/vk");

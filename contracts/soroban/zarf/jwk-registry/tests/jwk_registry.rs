@@ -55,3 +55,25 @@ fn owner_can_register_precomputed_key_hash() {
     assert!(client.is_kid_registered(&kid));
     assert_eq!(client.get_registered_key_count(), 1);
 }
+
+#[test]
+fn key_mutations_require_owner_auth_without_mock_all_auths() {
+    let env = Env::default();
+
+    let owner = Address::generate(&env);
+    let id = env.register(JwkRegistryContract, (owner.clone(),));
+    let client = JwkRegistryContractClient::new(&env, &id);
+    let kid = String::from_str(&env, "google-key-1");
+    let limbs = limbs(&env);
+    let key_hash = client.compute_key_hash(&limbs);
+
+    assert!(client.try_register_key(&kid, &limbs).is_err());
+    assert!(!client.is_valid_key_hash(&key_hash));
+    assert!(!client.is_kid_registered(&kid));
+    assert_eq!(client.get_registered_key_count(), 0);
+
+    assert!(client.try_register_key_hash(&kid, &key_hash).is_err());
+    assert!(!client.is_valid_key_hash(&key_hash));
+    assert!(!client.is_kid_registered(&kid));
+    assert_eq!(client.get_registered_key_count(), 0);
+}
