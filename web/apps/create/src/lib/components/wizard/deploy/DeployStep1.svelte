@@ -2,13 +2,14 @@
     import { deployStore } from '../../../stores/deployStore.svelte';
 
     import { fly } from 'svelte/transition';
-    import { AlertTriangle, CheckCircle2 } from 'lucide-svelte';
+    import { AlertTriangle, CheckCircle2, Wallet } from 'lucide-svelte';
 
     import { wizardStore } from '../../../stores/wizardStore.svelte';
     import { parseTokenAmount } from '@zarf/core/utils/amount';
     import { buildClaimList } from '@zarf/core/domain/claimListBuilder';
     import { planScheduleSeconds } from '@zarf/core/domain/deployPlanner';
     import { pinClaimList } from '../../../services/pinService';
+    import { walletStore } from '@zarf/ui/stores/walletStore.svelte';
     import ZenButton from '@zarf/ui/components/ui/ZenButton.svelte';
     import { toMessage } from '@zarf/core/utils/error';
     import { err } from '@zarf/core/utils/log';
@@ -21,9 +22,15 @@
     let isPinning = $derived(deployStore.isPinning);
     let pinError = $derived(deployStore.pinError);
     let metadataCid = $derived(deployStore.metadataCid);
+    let walletAddress = $derived(walletStore.address);
+    let isWrongNetwork = $derived(walletStore.isWrongNetwork);
+    let walletError = $derived(walletStore.error);
 
     async function pinList(result: typeof merkleResult) {
         if (!distribution || !result) return;
+        if (!walletAddress) return;
+        if (isWrongNetwork) return;
+
         deployStore.startPinning();
         try {
             const planAt = new Date();
@@ -36,7 +43,7 @@
                 vestingSeconds: seconds.vestingSeconds,
                 periodSeconds: seconds.periodSeconds,
             });
-            const pinned = await pinClaimList(claimList);
+            const pinned = await pinClaimList(claimList, { owner: walletAddress });
             deployStore.setMetadataCid(pinned.cid);
         } catch (e: unknown) {
             err('Pin error:', e);
@@ -65,7 +72,9 @@
             const { processWhitelist } = await import('@zarf/core/crypto/merkleTree');
             const result = await processWhitelist(entries, distribution.schedule);
             deployStore.setMerkleResult(result);
-            await pinList(result);
+            if (walletAddress && !isWrongNetwork) {
+                await pinList(result);
+            }
         } catch (e: unknown) {
             err('Merkle generation error:', e);
             deployStore.setMerkleError(toMessage(e, 'Failed to generate Merkle Tree'));
@@ -77,7 +86,14 @@
         if (merkleResult && metadataCid) return;
 
         // Pin already-generated merkle if pinning failed earlier or never ran
-        if (merkleResult && !metadataCid && !isPinning && !pinError) {
+        if (
+            merkleResult &&
+            !metadataCid &&
+            !isPinning &&
+            !pinError &&
+            walletAddress &&
+            !isWrongNetwork
+        ) {
             pinList(merkleResult);
             return;
         }
@@ -94,6 +110,14 @@
             pinList(merkleResult);
         } else {
             generateTree();
+        }
+    }
+
+    async function connectWallet() {
+        try {
+            await walletStore.requestConnection();
+        } catch {
+            // walletStore owns the displayed error state
         }
     }
 </script>
@@ -193,6 +217,43 @@
                 <ZenButton variant="danger" class="mt-4 border border-zen-error" onclick={retry}>
                     Retry
                 </ZenButton>
+            </div>
+        {:else if merkleResult && !metadataCid && !walletAddress}
+            <div class="flex flex-col items-center gap-4" in:fly={{ y: 10 }}>
+                <div
+                    class="w-12 h-12 rounded-full bg-zen-fg/10 flex items-center justify-center mb-2"
+                >
+                    <Wallet class="w-6 h-6 text-zen-fg" />
+                </div>
+                <div>
+                    <h3 class="font-bold">Authorize Pinning</h3>
+                    <p class="text-sm text-zen-fg-subtle max-w-md">
+                        Connect Freighter to sign the IPFS pin request for this distribution.
+                    </p>
+                    {#if walletError}
+                        <p class="text-sm text-zen-error mt-2">{walletError}</p>
+                    {/if}
+                </div>
+                <ZenButton
+                    variant="primary"
+                    class="mt-2"
+                    loading={walletStore.isConnecting}
+                    onclick={connectWallet}
+                >
+                    Connect Wallet
+                </ZenButton>
+            </div>
+        {:else if merkleResult && !metadataCid && isWrongNetwork}
+            <div class="text-zen-error flex flex-col items-center gap-2" in:fly={{ y: 10 }}>
+                <div
+                    class="w-12 h-12 rounded-full bg-zen-error/10 flex items-center justify-center mb-2"
+                >
+                    <AlertTriangle class="w-6 h-6 text-zen-error" />
+                </div>
+                <h3 class="font-bold">Wrong Network</h3>
+                <p class="text-sm opacity-80 max-w-md">
+                    Switch Freighter to the configured Stellar network before pinning.
+                </p>
             </div>
         {:else if merkleResult && metadataCid}
             <div class="text-zen-success flex flex-col items-center gap-2" in:fly={{ y: 10 }}>

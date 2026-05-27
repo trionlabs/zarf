@@ -9,6 +9,10 @@
     "tail": "wrangler tail",
     "typecheck": "tsc --noEmit"
   },
+  "dependencies": {
+    "@stellar/stellar-sdk": "^15.0.1",
+    "buffer": "^6.0.3"
+  },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20251218.0",
     "typescript": "^5.9.3",

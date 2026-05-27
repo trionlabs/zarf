@@ -17,6 +17,9 @@
  *   MAX_BODY_BYTES   - max accepted body size (string-encoded number)
  */
 
+import { Keypair, StrKey } from '@stellar/stellar-sdk';
+import { Buffer } from 'buffer';
+
 interface Env {
     PINATA_JWT: string;
     ALLOWED_ORIGINS: string;
@@ -38,6 +41,9 @@ interface PinataResponse {
 }
 
 const PINATA_PIN_URL = 'https://api.pinata.cloud/pinning/pinJSONToIPFS';
+const PIN_AUTH_VERSION = 'zarf-pin-v1';
+const PIN_AUTH_MAX_AGE_MS = 5 * 60 * 1000;
+const HEX_32 = /^0x[0-9a-fA-F]{64}$/;
 const IPFS_READ_GATEWAYS = [
     'https://gateway.pinata.cloud/ipfs',
     'https://ipfs.io/ipfs',
@@ -86,9 +92,10 @@ async function handlePin(
         return json({ error: 'unsupported_media_type' }, 415, corsHeaders);
     }
 
+    let raw: string;
     let body: ClaimList;
     try {
-        const raw = await request.text();
+        raw = await request.text();
         if (new TextEncoder().encode(raw).length > maxBytes) {
             return json({ error: 'payload_too_large', maxBytes }, 413, corsHeaders);
         }
@@ -100,6 +107,15 @@ async function handlePin(
     const validationError = validateClaimList(body);
     if (validationError) {
         return json({ error: 'invalid_claim_list', reason: validationError }, 400, corsHeaders);
+    }
+
+    const authError = await validatePinAuth(request, raw, body.merkleRoot);
+    if (authError) {
+        return json(
+            { error: 'unauthorized_pin', reason: authError.reason },
+            authError.status,
+            corsHeaders,
+        );
     }
 
     if (!env.PINATA_JWT) {
@@ -167,16 +183,119 @@ function validateClaimList(body: unknown): string | null {
     if (!body || typeof body !== 'object') return 'not_an_object';
     const obj = body as Record<string, unknown>;
 
-    if (typeof obj.merkleRoot !== 'string' || !obj.merkleRoot.startsWith('0x')) {
+    if (typeof obj.merkleRoot !== 'string' || !HEX_32.test(obj.merkleRoot)) {
         return 'missing_or_invalid_merkleRoot';
     }
     if (!Array.isArray(obj.leaves) || obj.leaves.length === 0) {
         return 'missing_or_empty_leaves';
     }
+    if (obj.leaves.some((leaf) => typeof leaf !== 'string' || !HEX_32.test(leaf))) {
+        return 'invalid_leaf';
+    }
     if (!obj.schedule || typeof obj.schedule !== 'object') {
         return 'missing_schedule';
     }
     return null;
+}
+
+interface PinAuthError {
+    status: number;
+    reason: string;
+}
+
+async function validatePinAuth(
+    request: Request,
+    rawBody: string,
+    merkleRoot: string,
+): Promise<PinAuthError | null> {
+    const owner = request.headers.get('X-Zarf-Owner')?.trim();
+    const issuedAtRaw = request.headers.get('X-Zarf-Issued-At')?.trim();
+    const bodyHash = request.headers.get('X-Zarf-Body-SHA256')?.trim();
+    const signature = request.headers.get('X-Zarf-Signature')?.trim();
+
+    if (!owner || !issuedAtRaw || !bodyHash || !signature) {
+        return { status: 401, reason: 'missing_auth_headers' };
+    }
+    if (!StrKey.isValidEd25519PublicKey(owner)) {
+        return { status: 401, reason: 'invalid_owner' };
+    }
+
+    const issuedAt = Number(issuedAtRaw);
+    if (!Number.isSafeInteger(issuedAt) || issuedAt <= 0) {
+        return { status: 401, reason: 'invalid_issued_at' };
+    }
+    if (Math.abs(Date.now() - issuedAt) > PIN_AUTH_MAX_AGE_MS) {
+        return { status: 401, reason: 'expired_signature' };
+    }
+
+    if (!/^[0-9a-fA-F]{64}$/.test(bodyHash)) {
+        return { status: 401, reason: 'invalid_body_hash' };
+    }
+    const expectedBodyHash = await sha256Hex(rawBody);
+    if (bodyHash.toLowerCase() !== expectedBodyHash) {
+        return { status: 401, reason: 'body_hash_mismatch' };
+    }
+
+    const signatureBytes = decodeSignature(signature);
+    if (!signatureBytes) {
+        return { status: 401, reason: 'invalid_signature_encoding' };
+    }
+
+    const message = buildPinAuthMessage({
+        owner,
+        merkleRoot,
+        bodyHash: expectedBodyHash,
+        issuedAt,
+    });
+
+    const verified = Keypair.fromPublicKey(owner).verify(
+        Buffer.from(new TextEncoder().encode(message)),
+        signatureBytes,
+    );
+    return verified ? null : { status: 401, reason: 'invalid_signature' };
+}
+
+function buildPinAuthMessage(input: {
+    owner: string;
+    merkleRoot: string;
+    bodyHash: string;
+    issuedAt: number;
+}): string {
+    return [
+        PIN_AUTH_VERSION,
+        `owner:${input.owner}`,
+        `merkleRoot:${input.merkleRoot}`,
+        `bodyHash:${input.bodyHash}`,
+        `issuedAt:${input.issuedAt}`,
+    ].join('\n');
+}
+
+async function sha256Hex(value: string): Promise<string> {
+    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
+    return Array.from(new Uint8Array(digest))
+        .map((byte) => byte.toString(16).padStart(2, '0'))
+        .join('');
+}
+
+function decodeSignature(raw: string): Buffer | null {
+    if (raw.length > 512) return null;
+    const hex = raw.startsWith('0x') ? raw.slice(2) : raw;
+    if (/^[0-9a-fA-F]{128}$/.test(hex)) {
+        return Buffer.from(hex, 'hex');
+    }
+
+    const normalized = raw.replace(/-/g, '+').replace(/_/g, '/');
+    if (!/^[A-Za-z0-9+/]+={0,2}$/.test(normalized)) {
+        return null;
+    }
+    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=');
+
+    try {
+        const decoded = Buffer.from(padded, 'base64');
+        return decoded.length === 64 ? decoded : null;
+    } catch {
+        return null;
+    }
 }
 
 function validateCid(raw: string): string | null {
@@ -205,7 +324,8 @@ function buildCorsHeaders(origin: string | null, env: Env): Record<string, strin
     return {
         'Access-Control-Allow-Origin': allowOrigin,
         'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type',
+        'Access-Control-Allow-Headers':
+            'Content-Type, X-Zarf-Owner, X-Zarf-Issued-At, X-Zarf-Body-SHA256, X-Zarf-Signature',
         'Access-Control-Max-Age': '86400',
         Vary: 'Origin',
     };
