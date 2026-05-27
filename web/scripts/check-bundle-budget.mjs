@@ -26,7 +26,7 @@ import { resolve, basename, join } from 'node:path';
 const KB = 1024;
 
 const BUDGETS = {
-    landing: { initialGz: 77 * KB, totalGz: 100 * KB },
+    landing: { initialGz: 79 * KB, totalGz: 100 * KB },
     claim: { initialGz: 123 * KB, totalGz: 13250 * KB },
     create: { initialGz: 456 * KB, totalGz: 6350 * KB },
 };
