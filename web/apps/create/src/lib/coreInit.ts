@@ -12,6 +12,7 @@ import {
     type StellarRuntimeConfig,
 } from '@zarf/core/config/runtime';
 import { browser } from '$app/environment';
+import { setupErrorTelemetry } from '@zarf/core/utils/telemetry';
 
 const DEFAULTS = {
     testnet: {
@@ -31,6 +32,7 @@ const DEFAULTS = {
 // VITE_* key into the client bundle. Enumerate keys here; never widen access.
 const ENV: Readonly<Record<string, string | boolean | undefined>> = {
     VITE_INDEXER_URL: import.meta.env.VITE_INDEXER_URL,
+    VITE_TELEMETRY_ENDPOINT: import.meta.env.VITE_TELEMETRY_ENDPOINT,
     VITE_STELLAR_DEFAULT_NETWORK: import.meta.env.VITE_STELLAR_DEFAULT_NETWORK,
 
     VITE_STELLAR_TESTNET_RPC_URL: import.meta.env.VITE_STELLAR_TESTNET_RPC_URL,
@@ -146,3 +148,12 @@ configureCore({
     defaultStellarNetwork,
     indexerUrl: readEnv('VITE_INDEXER_URL'),
 });
+
+// Error telemetry — active only when an operator endpoint is configured;
+// otherwise a no-op and nothing leaves the device. See @zarf/core/utils/telemetry.
+if (browser) {
+    setupErrorTelemetry({
+        endpoint: readEnv('VITE_TELEMETRY_ENDPOINT'),
+        context: `create@${defaultStellarNetwork}`,
+    });
+}
