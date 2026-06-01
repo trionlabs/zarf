@@ -1,13 +1,15 @@
 <script lang="ts">
     import { wizardStore } from '$lib/stores/wizardStore.svelte';
     import { goto } from '$app/navigation';
-    import { onMount } from 'svelte';
+    import { onMount, tick } from 'svelte';
     import { ArrowRight, Clipboard, Loader2, AlertCircle } from 'lucide-svelte';
     import { fetchTokenMetadata, type TokenMetadata } from '$lib/services/tokenMetadata';
     import { isValidContractAddressShape as isValidContractAddress } from '@zarf/core/utils/addressShape';
     import { fade, fly } from 'svelte/transition';
     import ZenButton from '@zarf/ui/components/ui/ZenButton.svelte';
     import ZenCard from '@zarf/ui/components/ui/ZenCard.svelte';
+    import { networkStore } from '@zarf/ui/stores/networkStore.svelte';
+    import { getTokenPresets, type TokenPreset } from '$lib/config/tokenPresets';
 
     // --- State ---
     let tokenAddress = $state('');
@@ -15,6 +17,16 @@
     let isFetching = $state(false);
     let error = $state<string | null>(null);
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    let selectedPreset = $state<TokenPreset | null>(null);
+    let fetchSeq = 0;
+    let inputEl = $state<HTMLInputElement | undefined>(undefined);
+
+    // After a programmatic fill, the input auto-scrolls to the caret (end), hiding the
+    // leading "C…". Reset to the start so users can verify the address prefix.
+    async function revealStart() {
+        await tick();
+        if (inputEl) inputEl.scrollLeft = 0;
+    } // monotonic request id — guards against out-of-order resolution
 
     onMount(() => {
         wizardStore.goToStep(0);
@@ -43,13 +55,52 @@
     // --- Derived ---
     const isAddressValid = $derived(isValidContractAddress(tokenAddress));
 
+    // Presets react to network switches: networkStore.activeId is $state-backed,
+    // unlike getActiveStellarNetworkId() which reads a non-reactive module var.
+    const presets = $derived.by(() => {
+        try {
+            return getTokenPresets(networkStore.activeId);
+        } catch {
+            return [];
+        }
+    });
+
     // --- Actions ---
+    function resetLookup() {
+        if (debounceTimer) clearTimeout(debounceTimer);
+        error = null;
+        tokenMetadata = null;
+        isFetching = false; // a superseded in-flight fetch won't clear this itself (seq mismatch)
+        fetchSeq++; // invalidate any in-flight fetch
+    }
+
+    function handleAddressInput() {
+        selectedPreset = null; // manual typing clears chip selection
+        resetLookup();
+        // No error here — the status area owns shape feedback (char count / "starts with C").
+        if (!isValidContractAddress(tokenAddress)) return;
+        debounceTimer = setTimeout(fetchMetadata, 500);
+    }
+
+    function selectPreset(preset: TokenPreset) {
+        // No same-preset early return: chips are hidden once a token loads, so a re-click
+        // only ever happens to retry after an error — which must be allowed.
+        selectedPreset = preset;
+        tokenAddress = preset.sacAddress;
+        resetLookup();
+        fetchMetadata(); // presets are known-good — skip the debounce
+        revealStart();
+    }
+
     async function handlePaste() {
         try {
             const text = await navigator.clipboard.readText();
             if (isValidContractAddress(text)) {
                 tokenAddress = text;
-                handleAddressInput();
+                selectedPreset = null;
+                resetLookup();
+                fetchMetadata();
+                revealStart();
             } else {
                 error = 'Invalid address in clipboard';
             }
@@ -58,48 +109,38 @@
         }
     }
 
-    function handleAddressInput() {
-        if (debounceTimer) clearTimeout(debounceTimer);
-        error = null;
-        tokenMetadata = null;
-
-        if (!isValidContractAddress(tokenAddress)) {
-            if (tokenAddress.length > 0 && !tokenAddress.startsWith('C')) {
-                error = 'Stellar contract IDs start with C';
-            }
-            return;
-        }
-
-        debounceTimer = setTimeout(fetchMetadata, 500);
-    }
-
     async function fetchMetadata() {
-        if (!isAddressValid) return;
+        const addr = tokenAddress; // snapshot — fetch resolves against this exact value
+        if (!isValidContractAddress(addr)) return;
 
+        const seq = ++fetchSeq;
         isFetching = true;
         error = null;
 
         try {
-            const result = await fetchTokenMetadata(tokenAddress);
+            const result = await fetchTokenMetadata(addr);
+            if (seq !== fetchSeq) return; // a newer lookup superseded this one — drop it
 
             if (result.success && result.data) {
                 tokenMetadata = result.data;
                 // Sync to store immediately
                 wizardStore.setTokenDetails({
-                    tokenAddress,
-                    tokenName: tokenMetadata.name,
-                    tokenSymbol: tokenMetadata.symbol,
-                    tokenDecimals: tokenMetadata.decimals,
-                    tokenTotalSupply: tokenMetadata.totalSupply,
-                    iconUrl: tokenMetadata.logoUrl,
+                    tokenAddress: addr,
+                    // Coalesce: the success gate guarantees decimals, but name/symbol/supply
+                    // can still be null — downstream BigInt/render code must not see null.
+                    tokenName: result.data.name ?? '',
+                    tokenSymbol: result.data.symbol ?? '',
+                    tokenDecimals: result.data.decimals ?? 18,
+                    tokenTotalSupply: result.data.totalSupply ?? '0',
+                    iconUrl: result.data.logoUrl,
                 });
             } else {
                 error = result.error || 'Could not fetch token metadata';
             }
         } catch {
-            error = 'Network error while fetching metadata';
+            if (seq === fetchSeq) error = 'Network error while fetching metadata';
         } finally {
-            isFetching = false;
+            if (seq === fetchSeq) isFetching = false;
         }
     }
 
@@ -130,8 +171,11 @@
         <div class="relative group">
             <input
                 type="text"
-                placeholder="Paste Token Contract..."
-                class="w-full bg-transparent border-none !text-4xl !md:text-5xl font-light text-center placeholder:text-zen-fg-faint text-zen-fg focus:outline-none focus:ring-0 transition-all duration-300"
+                placeholder="Token contract ID…"
+                class="w-full bg-transparent border-none font-light font-mono placeholder:font-sans placeholder:text-zen-fg-faint text-zen-fg focus:outline-none focus:ring-0 transition-all duration-300 {tokenAddress
+                    ? 'text-left text-base sm:text-lg'
+                    : 'text-center text-2xl sm:text-3xl md:text-4xl px-12'}"
+                bind:this={inputEl}
                 bind:value={tokenAddress}
                 oninput={handleAddressInput}
                 spellcheck="false"
@@ -142,10 +186,15 @@
             <!-- Paste Button (Visible when empty) -->
             {#if !tokenAddress}
                 <div
-                    class="absolute top-1/2 -translate-y-1/2 right-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                    class="absolute top-1/2 -translate-y-1/2 right-0 opacity-70 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity"
                 >
-                    <ZenButton variant="ghost" size="sm" onclick={handlePaste}>
-                        Paste <Clipboard class="w-3 h-3 ml-1" />
+                    <ZenButton
+                        variant="ghost"
+                        size="sm"
+                        onclick={handlePaste}
+                        aria-label="Paste contract from clipboard"
+                    >
+                        <Clipboard class="w-4 h-4" />
                     </ZenButton>
                 </div>
             {/if}
@@ -153,13 +202,51 @@
             <!-- Error Message -->
             {#if error}
                 <div
+                    role="alert"
                     class="mt-4 text-zen-error text-sm font-medium flex items-center justify-center gap-2 animate-zen-slide-up"
                 >
-                    <AlertCircle class="w-4 h-4" />
-                    {error}
+                    <AlertCircle class="w-4 h-4 shrink-0" />
+                    <span>{error}</span>
+                    {#if isAddressValid}
+                        <button
+                            type="button"
+                            onclick={fetchMetadata}
+                            class="underline underline-offset-2 hover:text-zen-fg transition-colors rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zen-primary"
+                        >
+                            Retry
+                        </button>
+                    {/if}
                 </div>
             {/if}
         </div>
+
+        <!-- Quick-Launch Presets -->
+        {#if !tokenMetadata && presets.length > 0}
+            <div
+                class="flex flex-wrap items-center justify-center gap-2"
+                role="group"
+                aria-label="Quick launch tokens"
+            >
+                <span class="text-xs text-zen-fg-faint mr-1">Quick launch:</span>
+                {#each presets as preset (preset.sacAddress)}
+                    {@const active = selectedPreset?.sacAddress === preset.sacAddress}
+                    <button
+                        type="button"
+                        onclick={() => selectPreset(preset)}
+                        aria-pressed={active}
+                        aria-label={`Use ${preset.label}`}
+                        class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-full border transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zen-primary focus-visible:ring-offset-2 focus-visible:ring-offset-zen-bg {active
+                            ? 'border-zen-fg bg-zen-fg text-zen-bg font-medium'
+                            : 'border-zen-border-subtle bg-zen-fg/5 text-zen-fg-muted hover:border-zen-fg/20 hover:text-zen-fg hover:bg-zen-fg/10'}"
+                    >
+                        {#if preset.iconUrl}
+                            <img src={preset.iconUrl} alt="" class="w-4 h-4 rounded-full" />
+                        {/if}
+                        {preset.label}
+                    </button>
+                {/each}
+            </div>
+        {/if}
 
         <!-- Status / Result -->
         <div class="h-32 flex items-center justify-center">
@@ -171,18 +258,28 @@
                     >
                 </div>
             {:else if tokenMetadata}
+                {@const cardLogo = tokenMetadata.logoUrl ?? selectedPreset?.iconUrl}
                 <!-- Token Card (Minimal) -->
                 <div in:fly={{ y: 10, duration: 400 }} class="w-full max-w-md mx-auto">
                     <ZenCard
                         interactive
+                        role="button"
+                        tabindex={0}
                         onclick={handleNext}
+                        onkeydown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                handleNext();
+                            }
+                        }}
+                        aria-label={`Continue with ${tokenMetadata.name ?? tokenMetadata.symbol ?? 'selected token'}`}
                         class="flex items-center gap-5 p-4 cursor-pointer text-left"
                     >
                         <!-- Logo Box -->
                         <div class="relative shrink-0">
-                            {#if tokenMetadata.logoUrl}
+                            {#if cardLogo}
                                 <img
-                                    src={tokenMetadata.logoUrl}
+                                    src={cardLogo}
                                     alt=""
                                     class="w-12 h-12 rounded-full grayscale opacity-80 group-hover:grayscale-0 group-hover:opacity-100 transition-all"
                                 />
@@ -203,7 +300,7 @@
                                 </h3>
                                 <span
                                     class="text-[10px] uppercase tracking-widest text-zen-fg-faint"
-                                    >Verified</span
+                                    >On-chain</span
                                 >
                             </div>
 
@@ -226,6 +323,16 @@
                             <ArrowRight class="w-4 h-4" />
                         </div>
                     </ZenCard>
+                </div>
+            {:else if tokenAddress && !isAddressValid}
+                <div class="text-zen-fg-faint text-sm" aria-live="polite" in:fade>
+                    {#if !tokenAddress.startsWith('C')}
+                        Contract IDs start with "C"
+                    {:else if tokenAddress.length < 56}
+                        <span class="font-mono">{tokenAddress.length}</span>/56 characters
+                    {:else}
+                        Invalid contract format
+                    {/if}
                 </div>
             {:else if !tokenAddress}
                 <p class="text-zen-fg-muted text-sm font-light">Supports Stellar</p>
