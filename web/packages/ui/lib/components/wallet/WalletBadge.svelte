@@ -6,7 +6,13 @@
     <div
         class="flex items-center gap-1.5 px-2 py-1 rounded-md bg-zen-fg/5 text-xs font-mono text-zen-fg-muted"
     >
-        <span class="w-1.5 h-1.5 rounded-full bg-zen-success"></span>
+        <span
+            class="w-1.5 h-1.5 rounded-full {walletStore.isWrongNetwork
+                ? 'bg-zen-warning animate-pulse'
+                : walletStore.isMainnet
+                  ? 'bg-zen-warning'
+                  : 'bg-zen-success'}"
+        ></span>
         <span>{walletStore.shortAddress}</span>
     </div>
 {/if}
