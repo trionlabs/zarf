@@ -2,14 +2,16 @@
     import { wizardStore } from '$lib/stores/wizardStore.svelte';
     import { goto } from '$app/navigation';
     import { onMount, tick } from 'svelte';
-    import { ArrowRight, Clipboard, Loader2, AlertCircle } from 'lucide-svelte';
+    import { ArrowRight, Clipboard, Loader2, AlertCircle, AlertTriangle } from 'lucide-svelte';
     import { fetchTokenMetadata, type TokenMetadata } from '$lib/services/tokenMetadata';
     import { isValidContractAddressShape as isValidContractAddress } from '@zarf/core/utils/addressShape';
     import { fade, fly } from 'svelte/transition';
     import ZenButton from '@zarf/ui/components/ui/ZenButton.svelte';
     import ZenCard from '@zarf/ui/components/ui/ZenCard.svelte';
+    import ZenCheckbox from '@zarf/ui/components/ui/ZenCheckbox.svelte';
     import { networkStore } from '@zarf/ui/stores/networkStore.svelte';
     import { getTokenPresets, type TokenPreset } from '$lib/config/tokenPresets';
+    import { getRegistryToken } from '$lib/config/tokenRegistry';
     import TokenPickerModal from '$lib/components/TokenPickerModal.svelte';
     import { Search } from 'lucide-svelte';
 
@@ -23,6 +25,8 @@
     let fetchSeq = 0; // monotonic request id — guards against out-of-order resolution
     let inputEl = $state<HTMLInputElement | undefined>(undefined);
     let pickerOpen = $state(false);
+    let selectedTrust = $state<'curated' | 'imported'>('curated');
+    let acknowledged = $state(false);
 
     // After a programmatic fill, the input auto-scrolls to the caret (end), hiding the
     // leading "C…". Reset to the start so users can verify the address prefix.
@@ -91,7 +95,32 @@
     function loadToken(sacAddress: string, presetLike: TokenPreset | null) {
         selectedPreset = presetLike;
         tokenAddress = sacAddress;
+        acknowledged = false;
         resetLookup();
+
+        // Trust + offline identity (D4/D5): a curated token renders its identity
+        // from the registry immediately — and can proceed — even if the indexer
+        // is down. fetchMetadata enriches on-chain fields when it responds.
+        const known = getRegistryToken(networkStore.activeId, sacAddress);
+        selectedTrust = known ? 'curated' : 'imported';
+        if (known) {
+            tokenMetadata = {
+                name: known.name,
+                symbol: known.symbol,
+                decimals: known.decimals,
+                totalSupply: null,
+                logoUrl: known.iconUrl ?? null,
+            };
+            wizardStore.setTokenDetails({
+                tokenAddress: sacAddress,
+                tokenName: known.name,
+                tokenSymbol: known.symbol,
+                tokenDecimals: known.decimals,
+                tokenTotalSupply: '0',
+                iconUrl: known.iconUrl,
+            });
+        }
+
         fetchMetadata();
         revealStart();
     }
@@ -150,17 +179,22 @@
                     tokenTotalSupply: result.data.totalSupply ?? '0',
                     iconUrl: result.data.logoUrl,
                 });
-            } else {
+            } else if (!tokenMetadata) {
+                // Keep a curated registry-seeded card instead of dead-ending (D5).
                 error = result.error || 'Could not fetch token metadata';
             }
         } catch {
-            if (seq === fetchSeq) error = 'Network error while fetching metadata';
+            if (seq === fetchSeq && !tokenMetadata) {
+                error = 'Network error while fetching metadata';
+            }
         } finally {
             if (seq === fetchSeq) isFetching = false;
         }
     }
 
     function handleNext() {
+        // Imported (unverified) tokens require an explicit acknowledgement (D4).
+        if (selectedTrust === 'imported' && !acknowledged) return;
         wizardStore.nextStep();
         goto('/wizard/step-1');
     }
@@ -179,7 +213,7 @@
 <div class="min-h-[50vh] flex flex-col items-center justify-center p-4 relative overflow-hidden">
     <!-- Background Decor -->
     <div
-        class="absolute -z-10 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-zen-fg/5 rounded-full blur-[120px] pointer-events-none"
+        class="absolute -z-10 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-125 h-125 bg-zen-fg/5 rounded-full blur-[120px] pointer-events-none"
     ></div>
 
     <div class="w-full max-w-2xl text-center space-y-10">
@@ -278,7 +312,7 @@
         {/if}
 
         <!-- Status / Result -->
-        <div class="h-32 flex items-center justify-center">
+        <div class="min-h-32 flex items-center justify-center">
             {#if isFetching}
                 <div class="flex flex-col items-center gap-3 text-zen-fg-faint" in:fade>
                     <Loader2 class="w-6 h-6 animate-spin text-zen-fg" />
@@ -288,30 +322,16 @@
                 </div>
             {:else if tokenMetadata}
                 {@const cardLogo = tokenMetadata.logoUrl ?? selectedPreset?.iconUrl}
-                <!-- Token Card (Minimal) -->
-                <div in:fly={{ y: 10, duration: 400 }} class="w-full max-w-md mx-auto">
-                    <ZenCard
-                        interactive
-                        role="button"
-                        tabindex={0}
-                        onclick={handleNext}
-                        onkeydown={(e) => {
-                            if (e.key === 'Enter' || e.key === ' ') {
-                                e.preventDefault();
-                                handleNext();
-                            }
-                        }}
-                        aria-label={`Continue with ${tokenMetadata.name ?? tokenMetadata.symbol ?? 'selected token'}`}
-                        class="flex items-center gap-5 p-4 cursor-pointer text-left"
-                    >
+                {@const imported = selectedTrust === 'imported'}
+                <div
+                    in:fly={{ y: 10, duration: 400 }}
+                    class="w-full max-w-md mx-auto space-y-3 text-left"
+                >
+                    <ZenCard class="flex items-center gap-5 p-4">
                         <!-- Logo Box -->
-                        <div class="relative shrink-0">
+                        <div class="shrink-0">
                             {#if cardLogo}
-                                <img
-                                    src={cardLogo}
-                                    alt=""
-                                    class="w-12 h-12 rounded-full grayscale opacity-80 group-hover:grayscale-0 group-hover:opacity-100 transition-all"
-                                />
+                                <img src={cardLogo} alt="" class="w-12 h-12 rounded-full" />
                             {:else}
                                 <div
                                     class="w-12 h-12 rounded-full bg-zen-fg/5 flex items-center justify-center text-zen-fg-faint font-mono font-bold text-lg border-[0.5px] border-zen-border-subtle"
@@ -323,14 +343,17 @@
 
                         <!-- Details -->
                         <div class="flex-1 min-w-0">
-                            <div class="flex items-baseline justify-between mb-1">
-                                <h3 class="text-lg font-medium text-zen-fg truncate pr-4">
+                            <div class="flex items-baseline justify-between gap-3 mb-1">
+                                <h3 class="text-lg font-medium text-zen-fg truncate">
                                     {tokenMetadata.name}
                                 </h3>
                                 <span
-                                    class="text-[10px] uppercase tracking-widest text-zen-fg-faint"
-                                    >On-chain</span
+                                    class="text-[10px] uppercase tracking-widest shrink-0 {imported
+                                        ? 'text-zen-warning'
+                                        : 'text-zen-success'}"
                                 >
+                                    {imported ? 'Unverified' : 'Verified'}
+                                </span>
                             </div>
 
                             <div class="flex items-center gap-3">
@@ -344,14 +367,35 @@
                                 </span>
                             </div>
                         </div>
-
-                        <!-- Subtle Arrow -->
-                        <div
-                            class="text-zen-fg-faint group-hover:text-zen-fg-muted transition-colors pl-2"
-                        >
-                            <ArrowRight class="w-4 h-4" />
-                        </div>
                     </ZenCard>
+
+                    {#if imported}
+                        <div class="rounded-xl border border-zen-warning/30 bg-zen-warning/5 p-3">
+                            <p class="flex items-start gap-2 text-xs text-zen-fg-muted">
+                                <AlertTriangle class="w-4 h-4 text-zen-warning shrink-0 mt-px" />
+                                <span>
+                                    Anyone can deploy a token using a familiar name. Confirm this is
+                                    the exact contract you mean to distribute — sending the wrong
+                                    asset can't be undone.
+                                </span>
+                            </p>
+                            <div class="mt-2.5 pl-6">
+                                <ZenCheckbox
+                                    bind:checked={acknowledged}
+                                    label="I've verified this contract address"
+                                />
+                            </div>
+                        </div>
+                    {/if}
+
+                    <ZenButton
+                        variant="primary"
+                        class="w-full"
+                        disabled={imported && !acknowledged}
+                        onclick={handleNext}
+                    >
+                        Continue <ArrowRight class="w-4 h-4 ml-1" />
+                    </ZenButton>
                 </div>
             {:else if tokenAddress && !isAddressValid}
                 <div class="text-zen-fg-faint text-sm" aria-live="polite" in:fade>

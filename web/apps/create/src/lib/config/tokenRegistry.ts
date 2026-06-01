@@ -25,6 +25,8 @@ export interface RegistryToken {
     issuer?: string;
     sacAddress: string;
     network: StellarNetworkId;
+    /** SAC token decimals — classic-asset-backed SACs are fixed at 7. */
+    decimals: number;
     /** Bundled logo served from static/ (e.g. '/tokens/usdc.svg'). */
     iconUrl?: string;
     trust: TrustTier;
@@ -37,6 +39,7 @@ const REGISTRY: RegistryToken[] = [
         name: 'USD Coin',
         network: 'mainnet',
         sacAddress: 'CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75',
+        decimals: 7,
         iconUrl: '/tokens/usdc.svg',
         trust: 'curated',
     },
@@ -45,6 +48,7 @@ const REGISTRY: RegistryToken[] = [
         name: 'USD Coin',
         network: 'testnet',
         sacAddress: 'CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA',
+        decimals: 7,
         iconUrl: '/tokens/usdc.svg',
         trust: 'curated',
     },
@@ -54,6 +58,7 @@ const REGISTRY: RegistryToken[] = [
         name: 'Stellar Lumens',
         network: 'testnet',
         sacAddress: 'CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC',
+        decimals: 7,
         iconUrl: '/tokens/xlm.svg',
         trust: 'curated',
     },
@@ -62,6 +67,7 @@ const REGISTRY: RegistryToken[] = [
         name: 'Stellar Lumens',
         network: 'mainnet',
         sacAddress: 'CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA',
+        decimals: 7,
         iconUrl: '/tokens/xlm.svg',
         trust: 'curated',
     },

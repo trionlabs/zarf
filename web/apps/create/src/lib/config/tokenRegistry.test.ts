@@ -45,8 +45,10 @@ describe('searchRegistry', () => {
 });
 
 describe('getRegistryToken', () => {
-    it('finds a token by network + SAC', () => {
-        expect(getRegistryToken('testnet', TESTNET_USDC)?.symbol).toBe('USDC');
+    it('finds a token by network + SAC, with decimals for offline identity', () => {
+        const token = getRegistryToken('testnet', TESTNET_USDC);
+        expect(token?.symbol).toBe('USDC');
+        expect(token?.decimals).toBe(7);
     });
 
     it('does not cross networks', () => {
