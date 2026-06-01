@@ -110,7 +110,7 @@
     function onSearchKeydown(e: KeyboardEvent) {
         if (e.key === 'ArrowDown') {
             e.preventDefault();
-            activeIndex = Math.min(activeIndex + 1, items.length - 1);
+            if (items.length) activeIndex = Math.min(activeIndex + 1, items.length - 1);
         } else if (e.key === 'ArrowUp') {
             e.preventDefault();
             activeIndex = Math.max(activeIndex - 1, 0);
