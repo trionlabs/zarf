@@ -1,9 +1,10 @@
 <script lang="ts">
     import { networkStore } from '@zarf/ui/stores/networkStore.svelte';
     import { searchRegistry } from '$lib/config/tokenRegistry';
-    import { isValidContractAddressShape } from '@zarf/core/utils/addressShape';
+    import { parseTokenQuery, resolveSac } from '@zarf/core/utils/tokenAsset';
+    import { getStellarConfig } from '@zarf/core/config/runtime';
     import { focusTrap } from '@zarf/ui/actions/focusTrap';
-    import { Search, X } from 'lucide-svelte';
+    import { Search, X, Loader2 } from 'lucide-svelte';
     import TokenRow from './TokenRow.svelte';
 
     interface PickedToken {
@@ -22,21 +23,45 @@
 
     let query = $state('');
     let searchEl = $state<HTMLInputElement | undefined>(undefined);
+    let activeIndex = $state(0);
+    let importError = $state<string | null>(null);
+    let resolving = $state(false);
 
     const baseId = $props.id();
     const titleId = `${baseId}-title`;
+    const listId = `${baseId}-list`;
+    const optId = (i: number) => `${baseId}-opt-${i}`;
+    const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 
     const results = $derived(searchRegistry(networkStore.activeId, query));
 
-    // A pasted contract ID that isn't already a curated result → offer to import.
-    const importAddr = $derived.by(() => {
-        const q = query.trim();
-        if (!isValidContractAddressShape(q)) return null;
-        return results.some((t) => t.sacAddress === q) ? null : q;
+    // An import candidate: a contract id or CODE:ISSUER asset not already curated.
+    const importItem = $derived.by(() => {
+        const parsed = parseTokenQuery(query);
+        if (parsed.kind === 'contract') {
+            if (results.some((t) => t.sacAddress === parsed.address)) return null;
+            return { query: parsed.address, title: 'Import token', subtitle: short(parsed.address) };
+        }
+        if (parsed.kind === 'classic') {
+            return {
+                query: query.trim(),
+                title: `Import ${parsed.code}`,
+                subtitle: `${parsed.code}:${short(parsed.issuer)}`,
+            };
+        }
+        return null;
     });
+
+    // Flat, keyboard-navigable list: import row (if any) first, then results.
+    const items = $derived([
+        ...(importItem ? [{ kind: 'import' as const, ...importItem }] : []),
+        ...results.map((token) => ({ kind: 'token' as const, token })),
+    ]);
 
     function close() {
         query = '';
+        activeIndex = 0;
+        importError = null;
         onclose();
     }
 
@@ -45,15 +70,45 @@
         close();
     }
 
+    async function commitImport(q: string) {
+        importError = null;
+        resolving = true;
+        try {
+            const passphrase = getStellarConfig().networkPassphrase;
+            if (!passphrase) throw new Error('Network is not configured.');
+            const sacAddress = await resolveSac(q, passphrase);
+            pick({ sacAddress });
+        } catch (e) {
+            importError = e instanceof Error ? e.message : 'Could not resolve that token.';
+        } finally {
+            resolving = false;
+        }
+    }
+
+    function selectIndex(i: number) {
+        const item = items[i];
+        if (!item) return;
+        if (item.kind === 'import') {
+            void commitImport(item.query);
+        } else {
+            pick({
+                sacAddress: item.token.sacAddress,
+                iconUrl: item.token.iconUrl,
+                symbol: item.token.symbol,
+            });
+        }
+    }
+
     function onSearchKeydown(e: KeyboardEvent) {
-        // Enter commits the top item (import candidate first, else first result).
-        if (e.key !== 'Enter') return;
-        e.preventDefault();
-        if (importAddr) {
-            pick({ sacAddress: importAddr });
-        } else if (results[0]) {
-            const t = results[0];
-            pick({ sacAddress: t.sacAddress, iconUrl: t.iconUrl, symbol: t.symbol });
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            activeIndex = Math.min(activeIndex + 1, items.length - 1);
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            activeIndex = Math.max(activeIndex - 1, 0);
+        } else if (e.key === 'Enter') {
+            e.preventDefault();
+            selectIndex(activeIndex);
         }
     }
 
@@ -91,7 +146,7 @@
                 </button>
             </div>
 
-            <!-- Search -->
+            <!-- Search (combobox) -->
             <div class="p-4 pb-2">
                 <div class="relative">
                     <Search
@@ -100,38 +155,55 @@
                     <input
                         bind:this={searchEl}
                         bind:value={query}
+                        oninput={() => (activeIndex = 0)}
                         onkeydown={onSearchKeydown}
                         type="text"
-                        placeholder="Search name or symbol, or paste a contract ID"
+                        role="combobox"
+                        aria-expanded="true"
+                        aria-controls={listId}
+                        aria-activedescendant={items.length ? optId(activeIndex) : undefined}
                         aria-label="Search tokens"
+                        placeholder="Search name or symbol, or paste a contract ID"
                         spellcheck="false"
                         autocomplete="off"
                         autocapitalize="none"
                         class="w-full rounded-xl border-[0.5px] border-zen-border-subtle bg-zen-fg/5 py-2.5 pl-9 pr-3 text-sm text-zen-fg placeholder:text-zen-fg-faint transition-colors focus:border-zen-primary/50 focus:outline-none"
                     />
                 </div>
+                {#if importError}
+                    <p role="alert" class="mt-2 px-1 text-xs text-zen-error">{importError}</p>
+                {/if}
             </div>
 
             <!-- Results -->
-            <div class="flex-1 overflow-y-auto px-2 pb-3" role="listbox" aria-label="Token results">
-                {#if importAddr}
-                    <TokenRow importAddress={importAddr} onselect={() => pick({ sacAddress: importAddr })} />
-                {/if}
-                {#each results as token (token.sacAddress)}
+            <div
+                id={listId}
+                class="flex-1 overflow-y-auto px-2 pb-3"
+                role="listbox"
+                aria-label="Token results"
+            >
+                {#each items as item, i (item.kind === 'import' ? 'import' : item.token.sacAddress)}
                     <TokenRow
-                        {token}
-                        onselect={() =>
-                            pick({
-                                sacAddress: token.sacAddress,
-                                iconUrl: token.iconUrl,
-                                symbol: token.symbol,
-                            })}
+                        id={optId(i)}
+                        token={item.kind === 'token' ? item.token : undefined}
+                        importItem={item.kind === 'import'
+                            ? { title: item.title, subtitle: item.subtitle }
+                            : undefined}
+                        active={i === activeIndex}
+                        onselect={() => selectIndex(i)}
+                        onhover={() => (activeIndex = i)}
                     />
                 {/each}
-                {#if !results.length && !importAddr}
+                {#if resolving}
+                    <div
+                        class="flex items-center justify-center gap-2 py-4 text-sm text-zen-fg-faint"
+                    >
+                        <Loader2 class="w-4 h-4 animate-spin" /> Resolving…
+                    </div>
+                {:else if !items.length}
                     <p class="text-center text-sm text-zen-fg-muted py-8 px-4">
                         {query.trim()
-                            ? 'No known token matches. Paste a contract ID (C…) to import it.'
+                            ? 'No known token. Paste a contract ID or CODE:ISSUER to import.'
                             : 'No tokens configured for this network.'}
                     </p>
                 {/if}

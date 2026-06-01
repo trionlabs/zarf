@@ -2,22 +2,33 @@
     import type { RegistryToken } from '$lib/config/tokenRegistry';
 
     interface Props {
+        id: string;
         /** A curated/known token row. */
         token?: RegistryToken;
-        /** An import row for a pasted contract ID not in the registry. */
-        importAddress?: string;
+        /** An import row for a pasted contract id / CODE:ISSUER asset. */
+        importItem?: { title: string; subtitle: string };
+        /** Keyboard-highlighted (aria-activedescendant target). */
+        active: boolean;
         onselect: () => void;
+        onhover: () => void;
     }
 
-    let { token, importAddress, onselect }: Props = $props();
-
-    const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
+    let { id, token, importItem, active, onselect, onhover }: Props = $props();
 </script>
 
-<button
-    type="button"
+<!-- Keyboard activation is handled by the combobox input (aria-activedescendant). -->
+<!-- svelte-ignore a11y_click_events_have_key_events -->
+<!-- svelte-ignore a11y_no_static_element_interactions -->
+<div
+    {id}
+    role="option"
+    tabindex={-1}
+    aria-selected={active}
     onclick={onselect}
-    class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-colors hover:bg-zen-fg/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zen-primary focus-visible:ring-inset"
+    onmouseenter={onhover}
+    class="flex cursor-pointer items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors {active
+        ? 'bg-zen-fg/10'
+        : ''}"
 >
     {#if token?.iconUrl}
         <img src={token.iconUrl} alt="" class="w-7 h-7 rounded-full shrink-0" />
@@ -36,12 +47,12 @@
                 <span class="text-xs text-zen-fg-faint shrink-0">{token.symbol}</span>
             </div>
             <span class="block text-xs text-zen-fg-faint font-mono truncate">
-                {short(token.sacAddress)}
+                {`${token.sacAddress.slice(0, 6)}…${token.sacAddress.slice(-4)}`}
             </span>
-        {:else if importAddress}
-            <div class="font-medium text-zen-fg">Import token</div>
+        {:else if importItem}
+            <div class="font-medium text-zen-fg truncate">{importItem.title}</div>
             <span class="block text-xs text-zen-fg-faint font-mono truncate">
-                {short(importAddress)}
+                {importItem.subtitle}
             </span>
         {/if}
     </div>
@@ -49,4 +60,4 @@
     <span class="text-[10px] uppercase tracking-widest text-zen-fg-faint shrink-0">
         {token ? 'Known' : 'Unverified'}
     </span>
-</button>
+</div>
