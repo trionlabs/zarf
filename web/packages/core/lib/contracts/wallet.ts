@@ -13,9 +13,16 @@ import { browser } from '../utils/ssr';
 import type { WatchWalletChanges } from '@stellar/freighter-api';
 import { getStellarConfig } from '../config/runtime';
 import type { StellarAddress, WalletAccount, WalletConnection } from '../types';
+import { xlmToStroops, computeReserveStroops } from './balance';
 
 export interface StellarBalance {
+    /** Total native balance in stroops (exact; 1 XLM = 10^7 stroops). */
     value: bigint;
+    /** Protocol-reserved, non-spendable stroops (base reserve + subentries). */
+    reserved: bigint;
+    /** Spendable stroops = max(0, value − reserved). */
+    spendable: bigint;
+    /** Raw Horizon decimal-XLM string, full precision. */
     formatted: string;
     symbol: string;
 }
@@ -25,6 +32,9 @@ interface HorizonAccountResponse {
         asset_type?: string;
         balance?: string;
     }>;
+    subentry_count?: number;
+    num_sponsoring?: number;
+    num_sponsored?: number;
 }
 
 let watcher: InstanceType<typeof WatchWalletChanges> | null = null;
@@ -45,18 +55,59 @@ function freighterErrorMessage(error: unknown): string {
     return maybe.message || maybe.error || 'Freighter request failed';
 }
 
+/**
+ * Build an Error from a Freighter error, PRESERVING its numeric `code`. Throwing
+ * a bare `new Error(message)` discards the code, which downstream sanitizers use
+ * (e.g. -32002 "request already pending") — so always throw via this helper.
+ */
+function freighterError(error: unknown): Error {
+    const e = new Error(freighterErrorMessage(error)) as Error & { code?: number };
+    const code = (error as { code?: number } | null)?.code;
+    if (typeof code === 'number') e.code = code;
+    return e;
+}
+
 function assertBrowser(): void {
     if (!browser) {
         throw new Error('Cannot connect Stellar wallet during SSR');
     }
 }
 
+/** Canonical Stellar network passphrases. The passphrase — not the wallet's
+ *  free-text network name — is the trusted identifier for any safety decision. */
+export const STELLAR_PASSPHRASE = {
+    PUBLIC: 'Public Global Stellar Network ; September 2015',
+    TESTNET: 'Test SDF Network ; September 2015',
+    FUTURENET: 'Test SDF Future Network ; October 2022',
+} as const;
+
+/** Abort a Horizon balance request that hangs, so the UI never spins forever. */
+const HORIZON_TIMEOUT_MS = 10_000;
+
 function normalizeNetworkName(name?: string, passphrase?: string): string {
     if (name) return name;
-    if (passphrase === 'Public Global Stellar Network ; September 2015') return 'PUBLIC';
-    if (passphrase === 'Test SDF Network ; September 2015') return 'TESTNET';
-    if (passphrase === 'Test SDF Future Network ; October 2022') return 'FUTURENET';
+    if (passphrase === STELLAR_PASSPHRASE.PUBLIC) return 'PUBLIC';
+    if (passphrase === STELLAR_PASSPHRASE.TESTNET) return 'TESTNET';
+    if (passphrase === STELLAR_PASSPHRASE.FUTURENET) return 'FUTURENET';
     return 'CUSTOM';
+}
+
+/** True only on Stellar mainnet (the PUBLIC network). Drives real-funds UI guards. */
+export function isMainnetPassphrase(passphrase?: string | null): boolean {
+    return passphrase === STELLAR_PASSPHRASE.PUBLIC;
+}
+
+/**
+ * User-facing network label derived ONLY from the passphrase (the trusted
+ * identifier), never from the wallet's self-reported network string. Returns
+ * null when no passphrase is known (e.g. while disconnected).
+ */
+export function networkLabelFromPassphrase(passphrase?: string | null): string | null {
+    if (!passphrase) return null;
+    if (passphrase === STELLAR_PASSPHRASE.PUBLIC) return 'MAINNET';
+    if (passphrase === STELLAR_PASSPHRASE.TESTNET) return 'TESTNET';
+    if (passphrase === STELLAR_PASSPHRASE.FUTURENET) return 'FUTURENET';
+    return 'UNKNOWN';
 }
 
 function bytesToBase64(bytes: Uint8Array): string {
@@ -91,17 +142,17 @@ export async function connectWallet(): Promise<WalletConnection> {
     const fr = await loadFreighter();
 
     const connected = await fr.isConnected();
-    if (connected.error) throw new Error(freighterErrorMessage(connected.error));
+    if (connected.error) throw freighterError(connected.error);
     if (!connected.isConnected) {
         throw new Error('No Stellar wallet detected. Please install Freighter.');
     }
 
     const access = await fr.requestAccess();
-    if (access.error) throw new Error(freighterErrorMessage(access.error));
+    if (access.error) throw freighterError(access.error);
     if (!access.address) throw new Error('Freighter did not return a Stellar address.');
 
     const network = await fr.getNetworkDetails();
-    if (network.error) throw new Error(freighterErrorMessage(network.error));
+    if (network.error) throw freighterError(network.error);
 
     return {
         address: access.address,
@@ -119,29 +170,44 @@ export async function reconnectWallet(): Promise<void> {
     await getWalletAccount();
 }
 
-export async function switchChain(): Promise<void> {
-    throw new Error(
-        'Network changes are handled in Freighter. Select the configured Stellar network there.',
-    );
-}
-
 export async function getNativeBalance(address: StellarAddress): Promise<StellarBalance> {
     const cfg = getStellarConfig();
     if (!cfg.horizonUrl) throw new Error('Missing Stellar Horizon URL');
 
     const url = new URL(`/accounts/${address}`, cfg.horizonUrl);
-    const res = await fetch(url);
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), HORIZON_TIMEOUT_MS);
+    let res: Response;
+    try {
+        res = await fetch(url, { signal: controller.signal });
+    } finally {
+        clearTimeout(timer);
+    }
+
+    // A brand-new / unfunded account does not exist on the ledger yet → Horizon
+    // returns 404. That is a real zero balance, not an error: report 0 XLM so a
+    // fresh wallet shows a fundable account instead of spinning forever.
+    if (res.status === 404) {
+        return { value: 0n, reserved: 0n, spendable: 0n, formatted: '0', symbol: 'XLM' };
+    }
     if (!res.ok) throw new Error(`Failed to fetch Stellar account balance: ${res.status}`);
 
     const json = (await res.json()) as HorizonAccountResponse;
     const native = json.balances?.find((balance) => balance.asset_type === 'native');
     const formatted = native?.balance ?? '0';
 
-    return {
-        value: BigInt(Math.trunc(Number(formatted) * 10_000_000)),
-        formatted,
-        symbol: 'XLM',
-    };
+    // Exact, float-free stroop conversion; reserve from the account's subentry
+    // profile so callers can show spendable vs. total.
+    const value = xlmToStroops(formatted);
+    const reserved = computeReserveStroops(
+        json.subentry_count ?? 0,
+        json.num_sponsoring ?? 0,
+        json.num_sponsored ?? 0,
+    );
+    const spendable = value > reserved ? value - reserved : 0n;
+
+    return { value, reserved, spendable, formatted, symbol: 'XLM' };
 }
 
 export async function getWalletAccount(): Promise<WalletAccount> {
@@ -202,7 +268,7 @@ export async function signTransaction(xdr: string, address: StellarAddress): Pro
         networkPassphrase: cfg.networkPassphrase,
     });
 
-    if (result.error) throw new Error(freighterErrorMessage(result.error));
+    if (result.error) throw freighterError(result.error);
     if (!result.signedTxXdr) throw new Error('Freighter did not return a signed transaction.');
     return result.signedTxXdr;
 }
@@ -216,7 +282,7 @@ export async function signMessage(message: string, address: StellarAddress): Pro
         networkPassphrase: cfg.networkPassphrase,
     });
 
-    if (result.error) throw new Error(freighterErrorMessage(result.error));
+    if (result.error) throw freighterError(result.error);
     if (!result.signedMessage) throw new Error('Freighter did not return a signed message.');
     if (result.signerAddress && result.signerAddress !== address) {
         throw new Error('Freighter signed with a different Stellar address.');
@@ -226,3 +292,11 @@ export async function signMessage(message: string, address: StellarAddress): Pro
         ? result.signedMessage
         : bytesToBase64(result.signedMessage);
 }
+
+export {
+    xlmToStroops,
+    formatXlmAmount,
+    computeReserveStroops,
+    STROOPS_PER_XLM,
+    BASE_RESERVE_STROOPS,
+} from './balance';
