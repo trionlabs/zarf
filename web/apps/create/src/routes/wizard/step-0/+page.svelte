@@ -2,7 +2,7 @@
     import { wizardStore } from '$lib/stores/wizardStore.svelte';
     import { goto } from '$app/navigation';
     import { onMount, tick } from 'svelte';
-    import { ArrowRight, Clipboard, Loader2, AlertCircle, AlertTriangle } from 'lucide-svelte';
+    import { ArrowRight, ArrowLeft, Clipboard, Loader2, AlertCircle, AlertTriangle } from 'lucide-svelte';
     import { fetchTokenMetadata, type TokenMetadata } from '$lib/services/tokenMetadata';
     import { isValidContractAddressShape as isValidContractAddress } from '@zarf/core/utils/addressShape';
     import { fade, fly } from 'svelte/transition';
@@ -198,6 +198,18 @@
         wizardStore.nextStep();
         goto('/wizard/step-1');
     }
+
+    // Clear the confirmed selection and return to the picker state. The input,
+    // chips and search trigger are gated on `!tokenMetadata`, so resetting here
+    // re-reveals them; refocus the input so a keyboard user can act immediately.
+    function changeToken() {
+        selectedPreset = null;
+        tokenAddress = '';
+        acknowledged = false;
+        selectedTrust = 'curated';
+        resetLookup(); // clears tokenMetadata + error, bumps fetchSeq
+        tick().then(() => inputEl?.focus());
+    }
 </script>
 
 <svelte:head>
@@ -217,8 +229,9 @@
     ></div>
 
     <div class="w-full max-w-2xl text-center space-y-10">
-        <!-- Input Section -->
-        <div class="relative group">
+        <!-- Input Section — hidden once a token is confirmed; the card owns identity. -->
+        {#if !tokenMetadata}
+            <div class="relative group">
             <input
                 type="text"
                 placeholder="Token contract ID…"
@@ -268,7 +281,8 @@
                     {/if}
                 </div>
             {/if}
-        </div>
+            </div>
+        {/if}
 
         <!-- Quick-Launch Presets + token picker trigger -->
         {#if !tokenMetadata}
@@ -379,6 +393,11 @@
                                     asset can't be undone.
                                 </span>
                             </p>
+                            <p
+                                class="mt-2 pl-6 font-mono text-[11px] leading-relaxed text-zen-fg-muted break-all"
+                            >
+                                {tokenAddress}
+                            </p>
                             <div class="mt-2.5 pl-6">
                                 <ZenCheckbox
                                     bind:checked={acknowledged}
@@ -396,6 +415,14 @@
                     >
                         Continue <ArrowRight class="w-4 h-4 ml-1" />
                     </ZenButton>
+
+                    <button
+                        type="button"
+                        onclick={changeToken}
+                        class="mx-auto flex items-center gap-1.5 rounded text-xs text-zen-fg-faint transition-colors hover:text-zen-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zen-primary focus-visible:ring-offset-2 focus-visible:ring-offset-zen-bg"
+                    >
+                        <ArrowLeft class="w-3.5 h-3.5" /> Choose a different token
+                    </button>
                 </div>
             {:else if tokenAddress && !isAddressValid}
                 <div class="text-zen-fg-faint text-sm" aria-live="polite" in:fade>
