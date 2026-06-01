@@ -10,6 +10,8 @@
     import ZenCard from '@zarf/ui/components/ui/ZenCard.svelte';
     import { networkStore } from '@zarf/ui/stores/networkStore.svelte';
     import { getTokenPresets, type TokenPreset } from '$lib/config/tokenPresets';
+    import TokenPickerModal from '$lib/components/TokenPickerModal.svelte';
+    import { Search } from 'lucide-svelte';
 
     // --- State ---
     let tokenAddress = $state('');
@@ -18,15 +20,16 @@
     let error = $state<string | null>(null);
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
     let selectedPreset = $state<TokenPreset | null>(null);
-    let fetchSeq = 0;
+    let fetchSeq = 0; // monotonic request id — guards against out-of-order resolution
     let inputEl = $state<HTMLInputElement | undefined>(undefined);
+    let pickerOpen = $state(false);
 
     // After a programmatic fill, the input auto-scrolls to the caret (end), hiding the
     // leading "C…". Reset to the start so users can verify the address prefix.
     async function revealStart() {
         await tick();
         if (inputEl) inputEl.scrollLeft = 0;
-    } // monotonic request id — guards against out-of-order resolution
+    }
 
     onMount(() => {
         wizardStore.goToStep(0);
@@ -82,28 +85,41 @@
         debounceTimer = setTimeout(fetchMetadata, 500);
     }
 
-    function selectPreset(preset: TokenPreset) {
-        // No same-preset early return: chips are hidden once a token loads, so a re-click
-        // only ever happens to retry after an error — which must be allowed.
-        selectedPreset = preset;
-        tokenAddress = preset.sacAddress;
+    // Commit a chosen address (preset, paste, or picker) and look it up. presetLike
+    // carries the icon/symbol so the result card can fall back to it when the chain
+    // returns no logo.
+    function loadToken(sacAddress: string, presetLike: TokenPreset | null) {
+        selectedPreset = presetLike;
+        tokenAddress = sacAddress;
         resetLookup();
-        fetchMetadata(); // presets are known-good — skip the debounce
+        fetchMetadata();
         revealStart();
+    }
+
+    function selectPreset(preset: TokenPreset) {
+        // No same-preset early return: chips hide once a token loads, so a re-click
+        // only ever happens to retry after an error — which must be allowed.
+        loadToken(preset.sacAddress, preset);
+    }
+
+    function handlePicked(sel: { sacAddress: string; iconUrl?: string; symbol?: string }) {
+        const presetLike: TokenPreset | null = sel.symbol
+            ? {
+                  label: sel.symbol,
+                  symbol: sel.symbol,
+                  sacAddress: sel.sacAddress,
+                  network: networkStore.activeId,
+                  iconUrl: sel.iconUrl,
+              }
+            : null;
+        loadToken(sel.sacAddress, presetLike);
     }
 
     async function handlePaste() {
         try {
             const text = await navigator.clipboard.readText();
-            if (isValidContractAddress(text)) {
-                tokenAddress = text;
-                selectedPreset = null;
-                resetLookup();
-                fetchMetadata();
-                revealStart();
-            } else {
-                error = 'Invalid address in clipboard';
-            }
+            if (isValidContractAddress(text)) loadToken(text, null);
+            else error = 'Invalid address in clipboard';
         } catch {
             error = 'Could not access clipboard';
         }
@@ -220,31 +236,44 @@
             {/if}
         </div>
 
-        <!-- Quick-Launch Presets -->
-        {#if !tokenMetadata && presets.length > 0}
-            <div
-                class="flex flex-wrap items-center justify-center gap-2"
-                role="group"
-                aria-label="Quick launch tokens"
-            >
-                <span class="text-xs text-zen-fg-faint mr-1">Quick launch:</span>
-                {#each presets as preset (preset.sacAddress)}
-                    {@const active = selectedPreset?.sacAddress === preset.sacAddress}
-                    <button
-                        type="button"
-                        onclick={() => selectPreset(preset)}
-                        aria-pressed={active}
-                        aria-label={`Use ${preset.label}`}
-                        class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-full border transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zen-primary focus-visible:ring-offset-2 focus-visible:ring-offset-zen-bg {active
-                            ? 'border-zen-fg bg-zen-fg text-zen-bg font-medium'
-                            : 'border-zen-border-subtle bg-zen-fg/5 text-zen-fg-muted hover:border-zen-fg/20 hover:text-zen-fg hover:bg-zen-fg/10'}"
+        <!-- Quick-Launch Presets + token picker trigger -->
+        {#if !tokenMetadata}
+            <div class="flex flex-wrap items-center justify-center gap-2">
+                {#if presets.length > 0}
+                    <div
+                        class="flex flex-wrap items-center justify-center gap-2"
+                        role="group"
+                        aria-label="Quick launch tokens"
                     >
-                        {#if preset.iconUrl}
-                            <img src={preset.iconUrl} alt="" class="w-4 h-4 rounded-full" />
-                        {/if}
-                        {preset.label}
-                    </button>
-                {/each}
+                        <span class="text-xs text-zen-fg-faint mr-1">Quick launch:</span>
+                        {#each presets as preset (preset.sacAddress)}
+                            {@const active = selectedPreset?.sacAddress === preset.sacAddress}
+                            <button
+                                type="button"
+                                onclick={() => selectPreset(preset)}
+                                aria-pressed={active}
+                                aria-label={`Use ${preset.label}`}
+                                class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-full border transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zen-primary focus-visible:ring-offset-2 focus-visible:ring-offset-zen-bg {active
+                                    ? 'border-zen-fg bg-zen-fg text-zen-bg font-medium'
+                                    : 'border-zen-border-subtle bg-zen-fg/5 text-zen-fg-muted hover:border-zen-fg/20 hover:text-zen-fg hover:bg-zen-fg/10'}"
+                            >
+                                {#if preset.iconUrl}
+                                    <img src={preset.iconUrl} alt="" class="w-4 h-4 rounded-full" />
+                                {/if}
+                                {preset.label}
+                            </button>
+                        {/each}
+                    </div>
+                {/if}
+                <button
+                    type="button"
+                    onclick={() => (pickerOpen = true)}
+                    aria-haspopup="dialog"
+                    class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-full border border-dashed border-zen-border-subtle bg-transparent text-zen-fg-muted transition-all duration-200 hover:border-zen-fg/30 hover:text-zen-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zen-primary focus-visible:ring-offset-2 focus-visible:ring-offset-zen-bg"
+                >
+                    <Search class="w-3.5 h-3.5" />
+                    Search tokens
+                </button>
             </div>
         {/if}
 
@@ -339,4 +368,10 @@
             {/if}
         </div>
     </div>
+
+    <TokenPickerModal
+        open={pickerOpen}
+        onclose={() => (pickerOpen = false)}
+        onselect={handlePicked}
+    />
 </div>
