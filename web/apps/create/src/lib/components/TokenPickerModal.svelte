@@ -58,6 +58,13 @@
         ...results.map((token) => ({ kind: 'token' as const, token })),
     ]);
 
+    // Keep the keyboard-highlighted option visible when arrowing through a list
+    // taller than the viewport. block:'nearest' is a no-op when already in view
+    // (e.g. on hover), so this is safe to run on every activeIndex change.
+    $effect(() => {
+        document.getElementById(optId(activeIndex))?.scrollIntoView({ block: 'nearest' });
+    });
+
     function close() {
         query = '';
         activeIndex = 0;
@@ -89,6 +96,7 @@
         const item = items[i];
         if (!item) return;
         if (item.kind === 'import') {
+            if (resolving) return; // ignore Enter-spam while a resolve is in flight
             void commitImport(item.query);
         } else {
             pick({
@@ -155,11 +163,15 @@
                     <input
                         bind:this={searchEl}
                         bind:value={query}
-                        oninput={() => (activeIndex = 0)}
+                        oninput={() => {
+                            activeIndex = 0;
+                            importError = null;
+                        }}
                         onkeydown={onSearchKeydown}
                         type="text"
                         role="combobox"
                         aria-expanded="true"
+                        aria-autocomplete="list"
                         aria-controls={listId}
                         aria-activedescendant={items.length ? optId(activeIndex) : undefined}
                         aria-label="Search tokens"
