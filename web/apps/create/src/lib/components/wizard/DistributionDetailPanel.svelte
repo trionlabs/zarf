@@ -42,10 +42,13 @@
     <!-- Header -->
     <header class="p-4 border-b border-zen-border-subtle flex items-center justify-between">
         <div class="flex items-center gap-3">
-            <div
-                class="w-10 h-10 rounded-xl bg-zen-primary/10 flex items-center justify-center text-zen-primary font-bold"
-            >
-                {distribution.name.charAt(0)}
+            <div class="relative flex items-center justify-center shrink-0">
+                <div class="absolute w-11 h-11 rounded-full bg-zen-primary/10 blur-sm"></div>
+                <div
+                    class="w-10 h-10 rounded-xl bg-gradient-to-tr from-zen-primary/15 to-zen-primary/5 border border-zen-primary/20 flex items-center justify-center text-zen-primary font-mono font-bold shadow-sm relative z-10"
+                >
+                    {distribution.name.charAt(0).toUpperCase()}
+                </div>
             </div>
             <div>
                 <h2 class="font-semibold text-base">{distribution.name}</h2>
