@@ -222,6 +222,31 @@
 
     let copied = $state(false);
 
+    // Animated example for the empty-state hint: a fixed, emphasized "C" followed
+    // by base32 characters that shimmer like matrix rain. Purely decorative
+    // (aria-hidden). The $effect reads `tokenAddress`, so it re-runs when the
+    // input gains/loses a value; its teardown clears the interval when the input
+    // is filled or the component unmounts — and it stays still for reduced-motion.
+    const BASE32 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'; // StrKey alphabet, like real C… ids
+    function randBase32(n: number): string {
+        let s = '';
+        for (let i = 0; i < n; i++) s += BASE32[Math.floor(Math.random() * BASE32.length)];
+        return s;
+    }
+    let exampleLead = $state('•••••');
+    let exampleTail = $state('••••');
+    $effect(() => {
+        if (tokenAddress) return; // only animate while the input is empty
+        exampleLead = randBase32(5);
+        exampleTail = randBase32(4);
+        if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+        const id = setInterval(() => {
+            exampleLead = randBase32(5);
+            exampleTail = randBase32(4);
+        }, 90);
+        return () => clearInterval(id);
+    });
+
     async function copyAddress() {
         try {
             await navigator.clipboard.writeText(tokenAddress);
@@ -267,7 +292,7 @@
             <div class="relative group">
             <input
                 type="text"
-                placeholder="Paste token contract ID"
+                placeholder="Paste Token Contract ID"
                 class="w-full bg-transparent border-none font-light font-mono placeholder:font-sans placeholder:text-zen-fg-faint text-zen-fg focus:outline-none focus:ring-0 transition-all duration-300 {tokenAddress
                     ? 'text-left text-base sm:text-lg'
                     : 'text-center text-xl sm:text-2xl md:text-3xl px-6 sm:px-12'}"
@@ -295,9 +320,11 @@
                 </div>
             {/if}
 
-            <!-- Format hint, paired with the placeholder; only while empty. -->
+            <!-- Animated example: fixed emphasized "C" + matrix-shimmering base32. -->
             {#if !tokenAddress}
-                <p class="mt-1.5 font-mono text-sm text-zen-fg-faint" aria-hidden="true">(C…)</p>
+                <p class="mt-1.5 text-sm text-zen-fg-faint" aria-hidden="true">
+                    e.g. <span class="font-mono"><span class="font-semibold text-zen-fg">C</span>{exampleLead}…{exampleTail}</span>
+                </p>
             {/if}
 
             <!-- Error Message -->
