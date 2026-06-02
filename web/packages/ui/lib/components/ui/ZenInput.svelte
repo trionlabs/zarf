@@ -5,6 +5,7 @@
     interface Props extends HTMLInputAttributes {
         label?: string;
         error?: string | null;
+        hint?: string;
         icon?: ComponentType;
         containerClass?: string;
         tag?: 'input' | 'textarea';
@@ -14,6 +15,7 @@
     let {
         label,
         error = null,
+        hint,
         icon: Icon,
         containerClass = '',
         class: className = '',
@@ -27,6 +29,7 @@
     const generatedId = $props.id();
     const inputId = $derived(id ?? generatedId);
     const errorId = $derived(`${inputId}-error`);
+    const hintId = $derived(`${inputId}-hint`);
 
     const baseInputClasses = `
         w-full transition-all duration-[var(--zen-motion-base)]
@@ -82,7 +85,7 @@
                     ? 'pl-12'
                     : ''} {className}"
                 aria-invalid={error ? 'true' : undefined}
-                aria-describedby={error ? errorId : undefined}
+                aria-describedby={error ? errorId : hint ? hintId : undefined}
                 bind:value
                 {...rest}
             />
@@ -93,7 +96,7 @@
                     variant
                 ]} {errorClasses} resize-none min-h-24 {className}"
                 aria-invalid={error ? 'true' : undefined}
-                aria-describedby={error ? errorId : undefined}
+                aria-describedby={error ? errorId : hint ? hintId : undefined}
                 bind:value
                 {...rest as any}
             ></textarea>
@@ -103,6 +106,10 @@
     {#if error}
         <div id={errorId} class="pt-1 pl-1 text-xs font-medium text-zen-error animate-zen-slide-up">
             {error}
+        </div>
+    {:else if hint}
+        <div id={hintId} class="pt-1 pl-1 text-xs text-zen-fg-subtle">
+            {hint}
         </div>
     {/if}
 </div>

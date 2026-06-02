@@ -96,6 +96,8 @@
     });
 
     function handleCreateNew() {
+        // Explicit "new" — start fresh rather than rehydrating a prior draft.
+        wizardStore.clearDraft();
         goto('/wizard/step-0');
     }
 </script>
