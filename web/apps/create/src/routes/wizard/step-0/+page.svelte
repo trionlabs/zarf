@@ -222,28 +222,27 @@
 
     let copied = $state(false);
 
-    // Animated example for the empty-state hint: a fixed, emphasized "C" followed
-    // by base32 characters that shimmer like matrix rain. Purely decorative
-    // (aria-hidden). The $effect reads `tokenAddress`, so it re-runs when the
-    // input gains/loses a value; its teardown clears the interval when the input
-    // is filled or the component unmounts — and it stays still for reduced-motion.
+    // Animated example for the empty-state hint: a fixed, emphasized white "C"
+    // followed by 55 base32 chars — a real contract id's full length (56) — that
+    // shimmer slowly like matrix rain (only a few positions flip per tick).
+    // Decorative (aria-hidden). The $effect depends on `tokenAddress`, so the
+    // interval tears down the moment the input is filled or the component
+    // unmounts, and it stays static under prefers-reduced-motion. The initial
+    // value is deterministic (dots) so SSR/hydration never sees a random diff.
     const BASE32 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'; // StrKey alphabet, like real C… ids
-    function randBase32(n: number): string {
-        let s = '';
-        for (let i = 0; i < n; i++) s += BASE32[Math.floor(Math.random() * BASE32.length)];
-        return s;
-    }
-    let exampleLead = $state('•••••');
-    let exampleTail = $state('••••');
+    const EXAMPLE_LEN = 55; // chars after the fixed "C" → 56 total
+    const randChar = () => BASE32[Math.floor(Math.random() * BASE32.length)];
+    let exampleChars = $state<string[]>(Array(EXAMPLE_LEN).fill('•'));
     $effect(() => {
         if (tokenAddress) return; // only animate while the input is empty
-        exampleLead = randBase32(5);
-        exampleTail = randBase32(4);
+        let chars = Array.from({ length: EXAMPLE_LEN }, randChar);
+        exampleChars = chars;
         if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
         const id = setInterval(() => {
-            exampleLead = randBase32(5);
-            exampleTail = randBase32(4);
-        }, 90);
+            chars = chars.slice();
+            for (let k = 0; k < 3; k++) chars[Math.floor(Math.random() * EXAMPLE_LEN)] = randChar();
+            exampleChars = chars;
+        }, 150);
         return () => clearInterval(id);
     });
 
@@ -289,13 +288,17 @@
     <div class="w-full max-w-2xl text-center space-y-10">
         <!-- Input Section — hidden once a token is confirmed; the card owns identity. -->
         {#if !tokenMetadata}
+            <!-- One wrapper so the surrounding space-y-10 treats input+hint as a
+                 single unit; .relative.group wraps only the input so the paste
+                 button stays vertically centered on it. -->
+            <div>
             <div class="relative group">
             <input
                 type="text"
                 placeholder="Paste Token Contract ID"
                 class="w-full bg-transparent border-none font-light font-mono placeholder:font-sans placeholder:text-zen-fg-faint text-zen-fg focus:outline-none focus:ring-0 transition-all duration-300 {tokenAddress
                     ? 'text-left text-base sm:text-lg'
-                    : 'text-center text-xl sm:text-2xl md:text-3xl px-6 sm:px-12'}"
+                    : 'text-center text-lg sm:text-2xl md:text-3xl px-4 sm:px-12'}"
                 bind:this={inputEl}
                 bind:value={tokenAddress}
                 oninput={handleAddressInput}
@@ -319,12 +322,24 @@
                     </ZenButton>
                 </div>
             {/if}
+            </div>
 
-            <!-- Animated example: fixed emphasized "C" + matrix-shimmering base32. -->
+            <!-- Animated example, contained: emphasized white "C" + full-length
+                 matrix base32 in a fixed-width mono field that fades out at the
+                 right edge (mask); one line, never wraps or overflows. -->
             {#if !tokenAddress}
-                <p class="mt-1.5 text-sm text-zen-fg-faint" aria-hidden="true">
-                    e.g. <span class="font-mono"><span class="font-semibold text-zen-fg">C</span>{exampleLead}…{exampleTail}</span>
-                </p>
+                <div
+                    class="mx-auto mt-3 flex w-full max-w-xs items-center gap-2 rounded-lg border-[0.5px] border-zen-border-subtle bg-zen-fg/5 px-2.5 py-1.5"
+                    aria-hidden="true"
+                >
+                    <span class="shrink-0 text-[10px] uppercase tracking-wider text-zen-fg-faint"
+                        >e.g.</span
+                    >
+                    <span
+                        class="min-w-0 flex-1 overflow-hidden whitespace-nowrap font-mono text-xs text-zen-fg-faint mask-[linear-gradient(to_right,black_72%,transparent)]"
+                        ><span class="font-semibold text-zen-fg">C</span>{exampleChars.join('')}</span
+                    >
+                </div>
             {/if}
 
             <!-- Error Message -->
