@@ -1,10 +1,11 @@
 <script lang="ts">
     import { wizardStore } from '$lib/stores/wizardStore.svelte';
     import { goto } from '$app/navigation';
+    import { page, navigating } from '$app/state';
     import { onMount } from 'svelte';
     import { fade, slide } from 'svelte/transition';
-    import { ArrowRight, ArrowLeft, Sparkles, Eye, Calendar } from 'lucide-svelte';
-    import type { Recipient, Distribution } from '$lib/stores/types';
+    import { ArrowRight, Eye, Calendar } from 'lucide-svelte';
+    import type { Recipient, Distribution, DistributionDraft } from '$lib/stores/types';
     import type { DurationUnit } from '@zarf/core/utils/vesting';
     import { CREATION_STEPS } from '@zarf/core/constants/wizard';
 
@@ -13,19 +14,45 @@
     import DistributionSchedule from '$lib/components/wizard/steps/DistributionSchedule.svelte';
     import DistributionRecipients from '$lib/components/wizard/steps/DistributionRecipients.svelte';
     import VestingTimeline from '$lib/components/wizard/VestingTimeline.svelte'; // Import Chart
+    import MicroStepProgress from '$lib/components/wizard/MicroStepProgress.svelte';
     import ZenButton from '@zarf/ui/components/ui/ZenButton.svelte';
 
     onMount(() => {
-        // Guard: Redirect if no token entered
-        if (!wizardStore.tokenDetails.tokenAddress) {
+        // restore() is idempotent; must run BEFORE the guard since a child's onMount
+        // fires before the root layout's restore() — otherwise a hard load / deep-link
+        // reads an un-restored (empty) store and wrongly bounces to step-0.
+        wizardStore.restore();
+
+        // Guard: redirect if no token, or if an imported token wasn't acknowledged.
+        // step-0 commits the acknowledgement to the store on Continue, so a direct
+        // navigation / deep-link here re-asserts the trust gate instead of relying on
+        // step-0's ephemeral in-memory check.
+        const td = wizardStore.tokenDetails;
+        if (!td.tokenAddress || (td.trust === 'imported' && !td.acknowledged)) {
             goto('/wizard/step-0');
             return;
         }
         wizardStore.goToStep(1);
+
+        const d = wizardStore.draft;
+        if (d) {
+            name = d.name;
+            description = d.description;
+            usRestricted = d.usRestricted;
+            euRestricted = d.euRestricted;
+            poolAmount = d.poolAmount;
+            poolInputValue = d.poolInputValue;
+            cliffDate = d.cliffDate;
+            cliffTime = d.cliffTime;
+            duration = d.duration;
+            durationUnit = d.durationUnit;
+            csvFileName = d.csvFileName;
+        }
+        hydrated = true;
     });
 
     // --- State Management ---
-    let creationStep = $state(0);
+    let hydrated = $state(false);
 
     // Form Data
     let name = $state('');
@@ -51,14 +78,71 @@
         recipients.reduce((sum: number, r: Recipient) => sum + r.amount, 0),
     );
 
+    // Compare allocations at the token's base-unit granularity so float summation
+    // artifacts (e.g. 33.3333333 × 3 vs a 99.9999999 pool) don't spuriously fail an
+    // exactly balanced distribution. The deploy still runs an exact integer
+    // allocations-vs-total integrity check as the final guard.
+    const tokenDecimals = $derived(wizardStore.tokenDetails.tokenDecimals ?? 7);
+    const toBaseUnits = (n: number) => Math.round(n * 10 ** tokenDecimals);
+
     // --- Validation ---
     const isStep0Valid = $derived(name.length >= 3);
     const isStep1Valid = $derived(cliffDate !== '' && duration >= 0 && poolAmount > 0);
-    const isBudgetMatch = $derived(poolAmount > 0 && totalAmount === poolAmount);
+    const isBudgetMatch = $derived(
+        poolAmount > 0 && toBaseUnits(totalAmount) === toBaseUnits(poolAmount),
+    );
     const isStep2Valid = $derived(
         recipients.length > 0 && isBudgetMatch && validationErrors.length === 0,
     );
     const isFormValid = $derived(isStep0Valid && isStep1Valid && isStep2Valid);
+
+    // --- Micro-step routing (URL-driven via ?s=) ---
+    const STEP_SLUGS = ['identity', 'schedule', 'recipients'] as const;
+    const microSteps = CREATION_STEPS.map((s) => s.label);
+    const stepSubtitles = [
+        'Name this distribution and set who can claim.',
+        'Set the pool size and vesting schedule.',
+        'Add recipients and allocate the pool.',
+    ];
+
+    const requestedStep = $derived.by(() => {
+        const idx = (STEP_SLUGS as readonly string[]).indexOf(page.url.searchParams.get('s') ?? '');
+        return idx === -1 ? 0 : idx;
+    });
+    // Furthest step reachable given current data — blocks deep-linking past empty steps.
+    const maxReachableStep = $derived(!isStep0Valid ? 0 : !isStep1Valid ? 1 : 2);
+    const creationStep = $derived(Math.min(requestedStep, maxReachableStep));
+
+    function buildStepUrl(idx: number): string {
+        const url = new URL(page.url);
+        url.searchParams.set('s', STEP_SLUGS[idx]);
+        return url.pathname + url.search;
+    }
+    function goToMicroStep(idx: number, opts: { replace: boolean }) {
+        goto(buildStepUrl(idx), { replaceState: opts.replace, keepFocus: true, noScroll: true });
+    }
+
+    const microSegments = $derived(
+        microSteps.map((label, i) => ({
+            label,
+            href: i < creationStep ? buildStepUrl(i) : null,
+            complete: i < creationStep,
+        })),
+    );
+
+    const launchBlocker = $derived(
+        !isStep0Valid
+            ? 'Add a distribution name (at least 3 characters).'
+            : !isStep1Valid
+              ? 'Set a pool amount and vesting schedule.'
+              : recipients.length === 0
+                ? 'Add at least one recipient.'
+                : !isBudgetMatch
+                  ? 'Recipient allocations must total the pool amount.'
+                  : validationErrors.length > 0
+                    ? 'Resolve recipient errors before launching.'
+                    : '',
+    );
 
     // Sync editing states with StatsPanel
     $effect(() => {
@@ -75,6 +159,43 @@
     });
     $effect(() => {
         wizardStore.setEditingDurationUnit(durationUnit);
+    });
+
+    // Canonicalize the URL to the effective (clamped) micro-step. Gated so it
+    // never fights hydration or clobbers an in-flight push navigation.
+    $effect(() => {
+        if (!hydrated || navigating.to) return;
+        const canonical = STEP_SLUGS[creationStep];
+        if (page.url.searchParams.get('s') !== canonical) {
+            goto(buildStepUrl(creationStep), {
+                replaceState: true,
+                keepFocus: true,
+                noScroll: true,
+            });
+        }
+    });
+
+    // Persist the in-progress form as a draft so a reload/deep-link restores it.
+    // Recipients are intentionally excluded (large; already in saved distributions).
+    let draftTimer: ReturnType<typeof setTimeout> | undefined;
+    $effect(() => {
+        if (!hydrated) return;
+        const snapshot: DistributionDraft = {
+            name,
+            description,
+            usRestricted,
+            euRestricted,
+            poolAmount,
+            poolInputValue,
+            cliffDate,
+            cliffTime,
+            duration,
+            durationUnit,
+            csvFileName,
+        };
+        clearTimeout(draftTimer);
+        draftTimer = setTimeout(() => wizardStore.setDraft(snapshot), 300);
+        return () => clearTimeout(draftTimer);
     });
 
     // --- Actions ---
@@ -104,6 +225,7 @@
 
         wizardStore.addDistribution(newDist);
         wizardStore.clearEditingState();
+        wizardStore.clearDraft();
 
         // Redirect to distributions page after saving
         goto('/distributions');
@@ -119,32 +241,44 @@
 </script>
 
 <svelte:head>
-    <title>Recipients & Schedule — Create Distribution — Zarf</title>
-    <meta
-        name="description"
-        content="Step 2 of 3: add recipients and configure the vesting schedule."
-    />
+    <title>{microSteps[creationStep]} — Create Distribution — Zarf</title>
+    <meta name="description" content="Step 2 of 3: {stepSubtitles[creationStep]}" />
 </svelte:head>
 
-<h1 class="sr-only">Create Distribution — Step 2: Recipients and Schedule</h1>
+<h1 class="sr-only">Create Distribution — Step 2 of 3: {microSteps[creationStep]}</h1>
 
 <div class="flex flex-col lg:flex-row gap-8 items-start p-2">
     <!-- LEFT COLUMN: Form Wizard -->
     <div class="flex-1 w-full lg:max-w-xl flex flex-col min-h-[400px]">
-        <!-- Header / Back -->
-        <div class="flex items-center justify-between mb-4">
-            <button
-                class="flex items-center gap-2 text-sm text-zen-fg-subtle hover:text-zen-fg transition-colors"
-                onclick={() => goto('/wizard/step-0')}
+        <!-- Header: selected-token chip + named sub-progress -->
+        <div class="flex items-center justify-between gap-3 mb-4">
+            <!-- Token chip: persistent token context + change affordance, all steps/breakpoints -->
+            <div
+                class="inline-flex items-center gap-2 bg-zen-fg/5 rounded-full pl-1.5 pr-1 py-1 border border-zen-border-subtle"
             >
-                <ArrowLeft class="w-4 h-4" />
-                <span>Change Token</span>
-            </button>
-
-            <!-- Tiny Step Indicator -->
-            <div class="text-xs font-mono text-zen-fg-muted">
-                {creationStep + 1} / {creationSteps.length}
+                {#if wizardStore.tokenDetails.iconUrl}
+                    <img
+                        src={wizardStore.tokenDetails.iconUrl}
+                        alt=""
+                        class="w-4 h-4 rounded-full"
+                    />
+                {:else}
+                    <div
+                        class="w-4 h-4 rounded-full bg-zen-primary flex items-center justify-center text-[8px] text-zen-primary-content font-bold"
+                    >
+                        {wizardStore.tokenDetails.tokenSymbol?.charAt(0)}
+                    </div>
+                {/if}
+                <span class="text-xs font-semibold">{wizardStore.tokenDetails.tokenSymbol}</span>
+                <button
+                    class="text-[10px] font-medium text-zen-fg-subtle hover:text-zen-fg px-1.5 py-0.5 rounded-full hover:bg-zen-fg/5 transition-colors"
+                    onclick={() => goto('/wizard/step-0')}
+                >
+                    Change
+                </button>
             </div>
+
+            <MicroStepProgress segments={microSegments} current={creationStep} />
         </div>
 
         <!-- Dynamic Title -->
@@ -153,7 +287,7 @@
                 {creationSteps[creationStep].label}
             </h2>
             <p class="text-zen-fg-muted text-sm">
-                Configure the details for your new token distribution.
+                {stepSubtitles[creationStep]}
             </p>
         </div>
 
@@ -202,7 +336,11 @@
                 : 'justify-end'}"
         >
             {#if creationStep > 0}
-                <ZenButton variant="ghost" onclick={() => creationStep--}>Back</ZenButton>
+                <ZenButton
+                    variant="ghost"
+                    onclick={() => goToMicroStep(creationStep - 1, { replace: false })}
+                    >Back</ZenButton
+                >
             {/if}
 
             {#if creationStep < 2}
@@ -211,7 +349,7 @@
                     variant="primary"
                     size="lg"
                     disabled={!isCurrentStepValid}
-                    onclick={() => creationStep++}
+                    onclick={() => goToMicroStep(creationStep + 1, { replace: false })}
                     class="px-8"
                 >
                     Continue <ArrowRight class="w-4 h-4 ml-2" />
@@ -225,11 +363,11 @@
                         onclick={saveDistribution}
                         class="px-8 w-full sm:w-auto"
                     >
-                        <Sparkles class="w-4 h-4 mr-2" /> Launch Distribution
+                        Launch Distribution
                     </ZenButton>
-                    {#if !isFormValid}
-                        <span class="text-[10px] text-zen-fg-muted font-medium px-1 animate-pulse">
-                            Complete requirements to launch
+                    {#if launchBlocker}
+                        <span class="text-xs text-zen-fg-muted px-1">
+                            {launchBlocker}
                         </span>
                     {/if}
                 </div>
@@ -248,17 +386,10 @@
 
         <!-- The Card -->
         <div
-            class="bg-zen-bg border border-zen-border-subtle rounded-3xl shadow-xl overflow-hidden relative group"
+            class="bg-zen-bg border border-zen-border-subtle rounded-2xl shadow-sm overflow-hidden relative"
         >
-            <!-- decorative blurred blob inside preview -->
-            <div
-                class="absolute -top-10 -right-10 w-32 h-32 bg-zen-primary/10 rounded-full blur-[40px] pointer-events-none"
-            ></div>
-
             <!-- Card Header -->
-            <div
-                class="p-6 border-b border-zen-border-subtle relative bg-zen-bg/50 backdrop-blur-sm"
-            >
+            <div class="p-6 border-b border-zen-border-subtle relative bg-zen-bg">
                 <!-- Token Badge -->
                 <div
                     class="inline-flex items-center gap-2 bg-zen-fg/5 rounded-full px-2.5 py-1 mb-4 border border-zen-border-subtle"
@@ -286,7 +417,7 @@
                     {#if name}
                         {name}
                     {:else}
-                        <span class="opacity-20 italic">Untitled Event</span>
+                        <span class="opacity-20 italic">Untitled distribution</span>
                     {/if}
                 </h3>
 
@@ -295,7 +426,7 @@
                     {#if description}
                         {description}
                     {:else}
-                        <span class="opacity-20 italic">No description provided yet...</span>
+                        <span class="opacity-20 italic">No description yet.</span>
                     {/if}
                 </p>
             </div>
@@ -307,7 +438,7 @@
                     <div
                         class="mb-4 text-[10px] uppercase font-bold tracking-widest text-zen-fg-muted"
                     >
-                        Distribution Projection
+                        Vesting Schedule
                     </div>
                     <VestingTimeline
                         cliffEndDate={cliffDate}
@@ -323,7 +454,7 @@
                         class="h-40 flex flex-col items-center justify-center text-center opacity-40 bg-zen-fg/[0.02] rounded-2xl"
                     >
                         <Calendar class="w-8 h-8 mb-2 opacity-50" />
-                        <span class="text-xs font-medium">Schedule not configured</span>
+                        <span class="text-xs font-medium">Schedule not set yet</span>
                     </div>
                 {/if}
             </div>

@@ -46,7 +46,14 @@
     <div class="w-full border-b border-zen-border-subtle bg-zen-bg">
         <div class="max-w-7xl mx-auto px-6 py-2 flex items-center gap-4">
             <!-- Progress Bar -->
-            <div class="flex-1 h-1 bg-zen-fg/10 rounded-full overflow-hidden">
+            <div
+                class="flex-1 h-1 bg-zen-fg/10 rounded-full overflow-hidden"
+                role="progressbar"
+                aria-valuemin={1}
+                aria-valuemax={steps.length}
+                aria-valuenow={effectiveStepIndex + 1}
+                aria-valuetext={`Step ${effectiveStepIndex + 1} of ${steps.length}: ${currentStepLabel}`}
+            >
                 <div
                     class="h-full bg-zen-fg rounded-full transition-all duration-500 ease-out"
                     style="width: {progressPercent}%"

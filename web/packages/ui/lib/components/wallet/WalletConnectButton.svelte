@@ -19,9 +19,12 @@
         LogOut,
         ChevronDown,
         Wallet,
+        AlertTriangle,
+        ArrowLeftRight,
     } from 'lucide-svelte';
     import ZenButton from '../ui/ZenButton.svelte';
     import ZenSpinner from '../ui/ZenSpinner.svelte';
+    import { focusTrap } from '../../actions/focusTrap';
     import { warn } from '@zarf/core/utils/log';
 
     let mounted = $state(false);
@@ -34,13 +37,14 @@
     });
 
     const statusIndicatorClass = $derived(
-        walletStore.isWrongNetwork ? 'bg-zen-warning animate-pulse' : 'bg-zen-success',
+        walletStore.isWrongNetwork
+            ? 'bg-zen-warning animate-pulse'
+            : walletStore.isMainnet
+              ? 'bg-zen-warning'
+              : 'bg-zen-success',
     );
 
-    const explorerUrl = $derived.by(() => {
-        return walletStore.accountExplorerUrl;
-    });
-
+    const explorerUrl = $derived(walletStore.accountExplorerUrl);
     const canShowExplorer = $derived(explorerUrl !== null);
 
     // Close dropdown when clicking outside
@@ -58,6 +62,14 @@
     });
 
     // Actions
+    function toggleOpen() {
+        isOpen = !isOpen;
+        // Refresh on open so a stale figure (e.g. after a tx) self-corrects.
+        if (isOpen && !walletStore.isWrongNetwork) {
+            walletStore.refreshBalance();
+        }
+    }
+
     async function handleConnectClick() {
         await walletStore.requestConnection();
     }
@@ -70,9 +82,9 @@
     async function handleChangeWallet() {
         isOpen = false;
         await walletStore.disconnect();
-        setTimeout(() => {
-            walletStore.requestConnection();
-        }, 100);
+        // Freighter has no account-picker API; reopen the connect modal so the
+        // user can switch accounts in Freighter, then deliberately reconnect.
+        walletStore.openModal();
     }
 
     async function copyAddress() {
@@ -96,14 +108,16 @@
         <button
             type="button"
             class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-zen-fg/5 hover:bg-zen-fg/10 transition-colors text-sm"
-            onclick={() => (isOpen = !isOpen)}
+            onclick={toggleOpen}
             aria-expanded={isOpen}
             aria-haspopup="true"
         >
             <span class="w-2 h-2 rounded-full {statusIndicatorClass}"></span>
             <span class="font-mono text-xs text-zen-fg">{walletStore.shortAddress}</span>
             <span
-                class="px-1.5 py-0.5 rounded text-[10px] font-medium bg-zen-fg/5 text-zen-fg-muted"
+                class="px-1.5 py-0.5 rounded text-[10px] font-medium {walletStore.isMainnet
+                    ? 'bg-zen-warning-muted text-zen-warning-content'
+                    : 'bg-zen-fg/5 text-zen-fg-muted'}"
             >
                 {walletStore.networkName}
             </span>
@@ -116,20 +130,54 @@
         {#if isOpen}
             <div
                 class="absolute right-0 top-full mt-2 w-72 rounded-xl bg-zen-bg border border-zen-border shadow-lg z-50 overflow-hidden animate-zen-scale-in origin-top-right"
+                use:focusTrap={{ onEscape: () => (isOpen = false) }}
+                role="dialog"
+                aria-label="Wallet account"
+                tabindex="-1"
             >
                 <!-- Balance Section -->
                 <div class="px-4 py-3 bg-zen-fg/5">
-                    <span
-                        class="text-[10px] uppercase tracking-wider text-zen-fg-subtle font-medium"
-                        >Total Balance</span
-                    >
+                    <div class="flex items-center justify-between">
+                        <span
+                            class="text-[10px] uppercase tracking-wider text-zen-fg-subtle font-medium"
+                            >XLM Balance</span
+                        >
+                        {#if !walletStore.isWrongNetwork}
+                            <button
+                                type="button"
+                                class="p-0.5 text-zen-fg-subtle hover:text-zen-fg transition-colors"
+                                onclick={() => walletStore.refreshBalance()}
+                                aria-label="Refresh balance"
+                                title="Refresh balance"
+                            >
+                                <RefreshCw class="w-3 h-3" />
+                            </button>
+                        {/if}
+                    </div>
                     <div class="text-lg font-bold text-zen-fg mt-0.5">
-                        {#if walletStore.formattedBalance}
+                        {#if walletStore.isWrongNetwork}
+                            <span class="text-sm text-zen-warning"
+                                >Switch network to view balance</span
+                            >
+                        {:else if walletStore.formattedBalance}
                             {walletStore.formattedBalance}
+                        {:else if walletStore.balanceError}
+                            <button
+                                type="button"
+                                class="text-sm font-medium text-zen-warning hover:underline"
+                                onclick={() => walletStore.refreshBalance()}
+                            >
+                                Balance unavailable — retry
+                            </button>
                         {:else}
                             <ZenSpinner size="sm" />
                         {/if}
                     </div>
+                    {#if walletStore.hasReserve && walletStore.spendableBalance && !walletStore.isWrongNetwork}
+                        <div class="text-[11px] text-zen-fg-subtle mt-0.5">
+                            {walletStore.spendableBalance} available
+                        </div>
+                    {/if}
                 </div>
 
                 <!-- Address -->
@@ -147,12 +195,21 @@
                     >
                     <div class="mt-1 flex items-center gap-2">
                         <span
-                            class="w-2 h-2 rounded-full {walletStore.isWrongNetwork
+                            class="w-2 h-2 rounded-full {walletStore.isWrongNetwork ||
+                            walletStore.isMainnet
                                 ? 'bg-zen-warning'
                                 : 'bg-zen-success'}"
                         ></span>
                         <span class="text-sm text-zen-fg-muted">{walletStore.networkName}</span>
                     </div>
+                    {#if walletStore.isMainnet}
+                        <div
+                            class="mt-2 flex items-center gap-1.5 text-xs font-medium text-zen-warning"
+                        >
+                            <AlertTriangle class="w-3.5 h-3.5" />
+                            <span>Mainnet — real funds</span>
+                        </div>
+                    {/if}
                     {#if walletStore.isWrongNetwork}
                         <p class="mt-2 text-xs text-zen-warning">
                             Select the configured Stellar network in Freighter.
@@ -196,7 +253,7 @@
                     class="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-zen-fg/5 transition-colors text-left"
                     onclick={handleChangeWallet}
                 >
-                    <RefreshCw class="w-4 h-4 text-zen-fg-subtle" />
+                    <ArrowLeftRight class="w-4 h-4 text-zen-fg-subtle" />
                     <span class="text-sm text-zen-fg-muted">Change Wallet</span>
                 </button>
 

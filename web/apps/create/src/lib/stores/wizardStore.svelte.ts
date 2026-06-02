@@ -13,7 +13,7 @@
 import { browser } from '$app/environment';
 import { getActiveStellarNetworkId } from '@zarf/core/config/runtime';
 import { warn } from '@zarf/core/utils/log';
-import type { WizardState, TokenDetails, Distribution } from './types';
+import type { WizardState, TokenDetails, Distribution, DistributionDraft } from './types';
 
 const STORAGE_KEY = 'zarf_wizard_state';
 
@@ -38,8 +38,11 @@ const initialState: WizardState = {
         tokenDecimals: null,
         tokenTotalSupply: null,
         iconUrl: null,
+        trust: null,
+        acknowledged: false,
     },
     distributions: [],
+    draft: null,
 };
 
 // ============================================================================
@@ -92,9 +95,9 @@ function restore() {
         const saved = localStorage.getItem(storageKey());
         if (saved) {
             const parsed = JSON.parse(saved) as WizardState;
-            // Validate minimal structure
+            // Validate minimal structure; default `draft` for pre-migration blobs.
             if (parsed.distributions && Array.isArray(parsed.distributions)) {
-                state = parsed;
+                state = { ...parsed, draft: parsed.draft ?? null };
             }
         }
     } catch (error) {
@@ -188,6 +191,17 @@ function goToStep(step: number) {
     }
 }
 
+function setDraft(draft: DistributionDraft) {
+    state.draft = draft;
+    persist();
+}
+
+function clearDraft() {
+    if (state.draft === null) return;
+    state.draft = null;
+    persist();
+}
+
 function reset() {
     state = structuredClone(initialState);
     if (browser) {
@@ -209,6 +223,9 @@ export const wizardStore = {
     },
     get distributions() {
         return state.distributions;
+    },
+    get draft() {
+        return state.draft;
     },
     get editingPoolAmount() {
         return editingPoolAmount;
@@ -244,6 +261,8 @@ export const wizardStore = {
     nextStep,
     previousStep,
     goToStep,
+    setDraft,
+    clearDraft,
     reset,
     restore,
     // Editing State Setters (for live preview)
