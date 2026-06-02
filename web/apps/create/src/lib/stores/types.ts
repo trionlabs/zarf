@@ -39,6 +39,12 @@ export interface TokenDetails {
     tokenDecimals: number | null; // Fetched from contract
     tokenTotalSupply: string | null; // Fetched from contract
     iconUrl: string | null; // Fetched from API (if available)
+
+    // Trust gate (persisted so step-1 can re-assert it across navigation/deep-links,
+    // not just rely on step-0's ephemeral in-memory check). Optional for back-compat
+    // with pre-migration localStorage blobs.
+    trust?: 'curated' | 'imported' | null; // 'curated' = in the registry; else imported
+    acknowledged?: boolean; // imported-token acknowledgement, set on Continue
 }
 
 /**

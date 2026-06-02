@@ -23,8 +23,12 @@
         // reads an un-restored (empty) store and wrongly bounces to step-0.
         wizardStore.restore();
 
-        // Guard: Redirect if no token entered
-        if (!wizardStore.tokenDetails.tokenAddress) {
+        // Guard: redirect if no token, or if an imported token wasn't acknowledged.
+        // step-0 commits the acknowledgement to the store on Continue, so a direct
+        // navigation / deep-link here re-asserts the trust gate instead of relying on
+        // step-0's ephemeral in-memory check.
+        const td = wizardStore.tokenDetails;
+        if (!td.tokenAddress || (td.trust === 'imported' && !td.acknowledged)) {
             goto('/wizard/step-0');
             return;
         }
@@ -74,10 +78,19 @@
         recipients.reduce((sum: number, r: Recipient) => sum + r.amount, 0),
     );
 
+    // Compare allocations at the token's base-unit granularity so float summation
+    // artifacts (e.g. 33.3333333 × 3 vs a 99.9999999 pool) don't spuriously fail an
+    // exactly balanced distribution. The deploy still runs an exact integer
+    // allocations-vs-total integrity check as the final guard.
+    const tokenDecimals = $derived(wizardStore.tokenDetails.tokenDecimals ?? 7);
+    const toBaseUnits = (n: number) => Math.round(n * 10 ** tokenDecimals);
+
     // --- Validation ---
     const isStep0Valid = $derived(name.length >= 3);
     const isStep1Valid = $derived(cliffDate !== '' && duration >= 0 && poolAmount > 0);
-    const isBudgetMatch = $derived(poolAmount > 0 && totalAmount === poolAmount);
+    const isBudgetMatch = $derived(
+        poolAmount > 0 && toBaseUnits(totalAmount) === toBaseUnits(poolAmount),
+    );
     const isStep2Valid = $derived(
         recipients.length > 0 && isBudgetMatch && validationErrors.length === 0,
     );
@@ -93,9 +106,7 @@
     ];
 
     const requestedStep = $derived.by(() => {
-        const idx = (STEP_SLUGS as readonly string[]).indexOf(
-            page.url.searchParams.get('s') ?? '',
-        );
+        const idx = (STEP_SLUGS as readonly string[]).indexOf(page.url.searchParams.get('s') ?? '');
         return idx === -1 ? 0 : idx;
     });
     // Furthest step reachable given current data — blocks deep-linking past empty steps.
@@ -246,7 +257,11 @@
                 class="inline-flex items-center gap-2 bg-zen-fg/5 rounded-full pl-1.5 pr-1 py-1 border border-zen-border-subtle"
             >
                 {#if wizardStore.tokenDetails.iconUrl}
-                    <img src={wizardStore.tokenDetails.iconUrl} alt="" class="w-4 h-4 rounded-full" />
+                    <img
+                        src={wizardStore.tokenDetails.iconUrl}
+                        alt=""
+                        class="w-4 h-4 rounded-full"
+                    />
                 {:else}
                     <div
                         class="w-4 h-4 rounded-full bg-zen-primary flex items-center justify-center text-[8px] text-zen-primary-content font-bold"
@@ -323,7 +338,8 @@
             {#if creationStep > 0}
                 <ZenButton
                     variant="ghost"
-                    onclick={() => goToMicroStep(creationStep - 1, { replace: false })}>Back</ZenButton
+                    onclick={() => goToMicroStep(creationStep - 1, { replace: false })}
+                    >Back</ZenButton
                 >
             {/if}
 

@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { parseTokenQuery, resolveSac, TokenResolveError } from './tokenAsset';
+import {
+    parseTokenQuery,
+    resolveSac,
+    TokenResolveError,
+    isChecksumValidContract,
+} from './tokenAsset';
 
 // Network passphrases (avoid importing the SDK at module scope in tests).
 const TESTNET = 'Test SDF Network ; September 2015';
@@ -61,5 +66,21 @@ describe('resolveSac', () => {
 
     it('rejects unparseable input', async () => {
         await expect(resolveSac('nope', TESTNET)).rejects.toBeInstanceOf(TokenResolveError);
+    });
+});
+
+describe('isChecksumValidContract', () => {
+    it('accepts a checksum-valid contract id', async () => {
+        expect(await isChecksumValidContract(XLM_TESTNET_SAC)).toBe(true);
+        expect(await isChecksumValidContract(USDC_MAINNET_SAC)).toBe(true);
+    });
+
+    it('rejects a contract id whose StrKey checksum fails (typo/lookalike)', async () => {
+        const badChecksum = XLM_TESTNET_SAC.slice(0, -1) + 'A';
+        expect(await isChecksumValidContract(badChecksum)).toBe(false);
+    });
+
+    it('rejects a non-contract StrKey (e.g. an account G… address)', async () => {
+        expect(await isChecksumValidContract(USDC_ISSUER)).toBe(false);
     });
 });

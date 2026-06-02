@@ -38,6 +38,8 @@ const initialState: WizardState = {
         tokenDecimals: null,
         tokenTotalSupply: null,
         iconUrl: null,
+        trust: null,
+        acknowledged: false,
     },
     distributions: [],
     draft: null,

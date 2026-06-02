@@ -40,7 +40,11 @@
         const parsed = parseTokenQuery(query);
         if (parsed.kind === 'contract') {
             if (results.some((t) => t.sacAddress === parsed.address)) return null;
-            return { query: parsed.address, title: 'Import token', subtitle: short(parsed.address) };
+            return {
+                query: parsed.address,
+                title: 'Import token',
+                subtitle: short(parsed.address),
+            };
         }
         if (parsed.kind === 'classic') {
             return {
@@ -62,6 +66,7 @@
     // taller than the viewport. block:'nearest' is a no-op when already in view
     // (e.g. on hover), so this is safe to run on every activeIndex change.
     $effect(() => {
+        if (!items.length) return; // nothing to scroll to on an empty list
         document.getElementById(optId(activeIndex))?.scrollIntoView({ block: 'nearest' });
     });
 
@@ -131,7 +136,11 @@
     <div
         class="fixed inset-0 z-50 flex items-end justify-center bg-zen-scrim/50 backdrop-blur-sm animate-zen-fade-in sm:items-center sm:p-4"
         onclick={handleBackdrop}
-        use:focusTrap={{ onEscape: close, initialFocus: () => searchEl ?? null, hideBackground: true }}
+        use:focusTrap={{
+            onEscape: close,
+            initialFocus: () => searchEl ?? null,
+            hideBackground: true,
+        }}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
@@ -184,6 +193,17 @@
                 </div>
                 {#if importError}
                     <p role="alert" class="mt-2 px-1 text-xs text-zen-error">{importError}</p>
+                {/if}
+            </div>
+
+            <!-- SR-only result count: the combobox's option list changes as the user
+                 types, but a screen reader gets no count/empty feedback otherwise. -->
+            <div class="sr-only" role="status" aria-live="polite">
+                {#if query.trim()}
+                    {results.length}
+                    matching {results.length === 1 ? 'token' : 'tokens'}{importItem
+                        ? '; press Enter to import the pasted address'
+                        : '.'}
                 {/if}
             </div>
 

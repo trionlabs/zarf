@@ -42,6 +42,17 @@ export function parseTokenQuery(input: string): ParsedTokenQuery {
     return { kind: 'invalid' };
 }
 
+/**
+ * Verify a contract id's StrKey checksum (rejects typo'd / lookalike ids that
+ * pass the cheap shape regex). Dynamic-imports the SDK, so SSR and the static
+ * registry/preset paths stay SDK-free — call it only when committing a *pasted
+ * or typed* (non-curated) address, the same gate the picker's import flow uses.
+ */
+export async function isChecksumValidContract(address: string): Promise<boolean> {
+    const { StrKey } = await import('@stellar/stellar-sdk');
+    return StrKey.isValidContract(address);
+}
+
 /** Thrown by `resolveSac` for unparseable input or a failed StrKey checksum. */
 export class TokenResolveError extends Error {
     constructor(message: string) {

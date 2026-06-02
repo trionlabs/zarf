@@ -58,6 +58,6 @@
     </div>
 
     <span class="text-[10px] uppercase tracking-widest text-zen-fg-faint shrink-0">
-        {token ? 'Known' : 'Unverified'}
+        {token ? 'Verified' : 'Unverified'}
     </span>
 </div>
