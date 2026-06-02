@@ -2,7 +2,20 @@
     import { wizardStore } from '$lib/stores/wizardStore.svelte';
     import { goto } from '$app/navigation';
     import { onMount, tick } from 'svelte';
-    import { ArrowRight, ArrowLeft, Clipboard, Loader2, AlertCircle, AlertTriangle } from 'lucide-svelte';
+    import {
+        ArrowRight,
+        ArrowLeft,
+        Clipboard,
+        Loader2,
+        AlertCircle,
+        AlertTriangle,
+        Copy,
+        Check,
+        ExternalLink,
+    } from 'lucide-svelte';
+    import { getContractExplorerUrl } from '@zarf/core/contracts/explorer';
+    import { warn } from '@zarf/core/utils/log';
+    import Tooltip from '@zarf/ui/components/ui/Tooltip.svelte';
     import { fetchTokenMetadata, type TokenMetadata } from '$lib/services/tokenMetadata';
     import { isValidContractAddressShape as isValidContractAddress } from '@zarf/core/utils/addressShape';
     import { fade, fly } from 'svelte/transition';
@@ -199,6 +212,26 @@
         goto('/wizard/step-1');
     }
 
+    // Stellar Expert link for the selected contract. getContractExplorerUrl reads
+    // the non-reactive runtime singleton, so depend on networkStore.activeId to
+    // recompute when the user toggles networks (same trick the presets use).
+    const explorerUrl = $derived.by(() => {
+        networkStore.activeId;
+        return tokenAddress ? getContractExplorerUrl(tokenAddress) : '#';
+    });
+
+    let copied = $state(false);
+
+    async function copyAddress() {
+        try {
+            await navigator.clipboard.writeText(tokenAddress);
+            copied = true;
+            setTimeout(() => (copied = false), 2000);
+        } catch {
+            warn('Clipboard API not available');
+        }
+    }
+
     // Clear the confirmed selection and return to the picker state. The input,
     // chips and search trigger are gated on `!tokenMetadata`, so resetting here
     // re-reveals them; refocus the input so a keyboard user can act immediately.
@@ -234,10 +267,10 @@
             <div class="relative group">
             <input
                 type="text"
-                placeholder="Token contract ID…"
+                placeholder="Paste token contract ID"
                 class="w-full bg-transparent border-none font-light font-mono placeholder:font-sans placeholder:text-zen-fg-faint text-zen-fg focus:outline-none focus:ring-0 transition-all duration-300 {tokenAddress
                     ? 'text-left text-base sm:text-lg'
-                    : 'text-center text-2xl sm:text-3xl md:text-4xl px-12'}"
+                    : 'text-center text-xl sm:text-2xl md:text-3xl px-6 sm:px-12'}"
                 bind:this={inputEl}
                 bind:value={tokenAddress}
                 oninput={handleAddressInput}
@@ -260,6 +293,11 @@
                         <Clipboard class="w-4 h-4" />
                     </ZenButton>
                 </div>
+            {/if}
+
+            <!-- Format hint, paired with the placeholder; only while empty. -->
+            {#if !tokenAddress}
+                <p class="mt-1.5 font-mono text-sm text-zen-fg-faint" aria-hidden="true">(C…)</p>
             {/if}
 
             <!-- Error Message -->
@@ -376,9 +414,42 @@
                                 >
                                     {tokenMetadata.symbol}
                                 </span>
-                                <span class="text-xs text-zen-fg-faint truncate font-mono">
-                                    {tokenAddress.slice(0, 6)}...{tokenAddress.slice(-4)}
-                                </span>
+                                <div class="flex items-center gap-1">
+                                    <button
+                                        type="button"
+                                        onclick={copyAddress}
+                                        title={copied ? 'Copied!' : 'Copy contract address'}
+                                        aria-label={copied
+                                            ? 'Address copied'
+                                            : 'Copy contract address'}
+                                        class="inline-flex items-center gap-1 rounded font-mono text-xs text-zen-fg-faint transition-colors hover:text-zen-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zen-primary focus-visible:ring-offset-2 focus-visible:ring-offset-zen-bg"
+                                    >
+                                        <span class="truncate"
+                                            >{tokenAddress.slice(0, 6)}…{tokenAddress.slice(
+                                                -4,
+                                            )}</span
+                                        >
+                                        {#if copied}
+                                            <Check
+                                                class="w-3 h-3 text-zen-success"
+                                                aria-hidden="true"
+                                            />
+                                        {:else}
+                                            <Copy class="w-3 h-3" aria-hidden="true" />
+                                        {/if}
+                                    </button>
+                                    <Tooltip text="Verify on Stellar Expert" position="top">
+                                        <a
+                                            href={explorerUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            aria-label="Verify contract on Stellar Expert"
+                                            class="flex rounded p-0.5 text-zen-fg-faint transition-colors hover:text-zen-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zen-primary focus-visible:ring-offset-2 focus-visible:ring-offset-zen-bg"
+                                        >
+                                            <ExternalLink class="w-3 h-3" aria-hidden="true" />
+                                        </a>
+                                    </Tooltip>
+                                </div>
                             </div>
                         </div>
                     </ZenCard>
