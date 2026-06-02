@@ -45,7 +45,7 @@ Token Details
 -------------
 Symbol: ${tokenDetails.tokenSymbol || 'N/A'}
 Address: ${tokenDetails.tokenAddress || 'N/A'}
-Decimals: ${tokenDetails.tokenDecimals || 7}
+Decimals: ${tokenDetails.tokenDecimals ?? 7}
 
 Vesting Schedule
 ----------------

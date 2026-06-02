@@ -250,7 +250,7 @@
             const key = c.email || c.identityCommitment || String(c.leafIndex);
             const displayName = c.email || `Recipient ${c.identityCommitment?.slice(0, 8)}...`;
             const amount =
-                Number(c.amount) / Math.pow(10, wizardStore.tokenDetails.tokenDecimals || 7);
+                Number(c.amount) / Math.pow(10, wizardStore.tokenDetails.tokenDecimals ?? 7);
             if (grouped.has(key)) {
                 grouped.get(key)!.amount += amount;
             } else {
