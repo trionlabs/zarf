@@ -136,13 +136,13 @@ export default {
             }
 
             if (parts[1] === 'ipfs' && parts.length === 3) {
-                return handleIpfsRead(parts[2], corsHeaders);
+                return await handleIpfsRead(parts[2], corsHeaders);
             }
 
             if (parts.length === 4 && parts[2] === 'ledger' && parts[3] === 'latest') {
                 const network = decodeSegment(parts[1]);
                 const cfg = getNetworkConfig(env, network);
-                return handleLatestLedger(cfg, corsHeaders);
+                return await handleLatestLedger(cfg, corsHeaders);
             }
 
             if (parts.length === 6 && parts[2] === 'factory' && parts[3] === 'predict') {
@@ -150,28 +150,28 @@ export default {
                 const cfg = getNetworkConfig(env, network);
                 const owner = decodeSegment(parts[4]);
                 const salt = decodeSegment(parts[5]);
-                return handlePredictVestingAddress(owner, salt, cfg, corsHeaders);
+                return await handlePredictVestingAddress(owner, salt, cfg, corsHeaders);
             }
 
             if (parts.length >= 3 && parts[2] === 'vestings') {
                 const network = decodeSegment(parts[1]);
                 const cfg = getNetworkConfig(env, network);
                 if (parts.length === 3) {
-                    return handleAllVestings(cfg, corsHeaders);
+                    return await handleAllVestings(cfg, corsHeaders);
                 }
                 if (parts.length === 4) {
                     const address = decodeSegment(parts[3]);
-                    return handleVesting(address, cfg, corsHeaders);
+                    return await handleVesting(address, cfg, corsHeaders);
                 }
                 if (parts.length === 6 && parts[4] === 'claimed') {
                     const address = decodeSegment(parts[3]);
                     const commitment = decodeSegment(parts[5]);
-                    return handleEpochClaimed(address, commitment, cfg, corsHeaders);
+                    return await handleEpochClaimed(address, commitment, cfg, corsHeaders);
                 }
                 if (parts.length === 6 && parts[4] === 'recipient-id') {
                     const address = decodeSegment(parts[3]);
                     const recipient = decodeSegment(parts[5]);
-                    return handleRecipientId(address, recipient, cfg, corsHeaders);
+                    return await handleRecipientId(address, recipient, cfg, corsHeaders);
                 }
             }
 
@@ -180,16 +180,16 @@ export default {
                 const cfg = getNetworkConfig(env, network);
                 const token = decodeSegment(parts[3]);
                 if (parts.length === 4) {
-                    return handleTokenMetadata(token, cfg, corsHeaders);
+                    return await handleTokenMetadata(token, cfg, corsHeaders);
                 }
                 if (parts.length === 6 && parts[4] === 'balances') {
                     const owner = decodeSegment(parts[5]);
-                    return handleTokenBalance(token, owner, cfg, corsHeaders);
+                    return await handleTokenBalance(token, owner, cfg, corsHeaders);
                 }
                 if (parts.length === 7 && parts[4] === 'allowances') {
                     const owner = decodeSegment(parts[5]);
                     const spender = decodeSegment(parts[6]);
-                    return handleTokenAllowance(token, owner, spender, cfg, corsHeaders);
+                    return await handleTokenAllowance(token, owner, spender, cfg, corsHeaders);
                 }
             }
 
@@ -197,7 +197,7 @@ export default {
                 const network = decodeSegment(parts[1]);
                 const owner = decodeSegment(parts[3]);
                 const cfg = getNetworkConfig(env, network);
-                return handleOwnerVestings(owner, url, env, cfg, corsHeaders);
+                return await handleOwnerVestings(owner, url, env, cfg, corsHeaders);
             }
 
             return json({ error: 'not_found' }, 404, corsHeaders);
