@@ -10,7 +10,7 @@
  */
 
 import type { DistributionData } from '../services/distribution';
-import { calculateVestingPeriods, type VestingPeriod } from '../utils/vesting';
+import type { VestingPeriod } from '../utils/vesting';
 
 /**
  * Subset of the claim store's `EpochClaim` that the pure helpers actually
@@ -18,6 +18,7 @@ import { calculateVestingPeriods, type VestingPeriod } from '../utils/vesting';
  */
 export interface EpochAmount {
     amount: bigint;
+    unlockTime: number;
     isClaimed: boolean;
     isLocked: boolean;
 }
@@ -111,9 +112,9 @@ export function findNextClaimableIdx(epochs: ReadonlyArray<EpochSelectable>): nu
 // ──────────────────────────────────────────────────────────────────────────
 
 /**
- * Build the vesting-periods table. Mirrors the previous inline derivation
- * in `claimStore.periods`: claimed map is keyed by array index (epoch[i]
- * maps to period i), then handed to `calculateVestingPeriods`.
+ * Build the vesting-periods table from the discovered claim epochs. The
+ * commitments are authoritative for claim count, amount, unlock time, and the
+ * selected epoch index; schedule metadata is display context only.
  */
 export function buildClaimedMap(epochs: ReadonlyArray<EpochAmount>): Record<number, boolean> {
     const map: Record<number, boolean> = {};
@@ -124,12 +125,20 @@ export function buildClaimedMap(epochs: ReadonlyArray<EpochAmount>): Record<numb
 }
 
 export function buildVestingPeriods(
-    schedule: Schedule | null | undefined,
+    _schedule: Schedule | null | undefined,
     epochs: ReadonlyArray<EpochAmount>,
 ): VestingPeriod[] {
-    return calculateVestingPeriods(
-        schedule ?? null,
-        totalAllocation(epochs),
-        buildClaimedMap(epochs),
-    );
+    let cumulativeAmount = 0n;
+
+    return epochs.map((epoch, i) => {
+        cumulativeAmount += epoch.amount;
+
+        return {
+            index: i + 1,
+            unlockDate: new Date(epoch.unlockTime * 1000),
+            amount: epoch.amount,
+            status: epoch.isClaimed ? 'claimed' : epoch.isLocked ? 'locked' : 'claimable',
+            cumulativeAmount,
+        };
+    });
 }
