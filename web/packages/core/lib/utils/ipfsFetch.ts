@@ -1,14 +1,22 @@
 /**
- * IPFS JSON fetch through the Zarf indexer backend.
+ * IPFS JSON fetch through the Zarf indexer backend with public gateway fallback.
  *
- * The browser never falls back to public gateways. If the indexer is down,
- * callers receive the backend error and can no-op or show UI state.
+ * The indexer remains the preferred shared cache/proxy. Public gateways are a
+ * recovery path for CID-addressed public metadata when the worker's upstream
+ * gateway is temporarily rate-limited.
  *
  * @module utils/ipfsFetch
  */
 import { fetchIndexerJson } from './indexerClient';
 
 const MAX_CACHE_ENTRIES = 256;
+const PUBLIC_GATEWAYS = [
+    'https://gateway.pinata.cloud/ipfs',
+    'https://ipfs.io/ipfs',
+    'https://dweb.link/ipfs',
+    'https://w3s.link/ipfs',
+];
+const GATEWAY_TIMEOUT_MS = 10_000;
 
 const cache = new Map<string, unknown>();
 
@@ -70,8 +78,49 @@ function setCached(cid: string, data: unknown): void {
     cache.set(cid, data);
 }
 
+function errorMessage(error: unknown): string {
+    return error instanceof Error ? error.message : String(error);
+}
+
+async function fetchGatewayJson<T>(gateway: string, cid: string): Promise<T> {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), GATEWAY_TIMEOUT_MS);
+
+    try {
+        const response = await fetch(`${gateway}/${encodeURIComponent(cid)}`, {
+            headers: { Accept: 'application/json' },
+            signal: controller.signal,
+        });
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        return (await response.json()) as T;
+    } finally {
+        clearTimeout(timer);
+    }
+}
+
+async function fetchPublicGatewayJson<T>(cid: string, indexerError: unknown): Promise<T> {
+    const errors: string[] = [`indexer: ${errorMessage(indexerError)}`];
+
+    for (const gateway of PUBLIC_GATEWAYS) {
+        try {
+            return await fetchGatewayJson<T>(gateway, cid);
+        } catch (error) {
+            errors.push(`${gateway}: ${errorMessage(error)}`);
+        }
+    }
+
+    throw new IpfsFetchError(
+        `Could not load IPFS JSON for ${cid}: ${errors.join('; ')}`,
+        cid,
+        'GATEWAY_FAILURE',
+    );
+}
+
 /**
- * Fetch JSON content for a CID through the shared backend cache.
+ * Fetch JSON content for a CID through the shared backend cache, falling back
+ * to public gateways when the backend path is unavailable.
  */
 export async function fetchIpfsJson<T = unknown>(cid: string): Promise<T> {
     const validCid = validateCid(cid);
@@ -80,9 +129,15 @@ export async function fetchIpfsJson<T = unknown>(cid: string): Promise<T> {
         return cached;
     }
 
-    const indexed = await fetchIndexerJson<T>(`/v1/ipfs/${encodeURIComponent(validCid)}`);
-    setCached(validCid, indexed);
-    return indexed;
+    try {
+        const indexed = await fetchIndexerJson<T>(`/v1/ipfs/${encodeURIComponent(validCid)}`);
+        setCached(validCid, indexed);
+        return indexed;
+    } catch (error) {
+        const gateway = await fetchPublicGatewayJson<T>(validCid, error);
+        setCached(validCid, gateway);
+        return gateway;
+    }
 }
 
 export function clearIpfsCache(): void {
