@@ -13,7 +13,7 @@
         "GOOGLE_JWKS_URL": "https://www.googleapis.com/oauth2/v3/certs",
         "STELLAR_RPC_URL": "https://soroban-testnet.stellar.org",
         "STELLAR_NETWORK_PASSPHRASE": "Test SDF Network ; September 2015",
-        "JWK_REGISTRY_ADDRESS": "CCHROEUE37RFZJASWV43DGBYD4FU5G7H3AD6GKFJ2PEQAXMYGOAHMIDI",
+        "JWK_REGISTRY_ADDRESS": "CCTN3XSQM2P7CSXY4UOBGE67DA2Q7IZSRICP3ELKGUQDL5666VDCLXXW",
         "REVOKE_REMOVED_KEYS": "true",
         "TX_POLL_ATTEMPTS": "20",
     },

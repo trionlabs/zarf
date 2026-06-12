@@ -6,20 +6,6 @@ import topLevelAwait from 'vite-plugin-top-level-await';
 import { viteStaticCopy } from 'vite-plugin-static-copy';
 import { visualizer } from 'rollup-plugin-visualizer';
 import type { Plugin } from 'vite';
-import { createRequire } from 'node:module';
-
-const requireFromHere = createRequire(import.meta.url);
-// Pre-resolve pino's browser entry against this app's node_modules so
-// the virtual shim below can reference an absolute path. The bare
-// `pino/browser.js` specifier used to work in `vite dev` but Rollup's
-// production build resolves imports relative to the importing module,
-// and a virtual module has no on-disk location to walk from.
-//
-// pino is a TRANSITIVE dependency via @aztec/bb.js; nothing in this
-// repo lists it directly. If bb.js ever drops pino or pnpm hoisting
-// changes, this resolve() throws at config eval — promote pino to a
-// direct dependency in this app's package.json then.
-const PINO_BROWSER_PATH = requireFromHere.resolve('pino/browser.js');
 
 // Stub large browser-only libraries during SSR.
 const productionStub = (): Plugin => {
@@ -47,17 +33,14 @@ const productionStub = (): Plugin => {
     };
 };
 
-// pino@9.x's browser.js does `module.exports = pino` with no named
-// `pino` export. @aztec/bb.js's browser-side log module does
-// `import { pino } from 'pino'`, which resolves to undefined after
-// Vite's CJS-to-ESM interop and crashes Barretenberg init with
-// `does not provide an export named 'pino'`. Intercept the bare `pino`
-// import and serve a virtual module that re-exports the factory under
-// both `default` and a named `pino` export. The inner import is
-// baked from PINO_BROWSER_PATH (absolute, resolved at config eval
-// time) so Rollup's production pass can resolve it — a bare
-// `pino/browser.js` specifier works for `vite dev` but Rollup walks
-// relative to the importing module and the virtual id has none.
+// @aztec/bb.js's browser logger does `import { pino } from 'pino'`,
+// but pino@9's browser entry is CommonJS and Vite dev can serve it as
+// an ESM module with neither a named `pino` nor `default` export. bb.js
+// only calls `pino(opts)`, `.child({ name })`, and `.debug()`, so keep
+// pino out of the browser graph and provide the compatible surface
+// directly. Verbose levels stay silent, but warn/error/fatal pass
+// through to the console — Barretenberg init failures must not be
+// swallowed by the logging shim.
 const pinoNamedShim = (): Plugin => ({
     name: 'pino-named-shim',
     enforce: 'pre',
@@ -68,9 +51,23 @@ const pinoNamedShim = (): Plugin => ({
     load(id) {
         if (id !== '\0virtual:pino-named-shim') return null;
         return [
-            `import pinoFactory from ${JSON.stringify(PINO_BROWSER_PATH)};`,
-            'export default pinoFactory;',
-            'export const pino = pinoFactory;',
+            'const noop = () => {};',
+            'function createLogger(opts = {}) {',
+            '  const name = opts && opts.name ? String(opts.name) : "bb.js";',
+            '  return {',
+            '    child: (bindings = {}) =>',
+            '      createLogger({ ...opts, ...bindings, name: bindings.name ?? name }),',
+            '    trace: noop,',
+            '    debug: noop,',
+            '    info: noop,',
+            '    verbose: noop,',
+            '    warn: (...args) => console.warn(`[${name}]`, ...args),',
+            '    error: (...args) => console.error(`[${name}]`, ...args),',
+            '    fatal: (...args) => console.error(`[${name}]`, ...args),',
+            '  };',
+            '}',
+            'export default createLogger;',
+            'export const pino = createLogger;',
         ].join('\n');
     },
 });
@@ -171,11 +168,7 @@ export default defineConfig({
     },
     worker: {
         format: 'es',
-        plugins: () => [
-            pinoNamedShim(),
-            wasm(),
-            topLevelAwait(),
-        ],
+        plugins: () => [pinoNamedShim(), wasm(), topLevelAwait()],
     },
     server: {
         headers: {

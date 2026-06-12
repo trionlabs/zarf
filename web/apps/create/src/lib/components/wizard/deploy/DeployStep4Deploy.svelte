@@ -35,6 +35,11 @@
     let walletAddress = $derived(walletStore.address);
     let isWrongNetwork = $derived(walletStore.isWrongNetwork);
     let networkName = $derived(walletStore.networkName);
+    let isMainnet = $derived(walletStore.isMainnet);
+
+    // Real-funds gate: a mainnet deploy must be explicitly confirmed once.
+    let mainnetConfirmed = $state(false);
+    let showMainnetGate = $state(false);
 
     // Local deployment state
     let isDeploying = $state(false);
@@ -70,6 +75,13 @@
 
         if (isWrongNetwork) {
             error = 'Switch Freighter to the configured Stellar network before deploying.';
+            return;
+        }
+
+        // Real-funds gate — require one explicit confirmation before the first
+        // mainnet deploy. The gate UI calls confirmMainnetDeploy() to re-enter.
+        if (isMainnet && !mainnetConfirmed) {
+            showMainnetGate = true;
             return;
         }
 
@@ -161,6 +173,9 @@
                 currentStep = 'complete';
                 deployStore.setDeployed(vestingAddress);
 
+                // Deploy spent XLM (fees + funding) — refresh the wallet balance.
+                void walletStore.refreshBalance();
+
                 // Persist to Global Store
                 wizardStore.moveDistributionToLaunched(
                     distribution.id,
@@ -201,6 +216,16 @@
         }
     }
 
+    function confirmMainnetDeploy() {
+        mainnetConfirmed = true;
+        showMainnetGate = false;
+        void handleDeploy();
+    }
+
+    function cancelMainnetDeploy() {
+        showMainnetGate = false;
+    }
+
     function goToDashboard() {
         goto('/distributions');
     }
@@ -225,7 +250,7 @@
             const key = c.email || c.identityCommitment || String(c.leafIndex);
             const displayName = c.email || `Recipient ${c.identityCommitment?.slice(0, 8)}...`;
             const amount =
-                Number(c.amount) / Math.pow(10, wizardStore.tokenDetails.tokenDecimals || 7);
+                Number(c.amount) / Math.pow(10, wizardStore.tokenDetails.tokenDecimals ?? 7);
             if (grouped.has(key)) {
                 grouped.get(key)!.amount += amount;
             } else {
@@ -320,35 +345,53 @@
             <!-- Actions -->
             <div class="flex flex-col items-center gap-4">
                 {#if showNotDeployedIdle}
-                    <!-- Big Launch Button -->
-                    <ZenButton
-                        variant="primary"
-                        size="lg"
-                        class="px-12 text-lg shadow-md hover:shadow-lg transition-all duration-300"
-                        onclick={handleDeploy}
-                        disabled={isDeploying ||
-                            !walletAddress ||
-                            isWrongNetwork ||
-                            !factoryAvailable}
-                        loading={isDeploying}
-                    >
-                        {#if isDeploying}
-                            Preparing...
-                        {:else if !walletAddress}
-                            Connect Wallet First
-                        {:else if isWrongNetwork}
-                            Wrong Network
-                        {:else if !factoryAvailable}
-                            Factory Not Available
-                        {:else}
-                            <Rocket class="w-5 h-5 mr-2" />
-                            Launch Deployment
-                        {/if}
-                    </ZenButton>
+                    {#if showMainnetGate}
+                        <!-- Mainnet real-funds confirmation gate -->
+                        <ZenAlert variant="error" class="w-full max-w-md">
+                            {#snippet title()}Deploying on Stellar Mainnet{/snippet}
+                            This creates a real contract and transfers real funds on Stellar mainnet.
+                            It cannot be undone — confirm the network shown in your wallet before continuing.
+                        </ZenAlert>
+                        <div class="flex items-center gap-3">
+                            <ZenButton variant="ghost" size="lg" onclick={cancelMainnetDeploy}>
+                                Cancel
+                            </ZenButton>
+                            <ZenButton variant="danger" size="lg" onclick={confirmMainnetDeploy}>
+                                <Rocket class="w-5 h-5 mr-2" />
+                                Deploy on mainnet
+                            </ZenButton>
+                        </div>
+                    {:else}
+                        <!-- Big Launch Button -->
+                        <ZenButton
+                            variant="primary"
+                            size="lg"
+                            class="px-12 text-lg shadow-md hover:shadow-lg transition-all duration-300"
+                            onclick={handleDeploy}
+                            disabled={isDeploying ||
+                                !walletAddress ||
+                                isWrongNetwork ||
+                                !factoryAvailable}
+                            loading={isDeploying}
+                        >
+                            {#if isDeploying}
+                                Preparing...
+                            {:else if !walletAddress}
+                                Connect Wallet First
+                            {:else if isWrongNetwork}
+                                Wrong Network
+                            {:else if !factoryAvailable}
+                                Factory Not Available
+                            {:else}
+                                <Rocket class="w-5 h-5 mr-2" />
+                                Launch Deployment
+                            {/if}
+                        </ZenButton>
 
-                    <p class="text-xs text-zen-fg-subtle text-center max-w-md">
-                        This will require only 2 wallet confirmations. Much faster than before!
-                    </p>
+                        <p class="text-xs text-zen-fg-subtle text-center max-w-md">
+                            This will require only 2 wallet confirmations. Much faster than before!
+                        </p>
+                    {/if}
                 {:else if isDeployed && contractAddress && distribution}
                     <!-- Success State - Action Buttons (Card is on right) -->
                     <div class="flex gap-3 mt-4">

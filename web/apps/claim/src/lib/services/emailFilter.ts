@@ -10,7 +10,7 @@
 import { hashEmail } from '@zarf/core/utils/email';
 import type { StellarContractId } from '@zarf/core/types';
 import { getCidForVesting, type DiscoveredVesting } from '@zarf/core/services/vestingDiscovery';
-import { fetchIpfsJson, IpfsFetchError } from '@zarf/core/utils/ipfsFetch';
+import { fetchIpfsEmailHashes, fetchIpfsJson, IpfsFetchError } from '@zarf/core/utils/ipfsFetch';
 import { warn, err } from '@zarf/core/utils/log';
 
 type FilterableDistribution = StellarContractId | DiscoveredVesting;
@@ -42,20 +42,22 @@ export async function isEmailInDistribution(
 ): Promise<boolean> {
     const address = distributionAddress(distribution);
     try {
-        const data = await fetchDistribution(distribution);
-        if (!data) {
+        const cid = await resolveDistributionCid(distribution);
+        if (!cid) {
             warn(`[EmailFilter] Distribution not found: ${address}`);
             return false;
         }
 
+        const emailHashes = await fetchEmailHashes(cid);
+
         // Backward compatibility: no emailHashes means visible to everyone
-        if (!data.emailHashes || !Array.isArray(data.emailHashes)) {
+        if (!emailHashes || !Array.isArray(emailHashes)) {
             return true;
         }
 
         // Normalize hashes for comparison (ensure consistent 0x prefix and lowercase)
         const normalizedUserHash = userEmailHash.toLowerCase();
-        const normalizedDistHashes = data.emailHashes.map((h) => h.toLowerCase());
+        const normalizedDistHashes = emailHashes.map((h) => h.toLowerCase());
 
         return normalizedDistHashes.includes(normalizedUserHash);
     } catch (error) {
@@ -77,15 +79,27 @@ function distributionAddress(distribution: FilterableDistribution): StellarContr
     return typeof distribution === 'string' ? distribution : distribution.address;
 }
 
-async function fetchDistribution(
+async function resolveDistributionCid(
     distribution: FilterableDistribution,
-): Promise<DistributionWithHashes | null> {
-    const cid =
-        typeof distribution === 'string'
-            ? await getCidForVesting(distribution as StellarContractId)
-            : (distribution.metadataCid ?? (await getCidForVesting(distribution.address)));
-    if (!cid) return null;
-    return await fetchIpfsJson<DistributionWithHashes>(cid);
+): Promise<string | null> {
+    return typeof distribution === 'string'
+        ? await getCidForVesting(distribution as StellarContractId)
+        : (distribution.metadataCid ?? (await getCidForVesting(distribution.address)));
+}
+
+/**
+ * Eligibility filtering only needs `emailHashes`, so prefer the indexer's
+ * tiny extraction route over downloading the full distribution document
+ * (which grows with recipients × epochs). Older indexer deployments lack
+ * the route; fall back to the full document then.
+ */
+async function fetchEmailHashes(cid: string): Promise<string[] | null | undefined> {
+    try {
+        return await fetchIpfsEmailHashes(cid);
+    } catch {
+        const data = await fetchIpfsJson<DistributionWithHashes>(cid);
+        return data?.emailHashes;
+    }
 }
 
 /**

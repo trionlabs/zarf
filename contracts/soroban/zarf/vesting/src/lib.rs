@@ -21,6 +21,25 @@ const BN254_SCALAR_MODULUS: [u8; 32] = [
     0x28, 0x33, 0xe8, 0x48, 0x79, 0xb9, 0x70, 0x91, 0x43, 0xe1, 0xf5, 0x93, 0xf0, 0x00, 0x00, 0x01,
 ];
 
+/// One day of ledgers at the ~5s close time.
+pub const DAY_IN_LEDGERS: u32 = 17_280;
+/// TTL target for the instance, code, and persistent entries: ~120 days,
+/// safely under the ~180-day network maximum entry TTL. Vestings can span
+/// years, so every state-changing call re-extends; fully dormant contracts
+/// still need an external ExtendFootprintTTLOp before this window lapses.
+pub const TTL_EXTEND_TO: u32 = 120 * DAY_IN_LEDGERS;
+/// Re-extend only once the TTL has decayed by ~a day, so steady traffic pays
+/// the rent bump at most once a day instead of on every invocation.
+pub const TTL_THRESHOLD: u32 = TTL_EXTEND_TO - DAY_IN_LEDGERS;
+/// Cap for `claimed_statuses`, counted in ledger ENTRIES (not bytes): each
+/// commitment adds one entry to the read footprint and the network caps
+/// footprint entries per transaction (~100), so 64 leaves headroom for the
+/// instance and code entries. The cap counts requested items (duplicates
+/// included), so it can only over-estimate the real footprint. Deliberately
+/// more conservative than the factory's 80-item page cap — claim tooling
+/// tends to stack extra reads on top of this call.
+pub const MAX_CLAIMED_BATCH: u32 = 64;
+
 #[contract]
 pub struct ZarfVestingContract;
 
@@ -43,6 +62,7 @@ pub enum Error {
     InvalidAudience = 13,
     JwtExpired = 14,
     TokenTransferMismatch = 15,
+    TooManyCommitments = 16,
 }
 
 #[contracttype]
@@ -133,6 +153,7 @@ impl ZarfVestingContract {
         store.set(&DataKey::MerkleRoot, &merkle_root);
         store.set(&DataKey::AudienceHash, &audience_hash);
         store.set(&DataKey::MetadataCid, &metadata_cid);
+        Self::extend_contract_ttl(&env);
         Ok(())
     }
 
@@ -190,6 +211,7 @@ impl ZarfVestingContract {
         Self::require_owner(&env)?;
         let old_owner = Self::get_instance::<Address>(&env, DataKey::Owner)?;
         env.storage().instance().set(&DataKey::Owner, &new_owner);
+        Self::extend_contract_ttl(&env);
         OwnershipTransferred {
             previous_owner: old_owner,
             new_owner,
@@ -215,6 +237,7 @@ impl ZarfVestingContract {
         env.storage()
             .instance()
             .set(&DataKey::MerkleRoot, &merkle_root);
+        Self::extend_contract_ttl(&env);
         MerkleRootSet { merkle_root }.publish(&env);
         Ok(())
     }
@@ -244,6 +267,7 @@ impl ZarfVestingContract {
         {
             return Err(Error::TokenTransferMismatch);
         }
+        Self::extend_contract_ttl(&env);
         Deposited { amount }.publish(&env);
         Ok(())
     }
@@ -257,6 +281,27 @@ impl ZarfVestingContract {
             .persistent()
             .get(&DataKey::Claimed(epoch_commitment))
             .unwrap_or(false)
+    }
+
+    /// Batch view over the claim guards so callers resolve a recipient's
+    /// whole epoch chain in one simulation instead of one per epoch. An
+    /// archived (expired-TTL) guard reads as `false` here, same as
+    /// `is_claimed`; the on-chain `claim` still rejects after a restore.
+    /// The Zarf indexer reads the guard entries via getLedgerEntries and does
+    /// not need this; it exists for integrators without an indexer and as
+    /// the client-side fallback path.
+    pub fn claimed_statuses(
+        env: Env,
+        epoch_commitments: Vec<BytesN<32>>,
+    ) -> Result<Vec<bool>, Error> {
+        if epoch_commitments.len() > MAX_CLAIMED_BATCH {
+            return Err(Error::TooManyCommitments);
+        }
+        let mut statuses = Vec::new(&env);
+        for epoch_commitment in epoch_commitments.iter() {
+            statuses.push_back(Self::is_claimed(env.clone(), epoch_commitment));
+        }
+        Ok(statuses)
     }
 
     pub fn claim(
@@ -351,6 +396,13 @@ impl ZarfVestingContract {
             return Err(Error::TokenTransferMismatch);
         }
 
+        env.storage().persistent().extend_ttl(
+            &DataKey::Claimed(epoch_commitment.clone()),
+            TTL_THRESHOLD,
+            TTL_EXTEND_TO,
+        );
+        Self::extend_contract_ttl(&env);
+
         Claimed {
             epoch_commitment,
             recipient,
@@ -368,6 +420,11 @@ impl ZarfVestingContract {
             .instance()
             .get(&key)
             .ok_or(Error::NotInitialized)
+    }
+
+    fn extend_contract_ttl(env: &Env) {
+        env.deployer()
+            .extend_ttl(env.current_contract_address(), TTL_THRESHOLD, TTL_EXTEND_TO);
     }
 
     fn require_owner(env: &Env) -> Result<Address, Error> {

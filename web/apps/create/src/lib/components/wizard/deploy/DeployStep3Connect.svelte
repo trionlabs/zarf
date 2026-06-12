@@ -93,10 +93,11 @@
 
 <div class="max-w-2xl py-4">
     <div class="mb-8 flex items-start gap-4">
-        <div
-            class="w-12 h-12 rounded-2xl bg-zen-fg/10 text-zen-fg flex items-center justify-center shrink-0"
-        >
-            <Wallet class="w-6 h-6" />
+        <div class="relative flex items-center justify-center shrink-0">
+            <div class="absolute w-14 h-14 rounded-full bg-zen-primary/10 blur-md animate-pulse"></div>
+            <div class="w-12 h-12 rounded-xl border border-zen-border bg-zen-bg-elevated flex items-center justify-center relative animate-float text-zen-primary">
+                <Wallet class="w-5 h-5" />
+            </div>
         </div>
         <div>
             <h2 class="text-2xl font-bold">Connect Wallet</h2>
@@ -118,17 +119,19 @@
         <div class="p-6 sm:p-8">
             <div class="flex flex-col sm:flex-row items-center justify-between gap-6">
                 <div class="flex items-center gap-4 w-full sm:w-auto">
-                    <div class="relative">
+                    <div class="relative flex items-center justify-center">
+                        <div class="absolute w-16 h-16 rounded-full blur-xl animate-pulse-glow
+                            {walletStore.isConnected ? 'bg-zen-success/15' : 'bg-zen-fg/5'}"></div>
                         <div
-                            class="w-14 h-14 rounded-full flex items-center justify-center transition-colors duration-300
+                            class="w-14 h-14 rounded-full border flex items-center justify-center relative animate-float transition-all duration-300
                             {walletStore.isConnected
-                                ? 'bg-zen-success-muted text-zen-success'
-                                : 'bg-zen-fg/5 text-zen-fg-faint'}"
+                                ? 'border-zen-success/30 bg-zen-bg-elevated text-zen-success'
+                                : 'border-zen-border bg-zen-bg-elevated/50 text-zen-fg-faint'}"
                         >
                             {#if walletStore.isConnected}
-                                <Wallet class="w-6 h-6" />
+                                <Wallet class="w-5 h-5" />
                             {:else}
-                                <CreditCard class="w-6 h-6" />
+                                <CreditCard class="w-5 h-5" />
                             {/if}
                         </div>
                         {#if walletStore.isConnected}
@@ -304,3 +307,33 @@
         </div>
     {/if}
 </div>
+
+<style>
+    @keyframes float {
+        0%, 100% {
+            transform: translateY(0px);
+        }
+        50% {
+            transform: translateY(-4px);
+        }
+    }
+    
+    @keyframes pulse-glow {
+        0%, 100% {
+            opacity: 0.35;
+            transform: scale(0.95);
+        }
+        50% {
+            opacity: 0.65;
+            transform: scale(1.05);
+        }
+    }
+
+    .animate-float {
+        animation: float 4s ease-in-out infinite;
+    }
+
+    .animate-pulse-glow {
+        animation: pulse-glow 3s ease-in-out infinite;
+    }
+</style>

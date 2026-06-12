@@ -149,7 +149,7 @@ class ClaimFlowState {
     }
 
     get periods() {
-        return buildVestingPeriods(this.state.vestingSchedule, this.state.epochs);
+        return buildVestingPeriods(this.state.epochs);
     }
 
     get selectedEpoch() {

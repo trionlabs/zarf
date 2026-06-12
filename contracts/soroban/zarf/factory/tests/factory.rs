@@ -1,6 +1,13 @@
-use soroban_sdk::{testutils::Address as _, token, Address, BytesN, Env, String};
+use soroban_sdk::{
+    testutils::{
+        storage::{Instance, Persistent},
+        Address as _,
+    },
+    token, Address, BytesN, Env, String,
+};
 use zarf_vesting_factory_soroban::{
-    Error as FactoryError, ZarfVestingFactoryContract, ZarfVestingFactoryContractClient,
+    DataKey, DeploymentInfo, Error as FactoryError, ZarfVestingFactoryContract,
+    ZarfVestingFactoryContractClient, MAX_PAGE_LIMIT, TTL_EXTEND_TO,
 };
 
 const VESTING_WASM: &[u8] =
@@ -125,6 +132,109 @@ fn creates_vesting_and_tracks_metadata() {
     assert_eq!(owner_infos.len(), 1);
     assert_eq!(owner_infos.get_unchecked(0).address, vesting);
     assert_eq!(owner_infos.get_unchecked(0).metadata_cid, cid);
+}
+
+#[test]
+fn deployment_record_packs_address_and_cid_into_one_entry() {
+    // Range reads cost one ledger entry per item; pin the packed layout so a
+    // regression back to two entries per item (address + separate cid)
+    // fails loudly.
+    let env = Env::default();
+    let (factory, factory_id, _verifier, _registry, token_id) = setup(&env);
+
+    let owner = Address::generate(&env);
+    let cid = String::from_str(&env, "ipfs://packed");
+    let vesting = factory.create_vesting(
+        &owner,
+        &token_id,
+        &test_salt(&env, 22),
+        &String::from_str(&env, "Zarf"),
+        &String::from_str(&env, "Factory deployed"),
+        &BytesN::from_array(&env, &[8_u8; 32]),
+        &audience_hash(&env),
+        &1,
+        &100,
+        &cid,
+    );
+
+    let record: DeploymentInfo = env.as_contract(&factory_id, || {
+        env.storage()
+            .persistent()
+            .get(&DataKey::DeploymentAt(0))
+            .unwrap()
+    });
+    assert_eq!(record.address, vesting);
+    assert_eq!(record.metadata_cid, cid);
+
+    let owner_record: DeploymentInfo = env.as_contract(&factory_id, || {
+        env.storage()
+            .persistent()
+            .get(&DataKey::OwnerDeploymentAt(owner.clone(), 0))
+            .unwrap()
+    });
+    assert_eq!(owner_record.address, vesting);
+    assert_eq!(owner_record.metadata_cid, cid);
+}
+
+#[test]
+fn range_reads_reject_limits_above_footprint_budget() {
+    let env = Env::default();
+    let (factory, _factory_id, _verifier, _registry, _token_id) = setup(&env);
+    let owner = Address::generate(&env);
+
+    assert_eq!(factory.get_deployments(&0, &MAX_PAGE_LIMIT).len(), 0);
+    assert_eq!(factory.get_deployment_infos(&0, &MAX_PAGE_LIMIT).len(), 0);
+
+    let over = MAX_PAGE_LIMIT + 1;
+    for result in [
+        factory.try_get_deployments(&0, &over).map(|_| ()),
+        factory.try_get_deployment_infos(&0, &over).map(|_| ()),
+        factory
+            .try_get_owner_deployments(&owner, &0, &over)
+            .map(|_| ()),
+        factory
+            .try_get_owner_deployment_infos(&owner, &0, &over)
+            .map(|_| ()),
+    ] {
+        match result {
+            Err(Ok(FactoryError::InvalidLimit)) => {}
+            other => panic!("unexpected oversized range result: {:?}", other),
+        }
+    }
+}
+
+#[test]
+fn create_vesting_extends_registry_entry_and_instance_ttls() {
+    let env = Env::default();
+    let (factory, factory_id, _verifier, _registry, token_id) = setup(&env);
+
+    let owner = Address::generate(&env);
+    let vesting = factory.create_vesting(
+        &owner,
+        &token_id,
+        &test_salt(&env, 23),
+        &String::from_str(&env, "Zarf"),
+        &String::from_str(&env, "Factory deployed"),
+        &BytesN::from_array(&env, &[8_u8; 32]),
+        &audience_hash(&env),
+        &1,
+        &100,
+        &String::from_str(&env, "ipfs://ttl"),
+    );
+
+    let keys = [
+        DataKey::DeploymentAt(0),
+        DataKey::OwnerDeploymentAt(owner.clone(), 0),
+        DataKey::OwnerDeploymentCount(owner.clone()),
+        DataKey::MetadataCid(vesting.clone()),
+    ];
+    for key in keys {
+        let ttl = env.as_contract(&factory_id, || env.storage().persistent().get_ttl(&key));
+        assert_eq!(ttl, TTL_EXTEND_TO, "ttl not extended for {:?}", key);
+    }
+
+    let instance_ttl = env.as_contract(&factory_id, || env.storage().instance().get_ttl());
+    assert_eq!(instance_ttl, TTL_EXTEND_TO);
 }
 
 #[test]

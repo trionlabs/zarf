@@ -8,8 +8,15 @@
  *   GET /health
  *   GET /v1/:network/vestings
  *   GET /v1/:network/vestings/:address
+ *   GET /v1/:network/vestings/:address/claimed?commitments=<hex32>,...
+ *   GET /v1/:network/vestings/:address/claimed/:commitment
  *   GET /v1/:network/owners/:owner/vestings
  *   GET /v1/ipfs/:cid
+ *   GET /v1/ipfs/:cid/email-hashes
+ *
+ * Read responses are cached at the Cloudflare edge (per-colo) with TTLs
+ * matched to each endpoint's volatility; `?refresh=1` skips the cache read
+ * but still stores the fresh result. Error responses are never cached.
  */
 
 import {
@@ -24,6 +31,7 @@ import {
     scValToNative,
     xdr,
 } from '@stellar/stellar-sdk';
+import { readBodyWithLimit, verifyCidAgainstBytes } from '@zarf/core/utils/cidVerify';
 import { Buffer } from 'buffer';
 
 interface Env {
@@ -102,13 +110,36 @@ const IPFS_READ_GATEWAYS = [
     'https://w3s.link/ipfs',
 ];
 const GATEWAY_TIMEOUT_MS = 5_000;
-const FACTORY_RANGE_LIMIT = 100;
+const MAX_GATEWAY_RESPONSE_BYTES = 8 * 1024 * 1024;
+// Each deployment info costs TWO ledger-entry reads (DeploymentAt + MetadataCid)
+// on the currently deployed factory, and a simulated transaction's footprint is
+// capped at ~100 entries network-wide, so a page of 100 (~202 entries) blows the
+// budget once the factory fills a full page. 40 keeps a comfortable margin
+// (40×2 + instance + code = 82). Factories built from the current contract
+// source pack address+cid into ONE entry per item and cap pages at 80; 40 stays
+// valid for both layouts, so leave it until every factory is on the new build.
+const FACTORY_RANGE_LIMIT = 40;
+const CLAIMED_BATCH_LIMIT = 100;
+
+// Edge-cache TTLs (seconds), sized to each endpoint's volatility.
+const CACHE_TTL_IMMUTABLE = 31_536_000; // content-addressed / deterministic responses
+const CACHE_TTL_LIST = 60; // factory registry listings
+const CACHE_TTL_SUMMARY = 60; // vesting summary (embeds a volatile token balance)
+const CACHE_TTL_TOKEN_METADATA = 3_600; // token name/symbol/decimals
+const CACHE_TTL_RECIPIENT_ID = 3_600; // deterministic per (contract, recipient)
+const CACHE_TTL_LEDGER_LATEST = 5;
+const CACHE_TTL_CLAIMED_TRUE = 3_600; // a committed claim never reverts
+const CACHE_TTL_CLAIMED_FALSE = 10; // must flip quickly after a claim lands
 
 export default {
-    async fetch(request: Request, env: Env): Promise<Response> {
+    async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
         const url = new URL(request.url);
         const origin = request.headers.get('Origin');
         const corsHeaders = buildCorsHeaders(origin, env);
+        const cached = (
+            ttl: number | ((bodyText: string) => number),
+            produce: () => Promise<Response>,
+        ) => withEdgeCache(request, ctx, corsHeaders, ttl, produce);
 
         if (request.method === 'OPTIONS') {
             return new Response(null, { status: 204, headers: corsHeaders });
@@ -123,7 +154,7 @@ export default {
                 return json(
                     {
                         ok: true,
-                        cache: 'none',
+                        cache: 'edge',
                     },
                     200,
                     corsHeaders,
@@ -136,13 +167,23 @@ export default {
             }
 
             if (parts[1] === 'ipfs' && parts.length === 3) {
-                return handleIpfsRead(parts[2], corsHeaders);
+                return await cached(CACHE_TTL_IMMUTABLE, () =>
+                    handleIpfsRead(parts[2], corsHeaders),
+                );
+            }
+
+            if (parts[1] === 'ipfs' && parts.length === 4 && parts[3] === 'email-hashes') {
+                return await cached(CACHE_TTL_IMMUTABLE, () =>
+                    handleIpfsEmailHashes(parts[2], corsHeaders),
+                );
             }
 
             if (parts.length === 4 && parts[2] === 'ledger' && parts[3] === 'latest') {
                 const network = decodeSegment(parts[1]);
                 const cfg = getNetworkConfig(env, network);
-                return handleLatestLedger(cfg, corsHeaders);
+                return await cached(CACHE_TTL_LEDGER_LATEST, () =>
+                    handleLatestLedger(cfg, corsHeaders),
+                );
             }
 
             if (parts.length === 6 && parts[2] === 'factory' && parts[3] === 'predict') {
@@ -150,28 +191,42 @@ export default {
                 const cfg = getNetworkConfig(env, network);
                 const owner = decodeSegment(parts[4]);
                 const salt = decodeSegment(parts[5]);
-                return handlePredictVestingAddress(owner, salt, cfg, corsHeaders);
+                return await cached(CACHE_TTL_IMMUTABLE, () =>
+                    handlePredictVestingAddress(owner, salt, cfg, corsHeaders),
+                );
             }
 
             if (parts.length >= 3 && parts[2] === 'vestings') {
                 const network = decodeSegment(parts[1]);
                 const cfg = getNetworkConfig(env, network);
                 if (parts.length === 3) {
-                    return handleAllVestings(cfg, corsHeaders);
+                    return await cached(CACHE_TTL_LIST, () => handleAllVestings(cfg, corsHeaders));
                 }
                 if (parts.length === 4) {
                     const address = decodeSegment(parts[3]);
-                    return handleVesting(address, cfg, corsHeaders);
+                    return await cached(CACHE_TTL_SUMMARY, () =>
+                        handleVesting(address, cfg, corsHeaders),
+                    );
+                }
+                if (parts.length === 5 && parts[4] === 'claimed') {
+                    // Batched claim-status reads are per-user commitment sets:
+                    // edge caching them would never hit, so they stay uncached.
+                    const address = decodeSegment(parts[3]);
+                    return await handleEpochsClaimedBatch(address, url, cfg, corsHeaders);
                 }
                 if (parts.length === 6 && parts[4] === 'claimed') {
                     const address = decodeSegment(parts[3]);
                     const commitment = decodeSegment(parts[5]);
-                    return handleEpochClaimed(address, commitment, cfg, corsHeaders);
+                    return await cached(claimedResponseTtl, () =>
+                        handleEpochClaimed(address, commitment, cfg, corsHeaders),
+                    );
                 }
                 if (parts.length === 6 && parts[4] === 'recipient-id') {
                     const address = decodeSegment(parts[3]);
                     const recipient = decodeSegment(parts[5]);
-                    return handleRecipientId(address, recipient, cfg, corsHeaders);
+                    return await cached(CACHE_TTL_RECIPIENT_ID, () =>
+                        handleRecipientId(address, recipient, cfg, corsHeaders),
+                    );
                 }
             }
 
@@ -180,16 +235,20 @@ export default {
                 const cfg = getNetworkConfig(env, network);
                 const token = decodeSegment(parts[3]);
                 if (parts.length === 4) {
-                    return handleTokenMetadata(token, cfg, corsHeaders);
+                    return await cached(CACHE_TTL_TOKEN_METADATA, () =>
+                        handleTokenMetadata(token, cfg, corsHeaders),
+                    );
                 }
                 if (parts.length === 6 && parts[4] === 'balances') {
+                    // Balances/allowances gate create-flow approvals and must
+                    // reflect just-submitted transactions; never cache them.
                     const owner = decodeSegment(parts[5]);
-                    return handleTokenBalance(token, owner, cfg, corsHeaders);
+                    return await handleTokenBalance(token, owner, cfg, corsHeaders);
                 }
                 if (parts.length === 7 && parts[4] === 'allowances') {
                     const owner = decodeSegment(parts[5]);
                     const spender = decodeSegment(parts[6]);
-                    return handleTokenAllowance(token, owner, spender, cfg, corsHeaders);
+                    return await handleTokenAllowance(token, owner, spender, cfg, corsHeaders);
                 }
             }
 
@@ -197,7 +256,9 @@ export default {
                 const network = decodeSegment(parts[1]);
                 const owner = decodeSegment(parts[3]);
                 const cfg = getNetworkConfig(env, network);
-                return handleOwnerVestings(owner, url, env, cfg, corsHeaders);
+                return await cached(CACHE_TTL_LIST, () =>
+                    handleOwnerVestings(owner, url, env, cfg, corsHeaders),
+                );
             }
 
             return json({ error: 'not_found' }, 404, corsHeaders);
@@ -215,6 +276,77 @@ export default {
         }
     },
 };
+
+/**
+ * Edge-cache wrapper around a route handler.
+ *
+ * Responses are stored WITHOUT CORS headers: Access-Control-Allow-Origin is
+ * per-request while the cache key is URL-only (the Cache API does not honor
+ * Vary), so CORS headers are re-applied on every hit. `?refresh=1` skips the
+ * cache read but still stores the fresh result; it is stripped from the cache
+ * key so refreshed fills warm the shared entry. Non-200 responses and thrown
+ * errors are never cached.
+ */
+async function withEdgeCache(
+    request: Request,
+    ctx: ExecutionContext,
+    corsHeaders: Record<string, string>,
+    ttl: number | ((bodyText: string) => number),
+    produce: () => Promise<Response>,
+): Promise<Response> {
+    const url = new URL(request.url);
+    const bypass = url.searchParams.get('refresh') !== null;
+    url.searchParams.delete('refresh');
+    const cacheKey = new Request(url.toString(), { method: 'GET' });
+    const cache = caches.default;
+
+    if (!bypass) {
+        const hit = await cache.match(cacheKey);
+        if (hit) {
+            const headers = new Headers(hit.headers);
+            for (const [key, value] of Object.entries(corsHeaders)) headers.set(key, value);
+            return new Response(hit.body, { status: hit.status, headers });
+        }
+    }
+
+    const fresh = await produce();
+    if (fresh.status !== 200) return fresh;
+
+    const bodyText = await fresh.text();
+    const maxAge = typeof ttl === 'function' ? ttl(bodyText) : ttl;
+    const baseHeaders = {
+        'Content-Type': fresh.headers.get('Content-Type') ?? 'application/json',
+        'Cache-Control':
+            maxAge >= CACHE_TTL_IMMUTABLE
+                ? `public, max-age=${maxAge}, immutable`
+                : `public, max-age=${maxAge}`,
+    };
+
+    if (maxAge > 0) {
+        // put() can reject (e.g. oversized bodies); never let that surface as
+        // an unhandled rejection — the response has already been served.
+        ctx.waitUntil(
+            cache
+                .put(cacheKey, new Response(bodyText, { status: 200, headers: baseHeaders }))
+                .catch(() => {}),
+        );
+    }
+
+    // Force-refresh responses must not land in the BROWSER's HTTP cache either,
+    // or a second refresh within the TTL would be served stale without ever
+    // reaching the worker. The edge entry above still gets warmed.
+    const browserHeaders = bypass ? { ...baseHeaders, 'Cache-Control': 'no-store' } : baseHeaders;
+    return new Response(bodyText, { status: 200, headers: { ...browserHeaders, ...corsHeaders } });
+}
+
+function claimedResponseTtl(bodyText: string): number {
+    try {
+        const parsed = JSON.parse(bodyText) as { claimed?: unknown };
+        return parsed.claimed === true ? CACHE_TTL_CLAIMED_TRUE : CACHE_TTL_CLAIMED_FALSE;
+    } catch {
+        return 0;
+    }
+}
 
 async function handleAllVestings(
     cfg: NetworkConfig,
@@ -338,6 +470,64 @@ async function handleEpochClaimed(
         200,
         corsHeaders,
     );
+}
+
+async function handleEpochsClaimedBatch(
+    address: string,
+    url: URL,
+    cfg: NetworkConfig,
+    corsHeaders: Record<string, string>,
+): Promise<Response> {
+    assertAddress(address, 'vesting address');
+
+    const commitments = (url.searchParams.get('commitments') ?? '')
+        .split(',')
+        .map((value) => value.trim())
+        .filter(Boolean);
+    if (commitments.length === 0) {
+        throw new HttpError(
+            400,
+            'invalid_commitments',
+            'Provide ?commitments=<hex32>[,<hex32>...]',
+        );
+    }
+    if (commitments.length > CLAIMED_BATCH_LIMIT) {
+        throw new HttpError(
+            400,
+            'too_many_commitments',
+            `At most ${CLAIMED_BATCH_LIMIT} commitments per request`,
+        );
+    }
+    for (const commitment of commitments) {
+        validateHex32(commitment, 'epoch commitment');
+    }
+
+    return json(
+        {
+            claimed: Object.fromEntries(await readClaimedFlags(cfg, address, commitments)),
+            fetchedAt: Date.now(),
+        },
+        200,
+        corsHeaders,
+    );
+}
+
+async function handleIpfsEmailHashes(
+    rawCid: string,
+    corsHeaders: Record<string, string>,
+): Promise<Response> {
+    const cid = validateCid(decodeSegment(rawCid));
+    const doc = await fetchIpfsJson(cid);
+    const candidate =
+        typeof doc === 'object' && doc !== null
+            ? (doc as { emailHashes?: unknown }).emailHashes
+            : undefined;
+    // null = the distribution has no email gating (visible to everyone).
+    const emailHashes = Array.isArray(candidate)
+        ? candidate.filter((hash): hash is string => typeof hash === 'string')
+        : null;
+
+    return json({ emailHashes, fetchedAt: Date.now() }, 200, corsHeaders);
 }
 
 async function handleRecipientId(
@@ -560,7 +750,62 @@ async function isEpochClaimed(
     return Boolean(scValToNative(result));
 }
 
-async function predictVestingAddress(cfg: NetworkConfig, owner: string, salt: string): Promise<string> {
+/**
+ * Read the vesting contract's persistent `Claimed(commitment)` entries with a
+ * single `getLedgerEntries` RPC call instead of one `is_claimed` simulation
+ * per commitment. An absent entry means never claimed: a COMMITTED `Claimed`
+ * entry is always `true` (the contract's `false` writes happen only on error
+ * paths whose transactions revert), and the value is decoded rather than
+ * inferred from presence as defense in depth.
+ */
+async function readClaimedFlags(
+    cfg: NetworkConfig,
+    contractAddress: string,
+    commitments: string[],
+): Promise<Map<string, boolean>> {
+    const flags = new Map(commitments.map((commitment) => [commitment, false]));
+    const keys = commitments.map((commitment) => claimedLedgerKey(contractAddress, commitment));
+    const commitmentByKey = new Map(
+        keys.map((key, index) => [key.toXDR('base64'), commitments[index]]),
+    );
+
+    let response: rpc.Api.GetLedgerEntriesResponse;
+    try {
+        response = await new rpc.Server(cfg.rpcUrl).getLedgerEntries(...keys);
+    } catch (error) {
+        throw new HttpError(502, 'rpc_ledger_entries_error', (error as Error).message);
+    }
+
+    // getLedgerEntries omits absent keys and does not preserve request order,
+    // so returned entries are matched back to commitments by their key XDR.
+    for (const entry of response.entries) {
+        const commitment = commitmentByKey.get(entry.key.toXDR('base64'));
+        if (!commitment) continue;
+        flags.set(commitment, Boolean(scValToNative(entry.val.contractData().val())));
+    }
+    return flags;
+}
+
+function claimedLedgerKey(contractAddress: string, commitment: string): xdr.LedgerKey {
+    // Mirrors the contract's `DataKey::Claimed(BytesN<32>)`: a contracttype
+    // enum tuple variant is stored as ScVec([Symbol(variant), payload]).
+    return xdr.LedgerKey.contractData(
+        new xdr.LedgerKeyContractData({
+            contract: StellarSdkAddress.fromString(contractAddress).toScAddress(),
+            key: xdr.ScVal.scvVec([
+                xdr.ScVal.scvSymbol('Claimed'),
+                xdr.ScVal.scvBytes(hexToBuffer(commitment, 32)),
+            ]),
+            durability: xdr.ContractDataDurability.persistent(),
+        }),
+    );
+}
+
+async function predictVestingAddress(
+    cfg: NetworkConfig,
+    owner: string,
+    salt: string,
+): Promise<string> {
     const result = await simulate(cfg, cfg.factoryAddress, 'predict_vesting_address', [
         scAddress(owner),
         scBytesN32(salt),
@@ -721,7 +966,20 @@ async function fetchJsonFromGateway(gateway: string, cid: string): Promise<unkno
         if (!response.ok) {
             throw new Error(`HTTP ${response.status}`);
         }
-        return await response.json();
+
+        // This worker is the trusted proxy for every browser client, so
+        // gateway bytes must be authenticated against the CID before they
+        // are served onward (see cidVerify for the trust model).
+        const bytes = await readBodyWithLimit(response, MAX_GATEWAY_RESPONSE_BYTES);
+        const verification = await verifyCidAgainstBytes(cid, bytes);
+        if (verification === 'mismatch') {
+            throw new Error('content hash does not match CID');
+        }
+        if (verification === 'unverifiable') {
+            console.warn(`[Indexer] Unverifiable gateway response accepted for ${cid}`);
+        }
+
+        return JSON.parse(new TextDecoder().decode(bytes));
     } finally {
         clearTimeout(timer);
     }

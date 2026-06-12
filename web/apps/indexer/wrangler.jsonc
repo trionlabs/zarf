@@ -26,6 +26,8 @@
     //   STELLAR_MAINNET_FACTORY_ADDRESS
     //   STELLAR_MAINNET_NETWORK_PASSPHRASE
     //
-    // The worker does not use server-side cache. No Workers KV namespace is
-    // required for deploys.
+    // Read responses are cached via the Cloudflare Cache API (caches.default,
+    // per-colo) with per-endpoint TTLs; no Workers KV namespace is required
+    // for deploys. The Cache API needs a route/custom domain, which
+    // indexer.zarf.to provides.
 }

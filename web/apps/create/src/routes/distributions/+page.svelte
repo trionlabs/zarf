@@ -2,7 +2,7 @@
     import { onMount } from 'svelte';
     import { fade, slide, fly } from 'svelte/transition';
     import { goto } from '$app/navigation';
-    import { Plus, Wallet, Loader2, Sparkles, AlertCircle } from 'lucide-svelte';
+    import { Plus, Wallet, Loader2, FileText, Layers, Archive } from 'lucide-svelte';
 
     // Stores & Services
     import { wizardStore } from '$lib/stores/wizardStore.svelte';
@@ -96,6 +96,8 @@
     });
 
     function handleCreateNew() {
+        // Explicit "new" — start fresh rather than rehydrating a prior draft.
+        wizardStore.clearDraft();
         goto('/wizard/step-0');
     }
 </script>
@@ -190,7 +192,9 @@
             <div in:fade={{ duration: 200 }} class="space-y-6">
                 {#if drafts.length === 0}
                     <DistributionEmptyState
-                        icon={Sparkles}
+                        icon={FileText}
+                        color="bg-zen-primary-muted"
+                        iconColor="text-zen-primary"
                         title="No Drafts Yet"
                         description="Start creating a token distribution plan. It will be saved locally until you deploy."
                         action={createAction}
@@ -212,6 +216,8 @@
                 {#if !walletStore.isConnected}
                     <DistributionEmptyState
                         icon={Wallet}
+                        color="bg-zen-primary-muted"
+                        iconColor="text-zen-primary"
                         title="Connect Wallet"
                         description="Connect your wallet to view your on-chain distributions on Stellar."
                         action={connectAction}
@@ -240,7 +246,9 @@
 
                     {#if list.length === 0}
                         <DistributionEmptyState
-                            icon={AlertCircle}
+                            icon={activeTab === 'active' ? Layers : Archive}
+                            color={activeTab === 'active' ? 'bg-zen-success-muted' : 'bg-zen-fg-faint/10'}
+                            iconColor={activeTab === 'active' ? 'text-zen-success-content' : 'text-zen-fg-subtle'}
                             title={activeTab === 'active'
                                 ? 'No Active Distributions'
                                 : 'No History Found'}

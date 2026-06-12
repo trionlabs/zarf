@@ -65,12 +65,39 @@ export function devTag(label: string) {
 }
 
 /**
+ * Telemetry seam. Apps may register a single reporter (Sentry / Datadog /
+ * PostHog) at boot via `setLogReporter`; `warn()` and `err()` then forward to
+ * it in addition to the console. No reporter is wired by default, so nothing
+ * leaves the device until an app opts in. A throwing reporter never breaks
+ * logging or recurses.
+ */
+export type LogLevel = 'warn' | 'error';
+export type LogReporter = (level: LogLevel, args: unknown[]) => void;
+
+let reporter: LogReporter | null = null;
+
+/** Register (or clear with `null`) the single production log reporter. */
+export function setLogReporter(next: LogReporter | null): void {
+    reporter = next;
+}
+
+function report(level: LogLevel, args: unknown[]): void {
+    if (!reporter) return;
+    try {
+        reporter(level, args);
+    } catch {
+        // Telemetry must never break the app or recurse into logging.
+    }
+}
+
+/**
  * Warning that ships to production. Use for unexpected-but-recoverable
- * states (stale cache, recoverable I/O failure). One thin wrapper over
- * `console.warn` so future telemetry has a single hook.
+ * states (stale cache, recoverable I/O failure). Forwards to the console and
+ * the registered telemetry reporter.
  */
 export function warn(...args: unknown[]): void {
     console.warn(...args);
+    report('warn', args);
 }
 
 /**
@@ -79,4 +106,5 @@ export function warn(...args: unknown[]): void {
  */
 export function err(...args: unknown[]): void {
     console.error(...args);
+    report('error', args);
 }

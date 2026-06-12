@@ -16,6 +16,7 @@ import { Buffer } from 'buffer';
 import { getStellarConfig } from '../config/runtime';
 import type { StellarRuntimeConfig } from '../config/runtime';
 import { fetchIndexerJson, indexerNetworkPath } from '../utils/indexerClient';
+import { warn } from '../utils/log';
 import { validateTokenDecimals } from '../utils/tokenDecimals';
 import type {
     StellarAddress,
@@ -71,6 +72,10 @@ interface IndexerRecipientId {
 
 interface IndexerClaimed {
     claimed: boolean;
+}
+
+interface IndexerClaimedBatch {
+    claimed: Record<string, boolean>;
 }
 
 interface IndexerPrediction {
@@ -269,6 +274,50 @@ export async function isEpochClaimed(
         ),
     );
     return indexed.claimed;
+}
+
+/** Indexer batch route reads ledger entries directly; it accepts up to 100 commitments. */
+const CLAIMED_BATCH_CHUNK = 100;
+
+/**
+ * Batched claim-status lookup. One indexer request (one RPC `getLedgerEntries`
+ * call) covers up to 100 commitments, instead of one `is_claimed` simulation
+ * per epoch. Falls back to parallel per-epoch reads when the indexer
+ * deployment predates the batch route; individual fallback failures count as
+ * unclaimed, matching discovery semantics.
+ */
+export async function areEpochsClaimed(
+    epochCommitments: string[],
+    contractAddress?: StellarContractId,
+): Promise<Map<string, boolean>> {
+    const target = contractAddress || cfg().vestingAddress;
+    if (!target) throw new Error('Missing Stellar vesting contract address');
+
+    const flags = new Map<string, boolean>();
+    if (epochCommitments.length === 0) return flags;
+
+    try {
+        for (let i = 0; i < epochCommitments.length; i += CLAIMED_BATCH_CHUNK) {
+            const chunk = epochCommitments.slice(i, i + CLAIMED_BATCH_CHUNK);
+            const indexed = await fetchIndexerJson<IndexerClaimedBatch>(
+                indexerNetworkPath(`/vestings/${encodeURIComponent(target)}/claimed`),
+                { commitments: chunk.join(',') },
+            );
+            for (const commitment of chunk) {
+                flags.set(commitment, indexed.claimed[commitment] === true);
+            }
+        }
+        return flags;
+    } catch (error) {
+        warn('[Contracts] Batch claim-status read failed; falling back to per-epoch reads', error);
+        const statuses = await Promise.all(
+            epochCommitments.map((commitment) =>
+                isEpochClaimed(commitment, target).catch(() => false),
+            ),
+        );
+        epochCommitments.forEach((commitment, index) => flags.set(commitment, statuses[index]));
+        return flags;
+    }
 }
 
 export async function submitClaim(

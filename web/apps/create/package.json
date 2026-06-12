@@ -10,6 +10,7 @@
     "prepare": "svelte-kit sync || echo ''",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
+    "test": "vitest run",
     "deploy": "vite build && wrangler deploy"
   },
   "devDependencies": {
@@ -27,6 +28,7 @@
     "vite": "^7.3.3",
     "vite-plugin-top-level-await": "^1.6.0",
     "vite-plugin-wasm": "^3.6.0",
+    "vitest": "^4.1.7",
     "wrangler": "^4.95.0"
   },
   "dependencies": {

@@ -27,8 +27,15 @@ export interface DiscoveryCryptoDeps {
 
 export interface DiscoveryDataDeps {
     fetchDistribution: (contractAddress: string) => Promise<DistributionData>;
-    /** Returns true if the on-chain epoch is already claimed. Failures should NOT abort discovery. */
-    isEpochClaimed: (commitment: string, contractAddress: string) => Promise<boolean>;
+    /**
+     * Batched on-chain claim-status lookup for all discovered commitments.
+     * Commitments missing from the returned map are treated as unclaimed,
+     * and failures must NOT abort discovery.
+     */
+    areEpochsClaimed: (
+        commitments: string[],
+        contractAddress: string,
+    ) => Promise<Map<string, boolean>>;
 }
 
 export interface DiscoveredEpoch {
@@ -112,6 +119,9 @@ export interface DiscoverEpochsParams {
  *   commitment_i = computeIdentityCommitment(email, secret_i)
  *   stop on the first miss; throw if no epochs found at all
  *
+ * The chain walk is pure crypto and never touches the network; the
+ * on-chain claim-status lookup happens once, batched, after the walk.
+ *
  * @throws if no epochs found at all (likely wrong email/PIN).
  */
 export async function discoverEpochs(
@@ -126,7 +136,7 @@ export async function discoverEpochs(
     const distribution = await data.fetchDistribution(contractAddress);
     const lookup = buildCommitmentLookup(distribution.commitments);
 
-    const epochs: DiscoveredEpoch[] = [];
+    const hits: Array<{ commitment: string; salt: string; metas: EpochMetadata[] }> = [];
     let currentSecret = await crypto.pedersenHashBytes(crypto.stringToBytes(pin));
 
     for (let index = 0; index < maxEpochs; index++) {
@@ -137,19 +147,32 @@ export async function discoverEpochs(
         const metas = lookupCommitment(lookup, commitment);
         if (!metas || metas.length === 0) break;
 
-        let isClaimed = false;
-        try {
-            isClaimed = await data.isEpochClaimed(commitment, contractAddress);
-        } catch (e) {
-            // On-chain status check failures should not abort discovery; treat as unclaimed.
-            warn(`[Discovery] Status check failed for epoch ${index}`, e);
-        }
+        hits.push({ commitment, salt: '0x' + currentSecret.toString(16), metas });
+    }
 
+    if (hits.length === 0) {
+        throw new Error('No allocation found. Please check your Email and PIN.');
+    }
+
+    let claimedFlags = new Map<string, boolean>();
+    try {
+        claimedFlags = await data.areEpochsClaimed(
+            hits.map((hit) => hit.commitment),
+            contractAddress,
+        );
+    } catch (e) {
+        // On-chain status check failures should not abort discovery; treat as unclaimed.
+        warn('[Discovery] Claim-status check failed; treating all epochs as unclaimed', e);
+    }
+
+    const epochs: DiscoveredEpoch[] = [];
+    for (const hit of hits) {
+        const isClaimed = claimedFlags.get(hit.commitment) ?? false;
         const now = nowSeconds();
-        for (const meta of metas) {
+        for (const meta of hit.metas) {
             epochs.push({
-                identityCommitment: commitment,
-                salt: '0x' + currentSecret.toString(16),
+                identityCommitment: hit.commitment,
+                salt: hit.salt,
                 amount: BigInt(meta.amount),
                 leafIndex: meta.index,
                 unlockTime: meta.unlockTime,
@@ -158,10 +181,6 @@ export async function discoverEpochs(
                 canClaim: !isClaimed && now >= meta.unlockTime,
             });
         }
-    }
-
-    if (epochs.length === 0) {
-        throw new Error('No allocation found. Please check your Email and PIN.');
     }
 
     return { schedule: distribution.schedule, epochs };

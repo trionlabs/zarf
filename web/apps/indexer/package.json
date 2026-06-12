@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@stellar/stellar-sdk": "^15.1.0",
+    "@zarf/core": "workspace:*",
     "buffer": "^6.0.3"
   },
   "devDependencies": {

@@ -12,24 +12,22 @@ import {
     connectWallet as stellarConnect,
     disconnectWallet as stellarDisconnect,
     reconnectWallet as stellarReconnect,
-    switchChain as stellarSwitchChain,
     getNativeBalance as stellarGetBalance,
     getWalletAccount,
     watchWalletAccount,
     formatAddress,
+    formatXlmAmount,
     isSupportedNetwork,
+    isMainnetPassphrase,
+    networkLabelFromPassphrase,
     getConfiguredNetworkName,
 } from '@zarf/core/contracts/wallet';
+import type { StellarBalance } from '@zarf/core/contracts/wallet';
 import { getAccountExplorerUrl } from '@zarf/core/contracts/explorer';
+import { warn, err } from '@zarf/core/utils/log';
 import type { StellarAddress, WalletAccount } from '@zarf/core/types';
 import { sanitizeBlockchainError } from '../utils/errorSanitizer';
 import { networkStore } from './networkStore.svelte';
-
-interface WalletBalance {
-    value: bigint;
-    formatted: string;
-    symbol: string;
-}
 
 interface WalletState {
     address: StellarAddress | null;
@@ -37,12 +35,12 @@ interface WalletState {
     isConnecting: boolean;
     isDisconnecting: boolean;
     isReconnecting: boolean;
-    isSwitchingNetwork: boolean;
     network: string | null;
     networkPassphrase: string | null;
-    balance: WalletBalance | null;
+    balance: StellarBalance | null;
+    balanceError: boolean;
     error: string | null;
-    isModalOpen: boolean; // Added
+    isModalOpen: boolean;
 }
 
 const initialState: WalletState = {
@@ -51,14 +49,18 @@ const initialState: WalletState = {
     isConnecting: false,
     isDisconnecting: false,
     isReconnecting: false,
-    isSwitchingNetwork: false,
     network: null,
     networkPassphrase: null,
     balance: null,
+    balanceError: false,
     error: null,
-    isModalOpen: false, // Added
+    isModalOpen: false,
 };
 
+// Module-level runes are intentionally a single app-wide store. This is safe
+// under SSR: every mutator is `browser`-guarded, so writes only ever run in the
+// browser. The server never populates per-request state here, so nothing can
+// leak across requests — each server render sees the pristine initialState.
 const state = $state<WalletState>(structuredClone(initialState));
 let unwatchFn: (() => void) | null = null;
 let isInitialized = false;
@@ -67,20 +69,27 @@ let isInitialized = false;
 const activeNetworkId = $derived(networkStore.activeId);
 const configuredNetworkName = $derived(networkStore.active?.label ?? getConfiguredNetworkName());
 const isWrongNetwork = $derived(
-    activeNetworkId &&
+    Boolean(
+        activeNetworkId &&
         state.isConnected &&
         !isSupportedNetwork(state.networkPassphrase ?? undefined),
+    ),
 );
-const networkName = $derived(state.network || configuredNetworkName);
+// Trust the passphrase, not the wallet's self-reported network string: a custom
+// Freighter network could carry the Public passphrase but a name like "Testnet".
+const networkName = $derived(
+    networkLabelFromPassphrase(state.networkPassphrase) ?? configuredNetworkName,
+);
+const isMainnet = $derived(isMainnetPassphrase(state.networkPassphrase));
 const shortAddress = $derived(state.address ? formatAddress(state.address) : null);
-const isLoading = $derived(
-    state.isConnecting || state.isDisconnecting || state.isReconnecting || state.isSwitchingNetwork,
-);
+// Exact bigint formatting (truncated, dust-aware) — never via float.
 const formattedBalance = $derived(
-    state.balance
-        ? `${parseFloat(state.balance.formatted).toFixed(4)} ${state.balance.symbol}`
-        : null,
+    state.balance ? `${formatXlmAmount(state.balance.value)} ${state.balance.symbol}` : null,
 );
+const spendableBalance = $derived(
+    state.balance ? `${formatXlmAmount(state.balance.spendable)} ${state.balance.symbol}` : null,
+);
+const hasReserve = $derived(!!state.balance && state.balance.reserved > 0n);
 
 // Private Helpers
 
@@ -102,7 +111,6 @@ function updateInternalState(account: WalletAccount) {
     // Reset transient loading flags
     state.isConnecting = false;
     state.isDisconnecting = false;
-    state.isSwitchingNetwork = false;
     state.error = null; // Clear old errors on state change
 
     // Auto-close modal if connected
@@ -112,16 +120,21 @@ function updateInternalState(account: WalletAccount) {
 
     // Balance Fetch Logic
     if (state.isConnected && state.address) {
-        // Fetch if address/chain changed or valid connected state exists
+        // Refetch when the account/network changed, or when we have no balance
+        // yet AND no prior failure. The `!balanceError` guard stops the 1s wallet
+        // watcher from hammering Horizon when a fetch keeps failing — recovery
+        // happens through the explicit retry affordance instead.
+        const balanceMissing = !state.balance && !state.balanceError;
         if (
             state.address !== prevAddress ||
             state.networkPassphrase !== prevNetworkPassphrase ||
-            !state.balance
+            balanceMissing
         ) {
             refreshBalance();
         }
     } else {
         state.balance = null;
+        state.balanceError = false;
     }
 }
 
@@ -206,11 +219,19 @@ function closeModal() {
 
 async function refreshBalance() {
     if (!state.address || !state.isConnected) return;
+    // On a mismatched network the configured-network balance would be
+    // misleading; the UI shows a "switch network" hint instead of a number.
+    if (isWrongNetwork) {
+        state.balance = null;
+        state.balanceError = false;
+        return;
+    }
+    state.balanceError = false;
     try {
-        const bal = await stellarGetBalance(state.address);
-        state.balance = bal;
+        state.balance = await stellarGetBalance(state.address);
     } catch (e) {
-        if ((import.meta as any).env.DEV) console.warn('Failed to fetch balance', e);
+        state.balanceError = true;
+        warn('Failed to fetch wallet balance', e);
     }
 }
 
@@ -235,14 +256,10 @@ async function connect() {
             networkPassphrase: result.networkPassphrase,
         });
         return result;
-    } catch (err: unknown) {
-        // If it's already connected error, we can ignore it and just sync state
-        if (err instanceof Error && err.name === 'ConnectorAlreadyConnectedError') {
-            syncFromWallet();
-            return;
-        }
-        state.error = sanitizeError(err);
-        throw err;
+    } catch (cause: unknown) {
+        err('Wallet connection failed', cause);
+        state.error = sanitizeError(cause);
+        throw cause;
     } finally {
         state.isConnecting = false;
     }
@@ -256,29 +273,26 @@ async function disconnect() {
         await stellarDisconnect();
         updateInternalState({ isConnected: false });
         // State update handled by watcher
-    } catch (err: unknown) {
-        state.error = sanitizeError(err);
+    } catch (cause: unknown) {
+        warn('Wallet disconnect failed', cause);
+        state.error = sanitizeError(cause);
     } finally {
         state.isDisconnecting = false;
     }
 }
 
-async function switchChain() {
-    if (!browser) return;
-    state.isSwitchingNetwork = true;
-    state.error = null;
-    try {
-        await stellarSwitchChain();
-        // State update handled by watcher
-    } catch (err: unknown) {
-        state.error = sanitizeError(err);
-    } finally {
-        state.isSwitchingNetwork = false;
-    }
-}
-
 function clearError() {
     state.error = null;
+}
+
+/**
+ * Open the connect modal for a deliberate (re)connection. Freighter exposes no
+ * programmatic account picker, so "change account" means: disconnect, switch
+ * accounts inside Freighter, then reconnect through this modal.
+ */
+function openModal() {
+    state.error = null;
+    state.isModalOpen = true;
 }
 
 function destroy() {
@@ -287,10 +301,6 @@ function destroy() {
         unwatchFn = null;
     }
     isInitialized = false;
-}
-
-function setError(message: string) {
-    state.error = message;
 }
 
 export const walletStore = {
@@ -307,9 +317,6 @@ export const walletStore = {
     get isDisconnecting() {
         return state.isDisconnecting;
     },
-    get isSwitchingNetwork() {
-        return state.isSwitchingNetwork;
-    },
     get network() {
         return state.network;
     },
@@ -319,12 +326,15 @@ export const walletStore = {
     get balance() {
         return state.balance;
     },
+    get balanceError() {
+        return state.balanceError;
+    },
     get error() {
         return state.error;
     },
     get isModalOpen() {
         return state.isModalOpen;
-    }, // Exposed
+    },
 
     // Derived getters
     get isWrongNetwork() {
@@ -333,11 +343,20 @@ export const walletStore = {
     get networkName() {
         return networkName;
     },
+    get isMainnet() {
+        return isMainnet;
+    },
     get shortAddress() {
         return shortAddress;
     },
     get formattedBalance() {
         return formattedBalance;
+    },
+    get spendableBalance() {
+        return spendableBalance;
+    },
+    get hasReserve() {
+        return hasReserve;
     },
     get accountExplorerUrl() {
         if (!state.address) return null;
@@ -347,20 +366,16 @@ export const walletStore = {
             return null;
         }
     },
-    get isLoading() {
-        return isLoading;
-    },
 
     // Actions
     init,
-    requestConnection, // Main entry point
+    requestConnection,
     connect,
     disconnect,
-    switchChain,
     refreshBalance,
     clearError,
-    setError, // Added
-    closeModal, // Exposed
+    openModal,
+    closeModal,
     destroy,
 };
 

@@ -1,4 +1,4 @@
-import type { VestingSchedule, DurationUnit, UnlockMarker } from '../types';
+import type { DurationUnit, UnlockMarker } from '../types';
 
 // Re-export for convenience
 export type { DurationUnit };
@@ -202,73 +202,4 @@ export function unitToPeriodSeconds(unit: DurationUnit): bigint {
         default:
             throw new Error(`Unsupported duration unit: ${unit}`);
     }
-}
-
-/**
- * Calculates the full schedule of vesting periods based on contract parameters.
- * @param schedule The vesting schedule parameters (start, duration, cliff, etc.)
- * @param totalAllocation The total amount of tokens allocated
- * @param claimedEpochs An array of booleans or objects indicating if a specific epoch index is claimed
- * @returns Array of VestingPeriod objects
- */
-export function calculateVestingPeriods(
-    schedule: VestingSchedule | null,
-    totalAllocation: bigint,
-    claimedEpochs: Record<number, boolean> = {},
-): VestingPeriod[] {
-    if (!schedule || totalAllocation === 0n) {
-        return [];
-    }
-
-    const result: VestingPeriod[] = [];
-    const now = Date.now() / 1000;
-
-    // Calculate total number of unlocks
-    // If vestingPeriod is 0, it means linear streaming or single unlock at end?
-    // Assuming standard discrete vesting steps:
-    const totalPeriods =
-        Number(schedule.vestingPeriod) > 0
-            ? Math.floor(Number(schedule.vestingDuration) / Number(schedule.vestingPeriod))
-            : 1;
-
-    const amountPerPeriod = totalAllocation / BigInt(totalPeriods);
-
-    for (let i = 0; i < totalPeriods; i++) {
-        // Unlock time = Start + Cliff + ((i + 1) * PeriodLength)
-        // Usually cliff is part of the duration, but in some contracts cliff is a delay.
-        // Based on contract vesting semantics: start + cliff + duration.
-        // Let's match the logic previously used in the UI:
-        // unlockTimestamp = info.vestingStart + info.cliffDuration + (i + 1) * info.vestingPeriod;
-
-        const unlockTimestamp =
-            Number(schedule.vestingStart) +
-            Number(schedule.cliffDuration) +
-            (i + 1) * Number(schedule.vestingPeriod);
-
-        const unlockDate = new Date(unlockTimestamp * 1000);
-
-        let status: PeriodStatus;
-        const isPast = now >= unlockTimestamp;
-
-        if (isPast) {
-            // Check if this specific epoch index is marked as claimed
-            if (claimedEpochs[i]) {
-                status = 'claimed';
-            } else {
-                status = 'claimable';
-            }
-        } else {
-            status = 'locked';
-        }
-
-        result.push({
-            index: i + 1,
-            unlockDate,
-            amount: amountPerPeriod,
-            status,
-            cumulativeAmount: amountPerPeriod * BigInt(i + 1),
-        });
-    }
-
-    return result;
 }

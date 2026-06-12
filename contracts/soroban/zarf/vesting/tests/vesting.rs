@@ -1,11 +1,17 @@
 use soroban_sdk::{
     contract, contracterror, contractimpl, contracttype,
-    testutils::{Address as _, Ledger},
+    testutils::{
+        storage::{Instance, Persistent},
+        Address as _, Ledger,
+    },
     token, Address, Bytes, BytesN, ConversionError, Env, IntoVal, InvokeError, String, Symbol, Val,
     Vec,
 };
 use zarf_jwk_registry::{JwkRegistryContract, JwkRegistryContractClient};
-use zarf_vesting_soroban::{Error as VestingError, ZarfVestingContract, ZarfVestingContractClient};
+use zarf_vesting_soroban::{
+    DataKey, Error as VestingError, ZarfVestingContract, ZarfVestingContractClient, DAY_IN_LEDGERS,
+    MAX_CLAIMED_BATCH, TTL_EXTEND_TO,
+};
 
 #[contract]
 pub struct MockVerifier;
@@ -605,6 +611,133 @@ fn claim_negative_matrix_rejects_without_state_changes() {
             case.epoch_commitment.clone(),
         )
     });
+}
+
+fn commitment_n(env: &Env, n: u32) -> BytesN<32> {
+    let mut raw = [0_u8; 32];
+    raw[28..32].copy_from_slice(&n.to_be_bytes());
+    BytesN::from_array(env, &raw)
+}
+
+#[test]
+fn claimed_statuses_reports_batch_in_order() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let verifier_id = env.register(MockVerifier, ());
+    let case = setup_claim_case(&env, verifier_id, 123);
+    let vesting = ZarfVestingContractClient::new(&env, &case.vesting_id);
+
+    assert_eq!(vesting.claimed_statuses(&Vec::new(&env)).len(), 0);
+
+    vesting.claim(&case.proof, &case.public_inputs, &case.recipient);
+
+    let mut commitments = Vec::new(&env);
+    commitments.push_back(commitment_n(&env, 1));
+    commitments.push_back(case.epoch_commitment.clone());
+    commitments.push_back(commitment_n(&env, 2));
+
+    let mut expected = Vec::new(&env);
+    expected.push_back(false);
+    expected.push_back(true);
+    expected.push_back(false);
+    assert_eq!(vesting.claimed_statuses(&commitments), expected);
+}
+
+#[test]
+fn claimed_statuses_enforces_entry_count_cap() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let verifier_id = env.register(MockVerifier, ());
+    let case = setup_claim_case(&env, verifier_id, 123);
+    let vesting = ZarfVestingContractClient::new(&env, &case.vesting_id);
+
+    let mut at_cap = Vec::new(&env);
+    for n in 0..MAX_CLAIMED_BATCH {
+        at_cap.push_back(commitment_n(&env, n));
+    }
+    assert_eq!(vesting.claimed_statuses(&at_cap).len(), MAX_CLAIMED_BATCH);
+
+    let mut oversized = at_cap.clone();
+    oversized.push_back(commitment_n(&env, MAX_CLAIMED_BATCH));
+    match vesting.try_claimed_statuses(&oversized) {
+        Err(Ok(VestingError::TooManyCommitments)) => {}
+        other => panic!("unexpected oversized batch result: {:?}", other),
+    }
+}
+
+#[test]
+fn claim_extends_claimed_entry_and_instance_ttl() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let verifier_id = env.register(MockVerifier, ());
+    let case = setup_claim_case(&env, verifier_id, 123);
+    let vesting = ZarfVestingContractClient::new(&env, &case.vesting_id);
+
+    vesting.claim(&case.proof, &case.public_inputs, &case.recipient);
+
+    // A freshly written Claimed guard would otherwise live only the network
+    // minimum (~a week); claim must push it to the long-lived target.
+    let claimed_ttl = env.as_contract(&case.vesting_id, || {
+        env.storage()
+            .persistent()
+            .get_ttl(&DataKey::Claimed(case.epoch_commitment.clone()))
+    });
+    assert_eq!(claimed_ttl, TTL_EXTEND_TO);
+
+    let instance_ttl = env.as_contract(&case.vesting_id, || env.storage().instance().get_ttl());
+    assert_eq!(instance_ttl, TTL_EXTEND_TO);
+}
+
+#[test]
+fn constructor_extends_instance_ttl() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let verifier_id = env.register(MockVerifier, ());
+    let case = setup_claim_case(&env, verifier_id, 0);
+
+    let instance_ttl = env.as_contract(&case.vesting_id, || env.storage().instance().get_ttl());
+    assert_eq!(instance_ttl, TTL_EXTEND_TO);
+}
+
+#[test]
+fn set_merkle_root_re_extends_decayed_instance_ttl() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let owner = Address::generate(&env);
+    let zero_root = BytesN::from_array(&env, &[0_u8; 32]);
+    let root = BytesN::from_array(&env, &[5_u8; 32]);
+
+    let token_asset = env.register_stellar_asset_contract_v2(owner.clone());
+    let token_id = token_asset.address();
+    let verifier_id = env.register(MockVerifier, ());
+    let registry_id = env.register(JwkRegistryContract, (owner.clone(),));
+    let vesting_id = env.register(
+        ZarfVestingContract,
+        (
+            owner,
+            token_id,
+            verifier_id,
+            registry_id,
+            String::from_str(&env, "Zarf"),
+            String::from_str(&env, "Private vesting"),
+            zero_root,
+            audience_hash(&env),
+            String::from_str(&env, "ipfs://claim-list"),
+        ),
+    );
+    let vesting = ZarfVestingContractClient::new(&env, &vesting_id);
+
+    // Decay past the one-day re-extension threshold...
+    env.ledger()
+        .with_mut(|ledger| ledger.sequence_number += DAY_IN_LEDGERS + 1);
+    let decayed = env.as_contract(&vesting_id, || env.storage().instance().get_ttl());
+    assert_eq!(decayed, TTL_EXTEND_TO - DAY_IN_LEDGERS - 1);
+
+    // ...and the next state-changing call must bump it back to the target.
+    vesting.set_merkle_root(&root);
+    let extended = env.as_contract(&vesting_id, || env.storage().instance().get_ttl());
+    assert_eq!(extended, TTL_EXTEND_TO);
 }
 
 #[test]

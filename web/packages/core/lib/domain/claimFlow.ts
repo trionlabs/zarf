@@ -10,7 +10,7 @@
  */
 
 import type { DistributionData } from '../services/distribution';
-import { calculateVestingPeriods, type VestingPeriod } from '../utils/vesting';
+import type { VestingPeriod } from '../utils/vesting';
 
 /**
  * Subset of the claim store's `EpochClaim` that the pure helpers actually
@@ -18,6 +18,7 @@ import { calculateVestingPeriods, type VestingPeriod } from '../utils/vesting';
  */
 export interface EpochAmount {
     amount: bigint;
+    unlockTime: number;
     isClaimed: boolean;
     isLocked: boolean;
 }
@@ -111,25 +112,28 @@ export function findNextClaimableIdx(epochs: ReadonlyArray<EpochSelectable>): nu
 // ──────────────────────────────────────────────────────────────────────────
 
 /**
- * Build the vesting-periods table. Mirrors the previous inline derivation
- * in `claimStore.periods`: claimed map is keyed by array index (epoch[i]
- * maps to period i), then handed to `calculateVestingPeriods`.
+ * Build the vesting-periods table from the discovered claim epochs. The
+ * commitments are authoritative for claim count, amount, unlock time, and
+ * the claimed/locked status; nothing is derived from schedule metadata.
+ *
+ * Ordering contract: epochs arrive in hash-chain discovery order (epoch 0,
+ * 1, 2, …), which the claim-list builder constructs with monotonically
+ * increasing unlock times — so the table is chronological by construction.
+ * `index` is 1-based for display; consumers map back to the epochs array
+ * with `index - 1`.
  */
-export function buildClaimedMap(epochs: ReadonlyArray<EpochAmount>): Record<number, boolean> {
-    const map: Record<number, boolean> = {};
-    epochs.forEach((e, i) => {
-        if (e.isClaimed) map[i] = true;
-    });
-    return map;
-}
+export function buildVestingPeriods(epochs: ReadonlyArray<EpochAmount>): VestingPeriod[] {
+    let cumulativeAmount = 0n;
 
-export function buildVestingPeriods(
-    schedule: Schedule | null | undefined,
-    epochs: ReadonlyArray<EpochAmount>,
-): VestingPeriod[] {
-    return calculateVestingPeriods(
-        schedule ?? null,
-        totalAllocation(epochs),
-        buildClaimedMap(epochs),
-    );
+    return epochs.map((epoch, i) => {
+        cumulativeAmount += epoch.amount;
+
+        return {
+            index: i + 1,
+            unlockDate: new Date(epoch.unlockTime * 1000),
+            amount: epoch.amount,
+            status: epoch.isClaimed ? 'claimed' : epoch.isLocked ? 'locked' : 'claimable',
+            cumulativeAmount,
+        };
+    });
 }

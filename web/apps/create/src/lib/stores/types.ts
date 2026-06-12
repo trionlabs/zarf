@@ -11,7 +11,7 @@
  * @module stores/types
  */
 
-import type { Schedule, StellarAddress, StellarContractId } from '@zarf/core';
+import type { Schedule, StellarAddress, StellarContractId, DurationUnit } from '@zarf/core';
 
 // Re-export domain types for app-local convenience.
 export type {
@@ -39,6 +39,12 @@ export interface TokenDetails {
     tokenDecimals: number | null; // Fetched from contract
     tokenTotalSupply: string | null; // Fetched from contract
     iconUrl: string | null; // Fetched from API (if available)
+
+    // Trust gate (persisted so step-1 can re-assert it across navigation/deep-links,
+    // not just rely on step-0's ephemeral in-memory check). Optional for back-compat
+    // with pre-migration localStorage blobs.
+    trust?: 'curated' | 'imported' | null; // 'curated' = in the registry; else imported
+    acknowledged?: boolean; // imported-token acknowledgement, set on Continue
 }
 
 /**
@@ -96,6 +102,26 @@ export interface Distribution {
 }
 
 /**
+ * In-progress (un-saved) Step-1 form draft, persisted so a reload/deep-link
+ * restores the user's work. Recipients are intentionally excluded — they can be
+ * large (CSV import) and already live in saved `distributions[]`; they are
+ * re-imported from the CSV if a reload happens mid-flight.
+ */
+export interface DistributionDraft {
+    name: string;
+    description: string;
+    usRestricted: boolean;
+    euRestricted: boolean;
+    poolAmount: number;
+    poolInputValue: string;
+    cliffDate: string;
+    cliffTime: string;
+    duration: number;
+    durationUnit: DurationUnit;
+    csvFileName: string | null;
+}
+
+/**
  * Complete wizard state across all steps.
  *
  * Deploy-result fields (merkleRoot/deployedContractAddress/txHash) live in
@@ -110,6 +136,9 @@ export interface WizardState {
 
     // Step 1: Distributions (Basket)
     distributions: Distribution[];
+
+    // Step 1: In-progress form draft (null when none)
+    draft: DistributionDraft | null;
 }
 
 // ============================================================================
