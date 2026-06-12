@@ -257,9 +257,13 @@ async function main() {
         throw new Error('Merkle allocation total does not match requested amount');
     }
 
+    // The PIN is the claim credential. The well-known demo default is fine to
+    // persist/print; a custom one must never land in world-readable /tmp.
+    const pinForDisplay = pin === DEFAULT_PIN ? pin : '<redacted — provided via --pin>';
+
     const artifactDir = resolve('/tmp', `zarf-demo-${Date.now()}`);
-    mkdirSync(artifactDir, { recursive: true });
-    writeFileSync(resolve(artifactDir, 'claim-list.json'), body);
+    mkdirSync(artifactDir, { recursive: true, mode: 0o700 });
+    writeFileSync(resolve(artifactDir, 'claim-list.json'), body, { mode: 0o600 });
     writeFileSync(
         resolve(artifactDir, 'demo-summary.json'),
         JSON.stringify(
@@ -267,7 +271,7 @@ async function main() {
                 ownerAlias,
                 owner,
                 email,
-                pin,
+                pin: pinForDisplay,
                 amountHuman,
                 amountBase: amountBase.toString(),
                 periods,
@@ -282,6 +286,7 @@ async function main() {
             null,
             2,
         ),
+        { mode: 0o600 },
     );
 
     if (args['dry-run']) {
@@ -418,6 +423,7 @@ async function main() {
             null,
             2,
         ),
+        { mode: 0o600 },
     );
 
     console.log('\nDemo distribution deployed');
@@ -428,7 +434,7 @@ async function main() {
     console.log(`metadataCid=${cid}`);
     console.log(`merkleRoot=${factoryInputs.merkleRoot}`);
     console.log(`recipient=${email}`);
-    console.log(`pin=${pin}`);
+    console.log(`pin=${pinForDisplay}`);
     console.log(`periods=${periods}`);
     console.log(`amountBase=${amountBase}`);
     console.log(`artifactDir=${artifactDir}`);

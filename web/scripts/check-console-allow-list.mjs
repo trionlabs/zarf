@@ -73,6 +73,17 @@ const ALLOWLIST = {
         entries: WHOLE_FILE,
         reason: 'scheduled Cloudflare Worker — no Vite DEV gate available',
     },
+    // Single pinned site (not WHOLE_FILE): this worker is otherwise
+    // console-free and should stay that way.
+    'apps/pin-proxy/src/index.ts': {
+        entries: [
+            {
+                content:
+                    'console.warn(`[PinProxy] Unverifiable gateway response accepted for ${cid}`);',
+                reason: 'backend Cloudflare Worker — no Vite DEV gate available',
+            },
+        ],
+    },
 
     // Web Worker — runs off the main thread, has its own log channel,
     // conversion adds complexity for zero observable win.

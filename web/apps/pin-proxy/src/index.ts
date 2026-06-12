@@ -18,6 +18,7 @@
  */
 
 import { Keypair, StrKey } from '@stellar/stellar-sdk';
+import { readBodyWithLimit, verifyCidAgainstBytes } from '@zarf/core/utils/cidVerify';
 import { Buffer } from 'buffer';
 
 interface Env {
@@ -50,6 +51,7 @@ const IPFS_READ_GATEWAYS = [
     'https://ipfs.io/ipfs',
     'https://dweb.link/ipfs',
 ];
+const MAX_GATEWAY_RESPONSE_BYTES = 8 * 1024 * 1024;
 
 export default {
     async fetch(request: Request, env: Env): Promise<Response> {
@@ -168,10 +170,35 @@ async function handleIpfsRead(url: URL, corsHeaders: Record<string, string>): Pr
                 continue;
             }
 
+            // This route republishes gateway content under our own origin,
+            // so the bytes must be authenticated against the CID before
+            // being passed on (see cidVerify for the trust model). The
+            // original bytes are served so downstream clients can re-verify.
+            const bytes = await readBodyWithLimit(upstream, MAX_GATEWAY_RESPONSE_BYTES);
+            const verification = await verifyCidAgainstBytes(cid, bytes);
+            if (verification === 'mismatch') {
+                errors.push(`${gateway}: content hash does not match CID`);
+                continue;
+            }
+            if (verification === 'unverifiable') {
+                console.warn(`[PinProxy] Unverifiable gateway response accepted for ${cid}`);
+            }
+
+            try {
+                JSON.parse(new TextDecoder().decode(bytes));
+            } catch {
+                errors.push(`${gateway}: content is not JSON`);
+                continue;
+            }
+
             const headers = new Headers(corsHeaders);
-            headers.set('Content-Type', upstream.headers.get('Content-Type') || 'application/json');
+            // Fixed JSON content type (never the upstream header): this is an
+            // open passthrough, and reflecting a gateway-controlled type such
+            // as text/html would let pinned HTML render on this origin.
+            headers.set('Content-Type', 'application/json');
+            headers.set('X-Content-Type-Options', 'nosniff');
             headers.set('Cache-Control', 'public, max-age=300');
-            return new Response(upstream.body, { status: 200, headers });
+            return new Response(bytes, { status: 200, headers });
         } catch (error) {
             errors.push(`${gateway}: ${(error as Error).message}`);
         }
