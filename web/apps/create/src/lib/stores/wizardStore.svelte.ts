@@ -78,11 +78,28 @@ let editingCliffDate = $state<string>('');
 // Persistence Helpers
 // ============================================================================
 
+/**
+ * Strip recipient emails from a state snapshot before it touches disk.
+ * Emails are PII and must not sit in localStorage indefinitely; counts and
+ * amounts stay so dashboard stats survive a reload. A reload mid-deploy
+ * therefore requires re-importing the CSV (same trade-off the draft already
+ * makes — see DistributionDraft).
+ */
+function redactForStorage(snapshot: WizardState): WizardState {
+    return {
+        ...snapshot,
+        distributions: snapshot.distributions.map((dist) => ({
+            ...dist,
+            recipients: dist.recipients.map((recipient) => ({ ...recipient, email: '' })),
+        })),
+    };
+}
+
 function persist() {
     if (!browser) return;
 
     try {
-        localStorage.setItem(storageKey(), JSON.stringify(state));
+        localStorage.setItem(storageKey(), JSON.stringify(redactForStorage(state)));
     } catch (error) {
         warn('[WizardStore] Failed to persist:', error);
     }
@@ -98,6 +115,9 @@ function restore() {
             // Validate minimal structure; default `draft` for pre-migration blobs.
             if (parsed.distributions && Array.isArray(parsed.distributions)) {
                 state = { ...parsed, draft: parsed.draft ?? null };
+                // Blobs written by earlier versions still contain recipient
+                // emails — rewrite redacted immediately so the PII leaves disk.
+                persist();
             }
         }
     } catch (error) {
