@@ -7,7 +7,6 @@ import {
     isCliffPassed,
     cliffEndDate,
     findNextClaimableIdx,
-    buildClaimedMap,
     buildVestingPeriods,
 } from './claimFlow';
 
@@ -75,22 +74,9 @@ describe('findNextClaimableIdx', () => {
     });
 });
 
-describe('buildClaimedMap', () => {
-    it('keys by array index', () => {
-        const epochs = [e(1n, { claimed: true }), e(1n), e(1n, { claimed: true })];
-        expect(buildClaimedMap(epochs)).toEqual({ 0: true, 2: true });
-    });
-});
-
 describe('buildVestingPeriods', () => {
     it('uses discovered epochs instead of collapsing to schedule totalPeriods', () => {
-        const schedule = {
-            vestingStart: 1_780_876_800,
-            cliffDuration: 0,
-            vestingDuration: 1,
-            vestingPeriod: 1,
-        };
-        const periods = buildVestingPeriods(schedule, [
+        const periods = buildVestingPeriods([
             { ...e(50n), unlockTime: 1_780_876_800 },
             { ...e(70n, { locked: true }), unlockTime: 1_780_880_400 },
         ]);
@@ -99,5 +85,15 @@ describe('buildVestingPeriods', () => {
         expect(periods.map((p) => p.amount)).toEqual([50n, 70n]);
         expect(periods.map((p) => p.status)).toEqual(['claimable', 'locked']);
         expect(periods.map((p) => p.cumulativeAmount)).toEqual([50n, 120n]);
+    });
+
+    it('keys display index 1-based and derives status per epoch', () => {
+        const periods = buildVestingPeriods([
+            e(1n, { claimed: true }),
+            e(1n),
+            e(1n, { claimed: true }),
+        ]);
+        expect(periods.map((p) => p.index)).toEqual([1, 2, 3]);
+        expect(periods.map((p) => p.status)).toEqual(['claimed', 'claimable', 'claimed']);
     });
 });

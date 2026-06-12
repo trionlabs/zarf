@@ -113,21 +113,16 @@ export function findNextClaimableIdx(epochs: ReadonlyArray<EpochSelectable>): nu
 
 /**
  * Build the vesting-periods table from the discovered claim epochs. The
- * commitments are authoritative for claim count, amount, unlock time, and the
- * selected epoch index; schedule metadata is display context only.
+ * commitments are authoritative for claim count, amount, unlock time, and
+ * the claimed/locked status; nothing is derived from schedule metadata.
+ *
+ * Ordering contract: epochs arrive in hash-chain discovery order (epoch 0,
+ * 1, 2, …), which the claim-list builder constructs with monotonically
+ * increasing unlock times — so the table is chronological by construction.
+ * `index` is 1-based for display; consumers map back to the epochs array
+ * with `index - 1`.
  */
-export function buildClaimedMap(epochs: ReadonlyArray<EpochAmount>): Record<number, boolean> {
-    const map: Record<number, boolean> = {};
-    epochs.forEach((e, i) => {
-        if (e.isClaimed) map[i] = true;
-    });
-    return map;
-}
-
-export function buildVestingPeriods(
-    _schedule: Schedule | null | undefined,
-    epochs: ReadonlyArray<EpochAmount>,
-): VestingPeriod[] {
+export function buildVestingPeriods(epochs: ReadonlyArray<EpochAmount>): VestingPeriod[] {
     let cumulativeAmount = 0n;
 
     return epochs.map((epoch, i) => {
