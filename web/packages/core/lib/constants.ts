@@ -19,4 +19,7 @@ export const MAX_AUDIENCE_LENGTH = 128;
 // ===================================
 
 export const TREE_DEPTH = 20;
-export const MAX_SIGNED_DATA_LENGTH = 1024;
+// Must equal the circuit's MAX_DATA_LENGTH. Raised to 1536 alongside the
+// nonce-binding circuit revision so a real Google id_token carrying the
+// 64-char `nonce` claim fits the signed-data buffer.
+export const MAX_SIGNED_DATA_LENGTH = 1536;

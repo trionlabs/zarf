@@ -314,6 +314,50 @@ function generateAndStoreNonce(): string {
 }
 
 /**
+ * Recipient-bound login (nonce-binding circuit revision).
+ *
+ * The claim circuit asserts `id_token.nonce == lowercase 64-hex of the
+ * recipient field`, so a leaked id_token can only ever prove for the wallet
+ * the victim selected. The recipient field is only known after wallet
+ * selection, so this is a *re-auth*: call it at the Step 3 -> Step 4
+ * boundary with the recipient field (the indexer's `recipientId`, a 32-byte
+ * hex). The callback resumes at `resumeStep` for `targetWallet`.
+ *
+ * The nonce is the canonical lowercase 64-hex of the recipient, with no
+ * stored random nonce — the binding *is* the recipient, validated in-circuit
+ * and re-checked in `validateGoogleClaims` against the recomputed recipient.
+ */
+export function redirectToGoogleWithRecipient(args: {
+    clientId: string;
+    redirectUri: string;
+    contractAddress: string;
+    targetWallet: string;
+    recipientFieldHex: string;
+    resumeStep: number;
+}): void {
+    assertBrowser();
+    const nonce = recipientNonce(args.recipientFieldHex);
+    const state = encodeOAuthState({
+        address: args.contractAddress as OAuthState['address'],
+        targetWallet: args.targetWallet,
+        resumeStep: args.resumeStep,
+    });
+    initiateGoogleLogin(args.clientId, args.redirectUri, state, nonce);
+}
+
+/**
+ * Canonical OIDC nonce for a recipient field: lowercase, 0x-stripped, left
+ * padded to 64 hex chars. Matches the in-circuit decode exactly.
+ */
+export function recipientNonce(recipientFieldHex: string): string {
+    const clean = recipientFieldHex.replace(/^0x/, '').toLowerCase();
+    if (!/^[0-9a-f]{1,64}$/.test(clean)) {
+        throw new Error('recipient field must be <= 32 bytes of hex');
+    }
+    return clean.padStart(64, '0');
+}
+
+/**
  * Read + remove the stored OAuth nonce in one shot. Caller passes the
  * returned value to {@link validateGoogleClaims} so the JWT's `nonce`
  * claim is verified against what the OAuth request opened with.

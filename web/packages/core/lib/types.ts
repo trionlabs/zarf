@@ -136,6 +136,14 @@ export interface DecodedJWT {
 export interface OAuthState {
     /** Contract address to claim from (optional) */
     address?: StellarContractId;
+    /**
+     * Recipient wallet selected before a recipient-bound re-auth, so the
+     * callback can resume proof generation at the wallet the nonce binds.
+     * Present only on the post-wallet-selection re-auth (nonce-binding flow).
+     */
+    targetWallet?: string;
+    /** Claim-flow step to resume at after the re-auth callback. */
+    resumeStep?: number;
 }
 
 // ============================================================================
