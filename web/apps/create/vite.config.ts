@@ -34,8 +34,11 @@ const productionStub = (): Plugin => {
 // @aztec/bb.js's browser logger does `import { pino } from 'pino'`,
 // but pino@9's browser entry is CommonJS and Vite dev can serve it as
 // an ESM module with neither a named `pino` nor `default` export. bb.js
-// only needs a logger with `.child().debug()`, so keep pino out of the
-// browser graph and provide the tiny compatible surface directly.
+// only calls `pino(opts)`, `.child({ name })`, and `.debug()`, so keep
+// pino out of the browser graph and provide the compatible surface
+// directly. Verbose levels stay silent, but warn/error/fatal pass
+// through to the console — Barretenberg init failures must not be
+// swallowed by the logging shim.
 const pinoNamedShim = (): Plugin => ({
     name: 'pino-named-shim',
     enforce: 'pre',
@@ -47,17 +50,19 @@ const pinoNamedShim = (): Plugin => ({
         if (id !== '\0virtual:pino-named-shim') return null;
         return [
             'const noop = () => {};',
-            'function createLogger() {',
-            '  const logger = {',
-            '    child: () => logger,',
+            'function createLogger(opts = {}) {',
+            '  const name = opts && opts.name ? String(opts.name) : "bb.js";',
+            '  return {',
+            '    child: (bindings = {}) =>',
+            '      createLogger({ ...opts, ...bindings, name: bindings.name ?? name }),',
             '    trace: noop,',
             '    debug: noop,',
             '    info: noop,',
-            '    warn: noop,',
-            '    error: noop,',
-            '    fatal: noop,',
+            '    verbose: noop,',
+            '    warn: (...args) => console.warn(`[${name}]`, ...args),',
+            '    error: (...args) => console.error(`[${name}]`, ...args),',
+            '    fatal: (...args) => console.error(`[${name}]`, ...args),',
             '  };',
-            '  return logger;',
             '}',
             'export default createLogger;',
             'export const pino = createLogger;',
@@ -165,11 +170,7 @@ export default defineConfig({
     },
     worker: {
         format: 'es',
-        plugins: () => [
-            pinoNamedShim(),
-            wasm(),
-            topLevelAwait(),
-        ],
+        plugins: () => [pinoNamedShim(), wasm(), topLevelAwait()],
     },
     server: {
         headers: {
