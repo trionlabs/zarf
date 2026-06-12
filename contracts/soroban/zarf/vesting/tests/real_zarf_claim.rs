@@ -116,7 +116,7 @@ fn real_zarf_proof_claims_through_real_ultrahonk_verifier() {
     let token = token::TokenClient::new(&env, &token_id);
 
     let verifier_id = env.register(UltraHonkVerifierContract, (vk, vk_hash));
-    let registry_id = env.register(JwkRegistryContract, (owner.clone(),));
+    let registry_id = env.register(JwkRegistryContract, (owner.clone(), 0_u64));
     let registry = JwkRegistryContractClient::new(&env, &registry_id);
 
     registry.register_key(

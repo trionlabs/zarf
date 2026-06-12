@@ -41,6 +41,11 @@ interface Env {
     MIN_ACTIVE_KEYS?: string;
     MAX_REVOCATIONS_PER_RUN?: string;
     REVOKE_GRACE_HOURS?: string;
+    // Registry v2 mode: keys are PROPOSED (timelocked) instead of registered
+    // immediately, activated once the on-chain delay elapses, and revoked via
+    // operator_revoke_key. The signer secret then holds the OPERATOR key, not
+    // the owner. Flip to "true" when the v2 registry contract is deployed.
+    REGISTRY_V2?: string;
     // Optional KV namespace persisting first-missing timestamps so a key is
     // only revoked after it has been absent from Google's JWKS for the full
     // grace window. Without the binding the rails above still bound damage.
@@ -74,12 +79,18 @@ interface RegistryKey {
 }
 
 interface RegistryAction {
-    action: 'register' | 'revoke' | 'noop' | 'error';
+    action: 'register' | 'propose' | 'activate' | 'revoke' | 'noop' | 'error';
     kid: string;
     keyHash: HexString;
     reason: string;
     txHash?: string;
     error?: string;
+}
+
+interface PendingEntry {
+    keyHash: HexString;
+    kid: string;
+    activateAfter: number;
 }
 
 interface RotationReport {
@@ -92,6 +103,8 @@ interface RotationReport {
     currentKeys: ConvertedGoogleKey[];
     actions: RegistryAction[];
     registered: number;
+    proposed: number;
+    activated: number;
     revoked: number;
     unchanged: number;
     errors: number;
@@ -170,29 +183,64 @@ async function runRotation(
 
     try {
         validateConfig(env);
-        const [jwks, registryKeys] = await Promise.all([
+        const v2 = parseBoolean(env.REGISTRY_V2, false);
+        const [jwks, registryKeys, pendingKeys] = await Promise.all([
             fetchGoogleJwks(env),
             loadRegistryKeys(env),
+            v2 ? loadPendingKeys(env) : Promise.resolve([] as PendingEntry[]),
         ]);
         currentKeys.push(...convertGoogleKeys(jwks));
         const currentHashes = new Set(currentKeys.map((key) => key.keyHash));
         const activeRegistryHashes = new Set(
             registryKeys.filter((key) => key.active).map((key) => key.keyHash),
         );
+        const pendingByHash = new Map(pendingKeys.map((entry) => [entry.keyHash, entry]));
+
+        // Monitoring window: any on-chain key — active or pending — that is
+        // NOT in Google's live JWKS is either stale (will age out through
+        // the grace rails below) or evidence of a compromised signer key
+        // staging a malicious key. Alert loudly either way; for a pending
+        // key the activation delay is exactly the time to cancel it.
+        const unexpected = [
+            ...registryKeys
+                .filter((key) => key.active && !currentHashes.has(key.keyHash))
+                .map((key) => ({ keyHash: key.keyHash, state: 'active' })),
+            ...pendingKeys
+                .filter((entry) => !currentHashes.has(entry.keyHash))
+                .map((entry) => ({ keyHash: entry.keyHash, state: 'pending' })),
+        ];
+        if (unexpected.length > 0) {
+            await sendRawAlert(env, 'registry_keys_not_in_google_jwks', { unexpected });
+        }
 
         for (const key of currentKeys) {
-            const isValid = activeRegistryHashes.has(key.keyHash);
-
-            if (!isValid) {
-                const action = await registerKey(env, key, options.dryRun);
-                actions.push(action);
-                if (action.action === 'error') continue;
-            } else {
+            if (activeRegistryHashes.has(key.keyHash)) {
                 actions.push({
                     action: 'noop',
                     kid: key.kid,
                     keyHash: key.keyHash,
                     reason: 'already_active_on_chain',
+                });
+                continue;
+            }
+
+            if (!v2) {
+                const action = await registerKey(env, key, options.dryRun);
+                actions.push(action);
+                continue;
+            }
+
+            const pending = pendingByHash.get(key.keyHash);
+            if (!pending) {
+                actions.push(await proposeKey(env, key, options.dryRun));
+            } else if (Date.now() / 1000 >= pending.activateAfter) {
+                actions.push(await activatePendingKey(env, key, options.dryRun));
+            } else {
+                actions.push({
+                    action: 'noop',
+                    kid: key.kid,
+                    keyHash: key.keyHash,
+                    reason: 'pending_activation_delay',
                 });
             }
         }
@@ -251,11 +299,16 @@ async function runRotation(
 }
 
 function summarizeReport(
-    input: Omit<RotationReport, 'registered' | 'revoked' | 'unchanged' | 'errors'>,
+    input: Omit<
+        RotationReport,
+        'registered' | 'proposed' | 'activated' | 'revoked' | 'unchanged' | 'errors'
+    >,
 ): RotationReport {
     return {
         ...input,
         registered: input.actions.filter((a) => a.action === 'register').length,
+        proposed: input.actions.filter((a) => a.action === 'propose').length,
+        activated: input.actions.filter((a) => a.action === 'activate').length,
         revoked: input.actions.filter((a) => a.action === 'revoke').length,
         unchanged: input.actions.filter((a) => a.action === 'noop').length,
         errors: input.actions.filter((a) => a.action === 'error').length,
@@ -347,6 +400,77 @@ async function registerKey(
     }
 }
 
+async function proposeKey(
+    env: Env,
+    key: ConvertedGoogleKey,
+    dryRun: boolean,
+): Promise<RegistryAction> {
+    if (dryRun) {
+        return {
+            action: 'propose',
+            kid: key.kid,
+            keyHash: key.keyHash,
+            reason: 'dry_run_new_key',
+        };
+    }
+
+    try {
+        const txHash = await submitRegistryCall(env, 'propose_key', [
+            scString(key.kid),
+            scVec(key.limbs.map(scBytesN32)),
+        ]);
+        return {
+            action: 'propose',
+            kid: key.kid,
+            keyHash: key.keyHash,
+            reason: 'new_google_key_timelocked',
+            txHash,
+        };
+    } catch (error) {
+        return {
+            action: 'error',
+            kid: key.kid,
+            keyHash: key.keyHash,
+            reason: 'propose_failed',
+            error: error instanceof Error ? error.message : String(error),
+        };
+    }
+}
+
+async function activatePendingKey(
+    env: Env,
+    key: ConvertedGoogleKey,
+    dryRun: boolean,
+): Promise<RegistryAction> {
+    if (dryRun) {
+        return {
+            action: 'activate',
+            kid: key.kid,
+            keyHash: key.keyHash,
+            reason: 'dry_run_delay_elapsed',
+        };
+    }
+
+    try {
+        const txHash = await submitRegistryCall(env, 'activate_key', [scBytesN32(key.keyHash)]);
+        return {
+            action: 'activate',
+            kid: key.kid,
+            keyHash: key.keyHash,
+            reason: 'activation_delay_elapsed',
+            txHash,
+        };
+    } catch (error) {
+        return {
+            action: 'error',
+            kid: key.kid,
+            keyHash: key.keyHash,
+            reason: 'activate_failed',
+            error: error instanceof Error ? error.message : String(error),
+        };
+    }
+}
+
 async function revokeKey(
     env: Env,
     key: RegistryKey,
@@ -362,8 +486,12 @@ async function revokeKey(
         };
     }
 
+    // v2 splits roles: the worker holds the operator key, whose revocation
+    // entrypoint is operator_revoke_key (owner-only revoke_key remains).
+    const method = parseBoolean(env.REGISTRY_V2, false) ? 'operator_revoke_key' : 'revoke_key';
+
     try {
-        const txHash = await submitRegistryCall(env, 'revoke_key', [scBytesN32(key.keyHash)]);
+        const txHash = await submitRegistryCall(env, method, [scBytesN32(key.keyHash)]);
         return {
             action: 'revoke',
             kid: 'unknown',
@@ -554,6 +682,37 @@ async function loadRegistryKeys(env: Env): Promise<RegistryKey[]> {
     return keys;
 }
 
+async function loadPendingKeys(env: Env): Promise<PendingEntry[]> {
+    const count = Number(
+        scValToNative(await simulateRegistryCall(env, 'get_pending_count')),
+    );
+    const pendings: PendingEntry[] = [];
+
+    for (let index = 0; index < count; index += 1) {
+        try {
+            const hashResult = await simulateRegistryCall(env, 'get_pending_at', [scU32(index)]);
+            const keyHash = bytesToHex(scValToNative(hashResult) as Buffer);
+            const pendingResult = await simulateRegistryCall(env, 'get_pending', [
+                scBytesN32(keyHash),
+            ]);
+            const native = scValToNative(pendingResult) as {
+                kid?: unknown;
+                activate_after?: unknown;
+            } | null;
+            if (!native) continue;
+            pendings.push({
+                keyHash,
+                kid: typeof native.kid === 'string' ? native.kid : 'unknown',
+                activateAfter: Number(native.activate_after ?? 0),
+            });
+        } catch (error) {
+            console.error('[jwk-rotation] skipping unreadable pending index', index, error);
+        }
+    }
+
+    return pendings;
+}
+
 async function getRegisteredKeyCount(env: Env): Promise<number> {
     const result = await simulateRegistryCall(env, 'get_registered_key_count');
     return Number(scValToNative(result));
@@ -669,13 +828,17 @@ async function constantTimeStringEqual(a: string, b: string): Promise<boolean> {
 }
 
 async function sendAlert(env: Env, event: string, report: RotationReport): Promise<void> {
+    await sendRawAlert(env, event, { report });
+}
+
+async function sendRawAlert(env: Env, event: string, payload: object): Promise<void> {
     if (!env.ALERT_WEBHOOK_URL) return;
 
     try {
         const response = await fetch(env.ALERT_WEBHOOK_URL, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ event, report }),
+            body: JSON.stringify({ event, ...payload }),
         });
         if (!response.ok) {
             console.error('[jwk-rotation] alert webhook failed', response.status);
