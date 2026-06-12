@@ -196,8 +196,8 @@ async function runRotation(
         );
         const pendingByHash = new Map(pendingKeys.map((entry) => [entry.keyHash, entry]));
 
-        // Monitoring window: any on-chain key — active or pending — that is
-        // NOT in Google's live JWKS is either stale (will age out through
+        // Monitoring window covers every on-chain key — active or pending —
+        // that is NOT in Google's live JWKS: either stale (will age out through
         // the grace rails below) or evidence of a compromised signer key
         // staging a malicious key. Alert loudly either way; for a pending
         // key the activation delay is exactly the time to cancel it.
