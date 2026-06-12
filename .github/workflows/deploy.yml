@@ -314,12 +314,14 @@ jobs:
         env:
           WORKER_URL: ${{ matrix.url }}
         run: |
+          # /health is intentionally minimal ({ok:true}); secret presence is
+          # verified independently by the "Verify Worker runtime secrets" step.
           for attempt in {1..10}; do
             health="$(curl -fsS "$WORKER_URL/health")"
             if HEALTH="$health" node <<'NODE'
           const health = JSON.parse(process.env.HEALTH);
 
-          if (health.hasRegistry && health.hasRpc && health.hasOwnerSecret && health.hasAdminToken) {
+          if (health.ok === true) {
             process.exit(0);
           }
 
@@ -333,5 +335,5 @@ jobs:
             sleep 3
           done
 
-          echo "::error::jwk-rotation health check did not expose all required runtime bindings"
+          echo "::error::jwk-rotation health check failed"
           exit 1

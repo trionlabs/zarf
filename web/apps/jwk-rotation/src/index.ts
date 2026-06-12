@@ -19,6 +19,15 @@ const LIMB_BITS = 120n;
 const LIMB_COUNT = 18;
 const FIELD_BYTES = 32;
 
+// Revocation safety rails. A single malformed/empty Google response, or a
+// compromised JWKS URL, must never be able to revoke every registry key and
+// brick all claims until the next rotation.
+const MIN_FETCHED_KEYS = 2; // Google normally serves 2-3 overlapping keys
+const DEFAULT_MIN_ACTIVE_KEYS = 2;
+const DEFAULT_MAX_REVOCATIONS_PER_RUN = 1;
+const DEFAULT_REVOKE_GRACE_HOURS = 48; // Google id_tokens live <=1h after key removal
+const GRACE_MARKER_TTL_SECONDS = 90 * 24 * 3600;
+
 interface Env {
     STELLAR_RPC_URL: string;
     STELLAR_NETWORK_PASSPHRASE: string;
@@ -29,6 +38,13 @@ interface Env {
     GOOGLE_JWKS_URL?: string;
     REVOKE_REMOVED_KEYS?: string;
     TX_POLL_ATTEMPTS?: string;
+    MIN_ACTIVE_KEYS?: string;
+    MAX_REVOCATIONS_PER_RUN?: string;
+    REVOKE_GRACE_HOURS?: string;
+    // Optional KV namespace persisting first-missing timestamps so a key is
+    // only revoked after it has been absent from Google's JWKS for the full
+    // grace window. Without the binding the rails above still bound damage.
+    ROTATION_STATE?: KVNamespace;
 }
 
 interface GoogleJwk {
@@ -88,18 +104,13 @@ export default {
         const url = new URL(request.url);
 
         if (url.pathname === '/health' && request.method === 'GET') {
-            return json({
-                ok: true,
-                state: 'on-chain',
-                hasRegistry: Boolean(env.JWK_REGISTRY_ADDRESS),
-                hasRpc: Boolean(env.STELLAR_RPC_URL),
-                hasOwnerSecret: Boolean(env.REGISTRY_OWNER_SECRET),
-                hasAdminToken: Boolean(env.ADMIN_TOKEN),
-            });
+            // Configuration details are admin-only (see /state); anonymous
+            // callers learn nothing beyond liveness.
+            return json({ ok: true });
         }
 
         if (url.pathname === '/state' && request.method === 'GET') {
-            const auth = requireAdmin(request, env);
+            const auth = await requireAdmin(request, env);
             if (auth) return auth;
             validateConfig(env);
             const [jwks, registryKeys] = await Promise.all([
@@ -108,6 +119,13 @@ export default {
             ]);
             const currentKeys = convertGoogleKeys(jwks);
             return json({
+                config: {
+                    hasRegistry: Boolean(env.JWK_REGISTRY_ADDRESS),
+                    hasRpc: Boolean(env.STELLAR_RPC_URL),
+                    hasOwnerSecret: Boolean(env.REGISTRY_OWNER_SECRET),
+                    hasAdminToken: Boolean(env.ADMIN_TOKEN),
+                    hasGraceState: Boolean(env.ROTATION_STATE),
+                },
                 currentKeys,
                 registryKeys,
                 activeRegistryKeys: registryKeys.filter((key) => key.active),
@@ -115,7 +133,7 @@ export default {
         }
 
         if (url.pathname === '/rotate' && request.method === 'POST') {
-            const auth = requireAdmin(request, env);
+            const auth = await requireAdmin(request, env);
             if (auth) return auth;
 
             const dryRun = parseBoolean(url.searchParams.get('dryRun'), false);
@@ -180,19 +198,14 @@ async function runRotation(
         }
 
         if (parseBoolean(env.REVOKE_REMOVED_KEYS, true)) {
-            for (const registryKey of registryKeys) {
-                if (!registryKey.active || currentHashes.has(registryKey.keyHash)) {
-                    continue;
-                }
-
-                const action = await revokeKey(
-                    env,
-                    registryKey,
-                    'removed_from_google_jwks',
-                    options.dryRun,
-                );
-                actions.push(action);
-            }
+            const revocations = await executeRevocations(env, {
+                currentKeys,
+                currentHashes,
+                registryKeys,
+                registeredThisRun: actions.filter((a) => a.action === 'register').length,
+                dryRun: options.dryRun,
+            });
+            actions.push(...revocations);
         }
 
         const hasErrors = actions.some((action) => action.action === 'error');
@@ -369,9 +382,152 @@ async function revokeKey(
     }
 }
 
+interface RevocationContext {
+    currentKeys: ConvertedGoogleKey[];
+    currentHashes: Set<HexString>;
+    registryKeys: RegistryKey[];
+    registeredThisRun: number;
+    dryRun: boolean;
+}
+
+/**
+ * Revoke registry keys that disappeared from Google's JWKS, bounded by
+ * safety rails so no single rotation run can take the registry down:
+ *
+ * 1. A Google response with fewer than MIN_FETCHED_KEYS valid keys aborts
+ *    all revocations (empty/malformed responses revoke nothing).
+ * 2. A key must have been missing for the full grace window before it is
+ *    revoked (tracked in the optional ROTATION_STATE KV; keys that reappear
+ *    have their marker cleared).
+ * 3. At most MAX_REVOCATIONS_PER_RUN keys are revoked per run.
+ * 4. Revocations never drop the active key count below MIN_ACTIVE_KEYS.
+ */
+async function executeRevocations(env: Env, ctx: RevocationContext): Promise<RegistryAction[]> {
+    const actions: RegistryAction[] = [];
+    const staleKeys = ctx.registryKeys.filter(
+        (key) => key.active && !ctx.currentHashes.has(key.keyHash),
+    );
+
+    if (staleKeys.length === 0) return actions;
+
+    if (ctx.currentKeys.length < MIN_FETCHED_KEYS) {
+        actions.push({
+            action: 'noop',
+            kid: 'rotation',
+            keyHash: ZERO_HASH,
+            reason: `revocations_skipped_google_returned_${ctx.currentKeys.length}_keys`,
+        });
+        return actions;
+    }
+
+    // Clear grace markers for keys that are present again.
+    if (env.ROTATION_STATE && !ctx.dryRun) {
+        for (const key of ctx.registryKeys) {
+            if (ctx.currentHashes.has(key.keyHash)) {
+                await env.ROTATION_STATE.delete(graceMarkerKey(key.keyHash));
+            }
+        }
+    }
+
+    const maxRevocations = parsePositiveInt(
+        env.MAX_REVOCATIONS_PER_RUN,
+        DEFAULT_MAX_REVOCATIONS_PER_RUN,
+    );
+    const minActive = parsePositiveInt(env.MIN_ACTIVE_KEYS, DEFAULT_MIN_ACTIVE_KEYS);
+    const graceMs =
+        parsePositiveInt(env.REVOKE_GRACE_HOURS, DEFAULT_REVOKE_GRACE_HOURS) * 3_600_000;
+
+    let activeCount =
+        ctx.registryKeys.filter((key) => key.active).length + ctx.registeredThisRun;
+    let revoked = 0;
+
+    for (const key of staleKeys) {
+        const grace = await checkGraceWindow(env, key.keyHash, graceMs, ctx.dryRun);
+        if (grace !== 'elapsed') {
+            actions.push({
+                action: 'noop',
+                kid: 'unknown',
+                keyHash: key.keyHash,
+                reason: grace === 'started' ? 'grace_period_started' : 'within_grace_period',
+            });
+            continue;
+        }
+
+        if (revoked >= maxRevocations) {
+            actions.push({
+                action: 'noop',
+                kid: 'unknown',
+                keyHash: key.keyHash,
+                reason: 'revocation_budget_exhausted',
+            });
+            continue;
+        }
+
+        if (activeCount - 1 < minActive) {
+            actions.push({
+                action: 'noop',
+                kid: 'unknown',
+                keyHash: key.keyHash,
+                reason: 'would_drop_below_min_active_keys',
+            });
+            continue;
+        }
+
+        const action = await revokeKey(env, key, 'removed_from_google_jwks', ctx.dryRun);
+        actions.push(action);
+        if (action.action === 'revoke') {
+            revoked += 1;
+            activeCount -= 1;
+            if (env.ROTATION_STATE && !ctx.dryRun) {
+                await env.ROTATION_STATE.delete(graceMarkerKey(key.keyHash));
+            }
+        }
+    }
+
+    return actions;
+}
+
+type GraceStatus = 'started' | 'pending' | 'elapsed';
+
+async function checkGraceWindow(
+    env: Env,
+    keyHash: HexString,
+    graceMs: number,
+    dryRun: boolean,
+): Promise<GraceStatus> {
+    // Without the KV binding there is no persistence for first-missing
+    // timestamps; the remaining rails (min fetched, max per run, min active)
+    // still bound the damage of a bad JWKS response.
+    if (!env.ROTATION_STATE) return 'elapsed';
+
+    const marker = await env.ROTATION_STATE.get(graceMarkerKey(keyHash));
+    if (marker === null) {
+        if (!dryRun) {
+            await env.ROTATION_STATE.put(graceMarkerKey(keyHash), String(Date.now()), {
+                expirationTtl: GRACE_MARKER_TTL_SECONDS,
+            });
+        }
+        return 'started';
+    }
+
+    const firstMissingAt = Number(marker);
+    if (!Number.isFinite(firstMissingAt)) return 'started';
+    return Date.now() - firstMissingAt >= graceMs ? 'elapsed' : 'pending';
+}
+
+function graceMarkerKey(keyHash: HexString): string {
+    return `firstMissingAt:${keyHash}`;
+}
+
+function parsePositiveInt(value: string | undefined, fallback: number): number {
+    const parsed = Number(value);
+    return Number.isInteger(parsed) && parsed >= 0 ? parsed : fallback;
+}
+
 async function loadRegistryKeys(env: Env): Promise<RegistryKey[]> {
     const count = await getRegisteredKeyCount(env);
     const keys: RegistryKey[] = [];
+    let unreadable = 0;
 
     for (let index = 0; index < count; index += 1) {
         try {
@@ -383,8 +539,16 @@ async function loadRegistryKeys(env: Env): Promise<RegistryKey[]> {
             // one stale index cannot wedge the whole rotation run. A key that
             // is unreachable here is also unreadable by claim's registry check
             // (archived Key entry reads invalid), so skipping is safe.
+            unreadable += 1;
             console.error('[jwk-rotation] skipping unreadable registry index', index, error);
         }
+    }
+
+    // Every index failing is not archival — it is a systemic RPC/registry
+    // outage. Abort instead of proceeding with an empty view of the registry
+    // (which would make every Google key look unregistered).
+    if (count > 0 && unreadable === count) {
+        throw new Error(`All ${count} registry indices failed to read; aborting rotation`);
     }
 
     return keys;
@@ -471,17 +635,37 @@ function validateConfig(env: Env): void {
     }
 }
 
-function requireAdmin(request: Request, env: Env): Response | null {
+async function requireAdmin(request: Request, env: Env): Promise<Response | null> {
     if (!env.ADMIN_TOKEN) {
         return json({ error: 'admin_token_not_configured' }, 503);
     }
 
     const auth = request.headers.get('Authorization') || '';
-    if (auth !== `Bearer ${env.ADMIN_TOKEN}`) {
+    const equal = await constantTimeStringEqual(auth, `Bearer ${env.ADMIN_TOKEN}`);
+    if (!equal) {
         return json({ error: 'unauthorized' }, 401);
     }
 
     return null;
+}
+
+/**
+ * Compare secrets without leaking timing. Hashing both sides first
+ * normalizes lengths, so the byte comparison runs over fixed-size digests.
+ */
+async function constantTimeStringEqual(a: string, b: string): Promise<boolean> {
+    const encoder = new TextEncoder();
+    const [digestA, digestB] = await Promise.all([
+        crypto.subtle.digest('SHA-256', encoder.encode(a)),
+        crypto.subtle.digest('SHA-256', encoder.encode(b)),
+    ]);
+    const bytesA = new Uint8Array(digestA);
+    const bytesB = new Uint8Array(digestB);
+    let diff = 0;
+    for (let i = 0; i < bytesA.length; i += 1) {
+        diff |= bytesA[i] ^ bytesB[i];
+    }
+    return diff === 0;
 }
 
 async function sendAlert(env: Env, event: string, report: RotationReport): Promise<void> {
