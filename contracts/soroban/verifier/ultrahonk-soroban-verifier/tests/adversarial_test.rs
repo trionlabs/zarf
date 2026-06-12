@@ -24,7 +24,10 @@ const PUBLIC_INPUTS: &[u8] = include_bytes!("../../tests/zarf/target/public_inpu
 const VK_HASH_HEX: &str = include_str!("../../tests/zarf/vk_hash.hex");
 
 fn vk_hash() -> [u8; 32] {
-    let hex = VK_HASH_HEX.trim().strip_prefix("0x").unwrap_or(VK_HASH_HEX.trim());
+    let hex = VK_HASH_HEX
+        .trim()
+        .strip_prefix("0x")
+        .unwrap_or(VK_HASH_HEX.trim());
     let mut out = [0u8; 32];
     for i in 0..32 {
         out[i] = u8::from_str_radix(&hex[i * 2..i * 2 + 2], 16).expect("valid hex");
@@ -95,7 +98,10 @@ fn bit_flips_across_public_inputs_are_rejected() {
             survived += 1;
         }
     }
-    assert_eq!(survived, 0, "{survived} tampered public-input sets verified");
+    assert_eq!(
+        survived, 0,
+        "{survived} tampered public-input sets verified"
+    );
 }
 
 /// Truncating or extending the proof must be rejected on length alone.
@@ -146,7 +152,10 @@ fn non_canonical_public_input_is_rejected() {
     let mut mutated = PUBLIC_INPUTS.to_vec();
     mutated[..32].copy_from_slice(&sum);
     // Sanity: the alias reduces to the original field element.
-    assert_eq!(Fr::from_bytes(&sum).to_bytes(), Fr::from_bytes(&field0).to_bytes());
+    assert_eq!(
+        Fr::from_bytes(&sum).to_bytes(),
+        Fr::from_bytes(&field0).to_bytes()
+    );
 
     let public_inputs = Bytes::from_slice(&env, &mutated);
     assert!(

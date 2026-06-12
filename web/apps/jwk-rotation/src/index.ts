@@ -565,8 +565,7 @@ async function executeRevocations(env: Env, ctx: RevocationContext): Promise<Reg
     const graceMs =
         parsePositiveInt(env.REVOKE_GRACE_HOURS, DEFAULT_REVOKE_GRACE_HOURS) * 3_600_000;
 
-    let activeCount =
-        ctx.registryKeys.filter((key) => key.active).length + ctx.registeredThisRun;
+    let activeCount = ctx.registryKeys.filter((key) => key.active).length + ctx.registeredThisRun;
     let revoked = 0;
 
     for (const key of staleKeys) {
@@ -683,9 +682,7 @@ async function loadRegistryKeys(env: Env): Promise<RegistryKey[]> {
 }
 
 async function loadPendingKeys(env: Env): Promise<PendingEntry[]> {
-    const count = Number(
-        scValToNative(await simulateRegistryCall(env, 'get_pending_count')),
-    );
+    const count = Number(scValToNative(await simulateRegistryCall(env, 'get_pending_count')));
     const pendings: PendingEntry[] = [];
 
     for (let index = 0; index < count; index += 1) {

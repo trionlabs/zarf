@@ -164,7 +164,7 @@
                 <ZenInput
                     type="password"
                     class="input-lg pl-11 tracking-widest font-mono placeholder:font-sans placeholder:tracking-normal"
-                    placeholder={'Enter your PIN'}
+                    placeholder="Enter your PIN"
                     maxlength={PIN_MAX_LENGTH}
                     bind:value={pin}
                     {error}

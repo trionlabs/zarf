@@ -23,8 +23,8 @@ fn limbs_with_seed(env: &Env, seed: u8) -> Vec<BytesN<32>> {
     for i in 0..18_u32 {
         let mut raw = [0_u8; 32];
         raw[31] = match i {
-            0 => seed | 1,  // modulus must be odd
-            17 => 0x80,     // exactly 2048 bits
+            0 => seed | 1, // modulus must be odd
+            17 => 0x80,    // exactly 2048 bits
             _ => seed.wrapping_add(i as u8) | 1,
         };
         limbs.push_back(BytesN::from_array(env, &raw));

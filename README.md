@@ -48,10 +48,10 @@ Configure cliff periods, linear release schedules, and complex vesting terms dir
 
 ### Prerequisites
 
-- [Noir](https://noir-lang.org/) v1.0.0-beta.17
+- [Noir](https://noir-lang.org/) v1.0.0-beta.18
 - Rust + `wasm32v1-none`
 - [Stellar CLI](https://developers.stellar.org/docs/tools/cli/install-cli)
-- Node.js 18+
+- Node.js 24+
 - pnpm
 
 ### Quick Start

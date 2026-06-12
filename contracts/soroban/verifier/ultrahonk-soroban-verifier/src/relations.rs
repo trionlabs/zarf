@@ -69,8 +69,7 @@ fn accumulate_permutation_relation(
         den
     };
 
-    evals[2] = ((wire(p, Wire::ZPerm) + wire(p, Wire::LagrangeFirst))
-        * grand_product_numerator
+    evals[2] = ((wire(p, Wire::ZPerm) + wire(p, Wire::LagrangeFirst)) * grand_product_numerator
         - (wire(p, Wire::ZPermShift) + wire(p, Wire::LagrangeLast) * rp.public_inputs_delta)
             * grand_product_denominator)
         * domain_sep;
@@ -104,10 +103,10 @@ fn accumulate_log_derivative_lookup_relation(
     let inverse_exists_xor = wire(p, Wire::LookupReadTags) + wire(p, Wire::QLookup)
         - wire(p, Wire::LookupReadTags) * wire(p, Wire::QLookup);
 
-    evals[4] = (read_term * write_term * wire(p, Wire::LookupInverses) - inverse_exists_xor)
-        * domain_sep;
-    evals[5] = wire(p, Wire::QLookup) * read_inverse
-        - wire(p, Wire::LookupReadCounts) * write_inverse;
+    evals[4] =
+        (read_term * write_term * wire(p, Wire::LookupInverses) - inverse_exists_xor) * domain_sep;
+    evals[5] =
+        wire(p, Wire::QLookup) * read_inverse - wire(p, Wire::LookupReadCounts) * write_inverse;
 
     let read_tag = wire(p, Wire::LookupReadTags);
     evals[6] = (read_tag * read_tag - read_tag) * domain_sep;
@@ -170,12 +169,7 @@ fn accumulate_elliptic_relation(p: &[Fr], evals: &mut [Fr], domain_sep: Fr) {
         + y_double_identity * domain_sep * q_elliptic * q_is_double;
 }
 
-fn accumulate_memory_relation(
-    p: &[Fr],
-    rp: &RelationParameters,
-    evals: &mut [Fr],
-    domain_sep: Fr,
-) {
+fn accumulate_memory_relation(p: &[Fr], rp: &RelationParameters, evals: &mut [Fr], domain_sep: Fr) {
     let mut memory_record_check = wire(p, Wire::Wo) * rp.eta_three
         + wire(p, Wire::Wr) * rp.eta_two
         + wire(p, Wire::Wl) * rp.eta
@@ -220,9 +214,9 @@ fn accumulate_memory_relation(
 
     let rom_consistency_check_identity =
         memory_record_check * wire(p, Wire::Ql) * wire(p, Wire::Qr);
-    let ram_timestamp_check_identity =
-        (Fr::one() - index_delta) * (wire(p, Wire::WrShift) - wire(p, Wire::Wr))
-            - wire(p, Wire::Wo);
+    let ram_timestamp_check_identity = (Fr::one() - index_delta)
+        * (wire(p, Wire::WrShift) - wire(p, Wire::Wr))
+        - wire(p, Wire::Wo);
     let ram_consistency_check_identity = access_check * wire(p, Wire::Qo);
 
     let memory_identity = rom_consistency_check_identity
@@ -247,8 +241,7 @@ fn accumulate_nnf_relation(p: &[Fr], evals: &mut [Fr], domain_sep: Fr) {
         non_native_field_gate_2 * limb_size - wire(p, Wire::W4Shift) + limb_subproduct;
     non_native_field_gate_2 = non_native_field_gate_2 * wire(p, Wire::Q4);
 
-    limb_subproduct =
-        limb_subproduct * limb_size + wire(p, Wire::WlShift) * wire(p, Wire::WrShift);
+    limb_subproduct = limb_subproduct * limb_size + wire(p, Wire::WlShift) * wire(p, Wire::WrShift);
 
     let non_native_field_gate_1 =
         (limb_subproduct - (wire(p, Wire::Wo) + wire(p, Wire::W4))) * wire(p, Wire::Qo);

@@ -136,9 +136,7 @@ export function fieldToHex32(value: bigint): HexString {
 
 export async function hashAudience(audience: string): Promise<HexString> {
     if (!audience) throw new Error('Google OAuth client ID is required');
-    return fieldToHex32(
-        await pedersenHashBytes(stringToBytes(audience, MAX_AUDIENCE_LENGTH)),
-    );
+    return fieldToHex32(await pedersenHashBytes(stringToBytes(audience, MAX_AUDIENCE_LENGTH)));
 }
 
 /**

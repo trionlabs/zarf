@@ -472,7 +472,8 @@ impl JwkRegistryContract {
             let count = Self::pending_count(env);
             let last = count.saturating_sub(1);
             if index != last {
-                if let Some(moved) = persistent.get::<DataKey, BytesN<32>>(&DataKey::PendingAt(last))
+                if let Some(moved) =
+                    persistent.get::<DataKey, BytesN<32>>(&DataKey::PendingAt(last))
                 {
                     persistent.set(&DataKey::PendingAt(index), &moved);
                     persistent.set(&DataKey::PendingIndex(moved), &index);
