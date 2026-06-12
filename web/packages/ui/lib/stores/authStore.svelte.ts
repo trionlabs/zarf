@@ -35,7 +35,7 @@ let isHydrated = $state(false); // Tracks if client-side restoration has complet
 // ============================================================================
 
 function setGmailSession(data: Partial<GmailSession>) {
-    // Merge new data. The JWT lives in memory only: any persisted copy
+    // Merge new data. The JWT lives in memory only — a persisted copy
     // (session/localStorage) is readable by script injection and outlives
     // its use. A hard refresh simply requires a fresh Google login.
     gmailState = { ...gmailState, ...data, isAuthenticated: true };
