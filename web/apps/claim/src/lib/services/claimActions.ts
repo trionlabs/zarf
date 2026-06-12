@@ -33,7 +33,7 @@ export async function discoverEpochs(
     claimStore.state.epochs = [];
 
     try {
-        const { isEpochClaimed, readVestingContract } = await import('@zarf/core/contracts');
+        const { areEpochsClaimed, readVestingContract } = await import('@zarf/core/contracts');
         const metadata = await readVestingContract(contractAddress);
         claimStore.state.tokenSymbol = metadata.tokenSymbol;
         claimStore.state.tokenDecimals = metadata.tokenDecimals;
@@ -46,7 +46,7 @@ export async function discoverEpochs(
             { computeIdentityCommitment, stringToBytes, pedersenHashBytes, pedersenHashField },
             {
                 fetchDistribution: fetchDistributionData,
-                isEpochClaimed,
+                areEpochsClaimed,
             },
         );
 

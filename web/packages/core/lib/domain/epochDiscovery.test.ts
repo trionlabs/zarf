@@ -65,7 +65,10 @@ function fakeData(
             schedule: fakeSchedule,
             commitments,
         }),
-        isEpochClaimed: async (commitment) => claimedSet.has(commitment.toLowerCase()),
+        areEpochsClaimed: async (batch) =>
+            new Map(
+                batch.map((commitment) => [commitment, claimedSet.has(commitment.toLowerCase())]),
+            ),
     };
 }
 
@@ -101,7 +104,7 @@ describe('discoverEpochs', () => {
         ).rejects.toThrow(/No allocation found/);
     });
 
-    it('treats an isEpochClaimed failure as "not claimed" and continues', async () => {
+    it('treats an areEpochsClaimed failure as "not claimed" and continues', async () => {
         const commitments: DistributionData['commitments'] = { [padded(66)]: meta(0, '100', 0) };
         const flakyData: DiscoveryDataDeps = {
             fetchDistribution: async () => ({
@@ -109,7 +112,7 @@ describe('discoverEpochs', () => {
                 schedule: fakeSchedule,
                 commitments,
             }),
-            isEpochClaimed: async () => {
+            areEpochsClaimed: async () => {
                 throw new Error('RPC down');
             },
         };
@@ -119,6 +122,56 @@ describe('discoverEpochs', () => {
             flakyData,
         );
         expect(result.epochs[0].isClaimed).toBe(false);
+    });
+
+    it('issues a single batched claim-status call covering every discovered commitment', async () => {
+        const commitments: DistributionData['commitments'] = {
+            [padded(66)]: meta(0, '100', 0),
+            [padded(67)]: meta(1, '200', 0),
+            [padded(68)]: meta(2, '300', 0),
+        };
+        const batches: string[][] = [];
+        const data: DiscoveryDataDeps = {
+            fetchDistribution: async () => ({
+                merkleRoot: '0xroot',
+                schedule: fakeSchedule,
+                commitments,
+            }),
+            areEpochsClaimed: async (batch) => {
+                batches.push(batch);
+                return new Map(batch.map((c) => [c, false]));
+            },
+        };
+        await discoverEpochs(
+            { email: 'a@b.co', pin: 'A', contractAddress: '0xv', nowSeconds: () => 0 },
+            fakeCrypto,
+            data,
+        );
+        expect(batches).toEqual([[padded(66), padded(67), padded(68)]]);
+    });
+
+    it('defaults to unclaimed for commitments missing from the batch result', async () => {
+        const commitments: DistributionData['commitments'] = {
+            [padded(66)]: meta(0, '100', 0),
+            [padded(67)]: meta(1, '200', 0),
+        };
+        const data: DiscoveryDataDeps = {
+            fetchDistribution: async () => ({
+                merkleRoot: '0xroot',
+                schedule: fakeSchedule,
+                commitments,
+            }),
+            // Partial result: the second commitment is absent from the map.
+            areEpochsClaimed: async () => new Map([[padded(66), true]]),
+        };
+        const result = await discoverEpochs(
+            { email: 'a@b.co', pin: 'A', contractAddress: '0xv', nowSeconds: () => 1000 },
+            fakeCrypto,
+            data,
+        );
+        expect(result.epochs[0].isClaimed).toBe(true);
+        expect(result.epochs[1].isClaimed).toBe(false);
+        expect(result.epochs[1].canClaim).toBe(true);
     });
 
     it('marks isLocked / canClaim relative to the injected clock', async () => {
@@ -157,7 +210,7 @@ describe('discoverEpochs', () => {
         expect(result.epochs).toHaveLength(3);
     });
 
-    it('reflects on-chain claimed status from isEpochClaimed', async () => {
+    it('reflects on-chain claimed status from areEpochsClaimed', async () => {
         const commitments: DistributionData['commitments'] = {
             [padded(66)]: meta(0, '100', 0),
             [padded(67)]: meta(1, '200', 0),

@@ -5,9 +5,18 @@
  * recovery path for CID-addressed public metadata when the worker's upstream
  * gateway is temporarily rate-limited.
  *
+ * Gateway responses are NOT trusted as-is: bytes are re-hashed against the
+ * CID before use (see `cidVerify`), so a compromised public gateway cannot
+ * substitute content. Responses too large for single-block verification are
+ * accepted with a warning — all security-relevant consumers re-verify this
+ * JSON against the on-chain Merkle root, which bounds tampering to display
+ * spoofing.
+ *
  * @module utils/ipfsFetch
  */
+import { verifyCidAgainstBytes, readBodyWithLimit } from './cidVerify';
 import { fetchIndexerJson } from './indexerClient';
+import { warn } from './log';
 
 const MAX_CACHE_ENTRIES = 256;
 const PUBLIC_GATEWAYS = [
@@ -17,6 +26,7 @@ const PUBLIC_GATEWAYS = [
     'https://w3s.link/ipfs',
 ];
 const GATEWAY_TIMEOUT_MS = 10_000;
+const MAX_GATEWAY_RESPONSE_BYTES = 8 * 1024 * 1024;
 
 const cache = new Map<string, unknown>();
 
@@ -94,7 +104,17 @@ async function fetchGatewayJson<T>(gateway: string, cid: string): Promise<T> {
         if (!response.ok) {
             throw new Error(`HTTP ${response.status}`);
         }
-        return (await response.json()) as T;
+
+        const bytes = await readBodyWithLimit(response, MAX_GATEWAY_RESPONSE_BYTES);
+        const verification = await verifyCidAgainstBytes(cid, bytes);
+        if (verification === 'mismatch') {
+            throw new Error('content hash does not match CID');
+        }
+        if (verification === 'unverifiable') {
+            warn(`[IPFS] Unverifiable gateway response accepted for ${cid} via ${gateway}`);
+        }
+
+        return JSON.parse(new TextDecoder().decode(bytes)) as T;
     } finally {
         clearTimeout(timer);
     }
@@ -138,6 +158,31 @@ export async function fetchIpfsJson<T = unknown>(cid: string): Promise<T> {
         setCached(validCid, gateway);
         return gateway;
     }
+}
+
+/**
+ * Fetch ONLY the `emailHashes` of a distribution document via the indexer's
+ * extraction route, avoiding the full (potentially multi-MB) JSON download
+ * that eligibility filtering would otherwise pay per distribution.
+ *
+ * Returns `null` when the document has no email gating. Throws when the
+ * route is unavailable (e.g. an older indexer deployment) so callers can
+ * fall back to the full-document path.
+ */
+export async function fetchIpfsEmailHashes(cid: string): Promise<string[] | null> {
+    const validCid = validateCid(cid);
+    const cacheKey = `email-hashes:${validCid}`;
+    const cached = getCached<string[] | null>(cacheKey);
+    if (cached !== undefined) {
+        return cached;
+    }
+
+    const indexed = await fetchIndexerJson<{ emailHashes: string[] | null }>(
+        `/v1/ipfs/${encodeURIComponent(validCid)}/email-hashes`,
+    );
+    const emailHashes = Array.isArray(indexed.emailHashes) ? indexed.emailHashes : null;
+    setCached(cacheKey, emailHashes);
+    return emailHashes;
 }
 
 export function clearIpfsCache(): void {

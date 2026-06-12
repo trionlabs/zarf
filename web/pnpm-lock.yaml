@@ -197,6 +197,9 @@ importers:
       '@stellar/stellar-sdk':
         specifier: ^15.1.0
         version: 15.1.0
+      '@zarf/core':
+        specifier: workspace:*
+        version: link:../../packages/core
       buffer:
         specifier: ^6.0.3
         version: 6.0.3
@@ -1035,8 +1038,8 @@ packages:
       rollup:
         optional: true
 
-  '@rollup/wasm-node@4.61.0':
-    resolution: {integrity: sha512-UpYM5v/7Quee4u+VWHuNSgSlvIEQMQL7T/jEaOuaNJQ+JJcqSVvcqN6s1cLiDH5DuJMWRqJzvaCnyexp/UGftQ==}
+  '@rollup/wasm-node@4.61.1':
+    resolution: {integrity: sha512-mSYYG8nIVGzK2rU38h9wIUncwwkP4z/qyv70+TbFDYK0u1aZIrKDEYnmNs4CBtNy5Ru4pmjo6Zi7kIhJk4RMYQ==}
     engines: {node: '>=18.0.0', npm: '>=8.0.0'}
     hasBin: true
 
@@ -3167,7 +3170,7 @@ snapshots:
 
   '@rollup/plugin-virtual@3.0.2': {}
 
-  '@rollup/wasm-node@4.61.0':
+  '@rollup/wasm-node@4.61.1':
     dependencies:
       '@types/estree': 1.0.9
     optionalDependencies:
@@ -4669,7 +4672,7 @@ snapshots:
       fdir: 6.5.0(picomatch@4.0.4)
       picomatch: 4.0.4
       postcss: 8.5.15
-      rollup: '@rollup/wasm-node@4.61.0'
+      rollup: '@rollup/wasm-node@4.61.1'
       tinyglobby: 0.2.16
     optionalDependencies:
       '@types/node': 25.9.1
