@@ -10,6 +10,22 @@ const BN254_SCALAR_MODULUS: [u8; 32] = [
     0x28, 0x33, 0xe8, 0x48, 0x79, 0xb9, 0x70, 0x91, 0x43, 0xe1, 0xf5, 0x93, 0xf0, 0x00, 0x00, 0x01,
 ];
 
+/// One day of ledgers at the ~5s close time.
+pub const DAY_IN_LEDGERS: u32 = 17_280;
+/// TTL target for the instance, code, and registry entries: ~120 days,
+/// safely under the ~180-day network maximum entry TTL. Every deployment
+/// re-extends; a fully dormant factory still needs an external
+/// ExtendFootprintTTLOp before this window lapses.
+pub const TTL_EXTEND_TO: u32 = 120 * DAY_IN_LEDGERS;
+/// Re-extend only once the TTL has decayed by ~a day, so steady traffic pays
+/// the rent bump at most once a day instead of on every invocation.
+pub const TTL_THRESHOLD: u32 = TTL_EXTEND_TO - DAY_IN_LEDGERS;
+/// Page cap for range reads, counted in ledger ENTRIES (not bytes): each
+/// item is one persistent entry in the read footprint and the network caps
+/// footprint entries per transaction (~100), so 80 leaves headroom for the
+/// instance and code entries.
+pub const MAX_PAGE_LIMIT: u32 = 80;
+
 #[contract]
 pub struct ZarfVestingFactoryContract;
 
@@ -33,8 +49,13 @@ pub enum DataKey {
     JwkRegistry,
     VestingWasmHash,
     DeploymentCount,
+    /// Holds a full `DeploymentInfo` so range reads cost one ledger entry
+    /// per item. Factories deployed from earlier builds stored a bare
+    /// `Address` here; there is no upgrade path, so the layouts never mix —
+    /// but an in-place WASM upgrade would require a storage migration.
     DeploymentAt(u32),
     OwnerDeploymentCount(Address),
+    /// Same `DeploymentInfo` layout (and same caveat) as `DeploymentAt`.
     OwnerDeploymentAt(Address, u32),
     MetadataCid(Address),
 }
@@ -73,6 +94,7 @@ impl ZarfVestingFactoryContract {
         store.set(&DataKey::JwkRegistry, &jwk_registry);
         store.set(&DataKey::VestingWasmHash, &vesting_wasm_hash);
         store.set(&DataKey::DeploymentCount, &0_u32);
+        Self::extend_contract_ttl(&env);
     }
 
     pub fn verifier(env: Env) -> Result<Address, Error> {
@@ -207,10 +229,7 @@ impl ZarfVestingFactoryContract {
     }
 
     pub fn get_deployment(env: Env, index: u32) -> Result<Address, Error> {
-        env.storage()
-            .persistent()
-            .get(&DataKey::DeploymentAt(index))
-            .ok_or(Error::NotInitialized)
+        Ok(Self::deployment_info(&env, DataKey::DeploymentAt(index))?.address)
     }
 
     pub fn get_deployments(env: Env, start: u32, limit: u32) -> Result<Vec<Address>, Error> {
@@ -234,10 +253,7 @@ impl ZarfVestingFactoryContract {
     }
 
     pub fn get_owner_deployment(env: Env, owner: Address, index: u32) -> Result<Address, Error> {
-        env.storage()
-            .persistent()
-            .get(&DataKey::OwnerDeploymentAt(owner, index))
-            .ok_or(Error::NotInitialized)
+        Ok(Self::deployment_info(&env, DataKey::OwnerDeploymentAt(owner, index))?.address)
     }
 
     pub fn get_owner_deployments(
@@ -317,26 +333,32 @@ impl ZarfVestingFactoryContract {
         recipient_count: u32,
         metadata_cid: String,
     ) {
+        let info = DeploymentInfo {
+            address: vesting.clone(),
+            metadata_cid: metadata_cid.clone(),
+        };
+        let persistent = env.storage().persistent();
+
         let deployment_count = Self::deployment_count(env);
-        env.storage()
-            .persistent()
-            .set(&DataKey::DeploymentAt(deployment_count), &vesting);
+        let deployment_key = DataKey::DeploymentAt(deployment_count);
+        persistent.set(&deployment_key, &info);
+        persistent.extend_ttl(&deployment_key, TTL_THRESHOLD, TTL_EXTEND_TO);
         env.storage()
             .instance()
             .set(&DataKey::DeploymentCount, &(deployment_count + 1));
 
         let owner_count = Self::owner_deployment_count(env, &owner);
-        env.storage().persistent().set(
-            &DataKey::OwnerDeploymentAt(owner.clone(), owner_count),
-            &vesting,
-        );
-        env.storage().persistent().set(
-            &DataKey::OwnerDeploymentCount(owner.clone()),
-            &(owner_count + 1),
-        );
-        env.storage()
-            .persistent()
-            .set(&DataKey::MetadataCid(vesting.clone()), &metadata_cid);
+        let owner_deployment_key = DataKey::OwnerDeploymentAt(owner.clone(), owner_count);
+        persistent.set(&owner_deployment_key, &info);
+        persistent.extend_ttl(&owner_deployment_key, TTL_THRESHOLD, TTL_EXTEND_TO);
+        let owner_count_key = DataKey::OwnerDeploymentCount(owner.clone());
+        persistent.set(&owner_count_key, &(owner_count + 1));
+        persistent.extend_ttl(&owner_count_key, TTL_THRESHOLD, TTL_EXTEND_TO);
+        let metadata_key = DataKey::MetadataCid(vesting.clone());
+        persistent.set(&metadata_key, &metadata_cid);
+        persistent.extend_ttl(&metadata_key, TTL_THRESHOLD, TTL_EXTEND_TO);
+
+        Self::extend_contract_ttl(env);
 
         VestingCreated {
             vesting,
@@ -436,27 +458,9 @@ impl ZarfVestingFactoryContract {
         limit: u32,
         owner: Option<Address>,
     ) -> Result<Vec<Address>, Error> {
-        if limit > 100 {
-            return Err(Error::InvalidLimit);
-        }
-
-        let count = match &owner {
-            Some(owner) => Self::owner_deployment_count(env, owner),
-            None => Self::deployment_count(env),
-        };
         let mut out = Vec::new(env);
-        let end = core::cmp::min(start.saturating_add(limit), count);
-        for index in start..end {
-            let key = match owner.clone() {
-                Some(owner) => DataKey::OwnerDeploymentAt(owner, index),
-                None => DataKey::DeploymentAt(index),
-            };
-            let deployment = env
-                .storage()
-                .persistent()
-                .get(&key)
-                .ok_or(Error::NotInitialized)?;
-            out.push_back(deployment);
+        for info in Self::range_infos(env, start, limit, owner)?.iter() {
+            out.push_back(info.address);
         }
         Ok(out)
     }
@@ -467,7 +471,7 @@ impl ZarfVestingFactoryContract {
         limit: u32,
         owner: Option<Address>,
     ) -> Result<Vec<DeploymentInfo>, Error> {
-        if limit > 100 {
+        if limit > MAX_PAGE_LIMIT {
             return Err(Error::InvalidLimit);
         }
 
@@ -488,19 +492,14 @@ impl ZarfVestingFactoryContract {
     }
 
     fn deployment_info(env: &Env, key: DataKey) -> Result<DeploymentInfo, Error> {
-        let address: Address = env
-            .storage()
+        env.storage()
             .persistent()
             .get(&key)
-            .ok_or(Error::NotInitialized)?;
-        let metadata_cid = env
-            .storage()
-            .persistent()
-            .get(&DataKey::MetadataCid(address.clone()))
-            .ok_or(Error::NotInitialized)?;
-        Ok(DeploymentInfo {
-            address,
-            metadata_cid,
-        })
+            .ok_or(Error::NotInitialized)
+    }
+
+    fn extend_contract_ttl(env: &Env) {
+        env.deployer()
+            .extend_ttl(env.current_contract_address(), TTL_THRESHOLD, TTL_EXTEND_TO);
     }
 }

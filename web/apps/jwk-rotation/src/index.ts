@@ -374,9 +374,17 @@ async function loadRegistryKeys(env: Env): Promise<RegistryKey[]> {
     const keys: RegistryKey[] = [];
 
     for (let index = 0; index < count; index += 1) {
-        const keyHash = await getRegisteredKey(env, index);
-        const active = await isRegistryKeyValid(env, keyHash);
-        keys.push({ keyHash, active });
+        try {
+            const keyHash = await getRegisteredKey(env, index);
+            const active = await isRegistryKeyValid(env, keyHash);
+            keys.push({ keyHash, active });
+        } catch (error) {
+            // An archived (expired-TTL) KeyAt entry fails the read; skip it so
+            // one stale index cannot wedge the whole rotation run. A key that
+            // is unreachable here is also unreadable by claim's registry check
+            // (archived Key entry reads invalid), so skipping is safe.
+            console.error('[jwk-rotation] skipping unreadable registry index', index, error);
+        }
     }
 
     return keys;

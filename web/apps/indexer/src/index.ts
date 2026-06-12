@@ -112,9 +112,12 @@ const IPFS_READ_GATEWAYS = [
 const GATEWAY_TIMEOUT_MS = 5_000;
 const MAX_GATEWAY_RESPONSE_BYTES = 8 * 1024 * 1024;
 // Each deployment info costs TWO ledger-entry reads (DeploymentAt + MetadataCid)
-// and a simulated transaction's footprint is capped at ~100 entries network-wide,
-// so a page of 100 (~202 entries) blows the budget once the factory fills a full
-// page. 40 keeps a comfortable margin (40×2 + instance + code = 82).
+// on the currently deployed factory, and a simulated transaction's footprint is
+// capped at ~100 entries network-wide, so a page of 100 (~202 entries) blows the
+// budget once the factory fills a full page. 40 keeps a comfortable margin
+// (40×2 + instance + code = 82). Factories built from the current contract
+// source pack address+cid into ONE entry per item and cap pages at 80; 40 stays
+// valid for both layouts, so leave it until every factory is on the new build.
 const FACTORY_RANGE_LIMIT = 40;
 const CLAIMED_BATCH_LIMIT = 100;
 

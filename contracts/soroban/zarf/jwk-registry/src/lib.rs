@@ -7,6 +7,17 @@ use soroban_sdk::{
 
 const PUBKEY_LIMBS: u32 = 18;
 
+/// One day of ledgers at the ~5s close time.
+pub const DAY_IN_LEDGERS: u32 = 17_280;
+/// TTL target for the instance, code, and key entries: ~120 days, safely
+/// under the ~180-day network maximum entry TTL. The JWK rotation job
+/// re-registers keys regularly, which re-extends; if rotation ever stalls
+/// longer than this window an external ExtendFootprintTTLOp is needed.
+pub const TTL_EXTEND_TO: u32 = 120 * DAY_IN_LEDGERS;
+/// Re-extend only once the TTL has decayed by ~a day, so steady traffic pays
+/// the rent bump at most once a day instead of on every invocation.
+pub const TTL_THRESHOLD: u32 = TTL_EXTEND_TO - DAY_IN_LEDGERS;
+
 #[contract]
 pub struct JwkRegistryContract;
 
@@ -27,6 +38,9 @@ pub enum DataKey {
     Kid(String),
     KeyCount,
     KeyAt(u32),
+    /// Reverse lookup hash -> enumeration index, so re-registering or
+    /// revoking a key can re-extend its `KeyAt` entry's TTL without scanning.
+    KeyIndex(BytesN<32>),
 }
 
 #[contractevent(topics = ["owner_set"])]
@@ -58,6 +72,7 @@ impl JwkRegistryContract {
     pub fn __constructor(env: Env, owner: Address) {
         env.storage().instance().set(&DataKey::Owner, &owner);
         env.storage().instance().set(&DataKey::KeyCount, &0_u32);
+        Self::extend_contract_ttl(&env);
     }
 
     pub fn owner(env: Env) -> Address {
@@ -87,27 +102,37 @@ impl JwkRegistryContract {
     }
 
     fn store_key(env: &Env, kid: String, key_hash: BytesN<32>) {
+        let persistent = env.storage().persistent();
         if !Self::is_valid_key_hash(env.clone(), key_hash.clone()) {
             let count = Self::key_count(env);
-            env.storage()
-                .persistent()
-                .set(&DataKey::KeyAt(count), &key_hash);
+            let key_at = DataKey::KeyAt(count);
+            persistent.set(&key_at, &key_hash);
+            persistent.extend_ttl(&key_at, TTL_THRESHOLD, TTL_EXTEND_TO);
+            let key_index = DataKey::KeyIndex(key_hash.clone());
+            persistent.set(&key_index, &count);
+            persistent.extend_ttl(&key_index, TTL_THRESHOLD, TTL_EXTEND_TO);
             env.storage()
                 .instance()
                 .set(&DataKey::KeyCount, &(count + 1));
+        } else {
+            // Re-registration of a live key: the rotation job does this daily,
+            // and it must also keep the enumeration entry alive or
+            // `get_registered_key` breaks once `KeyAt` archives.
+            Self::extend_enumeration_ttl(env, &key_hash);
         }
 
-        env.storage()
-            .persistent()
-            .set(&DataKey::Key(key_hash.clone()), &true);
-        env.storage()
-            .persistent()
-            .set(&DataKey::Kid(kid.clone()), &key_hash);
+        let key = DataKey::Key(key_hash.clone());
+        persistent.set(&key, &true);
+        persistent.extend_ttl(&key, TTL_THRESHOLD, TTL_EXTEND_TO);
+        let kid_key = DataKey::Kid(kid.clone());
+        persistent.set(&kid_key, &key_hash);
+        persistent.extend_ttl(&kid_key, TTL_THRESHOLD, TTL_EXTEND_TO);
+        Self::extend_contract_ttl(env);
         KeyRegistered {
             key_hash: key_hash.clone(),
             kid,
         }
-        .publish(&env);
+        .publish(env);
     }
 
     pub fn revoke_key(env: Env, key_hash: BytesN<32>) -> Result<(), Error> {
@@ -116,9 +141,16 @@ impl JwkRegistryContract {
             return Err(Error::KeyNotFound);
         }
 
+        let key = DataKey::Key(key_hash.clone());
+        env.storage().persistent().set(&key, &false);
+        // Keep the explicit `false` alive: an archived revocation reads the
+        // same (absent => false), but a live entry keeps the audit trail
+        // restorable and the lookup cheap.
         env.storage()
             .persistent()
-            .set(&DataKey::Key(key_hash.clone()), &false);
+            .extend_ttl(&key, TTL_THRESHOLD, TTL_EXTEND_TO);
+        Self::extend_enumeration_ttl(&env, &key_hash);
+        Self::extend_contract_ttl(&env);
         KeyRevoked { key_hash }.publish(&env);
         Ok(())
     }
@@ -170,6 +202,20 @@ impl JwkRegistryContract {
 
     fn require_owner(env: &Env) {
         Self::owner_unchecked(env).require_auth();
+    }
+
+    fn extend_contract_ttl(env: &Env) {
+        env.deployer()
+            .extend_ttl(env.current_contract_address(), TTL_THRESHOLD, TTL_EXTEND_TO);
+    }
+
+    fn extend_enumeration_ttl(env: &Env, key_hash: &BytesN<32>) {
+        let persistent = env.storage().persistent();
+        let key_index = DataKey::KeyIndex(key_hash.clone());
+        if let Some(index) = persistent.get::<DataKey, u32>(&key_index) {
+            persistent.extend_ttl(&key_index, TTL_THRESHOLD, TTL_EXTEND_TO);
+            persistent.extend_ttl(&DataKey::KeyAt(index), TTL_THRESHOLD, TTL_EXTEND_TO);
+        }
     }
 
     fn key_count(env: &Env) -> u32 {
