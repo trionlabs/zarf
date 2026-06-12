@@ -1,16 +1,25 @@
 import type { Handle } from '@sveltejs/kit';
 
-// Landing is a static marketing surface — no wallet, no WASM, no Soroban
-// fetches. Apply defense-in-depth headers without a strict CSP (which
-// would require a build + smoke pass to confirm the inline theme FOUC
-// script and Google Fonts links are accounted for). Two narrow CSP
-// directives ship now because they restrict only navigation/forms, not
-// fetches — safe for any inline-script setup:
-//   - base-uri 'self'   blocks <base href="…"> hijack of relative URLs
-//   - form-action 'self' blocks rogue form-submit injection
+// Landing is a static marketing surface with one security-critical duty: it
+// receives the Google OAuth callback (a live id_token in the URL fragment)
+// and forwards it to the claim app. That makes script injection here as
+// dangerous as on the claim app itself, so it gets a full strict CSP.
+// script-src comes from kit.csp (svelte.config.js) with a per-request nonce
+// covering SvelteKit's bootstrap and the nonce'd theme script in app.html;
+// the strict fallback only fires if kit.csp is removed.
+const FALLBACK_SCRIPT_SRC = "script-src 'self'";
+
 export const handle: Handle = async ({ event, resolve }) => {
     const response = await resolve(event);
-    response.headers.set('Content-Security-Policy', `base-uri 'self'; form-action 'self';`);
+    const kitCsp = response.headers.get('Content-Security-Policy');
+    const scriptSrc =
+        kitCsp && kitCsp.trim().startsWith('script-src')
+            ? kitCsp.trim().replace(/;?\s*$/, '')
+            : FALLBACK_SCRIPT_SRC;
+    response.headers.set(
+        'Content-Security-Policy',
+        `default-src 'self'; ${scriptSrc}; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://static.cloudflareinsights.com; img-src 'self' data:; worker-src 'self'; base-uri 'self'; form-action 'self';`,
+    );
     response.headers.set('X-Content-Type-Options', 'nosniff');
     response.headers.set('X-Frame-Options', 'DENY');
     response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');

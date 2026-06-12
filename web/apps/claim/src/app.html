@@ -19,7 +19,7 @@
         />
 
         <!-- SES/Svelte 5 Compatibility Patch: runtime defensive shim against extension lockdown -->
-        <script>
+        <script nonce="%sveltekit.nonce%">
             (function () {
                 if (typeof window === 'undefined') return;
                 // Patch Object.getOwnPropertyDescriptor to fool Svelte 5 when SES locks down intrinsics
@@ -55,7 +55,7 @@
         </script>
 
         <!-- Theme script to prevent flash during hydration -->
-        <script>
+        <script nonce="%sveltekit.nonce%">
             (function () {
                 try {
                     var stored = localStorage.getItem('zarf_theme');
