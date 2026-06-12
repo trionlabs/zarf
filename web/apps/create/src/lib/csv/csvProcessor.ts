@@ -180,7 +180,7 @@ export function generateSampleCSV(): string {
 alice@example.com,1000
 bob@example.com,2000
 charlie@example.com,5000
-yamancandev@gmail.com,10000`;
+dana@example.com,10000`;
 }
 
 /**

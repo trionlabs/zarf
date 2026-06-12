@@ -35,4 +35,5 @@ _backlogs/
 reports/
 *.md
 **/*.md
+!**/README.md
 **/_backlogs/

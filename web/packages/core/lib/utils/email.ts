@@ -22,6 +22,7 @@ export function isValidEmail(email: string): boolean {
  * Normalize email for consistent hashing
  * - Lowercase
  * - Trim whitespace
+ * - Canonicalize googlemail.com to gmail.com (same Google account namespace)
  * - Remove dots from Gmail local part (Gmail ignores dots)
  * - Remove plus addressing (alice+tag@co.com → alice@co.com)
  *
@@ -30,12 +31,20 @@ export function isValidEmail(email: string): boolean {
  *
  * @example
  * ```typescript
- * normalizeEmail('Alice.Smith@gmail.com') // 'alicesmith@gmail.com'
- * normalizeEmail('bob+work@example.com')  // 'bob@example.com'
+ * normalizeEmail('Alice.Smith@gmail.com')  // 'alicesmith@gmail.com'
+ * normalizeEmail('alice@googlemail.com')   // 'alice@gmail.com'
+ * normalizeEmail('bob+work@example.com')   // 'bob@example.com'
  * ```
  */
 export function normalizeEmail(email: string): string {
     let e = email.toLowerCase().trim();
+
+    // Legacy UK/DE Google accounts live under googlemail.com but are the same
+    // account namespace as gmail.com; the sender may know the recipient under
+    // either domain while the Google JWT reports the registered one.
+    if (e.endsWith('@googlemail.com')) {
+        e = e.slice(0, e.lastIndexOf('@')) + '@gmail.com';
+    }
 
     // Gmail: dots in local part are ignored
     if (e.endsWith('@gmail.com')) {
