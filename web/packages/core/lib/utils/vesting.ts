@@ -43,6 +43,9 @@ export function calculateEndDate(
         case 'hours':
             d.setHours(d.getHours() + duration);
             break;
+        case 'days':
+            d.setDate(d.getDate() + duration);
+            break;
         case 'weeks':
             d.setDate(d.getDate() + duration * 7);
             break;
@@ -55,6 +58,10 @@ export function calculateEndDate(
         case 'years':
             d.setFullYear(d.getFullYear() + duration);
             break;
+        default: {
+            const _exhaustive: never = durationUnit;
+            throw new Error(`Unhandled duration unit: ${String(_exhaustive)}`);
+        }
     }
     return d;
 }
@@ -118,6 +125,9 @@ export function generateUnlockMarkers(
             case 'hours':
                 unlockDate.setHours(unlockDate.getHours() + actualEvent);
                 break;
+            case 'days':
+                unlockDate.setDate(unlockDate.getDate() + actualEvent);
+                break;
             case 'weeks':
                 unlockDate.setDate(unlockDate.getDate() + actualEvent * 7);
                 break;
@@ -130,6 +140,10 @@ export function generateUnlockMarkers(
             case 'years':
                 unlockDate.setFullYear(unlockDate.getFullYear() + actualEvent);
                 break;
+            default: {
+                const _exhaustive: never = durationUnit;
+                throw new Error(`Unhandled duration unit: ${String(_exhaustive)}`);
+            }
         }
 
         const x = lockPeriodPercent + vestingWidth * percentCompletion;
@@ -156,6 +170,8 @@ export function durationToSeconds(duration: number, unit: DurationUnit): bigint 
             return BigInt(duration) * 60n;
         case 'hours':
             return BigInt(duration) * 60n * 60n;
+        case 'days':
+            return BigInt(duration) * DAY;
         case 'weeks':
             return BigInt(duration) * 7n * DAY;
         case 'months':
@@ -191,6 +207,8 @@ export function unitToPeriodSeconds(unit: DurationUnit): bigint {
             return 60n;
         case 'hours':
             return 60n * 60n;
+        case 'days':
+            return DAY;
         case 'weeks':
             return 7n * DAY;
         case 'months':

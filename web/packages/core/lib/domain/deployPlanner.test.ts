@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { planScheduleSeconds, planDeploy, buildOptimisticContract } from './deployPlanner';
+import { MAX_EPOCHS } from './epochDiscovery';
 
 const futureDate = '2099-01-01';
 const pastDate = '2000-01-01';
@@ -51,6 +52,20 @@ describe('planScheduleSeconds', () => {
         );
         expect(out.immediateUnlock).toBe(false);
     });
+
+    it('computes daily period seconds for the days unit', () => {
+        const out = planScheduleSeconds(
+            {
+                cliffEndDate: futureDate,
+                cliffTime: '00:00',
+                distributionDuration: 30,
+                durationUnit: 'days',
+            },
+            new Date('2025-01-01'),
+        );
+        expect(out.periodSeconds).toBe(86_400n); // one day
+        expect(out.vestingSeconds).toBe(30n * 86_400n);
+    });
 });
 
 describe('planDeploy', () => {
@@ -76,6 +91,24 @@ describe('planDeploy', () => {
 
     it('throws on integrity error (allocations sum ≠ totalAmount)', () => {
         expect(() => planDeploy({ ...inputs, allocationsTotal: 999n })).toThrow(/Integrity error/);
+    });
+
+    it('throws when the schedule has more epochs than MAX_EPOCHS (would silently strand later unlocks)', () => {
+        expect(() =>
+            planDeploy({
+                ...inputs,
+                schedule: { ...inputs.schedule, distributionDuration: MAX_EPOCHS + 1 },
+            }),
+        ).toThrow(/unlock periods/);
+    });
+
+    it('allows a schedule exactly at the MAX_EPOCHS boundary', () => {
+        expect(() =>
+            planDeploy({
+                ...inputs,
+                schedule: { ...inputs.schedule, distributionDuration: MAX_EPOCHS },
+            }),
+        ).not.toThrow();
     });
 });
 

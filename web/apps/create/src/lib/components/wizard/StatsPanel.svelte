@@ -52,6 +52,7 @@
 
             // Format unit label
             const unitLabels: Record<string, string> = {
+                days: 'Days',
                 weeks: 'Weeks',
                 months: 'Months',
                 quarters: 'Quarters',
@@ -63,13 +64,15 @@
             if (savedDurations.length > 0) {
                 // Convert editing duration to months for comparison
                 const editInMonths =
-                    editUnit === 'weeks'
-                        ? editDuration / 4
-                        : editUnit === 'quarters'
-                          ? editDuration * 3
-                          : editUnit === 'years'
-                            ? editDuration * 12
-                            : editDuration;
+                    editUnit === 'days'
+                        ? editDuration / 30
+                        : editUnit === 'weeks'
+                          ? editDuration / 4
+                          : editUnit === 'quarters'
+                            ? editDuration * 3
+                            : editUnit === 'years'
+                              ? editDuration * 12
+                              : editDuration;
 
                 const allMonths = [...savedDurations, editInMonths];
                 const min = Math.min(...allMonths);

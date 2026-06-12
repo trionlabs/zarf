@@ -36,7 +36,14 @@ export interface MerkleTreeData {
     claims: MerkleClaim[];
 }
 
-export type DurationUnit = 'minutes' | 'hours' | 'weeks' | 'months' | 'quarters' | 'years';
+export type DurationUnit =
+    | 'minutes'
+    | 'hours'
+    | 'days'
+    | 'weeks'
+    | 'months'
+    | 'quarters'
+    | 'years';
 
 export interface UnlockMarker {
     x: number;

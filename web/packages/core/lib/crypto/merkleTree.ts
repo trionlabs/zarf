@@ -20,6 +20,7 @@ import {
     MAX_AUDIENCE_LENGTH,
     PIN_GENERATED_LENGTH,
 } from '../constants';
+import { unitToPeriodSeconds } from '../utils/vesting';
 
 // ============================================================================
 // Barretenberg Singleton
@@ -621,28 +622,11 @@ export async function processWhitelist(
     // If durationUnit is months, period is roughly 30 days.
     const epochs = schedule.distributionDuration;
 
-    // Calculate Period Length in Seconds
-    let periodSeconds = 0;
-    switch (schedule.durationUnit) {
-        case 'minutes':
-            periodSeconds = 60;
-            break;
-        case 'hours':
-            periodSeconds = 3600;
-            break;
-        case 'weeks':
-            periodSeconds = 7 * 24 * 3600;
-            break;
-        case 'months':
-            periodSeconds = 30 * 24 * 3600;
-            break;
-        case 'quarters':
-            periodSeconds = 90 * 24 * 3600;
-            break;
-        case 'years':
-            periodSeconds = 365 * 24 * 3600;
-            break;
-    }
+    // Period length in seconds. Single source of truth shared with the deploy
+    // planner; exhaustive over DurationUnit, so a newly-added unit throws here
+    // instead of silently leaving periodSeconds = 0 (which would collapse every
+    // epoch onto the cliff timestamp).
+    const periodSeconds = Number(unitToPeriodSeconds(schedule.durationUnit));
 
     const bb = await initBarretenberg(); // Need BB for manual hashing in loop
 
