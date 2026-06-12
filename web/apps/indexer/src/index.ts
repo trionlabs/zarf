@@ -130,6 +130,13 @@ const CACHE_TTL_RECIPIENT_ID = 3_600; // deterministic per (contract, recipient)
 const CACHE_TTL_LEDGER_LATEST = 5;
 const CACHE_TTL_CLAIMED_TRUE = 3_600; // a committed claim never reverts
 const CACHE_TTL_CLAIMED_FALSE = 10; // must flip quickly after a claim lands
+const CACHE_TTL_UNVERIFIED = 300; // gateway bytes that could not be authenticated against the CID
+
+// Internal marker header: set by IPFS handlers when the served body could not
+// be cryptographically verified against its CID (multi-block dag-pb or
+// non-sha2-256). withEdgeCache caps the TTL for such responses and the header
+// is never forwarded to clients (cache/browser headers are rebuilt from scratch).
+const UNVERIFIED_HEADER = 'X-Zarf-Cid-Unverified';
 
 export default {
     async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
@@ -139,7 +146,8 @@ export default {
         const cached = (
             ttl: number | ((bodyText: string) => number),
             produce: () => Promise<Response>,
-        ) => withEdgeCache(request, ctx, corsHeaders, ttl, produce);
+            cacheKeyExtra?: string,
+        ) => withEdgeCache(request, ctx, corsHeaders, ttl, produce, cacheKeyExtra);
 
         if (request.method === 'OPTIONS') {
             return new Response(null, { status: 204, headers: corsHeaders });
@@ -191,8 +199,13 @@ export default {
                 const cfg = getNetworkConfig(env, network);
                 const owner = decodeSegment(parts[4]);
                 const salt = decodeSegment(parts[5]);
-                return await cached(CACHE_TTL_IMMUTABLE, () =>
-                    handlePredictVestingAddress(owner, salt, cfg, corsHeaders),
+                // The prediction is deterministic per (factory, owner, salt) but the
+                // active factory address lives in env, not the URL — fold it into
+                // the cache key so a factory redeploy cannot serve year-stale entries.
+                return await cached(
+                    CACHE_TTL_IMMUTABLE,
+                    () => handlePredictVestingAddress(owner, salt, cfg, corsHeaders),
+                    cfg.factoryAddress,
                 );
             }
 
@@ -293,10 +306,12 @@ async function withEdgeCache(
     corsHeaders: Record<string, string>,
     ttl: number | ((bodyText: string) => number),
     produce: () => Promise<Response>,
+    cacheKeyExtra?: string,
 ): Promise<Response> {
     const url = new URL(request.url);
     const bypass = url.searchParams.get('refresh') !== null;
     url.searchParams.delete('refresh');
+    if (cacheKeyExtra) url.searchParams.set('cachekey', cacheKeyExtra);
     const cacheKey = new Request(url.toString(), { method: 'GET' });
     const cache = caches.default;
 
@@ -313,7 +328,10 @@ async function withEdgeCache(
     if (fresh.status !== 200) return fresh;
 
     const bodyText = await fresh.text();
-    const maxAge = typeof ttl === 'function' ? ttl(bodyText) : ttl;
+    let maxAge = typeof ttl === 'function' ? ttl(bodyText) : ttl;
+    if (fresh.headers.get(UNVERIFIED_HEADER) === '1') {
+        maxAge = Math.min(maxAge, CACHE_TTL_UNVERIFIED);
+    }
     const baseHeaders = {
         'Content-Type': fresh.headers.get('Content-Type') ?? 'application/json',
         'Cache-Control':
@@ -417,7 +435,15 @@ async function handleIpfsRead(
     corsHeaders: Record<string, string>,
 ): Promise<Response> {
     const cid = validateCid(decodeSegment(rawCid));
-    return json(await fetchIpfsJson(cid), 200, corsHeaders);
+    const { data, verification } = await fetchIpfsJson(cid);
+    return json(data, 200, withVerificationMarker(corsHeaders, verification));
+}
+
+function withVerificationMarker(
+    headers: Record<string, string>,
+    verification: 'verified' | 'unverifiable',
+): Record<string, string> {
+    return verification === 'unverifiable' ? { ...headers, [UNVERIFIED_HEADER]: '1' } : headers;
 }
 
 async function handleLatestLedger(
@@ -517,7 +543,7 @@ async function handleIpfsEmailHashes(
     corsHeaders: Record<string, string>,
 ): Promise<Response> {
     const cid = validateCid(decodeSegment(rawCid));
-    const doc = await fetchIpfsJson(cid);
+    const { data: doc, verification } = await fetchIpfsJson(cid);
     const candidate =
         typeof doc === 'object' && doc !== null
             ? (doc as { emailHashes?: unknown }).emailHashes
@@ -527,7 +553,11 @@ async function handleIpfsEmailHashes(
         ? candidate.filter((hash): hash is string => typeof hash === 'string')
         : null;
 
-    return json({ emailHashes, fetchedAt: Date.now() }, 200, corsHeaders);
+    return json(
+        { emailHashes, fetchedAt: Date.now() },
+        200,
+        withVerificationMarker(corsHeaders, verification),
+    );
 }
 
 async function handleRecipientId(
@@ -937,7 +967,12 @@ function scString(value: xdr.ScVal): string {
     return String(native);
 }
 
-async function fetchIpfsJson(cid: string): Promise<unknown> {
+interface IpfsJsonResult {
+    data: unknown;
+    verification: 'verified' | 'unverifiable';
+}
+
+async function fetchIpfsJson(cid: string): Promise<IpfsJsonResult> {
     const errors: string[] = [];
     for (const gateway of IPFS_READ_GATEWAYS) {
         try {
@@ -954,7 +989,7 @@ async function fetchIpfsJson(cid: string): Promise<unknown> {
     );
 }
 
-async function fetchJsonFromGateway(gateway: string, cid: string): Promise<unknown> {
+async function fetchJsonFromGateway(gateway: string, cid: string): Promise<IpfsJsonResult> {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), GATEWAY_TIMEOUT_MS);
 
@@ -979,7 +1014,10 @@ async function fetchJsonFromGateway(gateway: string, cid: string): Promise<unkno
             console.warn(`[Indexer] Unverifiable gateway response accepted for ${cid}`);
         }
 
-        return JSON.parse(new TextDecoder().decode(bytes));
+        return {
+            data: JSON.parse(new TextDecoder().decode(bytes)),
+            verification,
+        };
     } finally {
         clearTimeout(timer);
     }
