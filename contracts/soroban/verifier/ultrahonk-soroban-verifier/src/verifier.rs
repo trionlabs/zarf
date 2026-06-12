@@ -68,10 +68,20 @@ impl UltraHonkVerifier {
             return Err(VerifyError::InvalidInput("proof length mismatch"));
         }
 
-        // 1) parse proof
-        let proof = load_proof(proof_bytes, self.vk.log_circuit_size as usize);
+        // 1) parse proof (length + structural G1 validity)
+        let proof = load_proof(proof_bytes, self.vk.log_circuit_size as usize)
+            .ok_or(VerifyError::InvalidInput("proof parse error"))?;
 
-        // 2) sanity on public inputs (length and VK metadata if present)
+        // Pairing point object entries are 68-bit limbs recombined by
+        // shifting in shplemini; an oversized limb would silently alias into
+        // its neighbour's bit range, so reject it here.
+        for limb in proof.pairing_point_object.iter() {
+            if !limb.fits_bits(68) {
+                return Err(VerifyError::InvalidInput("pairing point limb out of range"));
+            }
+        }
+
+        // 2) sanity on public inputs (length, canonical encoding, VK metadata)
         if public_inputs_bytes.len() % 32 != 0 {
             return Err(VerifyError::InvalidInput(
                 "public inputs must be 32-byte aligned",
@@ -85,6 +95,22 @@ impl UltraHonkVerifier {
             .ok_or(VerifyError::InvalidInput("vk inputs < 16"))?;
         if expected != provided {
             return Err(VerifyError::InvalidInput("public inputs mismatch"));
+        }
+        // Reject non-canonical (>= r) encodings: the transcript hashes the
+        // raw bytes while the arithmetic uses the reduced value, so a
+        // non-canonical alias would otherwise be a distinct-yet-accepted
+        // input encoding. Callers (e.g. the vesting contract) check this
+        // too; enforcing it here protects every other caller.
+        let mut idx = 0u32;
+        while idx < public_inputs_bytes.len() {
+            let mut arr = [0u8; 32];
+            public_inputs_bytes
+                .slice(idx..idx + 32)
+                .copy_into_slice(&mut arr);
+            if !Fr::is_canonical_be(&arr) {
+                return Err(VerifyError::InvalidInput("non-canonical public input"));
+            }
+            idx += 32;
         }
 
         // 3) Fiat–Shamir transcript

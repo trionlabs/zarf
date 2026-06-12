@@ -79,6 +79,32 @@ impl Fr {
     pub fn is_zero(&self) -> bool {
         self.0.is_zero()
     }
+
+    /// True iff the 32-byte big-endian encoding is the canonical (< r) form.
+    /// `from_bytes` silently reduces mod r; round-tripping detects any
+    /// non-canonical encoding without needing the modulus constant here.
+    pub fn is_canonical_be(bytes: &[u8; 32]) -> bool {
+        Self::from_bytes(bytes).to_bytes() == *bytes
+    }
+
+    /// True iff the canonical value fits in `bits` bits (bits <= 255).
+    /// Used to range-check prover-supplied limb encodings before they are
+    /// recombined by shifting (where an oversized limb would silently alias
+    /// into its neighbour's bit range).
+    pub fn fits_bits(&self, bits: u32) -> bool {
+        debug_assert!(bits <= 255);
+        let bytes = self.to_bytes();
+        let zero_bits = 256 - bits;
+        let full_zero_bytes = (zero_bits / 8) as usize;
+        let rem_bits = zero_bits % 8;
+        if bytes.iter().take(full_zero_bytes).any(|&b| b != 0) {
+            return false;
+        }
+        if rem_bits > 0 && bytes[full_zero_bytes] >> (8 - rem_bits) != 0 {
+            return false;
+        }
+        true
+    }
 }
 
 /// Montgomery batch inversion: compute all inverses of `vals[..n]` using a
