@@ -36,6 +36,19 @@
 <!-- Zen Pro Layout: Open, minimal, no card wrapper -->
 <div class="max-w-2xl animate-in fade-in zoom-in duration-300">
     <div class="space-y-8">
+        {#if claimStore.state.underfunded}
+            <div
+                class="rounded-lg border border-amber-500/40 bg-amber-500/10 p-4 text-sm"
+                role="alert"
+            >
+                <p class="font-bold mb-1">This distribution is under-funded</p>
+                <p class="text-zen-fg-muted">
+                    The vesting contract currently holds fewer tokens than your remaining
+                    allocation, so claims may fail until the creator deposits more.
+                </p>
+            </div>
+        {/if}
+
         <!-- Header Section: Wizard Style -->
         <header class="space-y-4">
             <div class="flex items-start justify-between flex-wrap gap-4">

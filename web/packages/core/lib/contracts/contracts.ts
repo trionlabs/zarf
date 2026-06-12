@@ -36,6 +36,8 @@ export interface VestingContractMetadata {
     merkleRoot: string;
     tokenSymbol: string;
     tokenDecimals: number;
+    /** Contract's current token balance (base units) when the indexer provides it. */
+    tokenBalance?: bigint;
 }
 
 export interface TokenContractMetadata {
@@ -56,6 +58,7 @@ interface IndexerVestingContract {
     tokenSymbol: string;
     tokenDecimals: number;
     metadataCid?: string | null;
+    tokenBalance?: string;
 }
 
 interface IndexerTokenBalance {
@@ -206,6 +209,11 @@ export async function readVestingContract(
 
     validateTokenDecimals(indexed.tokenDecimals);
 
+    let tokenBalance: bigint | undefined;
+    if (typeof indexed.tokenBalance === 'string' && /^\d+$/.test(indexed.tokenBalance)) {
+        tokenBalance = BigInt(indexed.tokenBalance);
+    }
+
     return {
         name: indexed.name,
         description: indexed.description,
@@ -214,6 +222,7 @@ export async function readVestingContract(
         merkleRoot: indexed.merkleRoot,
         tokenSymbol: indexed.tokenSymbol,
         tokenDecimals: indexed.tokenDecimals,
+        tokenBalance,
     };
 }
 

@@ -67,6 +67,19 @@ export async function discoverEpochs(
         claimStore.setCredentials(email, '', pin);
         claimStore.state.jwt = jwt;
         claimStore.setEpochs(found);
+
+        // Deposits are not enforced on-chain against the advertised
+        // allocations, so a campaign can be under-funded. Warn before the
+        // user spends effort (and fees) on a claim that would fail.
+        if (metadata.tokenBalance !== undefined) {
+            const remaining = found
+                .filter((e) => !e.isClaimed)
+                .reduce((sum, e) => sum + e.amount, 0n);
+            claimStore.state.underfunded = remaining > 0n && metadata.tokenBalance < remaining;
+        } else {
+            claimStore.state.underfunded = false;
+        }
+
         claimStore.nextStep();
     } catch (e: unknown) {
         err('Discovery failed:', e);

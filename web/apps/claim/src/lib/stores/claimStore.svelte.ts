@@ -55,6 +55,9 @@ class ClaimFlowState {
         loading: false,
         error: null as string | null,
         statusMessage: null as string | null,
+        // The vesting contract holds less than this user's remaining
+        // allocation — claims may fail until the creator deposits more.
+        underfunded: false,
 
         // Form inputs (persisted or transient)
         email: '' as string | null,

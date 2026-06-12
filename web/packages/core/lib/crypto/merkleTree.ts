@@ -14,7 +14,12 @@ import { browser } from '../utils/ssr';
 
 import type { Barretenberg } from '@aztec/bb.js';
 import type { HexString, MerkleTreeData, MerkleProof, MerkleClaim, Schedule } from '../types';
-import { TREE_DEPTH, MAX_EMAIL_LENGTH, MAX_AUDIENCE_LENGTH } from '../constants';
+import {
+    TREE_DEPTH,
+    MAX_EMAIL_LENGTH,
+    MAX_AUDIENCE_LENGTH,
+    PIN_GENERATED_LENGTH,
+} from '../constants';
 
 // ============================================================================
 // Barretenberg Singleton
@@ -300,25 +305,37 @@ export async function computeIdentityCommitment(
  * ```
  */
 /**
- * Generate a random salt within BN254 field modulus.
+ * Generate a random recipient PIN (master salt).
  *
- * @returns Random 8-character alphanumeric code
+ * 12 chars over a 55-symbol alphabet ≈ 69 bits of entropy — enough that a
+ * known target email's identity commitment cannot be confirmed by brute
+ * force over the PIN space. Rejection sampling removes the modulo bias a
+ * plain `byte % alphabet.length` would introduce. Existing shorter PINs
+ * keep working: discovery hashes whatever string the user enters.
+ *
+ * @returns Random 12-character alphanumeric code
  */
 export function generateSecureCode(): string {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789'; // Base58-like (no I, l, O, 0)
-    const length = 8;
-    const randomValues = new Uint8Array(length);
+    const length = PIN_GENERATED_LENGTH;
+    // Largest multiple of the alphabet size below 256; bytes at or above it
+    // are rejected so every symbol stays equally likely (220 = 4 * 55).
+    const rejectionBound = 256 - (256 % chars.length);
 
     // Web Crypto is universally available in every runtime this module
     // reaches (modern browsers, Node 16+, Cloudflare workerd). No fallback
     // path — an environment that wouldn't expose crypto.getRandomValues
     // couldn't reach this line anyway, since bb.js, Buffer polyfill, and
     // the Pedersen WASM all assume the same baseline.
-    crypto.getRandomValues(randomValues);
-
     let result = '';
-    for (let i = 0; i < length; i++) {
-        result += chars[randomValues[i] % chars.length];
+    const buffer = new Uint8Array(length * 2);
+    while (result.length < length) {
+        crypto.getRandomValues(buffer);
+        for (const byte of buffer) {
+            if (byte >= rejectionBound) continue;
+            result += chars[byte % chars.length];
+            if (result.length === length) break;
+        }
     }
     return result;
 }
