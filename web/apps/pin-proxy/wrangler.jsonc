@@ -5,8 +5,29 @@
     "main": "src/index.ts",
     "compatibility_date": "2025-01-15",
     "vars": {
+        // localhost origins are a dev convenience; override in production via
+        // the dashboard or `wrangler deploy --var ALLOWED_ORIGINS:...` if a
+        // stricter origin set is wanted (pin auth is signature-gated anyway).
         "ALLOWED_ORIGINS": "http://localhost:5173,http://localhost:5174,http://localhost:5175,https://create.zarf.to,https://claim.zarf.to",
         "MAX_BODY_BYTES": "1048576",
+    },
+    // Burst control on /pin: pin auth proves possession of *some* keypair,
+    // not authorization, so unlimited pinning = Pinata quota/cost abuse.
+    "unsafe": {
+        "bindings": [
+            {
+                "type": "ratelimit",
+                "name": "PIN_IP_LIMITER",
+                "namespace_id": "2001",
+                "simple": { "limit": 10, "period": 60 },
+            },
+            {
+                "type": "ratelimit",
+                "name": "PIN_OWNER_LIMITER",
+                "namespace_id": "2002",
+                "simple": { "limit": 5, "period": 60 },
+            },
+        ],
     },
     "observability": {
         "enabled": true,

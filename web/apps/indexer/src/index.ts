@@ -34,9 +34,19 @@ import {
 import { readBodyWithLimit, verifyCidAgainstBytes } from '@zarf/core/utils/cidVerify';
 import { Buffer } from 'buffer';
 
+/** Cloudflare Workers rate-limiting binding (wrangler `unsafe.bindings`). */
+interface RateLimiter {
+    limit(options: { key: string }): Promise<{ success: boolean }>;
+}
+
 interface Env {
     ALLOWED_ORIGINS?: string;
     MAX_CONTRACTS?: string;
+    // Optional per-IP limiter: a single uncached GET can fan out to ~200
+    // upstream RPC simulations, so an unauthenticated caller can otherwise
+    // amplify traffic into the configured RPC at will. A missing binding
+    // degrades to no limiting (deploys never break on absent bindings).
+    REQUEST_LIMITER?: RateLimiter;
 
     STELLAR_RPC_URL?: string;
     STELLAR_NETWORK_PASSPHRASE?: string;
@@ -155,6 +165,14 @@ export default {
 
         if (request.method !== 'GET') {
             return json({ error: 'method_not_allowed' }, 405, corsHeaders);
+        }
+
+        if (env.REQUEST_LIMITER) {
+            const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
+            const { success } = await env.REQUEST_LIMITER.limit({ key: ip });
+            if (!success) {
+                return json({ error: 'rate_limited' }, 429, corsHeaders);
+            }
         }
 
         try {
@@ -1151,7 +1169,9 @@ function buildCorsHeaders(origin: string | null, env: Env): Record<string, strin
         .map((o) => o.trim())
         .filter(Boolean);
 
-    const allowOrigin = origin && allowed.includes(origin) ? origin : allowed[0] || '*';
+    // Unmatched origins get the first allow-listed origin (a deny for the
+    // requesting page) — never '*', even when the var is misconfigured/empty.
+    const allowOrigin = origin && allowed.includes(origin) ? origin : (allowed[0] ?? 'null');
 
     return {
         'Access-Control-Allow-Origin': allowOrigin,
