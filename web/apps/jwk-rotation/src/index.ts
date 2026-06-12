@@ -345,7 +345,7 @@ function convertGoogleKeys(jwks: GoogleJwks): ConvertedGoogleKey[] {
         });
 }
 
-function jwkModulusToLimbs(modulusBase64Url: string): HexString[] {
+export function jwkModulusToLimbs(modulusBase64Url: string): HexString[] {
     let value = bytesToBigInt(base64UrlToBytes(modulusBase64Url));
     const mask = (1n << LIMB_BITS) - 1n;
     const limbs: HexString[] = [];
@@ -358,7 +358,7 @@ function jwkModulusToLimbs(modulusBase64Url: string): HexString[] {
     return limbs;
 }
 
-function hashLimbs(limbs: HexString[]): HexString {
+export function hashLimbs(limbs: HexString[]): HexString {
     const packed = concatBytes(limbs.map((limb) => hexToBytes(limb, FIELD_BYTES)));
     return bytesToHex(keccak_256(packed));
 }
@@ -646,7 +646,7 @@ function graceMarkerKey(keyHash: HexString): string {
     return `firstMissingAt:${keyHash}`;
 }
 
-function parsePositiveInt(value: string | undefined, fallback: number): number {
+export function parsePositiveInt(value: string | undefined, fallback: number): number {
     const parsed = Number(value);
     return Number.isInteger(parsed) && parsed >= 0 ? parsed : fallback;
 }
@@ -861,19 +861,19 @@ function scU32(value: number): xdr.ScVal {
     return xdr.ScVal.scvU32(value);
 }
 
-function parseBoolean(value: string | undefined | null, fallback: boolean): boolean {
+export function parseBoolean(value: string | undefined | null, fallback: boolean): boolean {
     if (value === undefined || value === null || value === '') return fallback;
     return ['1', 'true', 'yes', 'on'].includes(value.toLowerCase());
 }
 
-function base64UrlToBytes(base64url: string): Uint8Array {
+export function base64UrlToBytes(base64url: string): Uint8Array {
     const base64 = base64url.replace(/-/g, '+').replace(/_/g, '/');
     const padding = '='.repeat((4 - (base64.length % 4)) % 4);
     const binary = atob(base64 + padding);
     return Uint8Array.from(binary, (char) => char.charCodeAt(0));
 }
 
-function bytesToBigInt(bytes: Uint8Array): bigint {
+export function bytesToBigInt(bytes: Uint8Array): bigint {
     let value = 0n;
     for (const byte of bytes) {
         value = (value << 8n) + BigInt(byte);
@@ -881,11 +881,11 @@ function bytesToBigInt(bytes: Uint8Array): bigint {
     return value;
 }
 
-function bigIntToFieldHex(value: bigint): HexString {
+export function bigIntToFieldHex(value: bigint): HexString {
     return `0x${value.toString(16).padStart(FIELD_BYTES * 2, '0')}`;
 }
 
-function hexToBytes(value: HexString, expectedBytes?: number): Uint8Array {
+export function hexToBytes(value: HexString, expectedBytes?: number): Uint8Array {
     const hex = value.slice(2);
     if (!/^[0-9a-fA-F]*$/.test(hex) || hex.length % 2 !== 0) {
         throw new Error(`Invalid hex string: ${value}`);
@@ -900,7 +900,7 @@ function hexToBytes(value: HexString, expectedBytes?: number): Uint8Array {
     return bytes;
 }
 
-function bytesToHex(bytes: Uint8Array): HexString {
+export function bytesToHex(bytes: Uint8Array): HexString {
     return `0x${Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('')}`;
 }
 

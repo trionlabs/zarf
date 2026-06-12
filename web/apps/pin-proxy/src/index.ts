@@ -233,7 +233,7 @@ async function handleIpfsRead(url: URL, corsHeaders: Record<string, string>): Pr
     return json({ error: 'ipfs_gateway_error', detail: errors.join('; ') }, 502, corsHeaders);
 }
 
-function validateClaimList(body: unknown): string | null {
+export function validateClaimList(body: unknown): string | null {
     if (!body || typeof body !== 'object') return 'not_an_object';
     const obj = body as Record<string, unknown>;
 
@@ -309,7 +309,7 @@ async function validatePinAuth(
     return verified ? null : { status: 401, reason: 'invalid_signature' };
 }
 
-function buildPinAuthMessage(input: {
+export function buildPinAuthMessage(input: {
     owner: string;
     merkleRoot: string;
     bodyHash: string;
@@ -324,7 +324,7 @@ function buildPinAuthMessage(input: {
     ].join('\n');
 }
 
-async function sha256Hex(value: string): Promise<string> {
+export async function sha256Hex(value: string): Promise<string> {
     const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
     return Array.from(new Uint8Array(digest))
         .map((byte) => byte.toString(16).padStart(2, '0'))
@@ -339,7 +339,7 @@ async function sep53MessageHash(message: string): Promise<Buffer> {
     return Buffer.from(digest);
 }
 
-function decodeSignature(raw: string): Buffer | null {
+export function decodeSignature(raw: string): Buffer | null {
     if (raw.length > 512) return null;
     const hex = raw.startsWith('0x') ? raw.slice(2) : raw;
     if (/^[0-9a-fA-F]{128}$/.test(hex)) {
@@ -360,7 +360,7 @@ function decodeSignature(raw: string): Buffer | null {
     }
 }
 
-function validateCid(raw: string): string | null {
+export function validateCid(raw: string): string | null {
     let decoded: string;
     try {
         decoded = decodeURIComponent(raw).trim();
@@ -375,7 +375,7 @@ function validateCid(raw: string): string | null {
     return cidV0.test(cid) || cidV1Base32.test(cid) ? cid : null;
 }
 
-function buildCorsHeaders(origin: string | null, env: Env): Record<string, string> {
+export function buildCorsHeaders(origin: string | null, env: Env): Record<string, string> {
     const allowed = (env.ALLOWED_ORIGINS || '')
         .split(',')
         .map((o) => o.trim())
