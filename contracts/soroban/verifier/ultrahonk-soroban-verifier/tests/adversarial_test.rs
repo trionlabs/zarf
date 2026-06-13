@@ -214,3 +214,35 @@ fn g1_validation_accepts_generator_rejects_garbage() {
     };
     assert!(!off.is_valid());
 }
+
+/// An off-curve *reconstructed pairing point* must be rejected with a clean
+/// `Err`, not a host trap. The 16 pairing-point limbs (the first 16 * 32 proof
+/// bytes) are range-checked but never on-curve-validated at load — unlike the
+/// proof/VK commitments — so `verify_shplemini` validates them before the host
+/// MSM/pairing that would otherwise trap. Start from the real fixture (correct
+/// length, in-range limbs) and overwrite only `lhs` (pairing_point_object
+/// limbs 0..8) to encode the off-curve point (1, 1): `y^2 = x^3 + 3` has no
+/// solution there. Without the guard the off-curve point reaches the host and
+/// traps; with it, `verify` returns `Err`.
+#[test]
+fn off_curve_reconstructed_pairing_point_is_rejected_cleanly() {
+    let env = make_env();
+    let v = verifier(&env);
+    let public_inputs = Bytes::from_slice(&env, PUBLIC_INPUTS);
+
+    let mut mutated = PROOF.to_vec();
+    // lhs_x = limbs[0..4] (bytes 0..128), lhs_y = limbs[4..8] (bytes 128..256).
+    // Zero lhs, then set the low limb of each coordinate to 1 (the final,
+    // big-endian byte of fields 0 and 4) so the point reconstructs to (1, 1).
+    for b in mutated.iter_mut().take(256) {
+        *b = 0;
+    }
+    mutated[31] = 1;
+    mutated[159] = 1;
+
+    let proof = Bytes::from_slice(&env, &mutated);
+    assert!(
+        v.verify(&proof, &public_inputs).is_err(),
+        "off-curve reconstructed pairing point must be rejected, not trap"
+    );
+}

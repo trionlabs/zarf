@@ -71,8 +71,12 @@ impl Fr {
     }
 
     pub fn pow(&self, exp: u128) -> Self {
+        // Fill both low limbs from the u128 so an exponent >= 2^64 is not
+        // silently truncated. Every current caller uses small exponents
+        // (e.g. 5); this keeps the API honest for any future large exponent.
         let mut bits = [0u64; 4];
         bits[0] = exp as u64;
+        bits[1] = (exp >> 64) as u64;
         Fr(self.0.pow(bits))
     }
 
