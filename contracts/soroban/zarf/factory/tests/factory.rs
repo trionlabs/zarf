@@ -361,6 +361,9 @@ fn same_owner_same_salt_second_deploy_reverts_without_tracking() {
     let owner = Address::generate(&env);
     let salt = test_salt(&env, 16);
     let root = BytesN::from_array(&env, &[10_u8; 32]);
+    // Distinct root for the duplicate so this test still exercises the
+    // salt/address collision path rather than the root-uniqueness guard.
+    let dup_root = BytesN::from_array(&env, &[11_u8; 32]);
     let metadata = String::from_str(&env, "ipfs://metadata");
 
     let first = factory.create_vesting(
@@ -382,7 +385,7 @@ fn same_owner_same_salt_second_deploy_reverts_without_tracking() {
         &salt,
         &String::from_str(&env, "Zarf duplicate"),
         &String::from_str(&env, "Factory deployed"),
-        &root,
+        &dup_root,
         &audience_hash(&env),
         &1,
         &100,
@@ -394,6 +397,88 @@ fn same_owner_same_salt_second_deploy_reverts_without_tracking() {
     assert_eq!(factory.get_owner_deployment_count(&owner), 1);
     assert_eq!(factory.get_deployment(&0), first);
     assert_eq!(factory.vesting_metadata_cid(&first), metadata);
+}
+
+#[test]
+fn duplicate_merkle_root_is_rejected_across_campaigns() {
+    let env = Env::default();
+    let (factory, _factory_id, _verifier, _registry, token_id) = setup(&env);
+
+    let owner_a = Address::generate(&env);
+    let owner_b = Address::generate(&env);
+    let root = BytesN::from_array(&env, &[42_u8; 32]);
+
+    // First campaign reserves the root.
+    let first = factory.create_vesting(
+        &owner_a,
+        &token_id,
+        &test_salt(&env, 20),
+        &String::from_str(&env, "Zarf A"),
+        &String::from_str(&env, "Factory deployed"),
+        &root,
+        &audience_hash(&env),
+        &1,
+        &100,
+        &String::from_str(&env, "ipfs://a"),
+    );
+
+    // A different owner with a different salt (so the address does NOT
+    // collide) cannot reuse the same root — that is the cross-campaign replay
+    // vector, and it must be rejected before any deploy or tracking happens.
+    let result = factory.try_create_vesting(
+        &owner_b,
+        &token_id,
+        &test_salt(&env, 21),
+        &String::from_str(&env, "Zarf B"),
+        &String::from_str(&env, "Factory deployed"),
+        &root,
+        &audience_hash(&env),
+        &1,
+        &100,
+        &String::from_str(&env, "ipfs://b"),
+    );
+
+    match result {
+        Err(Ok(FactoryError::MerkleRootAlreadyUsed)) => {}
+        other => panic!("expected MerkleRootAlreadyUsed, got {:?}", other),
+    }
+
+    // Only the first campaign was tracked.
+    assert_eq!(factory.get_deployment_count(), 1);
+    assert_eq!(factory.get_deployment(&0), first);
+    assert_eq!(factory.get_owner_deployment_count(&owner_b), 0);
+}
+
+#[test]
+fn unfunded_create_vesting_rejects_deferred_zero_root() {
+    let env = Env::default();
+    let (factory, _factory_id, _verifier, _registry, token_id) = setup(&env);
+
+    let owner = Address::generate(&env);
+    let zero_root = BytesN::from_array(&env, &[0_u8; 32]);
+
+    // The unfunded create path no longer accepts a deferred (zero) root: a
+    // zero root would skip the UsedRoot reservation, so a later vesting-side
+    // `set_merkle_root` could collide with another campaign's root (L-1).
+    // Reject up front and track nothing.
+    let result = factory.try_create_vesting(
+        &owner,
+        &token_id,
+        &test_salt(&env, 30),
+        &String::from_str(&env, "Zarf deferred"),
+        &String::from_str(&env, "Factory deployed"),
+        &zero_root,
+        &audience_hash(&env),
+        &1,
+        &100,
+        &String::from_str(&env, "ipfs://deferred"),
+    );
+
+    match result {
+        Err(Ok(FactoryError::InvalidMerkleRoot)) => {}
+        other => panic!("expected InvalidMerkleRoot, got {:?}", other),
+    }
+    assert_eq!(factory.get_deployment_count(), 0);
 }
 
 #[test]
