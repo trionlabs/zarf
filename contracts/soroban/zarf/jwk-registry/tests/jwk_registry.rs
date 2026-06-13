@@ -7,10 +7,21 @@ use soroban_sdk::{
 };
 use zarf_jwk_registry::{
     DataKey, Error as RegistryError, JwkRegistryContract, JwkRegistryContractClient,
-    DAY_IN_LEDGERS, TTL_EXTEND_TO,
+    DAY_IN_LEDGERS, MAX_ACTIVATION_DELAY_SECS, TTL_EXTEND_TO,
 };
 
 const DELAY_SECS: u64 = 6 * 3600;
+
+#[test]
+#[should_panic]
+fn constructor_rejects_activation_delay_over_max() {
+    // An activation delay above the hard ceiling is now a typed
+    // `InvalidActivationDelay`, not an untyped panic. A constructor that
+    // returns Err traps the deployment, so registration fails here.
+    let env = Env::default();
+    let owner = Address::generate(&env);
+    env.register(JwkRegistryContract, (owner, MAX_ACTIVATION_DELAY_SECS + 1));
+}
 
 /// Limbs shaped like a real 2048-bit RSA modulus in 18x120-bit little-endian
 /// limb order: every limb < 2^120, limb 0 odd, top limb in [2^7, 2^8).
@@ -249,7 +260,7 @@ fn re_register_after_revoke_reuses_enumeration_slot() {
 }
 
 #[test]
-fn transfer_ownership_moves_registration_rights() {
+fn two_step_ownership_moves_registration_rights() {
     let env = Env::default();
 
     let owner = Address::generate(&env);
@@ -259,32 +270,65 @@ fn transfer_ownership_moves_registration_rights() {
     let kid = String::from_str(&env, "google-key-1");
     let limbs = limbs(&env);
 
-    // Non-owner cannot transfer ownership.
+    // Non-owner cannot propose a successor.
     assert!(client
         .mock_auths(&[MockAuth {
             address: &new_owner,
             invoke: &MockAuthInvoke {
                 contract: &id,
-                fn_name: "transfer_ownership",
+                fn_name: "propose_owner",
                 args: (&new_owner,).into_val(&env),
                 sub_invokes: &[],
             },
         }])
-        .try_transfer_ownership(&new_owner)
+        .try_propose_owner(&new_owner)
         .is_err());
 
+    // Owner proposes the successor; ownership has NOT moved yet.
     client
         .mock_auths(&[MockAuth {
             address: &owner,
             invoke: &MockAuthInvoke {
                 contract: &id,
-                fn_name: "transfer_ownership",
+                fn_name: "propose_owner",
                 args: (&new_owner,).into_val(&env),
                 sub_invokes: &[],
             },
         }])
-        .transfer_ownership(&new_owner);
+        .propose_owner(&new_owner);
+    assert_eq!(client.owner(), owner);
+    assert_eq!(client.pending_owner(), Some(new_owner.clone()));
+
+    // A third party cannot accept; only the nominee can.
+    let stranger = Address::generate(&env);
+    assert!(client
+        .mock_auths(&[MockAuth {
+            address: &stranger,
+            invoke: &MockAuthInvoke {
+                contract: &id,
+                fn_name: "accept_ownership",
+                args: ().into_val(&env),
+                sub_invokes: &[],
+            },
+        }])
+        .try_accept_ownership()
+        .is_err());
+    assert_eq!(client.owner(), owner);
+
+    // The nominee accepts — only now does ownership move.
+    client
+        .mock_auths(&[MockAuth {
+            address: &new_owner,
+            invoke: &MockAuthInvoke {
+                contract: &id,
+                fn_name: "accept_ownership",
+                args: ().into_val(&env),
+                sub_invokes: &[],
+            },
+        }])
+        .accept_ownership();
     assert_eq!(client.owner(), new_owner);
+    assert_eq!(client.pending_owner(), None);
 
     // The old owner can no longer register keys.
     assert!(client
@@ -313,6 +357,118 @@ fn transfer_ownership_moves_registration_rights() {
         }])
         .register_key(&kid, &limbs);
     assert!(client.is_kid_registered(&kid));
+}
+
+#[test]
+fn cancel_ownership_transfer_aborts_handover() {
+    let env = Env::default();
+
+    let owner = Address::generate(&env);
+    let nominee = Address::generate(&env);
+    let stranger = Address::generate(&env);
+    let id = env.register(JwkRegistryContract, (owner.clone(), DELAY_SECS));
+    let client = JwkRegistryContractClient::new(&env, &id);
+
+    // Owner proposes a successor.
+    client
+        .mock_auths(&[MockAuth {
+            address: &owner,
+            invoke: &MockAuthInvoke {
+                contract: &id,
+                fn_name: "propose_owner",
+                args: (&nominee,).into_val(&env),
+                sub_invokes: &[],
+            },
+        }])
+        .propose_owner(&nominee);
+    assert_eq!(client.pending_owner(), Some(nominee.clone()));
+
+    // A non-owner cannot abort the handover.
+    assert!(client
+        .mock_auths(&[MockAuth {
+            address: &stranger,
+            invoke: &MockAuthInvoke {
+                contract: &id,
+                fn_name: "cancel_ownership_transfer",
+                args: ().into_val(&env),
+                sub_invokes: &[],
+            },
+        }])
+        .try_cancel_ownership_transfer()
+        .is_err());
+    assert_eq!(client.pending_owner(), Some(nominee.clone()));
+
+    // The owner aborts it: the nomination clears and ownership is unchanged.
+    client
+        .mock_auths(&[MockAuth {
+            address: &owner,
+            invoke: &MockAuthInvoke {
+                contract: &id,
+                fn_name: "cancel_ownership_transfer",
+                args: ().into_val(&env),
+                sub_invokes: &[],
+            },
+        }])
+        .cancel_ownership_transfer();
+    assert_eq!(client.pending_owner(), None);
+    assert_eq!(client.owner(), owner);
+
+    // The cancelled nominee can no longer accept — the handover is gone.
+    match client
+        .mock_auths(&[MockAuth {
+            address: &nominee,
+            invoke: &MockAuthInvoke {
+                contract: &id,
+                fn_name: "accept_ownership",
+                args: ().into_val(&env),
+                sub_invokes: &[],
+            },
+        }])
+        .try_accept_ownership()
+    {
+        Err(Ok(RegistryError::PendingOwnerNotSet)) => {}
+        other => panic!("expected PendingOwnerNotSet after cancel, got {:?}", other),
+    }
+}
+
+#[test]
+fn accept_or_cancel_without_pending_nominee_errs() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let (_owner, _id, client) = setup(&env);
+    assert_eq!(client.pending_owner(), None);
+
+    match client.try_accept_ownership() {
+        Err(Ok(RegistryError::PendingOwnerNotSet)) => {}
+        other => panic!("expected PendingOwnerNotSet on accept, got {:?}", other),
+    }
+    match client.try_cancel_ownership_transfer() {
+        Err(Ok(RegistryError::PendingOwnerNotSet)) => {}
+        other => panic!("expected PendingOwnerNotSet on cancel, got {:?}", other),
+    }
+}
+
+#[test]
+fn re_propose_overwrites_pending_nominee() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let (_owner, _id, client) = setup(&env);
+    let first = Address::generate(&env);
+    let second = Address::generate(&env);
+
+    client.propose_owner(&first);
+    assert_eq!(client.pending_owner(), Some(first.clone()));
+
+    // Re-proposing replaces the nominee outright; the first is discarded.
+    client.propose_owner(&second);
+    assert_eq!(client.pending_owner(), Some(second.clone()));
+
+    // Only the current nominee can be installed by accept.
+    client.accept_ownership();
+    assert_eq!(client.owner(), second);
+    assert_eq!(client.pending_owner(), None);
 }
 
 #[test]

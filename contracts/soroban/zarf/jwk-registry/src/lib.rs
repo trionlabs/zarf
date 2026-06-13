@@ -40,12 +40,16 @@ pub enum Error {
     ActivationDelayNotElapsed = 6,
     InvalidModulus = 7,
     InvalidActivationDelay = 8,
+    PendingOwnerNotSet = 9,
 }
 
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum DataKey {
     Owner,
+    /// Nominated successor in a two-step ownership handover. Set by
+    /// `propose_owner`, cleared on `accept_ownership`/`cancel_ownership_transfer`.
+    PendingOwner,
     Key(BytesN<32>),
     Kid(String),
     KeyCount,
@@ -79,6 +83,13 @@ pub struct PendingKey {
 pub struct OwnershipTransferred {
     #[topic]
     pub previous_owner: Address,
+    #[topic]
+    pub new_owner: Address,
+}
+
+#[contractevent(topics = ["owner_proposed"], data_format = "single-value")]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct OwnerProposed {
     #[topic]
     pub new_owner: Address,
 }
@@ -146,9 +157,13 @@ pub struct KeyRevoked {
 /// There is deliberately NO delay bypass below the owner multisig.
 #[contractimpl]
 impl JwkRegistryContract {
-    pub fn __constructor(env: Env, owner: Address, activation_delay_secs: u64) {
+    pub fn __constructor(
+        env: Env,
+        owner: Address,
+        activation_delay_secs: u64,
+    ) -> Result<(), Error> {
         if activation_delay_secs > MAX_ACTIVATION_DELAY_SECS {
-            panic!("activation delay exceeds maximum");
+            return Err(Error::InvalidActivationDelay);
         }
         env.storage().instance().set(&DataKey::Owner, &owner);
         env.storage().instance().set(&DataKey::KeyCount, &0_u32);
@@ -157,21 +172,61 @@ impl JwkRegistryContract {
             .instance()
             .set(&DataKey::ActivationDelay, &activation_delay_secs);
         Self::extend_contract_ttl(&env);
+        Ok(())
     }
 
     pub fn owner(env: Env) -> Address {
         Self::owner_unchecked(&env)
     }
 
-    pub fn transfer_ownership(env: Env, new_owner: Address) {
-        let owner = Self::owner_unchecked(&env);
-        owner.require_auth();
-        env.storage().instance().set(&DataKey::Owner, &new_owner);
+    /// Step 1 of a two-step ownership handover: the current owner nominates a
+    /// successor. Nothing changes until the nominee calls `accept_ownership`,
+    /// so a fat-fingered or uncontrolled address can never brick the registry
+    /// — the trust root for every campaign. Re-proposing overwrites the
+    /// pending nominee; the owner can abort via `cancel_ownership_transfer`.
+    pub fn propose_owner(env: Env, new_owner: Address) {
+        Self::require_owner(&env);
+        env.storage()
+            .instance()
+            .set(&DataKey::PendingOwner, &new_owner);
+        Self::extend_contract_ttl(&env);
+        OwnerProposed { new_owner }.publish(&env);
+    }
+
+    /// Step 2: the nominated successor accepts, proving it controls the
+    /// address. Only then does ownership actually move.
+    pub fn accept_ownership(env: Env) -> Result<(), Error> {
+        let pending: Address = env
+            .storage()
+            .instance()
+            .get(&DataKey::PendingOwner)
+            .ok_or(Error::PendingOwnerNotSet)?;
+        pending.require_auth();
+        let previous_owner = Self::owner_unchecked(&env);
+        env.storage().instance().set(&DataKey::Owner, &pending);
+        env.storage().instance().remove(&DataKey::PendingOwner);
+        Self::extend_contract_ttl(&env);
         OwnershipTransferred {
-            previous_owner: owner,
-            new_owner,
+            previous_owner,
+            new_owner: pending,
         }
         .publish(&env);
+        Ok(())
+    }
+
+    /// The current owner aborts a pending handover before it is accepted.
+    pub fn cancel_ownership_transfer(env: Env) -> Result<(), Error> {
+        Self::require_owner(&env);
+        if !env.storage().instance().has(&DataKey::PendingOwner) {
+            return Err(Error::PendingOwnerNotSet);
+        }
+        env.storage().instance().remove(&DataKey::PendingOwner);
+        Self::extend_contract_ttl(&env);
+        Ok(())
+    }
+
+    pub fn pending_owner(env: Env) -> Option<Address> {
+        env.storage().instance().get(&DataKey::PendingOwner)
     }
 
     pub fn set_operator(env: Env, operator: Address) {
