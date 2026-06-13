@@ -61,15 +61,23 @@ length stays < 1536 (bump again if a profile-scoped token overflows).
 
 ```
 verifier   (new vk_bytes + vk_hash 0x27aeb147...)   # M4/M5/L6 hardening rides here
+*** GATE ***  verify_proof(known-good fixture) vs the fresh verifier — MUST pass
 registry   (v2: owner multisig + operator timelock)  # set_operator to the rotation worker key
 vesting    (upload new wasm hash)
 factory v2 (constructor: verifier, registry, vesting_wasm_hash)
 ```
 
-After deploy, **before wiring the factory into the UI**, verify a known-good
-fixture proof against the fresh verifier instance (the `vk_hash` is bb's
-internal VK hash, not keccak(vk_bytes), so the constructor cannot self-check
-it — see `verifier/src/lib.rs`).
+**Hard gate — before constructing the factory** (the factory constructor
+embeds the verifier address, so that is the real wiring point, not the UI):
+verify a known-good fixture proof against the fresh verifier instance. The
+`vk_hash` is bb's internal VK hash, not keccak(vk_bytes), so the constructor
+cannot self-check the (vk_bytes, vk_hash) pair — a *consistent but
+wrong-circuit* pair would deploy clean and silently verify a different
+circuit. This gate is automated in
+`contracts/soroban/zarf/scripts/run_testnet_factory_e2e.sh` (the `F-4 GATE`
+block runs `verify_proof` on the committed fixture and aborts before the
+factory is deployed); mirror that step in any mainnet/manual deploy and do
+NOT construct the factory until it passes. See `verifier/src/lib.rs`.
 
 ### 3. Update config + rotate the registry
 
@@ -79,6 +87,24 @@ it — see `verifier/src/lib.rs`).
 - Set `REGISTRY_V2=true` on the jwk-rotation worker and point its signer at
   the **operator** key; move the **owner** to a 2-of-3 Stellar multisig.
 - Run `contracts/soroban/zarf/scripts/run_testnet_e2e.sh`.
+
+### 3a. Merkle-root reservation & replay residual (factory)
+
+The factory reserves each campaign's merkle root (`UsedRoot`) so two factory
+campaigns can never share one — a proof binds `(merkle_root, audience_hash)`
+but NOT the vesting address, so identically-rooted siblings would otherwise
+both accept the same proof. Both create paths reject a zero/deferred root, so
+the reservation can never be skipped.
+
+- **Residual:** a *standalone* (non-factory) vesting is outside the factory's
+  view. Do NOT deploy two standalone vestings that share a `(merkle_root,
+  audience_hash)` pair; full closure needs in-circuit contract-instance binding
+  (a VK redeploy).
+- **`UsedRoot` TTL:** the reservation TTL is extended once at creation and
+  never re-extended. A multi-year campaign risks the entry being archived,
+  after which a second campaign could re-reserve the same root. For long-lived
+  campaigns, bump it with an `ExtendFootprintTTLOp` before the ~120-day window
+  lapses.
 
 ### 4. Backward compatibility
 

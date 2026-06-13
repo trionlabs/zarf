@@ -61,8 +61,10 @@ a third-party audit (see SECURITY.md).
 
 ## Key rotation reference
 
-- Registry **owner** (cold/multisig): `transfer_ownership`, `register_key`,
-  `cancel_pending`, `set_operator`, `revoke_key`.
+- Registry **owner** (cold/multisig): `propose_owner` → `accept_ownership`
+  (two-step handover — the nominee must counter-sign; abort a pending one with
+  `cancel_ownership_transfer`), `register_key`, `cancel_pending`,
+  `set_operator`, `revoke_key`.
 - Registry **operator** (hot worker): `propose_key`, `operator_revoke_key`.
 - Worker secrets: `wrangler secret put REGISTRY_OWNER_SECRET|ADMIN_TOKEN` per
   app; rotate by re-putting and redeploying.

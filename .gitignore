@@ -34,6 +34,9 @@ test_snapshots/
 !/CLAUDE.md
 !/SECURITY.md
 !/CONTRIBUTING.md
+# internal audit/business doc — kept local, not part of the public codebase.
+# Must come AFTER `!/docs/**` so this re-ignore wins by last-match.
+/docs/proposal_audit.md
 _backlogs/
 reports/
 .DS_Store
