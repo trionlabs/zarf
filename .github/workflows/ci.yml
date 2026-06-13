@@ -46,16 +46,11 @@ jobs:
             cargo fmt --manifest-path "$crate/Cargo.toml" --check
           done
 
-      - name: Clippy (deny warnings)
-        run: |
-          for crate in \
-            contracts/soroban/verifier \
-            contracts/soroban/zarf/jwk-registry \
-            contracts/soroban/zarf/vesting \
-            contracts/soroban/zarf/factory; do
-            cargo clippy --manifest-path "$crate/Cargo.toml" --all-targets -- -D warnings
-          done
-
+      # WASM artifacts MUST be built before clippy: `clippy --all-targets`
+      # compiles the integration-test targets, which `include_bytes!` /
+      # `contractimport!` these release WASMs (gitignored, absent on a cold
+      # checkout). Building first keeps the Soroban job green from a clean
+      # runner instead of dying on a missing-WASM compile error.
       - name: Build verifier WASM
         run: cargo build --manifest-path contracts/soroban/verifier/Cargo.toml --target wasm32v1-none --release
 
@@ -65,8 +60,26 @@ jobs:
           cargo build --manifest-path contracts/soroban/zarf/vesting/Cargo.toml --target wasm32v1-none --release
           cargo build --manifest-path contracts/soroban/zarf/factory/Cargo.toml --target wasm32v1-none --release
 
+      - name: Clippy (deny warnings)
+        run: |
+          for crate in \
+            contracts/soroban/verifier \
+            contracts/soroban/verifier/ultrahonk-soroban-verifier \
+            contracts/soroban/zarf/jwk-registry \
+            contracts/soroban/zarf/vesting \
+            contracts/soroban/zarf/factory; do
+            cargo clippy --manifest-path "$crate/Cargo.toml" --all-targets -- -D warnings
+          done
+
       - name: Test verifier
         run: cargo test --manifest-path contracts/soroban/verifier/Cargo.toml
+
+      # The vendored crate is a path dependency, so its integration tests do
+      # NOT run via the wrapper's `cargo test` above. Run them explicitly so
+      # the adversarial/soundness suite (incl. the on-curve pairing-point guard
+      # and Fr-boundary cases) is actually exercised in CI.
+      - name: Test ultrahonk verifier crate
+        run: cargo test --manifest-path contracts/soroban/verifier/ultrahonk-soroban-verifier/Cargo.toml
 
       - name: Test JWK registry
         run: cargo test --manifest-path contracts/soroban/zarf/jwk-registry/Cargo.toml
