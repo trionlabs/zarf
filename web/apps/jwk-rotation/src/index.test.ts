@@ -7,6 +7,9 @@ import {
     bigIntToFieldHex,
     hexToBytes,
     bytesToHex,
+    executeRevocations,
+    graceMarkerKey,
+    type RevocationContext,
 } from './index';
 
 describe('jwkModulusToLimbs', () => {
@@ -115,5 +118,64 @@ describe('hex helpers', () => {
 
     it('rejects malformed hex', () => {
         expect(() => hexToBytes('0xzz' as `0x${string}`)).toThrow();
+    });
+});
+
+describe('executeRevocations grace markers', () => {
+    const KEY = ('0x' + 'aa'.repeat(32)) as `0x${string}`;
+
+    function makeKv() {
+        const store = new Map<string, string>();
+        return {
+            store,
+            get: (k: string): Promise<string | null> => Promise.resolve(store.get(k) ?? null),
+            put: (k: string, v: string): Promise<void> => {
+                store.set(k, v);
+                return Promise.resolve();
+            },
+            delete: (k: string): Promise<void> => {
+                store.delete(k);
+                return Promise.resolve();
+            },
+        };
+    }
+
+    function makeCtx(overrides: Partial<RevocationContext>): RevocationContext {
+        return {
+            currentKeys: [],
+            currentHashes: new Set<string>([KEY]),
+            registryKeys: [{ keyHash: KEY, active: true }],
+            registeredThisRun: 0,
+            dryRun: false,
+            ...overrides,
+        } as RevocationContext;
+    }
+
+    it('clears a reappeared key grace marker even when nothing is stale', async () => {
+        const kv = makeKv();
+        kv.store.set(graceMarkerKey(KEY), '1000'); // marker from an earlier disappearance
+        const env = {
+            ROTATION_STATE: kv,
+        } as unknown as Parameters<typeof executeRevocations>[0];
+
+        // KEY is present again (currentHashes has it) and is the only registry key,
+        // so staleKeys is empty. The pre-fix ordering returned before clearing, so
+        // a later disappearance would have been revoked on the first missing run.
+        const actions = await executeRevocations(env, makeCtx({}));
+
+        expect(kv.store.has(graceMarkerKey(KEY))).toBe(false);
+        expect(actions).toEqual([]);
+    });
+
+    it('does not mutate rotation state on a dry run', async () => {
+        const kv = makeKv();
+        kv.store.set(graceMarkerKey(KEY), '1000');
+        const env = {
+            ROTATION_STATE: kv,
+        } as unknown as Parameters<typeof executeRevocations>[0];
+
+        await executeRevocations(env, makeCtx({ dryRun: true }));
+
+        expect(kv.store.get(graceMarkerKey(KEY))).toBe('1000');
     });
 });
