@@ -16,7 +16,7 @@
     "./types": "./lib/types.ts"
   },
   "peerDependencies": {
-    "svelte": "^5.0.0"
+    "svelte": "^5.56.3"
   },
   "dependencies": {
     "@zarf/core": "workspace:*",
@@ -27,8 +27,8 @@
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^6.2.4",
-    "happy-dom": "^20.9.0",
-    "svelte": "^5.0.0",
-    "vitest": "^4.1.7"
+    "happy-dom": "^20.10.3",
+    "svelte": "^5.56.3",
+    "vitest": "^4.1.8"
   }
 }
