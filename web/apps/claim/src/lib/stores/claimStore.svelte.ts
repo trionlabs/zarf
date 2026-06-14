@@ -298,9 +298,12 @@ class ClaimFlowState {
 
         const data = {
             step: this.state.currentStep,
-            email: this.state.email,
             targetWallet: this.state.targetWallet,
-            // PIN is never persisted for security (ADR-025)
+            // Email (PII) and PIN are never persisted. The OAuth callback
+            // re-establishes the email from the id_token; PIN is in-memory
+            // only (ADR-025). Persisting the email would expose the very
+            // identifier the protocol keeps unlinkable to any same-origin
+            // script / shared machine.
         };
 
         sessionStorage.setItem(this.sessionKey(), JSON.stringify(data));
@@ -316,8 +319,8 @@ class ClaimFlowState {
             const data = JSON.parse(raw);
             // Always force Step 1 on fresh load to ensure Barretenberg & Secrets are initialized correctly
             this.state.currentStep = 1;
-            this.state.email = data.email || null;
             this.state.targetWallet = data.targetWallet || null;
+            this.state.email = null; // Re-established from the OAuth id_token, never read from storage
             this.state.pin = null; // Ensure PIN is never recovered
         } catch (e) {
             warn('Failed to recover claim session', e);

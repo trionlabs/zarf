@@ -141,16 +141,16 @@ export interface DecodedJWT {
  * Used to pass contractAddress through Google OAuth flow
  */
 export interface OAuthState {
-    /** Contract address to claim from (optional) */
-    address?: StellarContractId;
     /**
-     * Recipient wallet selected before a recipient-bound re-auth, so the
-     * callback can resume proof generation at the wallet the nonce binds.
-     * Present only on the post-wallet-selection re-auth (nonce-binding flow).
+     * Contract address to claim from (optional). Restored to the URL by the
+     * OAuth callback so the claim flow knows which campaign to resume.
+     *
+     * Note: the recipient wallet is NOT carried here. The recipient-bound
+     * re-auth binds the wallet via the single-use OAuth nonce (the marker the
+     * callback validates), and the selected wallet itself is preserved in the
+     * claim store (saveSession/recoverSession) across the redirect.
      */
-    targetWallet?: string;
-    /** Claim-flow step to resume at after the re-auth callback. */
-    resumeStep?: number;
+    address?: StellarContractId;
 }
 
 // ============================================================================

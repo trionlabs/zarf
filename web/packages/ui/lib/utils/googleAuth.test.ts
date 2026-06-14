@@ -43,19 +43,15 @@ describe('recipientNonce', () => {
 });
 
 describe('OAuthState round-trip', () => {
-    it('encodes and decodes address + targetWallet + resumeStep', () => {
+    it('encodes and decodes address', () => {
         const address = 'CCTN3XSQM2P7CSXY4UOBGE67DA2Q7IZSRICP3ELKGUQDL5666VDCLXXW';
         const encoded = encodeOAuthState({
             address: address as never,
-            targetWallet: 'GWALLET',
-            resumeStep: 4,
         });
         expect(encoded).not.toBeNull();
         const decoded = decodeOAuthState(encoded);
         expect(decoded).toMatchObject({
             address,
-            targetWallet: 'GWALLET',
-            resumeStep: 4,
         });
     });
 

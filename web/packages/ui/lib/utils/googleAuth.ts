@@ -321,26 +321,37 @@ function generateAndStoreNonce(): string {
  * the victim selected. The recipient field is only known after wallet
  * selection, so this is a *re-auth*: call it at the Step 3 -> Step 4
  * boundary with the recipient field (the indexer's `recipientId`, a 32-byte
- * hex). The callback resumes at `resumeStep` for `targetWallet`.
+ * hex).
  *
- * The nonce is the canonical lowercase 64-hex of the recipient, with no
- * stored random nonce — the binding *is* the recipient, validated in-circuit
- * and re-checked in `validateGoogleClaims` against the recomputed recipient.
+ * This is a full-page redirect and PIN material is never persisted, so on
+ * return the recipient re-enters their PIN at Step 1; discovery then re-runs
+ * and, because `targetWallet` is preserved, Step 3 re-confirms the same wallet
+ * and advances to the proof without a second redirect. We deliberately do NOT
+ * resume past Step 1 — derived secrets are memory-only by design.
+ *
+ * The nonce is the canonical lowercase 64-hex of the recipient. We persist it
+ * as the single-use pending-flow marker (see {@link consumeStoredNonce}) so the
+ * callback refuses a token this tab did not initiate — without it, the nonce is
+ * a deterministic function of public (contract, wallet) that an attacker could
+ * reproduce to replay a captured id_token in a cold tab. It is also re-checked
+ * in `validateGoogleClaims` against the recomputed recipient.
  */
 export function redirectToGoogleWithRecipient(args: {
     clientId: string;
     redirectUri: string;
     contractAddress: string;
-    targetWallet: string;
     recipientFieldHex: string;
-    resumeStep: number;
 }): void {
     assertBrowser();
     const nonce = recipientNonce(args.recipientFieldHex);
+    // Persist the recipient nonce as the single-use pending-flow marker, the
+    // same channel the initial-login path uses, so the callback can require a
+    // marker this tab wrote before trusting the returned token. The marker IS
+    // the recipient binding (it encodes the recipient field), so the callback
+    // needs nothing more than this nonce to validate the wallet binding.
+    sessionStorage.setItem(OAUTH_NONCE_STORAGE_KEY, nonce);
     const state = encodeOAuthState({
         address: args.contractAddress as OAuthState['address'],
-        targetWallet: args.targetWallet,
-        resumeStep: args.resumeStep,
     });
     initiateGoogleLogin(args.clientId, args.redirectUri, state, nonce);
 }
