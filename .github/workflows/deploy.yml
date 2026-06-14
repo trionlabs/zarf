@@ -28,24 +28,56 @@ permissions:
   contents: read
 
 jobs:
+  # F-2 release-sequencing gate: create/claim bundle the VK-bound static
+  # circuits/zarf.json, so they must NOT publish ahead of a matching on-chain
+  # verifier cutover — neither on auto (merge to main) nor on a routine manual
+  # run. The `matrix` context is NOT available in a job-level `if:` (only
+  # github/inputs/needs/vars are — it evaluates to null there), so we compute the
+  # app set HERE from event + input and feed it to the deploy job as a dynamic
+  # matrix. A per-app job-level `if` referencing matrix.* would silently pass and
+  # deploy everything. On CI success create/claim are excluded; on manual
+  # dispatch the default 'all-safe' also excludes them, and an operator must pick
+  # create/claim BY NAME (one at a time) to ship them — only AFTER the
+  # coordinated contract redeploy + F-4 fixture gate
+  # (docs/runbooks/circuit-redeploy-cutover.md).
+  plan:
+    name: Plan deploy set
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.pick.outputs.matrix }}
+      empty: ${{ steps.pick.outputs.empty }}
+    steps:
+      - name: Select apps to deploy
+        id: pick
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PICK: ${{ inputs.app }}
+        run: |
+          node >> "$GITHUB_OUTPUT" <<'NODE'
+          const ALL = [
+            { app: 'landing', package: '@zarf/landing', kind: 'svelte', url: 'https://zarf.to' },
+            { app: 'create', package: '@zarf/create', kind: 'svelte', url: 'https://create.zarf.to' },
+            { app: 'claim', package: '@zarf/claim', kind: 'svelte', url: 'https://claim.zarf.to' },
+            { app: 'indexer', package: '@zarf/indexer', kind: 'worker', url: 'https://indexer.zarf.to' },
+            { app: 'pin-proxy', package: '@zarf/pin-proxy', kind: 'worker', url: 'zarf-pin-proxy' },
+            { app: 'jwk-rotation', package: '@zarf/jwk-rotation', kind: 'worker', url: 'https://jwt.zarf.to' },
+          ];
+          const VK = new Set(['create', 'claim']); // VK-bound: never auto/blanket deploy
+          const event = process.env.EVENT_NAME;
+          const pick = process.env.PICK || 'all-safe';
+          const chosen =
+            event === 'workflow_dispatch' && pick !== 'all-safe'
+              ? ALL.filter((a) => a.app === pick) // explicit single app (create/claim only post-cutover)
+              : ALL.filter((a) => !VK.has(a.app)); // auto + 'all-safe': exclude VK-bound apps
+          console.log(`matrix=${JSON.stringify({ include: chosen })}`);
+          console.log(`empty=${chosen.length === 0}`);
+          NODE
+
   deploy:
     name: Deploy ${{ matrix.app }}
-    # F-2 release-sequencing gate: create/claim bundle the VK-bound static
-    # circuits/zarf.json, so they must NOT publish ahead of a matching on-chain
-    # verifier cutover — neither on auto (merge to main) nor on a routine manual
-    # run. On CI success they are excluded; on manual dispatch the default
-    # 'all-safe' selection also excludes them, and an operator must pick
-    # create/claim BY NAME (one at a time) to ship them — done only AFTER the
-    # coordinated contract redeploy + F-4 fixture-proof gate
-    # (docs/runbooks/circuit-redeploy-cutover.md). landing (no VK) and the
-    # workers keep auto-deploying on CI success.
-    if: >-
-      ${{ (github.event_name == 'workflow_run'
-            && github.event.workflow_run.conclusion == 'success'
-            && matrix.app != 'create' && matrix.app != 'claim')
-          || (github.event_name == 'workflow_dispatch'
-            && ((inputs.app == 'all-safe' && matrix.app != 'create' && matrix.app != 'claim')
-                || inputs.app == matrix.app)) }}
+    needs: plan
+    if: ${{ needs.plan.outputs.empty == 'false' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     concurrency:
@@ -53,32 +85,7 @@ jobs:
       cancel-in-progress: false
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - app: landing
-            package: "@zarf/landing"
-            kind: svelte
-            url: https://zarf.to
-          - app: create
-            package: "@zarf/create"
-            kind: svelte
-            url: https://create.zarf.to
-          - app: claim
-            package: "@zarf/claim"
-            kind: svelte
-            url: https://claim.zarf.to
-          - app: indexer
-            package: "@zarf/indexer"
-            kind: worker
-            url: https://indexer.zarf.to
-          - app: pin-proxy
-            package: "@zarf/pin-proxy"
-            kind: worker
-            url: zarf-pin-proxy
-          - app: jwk-rotation
-            package: "@zarf/jwk-rotation"
-            kind: worker
-            url: https://jwt.zarf.to
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
     # Only build-time configuration lives at job level. Credentials
     # (CLOUDFLARE_API_TOKEN, PINATA_JWT, REGISTRY_OWNER_SECRET, ADMIN_TOKEN)
     # are scoped to the exact steps that need them so `pnpm install`

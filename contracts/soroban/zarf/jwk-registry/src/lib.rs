@@ -251,10 +251,14 @@ impl JwkRegistryContract {
     }
 
     pub fn get_activation_delay(env: Env) -> u64 {
+        // Fail CLOSED: if the delay is somehow absent (it is set + range-checked
+        // in the constructor and instance storage is kept alive), fall back to
+        // the floor, never to 0 — a 0 fallback would let `propose_key` mint an
+        // immediately-activatable key and silently bypass the timelock.
         env.storage()
             .instance()
             .get(&DataKey::ActivationDelay)
-            .unwrap_or(0)
+            .unwrap_or(MIN_ACTIVATION_DELAY_SECS)
     }
 
     /// Owner-only immediate registration. This is the emergency path and it

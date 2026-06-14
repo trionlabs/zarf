@@ -57,10 +57,16 @@ const FALLBACK_SCRIPT_SRC = "script-src 'self' 'wasm-unsafe-eval' blob:";
 export const handle: Handle = async ({ event, resolve }) => {
     const response = await resolve(event);
     const kitCsp = response.headers.get('Content-Security-Policy');
-    const scriptSrc =
-        kitCsp && kitCsp.trim().startsWith('script-src')
-            ? kitCsp.trim().replace(/;?\s*$/, '')
-            : FALLBACK_SCRIPT_SRC;
+    // Extract ONLY the script-src directive from SvelteKit's CSP (it carries the
+    // per-request nonce) rather than assuming the whole header is script-src. If
+    // kit.csp ever emits more than one directive, this avoids leaking its other
+    // directives into our script-src slot and shadowing the ones set below.
+    // Fails closed to the strict fallback when absent.
+    const kitScriptSrc = kitCsp
+        ?.split(';')
+        .map((directive) => directive.trim())
+        .find((directive) => directive === 'script-src' || directive.startsWith('script-src '));
+    const scriptSrc = kitScriptSrc || FALLBACK_SCRIPT_SRC;
     response.headers.set(
         'Content-Security-Policy',
         `default-src 'self'; ${scriptSrc}; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; ${connectSrc}; img-src 'self' data: https:; worker-src 'self' blob:; base-uri 'self'; form-action 'self';`,

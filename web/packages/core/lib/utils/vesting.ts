@@ -180,6 +180,10 @@ export function durationToSeconds(duration: number, unit: DurationUnit): bigint 
             return BigInt(duration) * 90n * DAY;
         case 'years':
             return BigInt(duration) * 365n * DAY;
+        default:
+            // Fail closed: an unknown unit (e.g. from untyped/legacy input) must
+            // not silently return undefined for a `bigint` contract value.
+            throw new Error(`Unsupported duration unit: ${String(unit)}`);
     }
 }
 

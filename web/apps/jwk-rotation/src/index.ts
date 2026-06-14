@@ -571,7 +571,10 @@ export async function executeRevocations(
         env.MAX_REVOCATIONS_PER_RUN,
         DEFAULT_MAX_REVOCATIONS_PER_RUN,
     );
-    const minActive = parsePositiveInt(env.MIN_ACTIVE_KEYS, DEFAULT_MIN_ACTIVE_KEYS);
+    // Never below 1: parsePositiveInt accepts 0, but a 0 floor would let
+    // revocations drain the registry to an empty active keyset, after which
+    // every claim fails (no valid Google key on-chain). Clamp to >= 1.
+    const minActive = Math.max(1, parsePositiveInt(env.MIN_ACTIVE_KEYS, DEFAULT_MIN_ACTIVE_KEYS));
     const graceMs =
         parsePositiveInt(env.REVOKE_GRACE_HOURS, DEFAULT_REVOKE_GRACE_HOURS) * 3_600_000;
 

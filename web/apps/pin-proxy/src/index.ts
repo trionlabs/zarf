@@ -95,16 +95,13 @@ async function handlePin(
     env: Env,
     corsHeaders: Record<string, string>,
 ): Promise<Response> {
+    // Per-IP limit first: CF-Connecting-IP is set by Cloudflare and cannot be
+    // spoofed, so this is the real volume/DoS backstop. The per-owner limit is
+    // applied AFTER auth below (keying it on the raw, unverified X-Zarf-Owner
+    // here let an attacker rotate the header per request to evade the cap).
     if (env.PIN_IP_LIMITER) {
         const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
         const { success } = await env.PIN_IP_LIMITER.limit({ key: ip });
-        if (!success) {
-            return json({ error: 'rate_limited' }, 429, corsHeaders);
-        }
-    }
-    if (env.PIN_OWNER_LIMITER) {
-        const owner = request.headers.get('X-Zarf-Owner') || 'unknown';
-        const { success } = await env.PIN_OWNER_LIMITER.limit({ key: owner });
         if (!success) {
             return json({ error: 'rate_limited' }, 429, corsHeaders);
         }
@@ -145,6 +142,18 @@ async function handlePin(
             authError.status,
             corsHeaders,
         );
+    }
+
+    // Per-owner rate limit AFTER auth, keyed on the now-VERIFIED owner.
+    // validatePinAuth proved the caller controls this X-Zarf-Owner key
+    // (signature check), so it can no longer be rotated per request to evade
+    // the per-identity cap that bounds Pinata-account abuse.
+    if (env.PIN_OWNER_LIMITER) {
+        const owner = request.headers.get('X-Zarf-Owner') || 'unknown';
+        const { success } = await env.PIN_OWNER_LIMITER.limit({ key: owner });
+        if (!success) {
+            return json({ error: 'rate_limited' }, 429, corsHeaders);
+        }
     }
 
     if (!env.PINATA_JWT) {
