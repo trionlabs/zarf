@@ -9,6 +9,20 @@ on:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      app:
+        description: "Which app to deploy on a manual run. 'all-safe' = every app EXCEPT create/claim (the VK-bound apps). Pick create/claim explicitly only after the on-chain verifier cutover."
+        type: choice
+        required: true
+        default: all-safe
+        options:
+          - all-safe
+          - landing
+          - indexer
+          - pin-proxy
+          - jwk-rotation
+          - create
+          - claim
 
 permissions:
   contents: read
@@ -16,7 +30,22 @@ permissions:
 jobs:
   deploy:
     name: Deploy ${{ matrix.app }}
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    # F-2 release-sequencing gate: create/claim bundle the VK-bound static
+    # circuits/zarf.json, so they must NOT publish ahead of a matching on-chain
+    # verifier cutover — neither on auto (merge to main) nor on a routine manual
+    # run. On CI success they are excluded; on manual dispatch the default
+    # 'all-safe' selection also excludes them, and an operator must pick
+    # create/claim BY NAME (one at a time) to ship them — done only AFTER the
+    # coordinated contract redeploy + F-4 fixture-proof gate
+    # (docs/runbooks/circuit-redeploy-cutover.md). landing (no VK) and the
+    # workers keep auto-deploying on CI success.
+    if: >-
+      ${{ (github.event_name == 'workflow_run'
+            && github.event.workflow_run.conclusion == 'success'
+            && matrix.app != 'create' && matrix.app != 'claim')
+          || (github.event_name == 'workflow_dispatch'
+            && ((inputs.app == 'all-safe' && matrix.app != 'create' && matrix.app != 'claim')
+                || inputs.app == matrix.app)) }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     concurrency:
