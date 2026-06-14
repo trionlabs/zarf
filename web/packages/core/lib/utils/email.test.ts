@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isValidEmail, normalizeEmail } from './email';
+import { canonicalizeEmailForCommitment, isValidEmail, normalizeEmail } from './email';
 
 describe('normalizeEmail', () => {
     it('lowercases and trims', () => {
@@ -39,6 +39,41 @@ describe('normalizeEmail', () => {
 
     it('handles plus addressing combined with gmail dots', () => {
         expect(normalizeEmail('Bob.Jones+payroll@gmail.com')).toBe('bobjones@gmail.com');
+    });
+});
+
+describe('canonicalizeEmailForCommitment (leaf / commitment / circuit witness)', () => {
+    // N3-1: the committed email must equal the LITERAL Google id_token `email`
+    // the circuit asserts byte-exact, so the ONLY safe transform is
+    // lowercase + trim — folding Gmail dots / plus / googlemail here would
+    // strand the recipient (their JWT carries the un-folded form).
+    it('lowercases and trims', () => {
+        expect(canonicalizeEmailForCommitment('  Alice@Example.COM ')).toBe('alice@example.com');
+    });
+
+    it('PRESERVES Gmail dots (must diverge from normalizeEmail)', () => {
+        expect(canonicalizeEmailForCommitment('Alice.Smith@gmail.com')).toBe(
+            'alice.smith@gmail.com',
+        );
+        expect(canonicalizeEmailForCommitment('Alice.Smith@gmail.com')).not.toBe(
+            normalizeEmail('Alice.Smith@gmail.com'),
+        );
+    });
+
+    it('PRESERVES plus-addressing', () => {
+        expect(canonicalizeEmailForCommitment('bob+work@gmail.com')).toBe('bob+work@gmail.com');
+    });
+
+    it('does NOT remap googlemail.com to gmail.com', () => {
+        expect(canonicalizeEmailForCommitment('Bob@GoogleMail.com')).toBe('bob@googlemail.com');
+    });
+
+    it('matches the claim-side witness rule (email.toLowerCase().trim()) and is idempotent', () => {
+        const jwtEmail = 'alice.smith@gmail.com';
+        expect(canonicalizeEmailForCommitment(jwtEmail)).toBe(jwtEmail.toLowerCase().trim());
+        expect(canonicalizeEmailForCommitment(canonicalizeEmailForCommitment(jwtEmail))).toBe(
+            canonicalizeEmailForCommitment(jwtEmail),
+        );
     });
 });
 

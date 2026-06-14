@@ -255,7 +255,10 @@ export async function computeIdentityCommitment(
 ): Promise<bigint> {
     const bb = await initBarretenberg();
 
-    // 1. Hash the email (as bytes)
+    // 1. Hash the email (as bytes). Canonical commit form is lowercase + trim
+    // ONLY (== canonicalizeEmailForCommitment); it must equal the literal Google
+    // id_token email the circuit asserts byte-exact (circuits/src/main.nr), so
+    // NO dot/plus/googlemail folding here — see finding N3-1.
     const emailBytes = stringToBytes(email.toLowerCase().trim(), MAX_EMAIL_LENGTH);
     const emailHash = await pedersenHashBytes(emailBytes);
 
@@ -669,9 +672,16 @@ export async function processWhitelist(
             const identityCommitmentBigInt = await computeIdentityCommitment(email, currentSecret);
             const identityCommitment = '0x' + identityCommitmentBigInt.toString(16);
 
-            // Compute Leaf: H(EpochCommitment, Amount, UnlockTime)
-            // Pass BigInt secret directly
-            const leaf = await computeLeaf(email, currentAmount, currentSecret, unlockTime);
+            // Compute Leaf: H(EpochCommitment, Amount, UnlockTime). Reuse the
+            // identity commitment computed just above instead of recomputing it
+            // inside computeLeaf (which re-runs 3 Pedersen hashes per leaf);
+            // computeLeafFromCommitment hashes only the final leaf. Identical
+            // output: BigInt(identityCommitment) === identityCommitmentBigInt.
+            const leaf = await computeLeafFromCommitment(
+                identityCommitment,
+                currentAmount,
+                unlockTime,
+            );
 
             claims.push({
                 email: email.toLowerCase().trim(),
