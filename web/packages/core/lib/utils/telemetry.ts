@@ -31,15 +31,27 @@ function stringifyArg(arg: unknown): string {
 }
 
 // Error args routinely embed the very material this app exists to protect:
-// Google id_tokens (JWTs) and recipient emails. Redact both before anything
-// leaves the device, and cap the payload so giant serialized objects (which
-// may contain witness data) cannot ride along.
+// Google id_tokens (JWTs) and recipient emails — and, if a whole claim object
+// is ever serialized into a message, the PIN and hash-chain secrets that derive
+// a claim. Redact all of them before anything leaves the device, and cap the
+// payload so giant serialized objects (which may contain witness data) cannot
+// ride along.
 const JWT_PATTERN = /\beyJ[\w-]{10,}\.[\w-]+\.[\w-]+\b/g;
 const EMAIL_PATTERN = /\b[\w.+-]+@[\w-]+(?:\.[\w-]+)+\b/g;
+// PINs and hash-chain secrets have no distinctive shape of their own, so when a
+// claim-like object is JSON-serialized into a message we redact them by key
+// name (covers `{"pin":"…"}`, `{"masterSalt":"…"}`, etc.). Defensive: no log
+// path is known to serialize these today, but it keeps a future one-liner from
+// beaconing secret material off-device.
+const SECRET_KV_PATTERN =
+    /("(?:pin|salt|masterSalt|secret|seed|mnemonic|privateKey)"\s*:\s*)"(?:[^"\\]|\\.)*"/gi;
 const MAX_MESSAGE_LENGTH = 2_048;
 
 export function redactTelemetry(message: string): string {
-    const redacted = message.replace(JWT_PATTERN, '[jwt]').replace(EMAIL_PATTERN, '[email]');
+    const redacted = message
+        .replace(JWT_PATTERN, '[jwt]')
+        .replace(EMAIL_PATTERN, '[email]')
+        .replace(SECRET_KV_PATTERN, '$1"[redacted]"');
     return redacted.length > MAX_MESSAGE_LENGTH
         ? `${redacted.slice(0, MAX_MESSAGE_LENGTH)}…[truncated]`
         : redacted;

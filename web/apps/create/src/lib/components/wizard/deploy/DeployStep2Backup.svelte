@@ -28,9 +28,21 @@
                 }
             });
 
+            // Neutralize CSV formula injection: a recipient-controlled email
+            // beginning with = + - @ (or tab/CR) would execute as a formula
+            // when the operator opens secrets.csv in Excel/Sheets/LibreOffice
+            // (DDE/HYPERLINK can exfil adjacent PIN cells). Quote every cell
+            // and prefix a single quote to any value starting with a formula
+            // trigger.
+            const csvCell = (value: string) => {
+                const escaped = value.replace(/"/g, '""');
+                const guard = /^[=+\-@\t\r]/.test(value) ? "'" : '';
+                return `"${guard}${escaped}"`;
+            };
+
             let csvContent = 'email,pin\n';
             userMap.forEach((pin, email) => {
-                csvContent += `${email},${pin}\n`;
+                csvContent += `${csvCell(email)},${csvCell(pin)}\n`;
             });
 
             backupError = null;
