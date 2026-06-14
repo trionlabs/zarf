@@ -55,14 +55,26 @@ Step 3 -> Step 4 boundary:
 
 **Gate:** exercise the full Google OAuth round-trip on a real account and
 confirm Google echoes the 64-hex nonce verbatim and the token's signed-data
-length stays < 1536 (bump again if a profile-scoped token overflows).
+length stays < 1536 (bump again if a profile-scoped token overflows). Run the
+round-trip with THREE account shapes, because the leaf commits the literal
+lowercase+trim id_token email (`canonicalizeEmailForCommitment`) and the circuit
+asserts `expected_email == jwt.email` byte-exact:
+- a plain `@gmail.com` account;
+- a **dotted / plus-tagged** Gmail (`a.b+tag@gmail.com`) — confirms the commit
+  path does NOT fold dots/plus (finding N3-1); and
+- a **mixed-case Workspace / hosted-domain** primary (e.g. `John.Doe@acme.com`)
+  — confirms whether Google emits the `email` claim lowercased. If it does NOT,
+  that recipient class cannot claim against this VK (the lowercased witness can
+  never match the byte-exact JWT assertion); `ClaimStep4Proof` now fails such a
+  token with an actionable error instead of an opaque prover abort, but the real
+  close is a case-folding circuit revision in a future VK redeploy.
 
 ### 2. Deploy order (testnet, needs the deployer secret)
 
 ```
 verifier   (new vk_bytes + vk_hash 0x27aeb147...)   # M4/M5/L6 hardening rides here
 *** GATE ***  verify_proof(known-good fixture) vs the fresh verifier — MUST pass
-registry   (v2: owner multisig + operator timelock)  # set_operator to the rotation worker key
+registry   (v2: owner multisig + operator timelock)  # --activation_delay_secs >= MIN (6h); then set_operator to the rotation worker key
 vesting    (upload new wasm hash)
 factory v2 (constructor: verifier, registry, vesting_wasm_hash)
 ```
@@ -84,8 +96,20 @@ NOT construct the factory until it passes. See `verifier/src/lib.rs`.
 - GitHub vars/secrets: `VITE_STELLAR_*_FACTORY_ADDRESS`, verifier/registry
   addresses; `JWK_REGISTRY_ADDRESS` in `jwk-rotation/wrangler.jsonc`; indexer
   factory config.
-- Set `REGISTRY_V2=true` on the jwk-rotation worker and point its signer at
-  the **operator** key; move the **owner** to a 2-of-3 Stellar multisig.
+- Deploy the registry with an explicit `--activation_delay_secs` >= the
+  contract floor `MIN_ACTIVATION_DELAY_SECS` (6h = 21600s). A zero/omitted delay
+  is now rejected by the constructor (`Error::InvalidActivationDelay`);
+  previously it silently disabled the operator timelock. The e2e script defaults
+  to 21600 via `ACTIVATION_DELAY_SECS`.
+- Set `REGISTRY_V2=true` on the jwk-rotation worker and point its signer at the
+  **operator** key; move the **owner** to a 2-of-3 Stellar multisig. NEVER leave
+  owner == operator — the timelock only protects you if the key that can
+  `propose_key` (hot worker) is distinct from the cold owner that can
+  `register_key`/`cancel_pending`. NOTE: the `REGISTRY_OWNER_SECRET` Worker
+  secret in `deploy.yml` is a hot key; when `REGISTRY_V2=true` it must hold the
+  OPERATOR key, never the owner. With `REGISTRY_V2` false that same hot key acts
+  as the registry owner and bypasses the timelock entirely, so v2 must be
+  enabled in the same cutover.
 - Run `contracts/soroban/zarf/scripts/run_testnet_e2e.sh`.
 
 ### 3a. Merkle-root reservation & replay residual (factory)

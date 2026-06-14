@@ -51,6 +51,7 @@ test/*.dev
 .agents/
 .gemini/
 .claude/
+.claude-tmp/
 .kiro/
 .cursor/
 
