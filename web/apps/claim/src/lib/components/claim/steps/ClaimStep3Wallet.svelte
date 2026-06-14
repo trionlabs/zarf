@@ -8,7 +8,6 @@
         recipientNonce,
         redirectToGoogleWithRecipient,
     } from '@zarf/ui/utils/googleAuth';
-    import { recipientId } from '@zarf/core/contracts';
     import { toMessage } from '@zarf/core/utils/error';
     import { err } from '@zarf/core/utils/log';
 
@@ -34,6 +33,12 @@
             // (COOP forbids a state-preserving popup) and PIN material is never
             // persisted, so the recipient re-enters their PIN once on return —
             // after which this guard matches and the flow advances to the proof.
+            //
+            // `@zarf/core/contracts` pulls the Stellar SDK, so import it lazily
+            // (Step 3 sits in the claim route's initial-paint closure; an eager
+            // import would drag the SDK into the first bundle — claim's
+            // bundle-budget gate). Mirrors ClaimStep4Proof.
+            const { recipientId } = await import('@zarf/core/contracts');
             const recipientFieldHex = await recipientId(contractAddress, address);
             const requiredNonce = recipientNonce(recipientFieldHex);
 
