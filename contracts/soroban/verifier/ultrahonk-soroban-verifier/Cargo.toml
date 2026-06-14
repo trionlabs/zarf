@@ -21,6 +21,18 @@ soroban-sdk = { version = "26.0.0-rc.1", default-features = false }
 [dev-dependencies]
 soroban-sdk = { version = "26.0.0-rc.1", default-features = false, features = ["testutils"] }
 
+# Vendored verbatim from upstream (yugocabrio/rs-soroban-ultrahonk); these are
+# upstream-parity / churn lints, not defects. NOTE: `deprecated` is a rustc
+# lint (soroban-sdk renamed bn254::Fr -> Bn254Fr), so it MUST live under
+# [lints.rust] — putting it under [lints.clippy] errors with E0602.
+[lints.rust]
+deprecated = "allow"
+
+[lints.clippy]
+should_implement_trait = "allow" # Fr::from_str is a named constructor on a foreign type
+needless_range_loop = "allow"    # index-writes into fixed-size [Fr; N] in MSM/transcript hot paths
+manual_is_multiple_of = "allow"  # `len % 32 != 0` reads as a 32-byte alignment check
+
 [features]
 default = ["alloc"]
 std = [

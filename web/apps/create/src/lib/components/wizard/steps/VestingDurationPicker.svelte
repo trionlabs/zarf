@@ -1,6 +1,8 @@
 <script lang="ts">
-    import { DURATION_UNITS } from '@zarf/core/constants/time';
+    import { getSelectableDurationUnits } from '@zarf/core/constants/time';
+    import { MAX_EPOCHS } from '@zarf/core/domain/epochDiscovery';
     import type { DurationUnit } from '@zarf/core/utils/vesting';
+    import { networkStore } from '@zarf/ui/stores/networkStore.svelte';
     import ZenButton from '@zarf/ui/components/ui/ZenButton.svelte';
     import ZenNumberInput from '@zarf/ui/components/ui/ZenNumberInput.svelte';
     import ZenSelect from '@zarf/ui/components/ui/ZenSelect.svelte';
@@ -12,6 +14,16 @@
 
     // --- Derived for clean markup ---
     const isInstantUnlock = $derived(duration === 0);
+
+    // Sub-day units (minutes/hours) are demo/test-only — show them in dev and on
+    // any non-mainnet network, hide them from the production (mainnet) picker.
+    const includeSubDay = $derived(import.meta.env.DEV || networkStore.activeId !== 'mainnet');
+    const units = $derived(getSelectableDurationUnits(includeSubDay));
+
+    // Each duration increment is one unlock epoch (one merkle leaf per recipient,
+    // one client-side hash-chain step). The claim-side discovery loop is capped at
+    // MAX_EPOCHS, so anything beyond it would silently strand the later unlocks.
+    const epochsOverCap = $derived(duration > MAX_EPOCHS);
 </script>
 
 <div class="pt-4 border-t border-zen-border-subtle space-y-3">
@@ -34,7 +46,7 @@
             <!-- Unit Select -->
             <ZenSelect
                 bind:value={durationUnit}
-                options={DURATION_UNITS}
+                options={units}
                 size="xl"
                 variant="ghost"
                 aria-label="Duration Unit"
@@ -43,7 +55,7 @@
 
         <!-- Quick Unit Selectors -->
         <div class="flex items-center gap-2">
-            {#each DURATION_UNITS as unit, i (i)}
+            {#each units as unit, i (i)}
                 <ZenButton
                     variant={durationUnit === unit.value ? 'primary' : 'ghost'}
                     size="sm"
@@ -72,6 +84,15 @@
                         claim that period's allocation.
                     </p>
                 </div>
+            </div>
+        {/if}
+
+        {#if epochsOverCap}
+            <div
+                class="p-3 border border-zen-warning/40 bg-zen-warning/[0.06] rounded-xl text-xs text-zen-warning font-medium"
+            >
+                This schedule has {duration} unlock periods; the maximum is {MAX_EPOCHS}. Reduce the
+                duration or choose a coarser unit (e.g. weeks or months).
             </div>
         {/if}
     </div>

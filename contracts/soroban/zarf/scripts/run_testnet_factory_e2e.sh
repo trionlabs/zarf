@@ -69,15 +69,52 @@ if [[ -z "${VERIFIER_ID:-}" ]]; then
   )
 fi
 
+# --- F-4 GATE: verify a KNOWN-GOOD fixture proof against the freshly deployed
+# verifier BEFORE the factory is constructed (the factory constructor embeds
+# the verifier address, so that is the real wiring point). `vk_hash` is bb's
+# internal VK hash, not keccak(vk_bytes), so the verifier constructor cannot
+# self-check the (vk_bytes, vk_hash) pair: a consistent-but-wrong-circuit VK
+# would deploy clean and silently verify a DIFFERENT circuit. This step is the
+# enforcement of that check (see verifier/src/lib.rs) — DO NOT remove it.
+# It runs before the proof is regenerated below, so it uses the committed,
+# known-good fixture in OUT_DIR.
+GATE_PI="$OUT_DIR/public_inputs"
+GATE_PROOF="$OUT_DIR/proof"
+if [[ ! -s "$GATE_PI" || ! -s "$GATE_PROOF" ]]; then
+  echo "FATAL: known-good fixture ($GATE_PROOF / $GATE_PI) missing; cannot gate the verifier." >&2
+  exit 1
+fi
+echo "Gate: verifying known-good fixture proof against verifier $VERIFIER_ID ..."
+if ! stellar contract invoke \
+  --id "$VERIFIER_ID" \
+  --source "$SOURCE" \
+  --network "$NETWORK" \
+  --send no \
+  -- verify_proof \
+  --public_inputs-file-path "$GATE_PI" \
+  --proof_bytes-file-path "$GATE_PROOF"; then
+  echo "FATAL: verifier $VERIFIER_ID rejected the known-good fixture proof." >&2
+  echo "The deployed (vk_bytes, vk_hash) pair does NOT match the shipped circuit. Aborting before wiring the factory." >&2
+  exit 1
+fi
+echo "Gate passed: verifier accepts the known-good fixture proof."
+
+# Activation-delay floor: must be >= the contract's MIN_ACTIVATION_DELAY_SECS
+# (6h = 21600s) or the constructor traps. A zero/omitted delay (the old default)
+# silently disabled the operator timelock and is now rejected. In a real deploy
+# also `set_operator` to the HOT rotation-worker key and keep `owner` on a cold
+# multisig (see docs/runbooks/circuit-redeploy-cutover.md).
+ACTIVATION_DELAY_SECS=${ACTIVATION_DELAY_SECS:-21600}
 if [[ -z "${REGISTRY_ID:-}" ]]; then
-  echo "Deploying JWK registry..."
+  echo "Deploying JWK registry (activation_delay_secs=$ACTIVATION_DELAY_SECS)..."
   REGISTRY_ID=$(
     stellar contract deploy \
       --wasm "$REGISTRY_WASM" \
       --source "$SOURCE" \
       --network "$NETWORK" \
       -- \
-      --owner "$SOURCE" | last_nonempty_line
+      --owner "$SOURCE" \
+      --activation_delay_secs "$ACTIVATION_DELAY_SECS" | last_nonempty_line
   )
 fi
 

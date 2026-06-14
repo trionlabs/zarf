@@ -4,6 +4,15 @@ use soroban_sdk::{
 };
 use ultrahonk_soroban_verifier::UltraHonkVerifier;
 
+/// One day of ledgers at the ~5s close time.
+pub const DAY_IN_LEDGERS: u32 = 17_280;
+/// TTL target for the instance/code entries: ~120 days, safely under the
+/// ~180-day network maximum. The verifier is otherwise stateless — nothing
+/// in-protocol would ever bump its TTL, and an archived verifier makes every
+/// claim fail until an external restore.
+pub const TTL_EXTEND_TO: u32 = 120 * DAY_IN_LEDGERS;
+pub const TTL_THRESHOLD: u32 = TTL_EXTEND_TO - DAY_IN_LEDGERS;
+
 /// Contract
 #[contract]
 pub struct UltraHonkVerifierContract;
@@ -29,6 +38,15 @@ impl UltraHonkVerifierContract {
     }
 
     /// Initialize the on-chain VK once at deploy time.
+    ///
+    /// `vk_hash` is bb's own verification-key hash (it feeds the Fiat-Shamir
+    /// transcript's first challenge). It is NOT a keccak of `vk_bytes` — bb
+    /// derives it internally from the VK fields — so it cannot be recomputed
+    /// here. A mismatched pair fails closed (no proof verifies), but a
+    /// deployer-supplied *consistent* pair for a different circuit would
+    /// verify that other circuit: deployment tooling MUST validate the pair
+    /// by verifying a known-good fixture proof against the freshly deployed
+    /// instance before wiring it into the factory.
     pub fn __constructor(env: Env, vk_bytes: Bytes, vk_hash: BytesN<32>) -> Result<(), Error> {
         if vk_hash.to_array() == [0_u8; 32] {
             return Err(Error::VkParseError);
@@ -37,6 +55,7 @@ impl UltraHonkVerifierContract {
             .map_err(|_| Error::VkParseError)?;
         env.storage().instance().set(&Self::key_vk(), &vk_bytes);
         env.storage().instance().set(&Self::key_vk_hash(), &vk_hash);
+        Self::extend_contract_ttl(&env);
         Ok(())
     }
 
@@ -71,6 +90,14 @@ impl UltraHonkVerifierContract {
         verifier
             .verify(&proof_bytes, &public_inputs)
             .map_err(|_| Error::VerificationFailed)?;
+        // Keep the instance (VK) alive: this contract is otherwise stateless
+        // and nothing else in-protocol bumps its TTL.
+        Self::extend_contract_ttl(&env);
         Ok(())
+    }
+
+    fn extend_contract_ttl(env: &Env) {
+        env.deployer()
+            .extend_ttl(env.current_contract_address(), TTL_THRESHOLD, TTL_EXTEND_TO);
     }
 }

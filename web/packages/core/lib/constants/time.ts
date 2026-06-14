@@ -21,11 +21,23 @@ export const MONTH_NAMES = [
 export const DURATION_UNITS = [
     { value: 'minutes', label: 'Minutes' },
     { value: 'hours', label: 'Hours' },
+    { value: 'days', label: 'Daily' },
     { value: 'weeks', label: 'Weekly' },
     { value: 'months', label: 'Monthly' },
     { value: 'quarters', label: 'Quarterly' },
     { value: 'years', label: 'Yearly' },
 ] as const;
+
+/**
+ * Sub-day units (minutes/hours) exist for testnet demos and time-gated tests —
+ * watching a vest complete in real time — but are nonsensical for a production
+ * distribution. They are hidden from the unit picker outside dev/testnet.
+ */
+export function getSelectableDurationUnits(includeSubDay: boolean) {
+    return includeSubDay
+        ? [...DURATION_UNITS]
+        : DURATION_UNITS.filter((u) => u.value !== 'minutes' && u.value !== 'hours');
+}
 
 export const CLIFF_PRESETS = [
     { label: '+3M', months: 3 },

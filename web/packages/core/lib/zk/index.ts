@@ -94,7 +94,8 @@ function terminateWorker() {
 
 function decodeJwtPayload(jwt: string): { aud?: unknown; exp?: unknown } {
     const parts = jwt.split('.');
-    if (parts.length !== 3) throw new Error(`Invalid JWT format: expected 3 parts, got ${parts.length}`);
+    if (parts.length !== 3)
+        throw new Error(`Invalid JWT format: expected 3 parts, got ${parts.length}`);
     const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
     const padded = base64.padEnd(Math.ceil(base64.length / 4) * 4, '=');
     return JSON.parse(atob(padded)) as { aud?: unknown; exp?: unknown };

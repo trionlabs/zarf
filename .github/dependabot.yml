@@ -1,0 +1,52 @@
+version: 2
+updates:
+  # Keeps SHA-pinned actions fresh: Dependabot bumps the pinned commit and
+  # updates the trailing version comment.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns:
+          - "*"
+
+  - package-ecosystem: npm
+    directory: /web
+    schedule:
+      interval: weekly
+    groups:
+      web-minor-patch:
+        update-types:
+          - minor
+          - patch
+
+  - package-ecosystem: npm
+    directory: /poc
+    schedule:
+      interval: weekly
+    groups:
+      poc-minor-patch:
+        update-types:
+          - minor
+          - patch
+
+  - package-ecosystem: cargo
+    directory: /contracts/soroban/verifier
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: cargo
+    directory: /contracts/soroban/zarf/jwk-registry
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: cargo
+    directory: /contracts/soroban/zarf/vesting
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: cargo
+    directory: /contracts/soroban/zarf/factory
+    schedule:
+      interval: weekly

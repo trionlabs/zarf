@@ -225,7 +225,7 @@
                                                         delay: 100,
                                                     }}
                                                 >
-                                                    <ClaimStep3Wallet />
+                                                    <ClaimStep3Wallet {contractAddress} />
                                                 </div>
                                             {:else if currentStep === 4}
                                                 <div in:fade={{ duration: 300 }}>

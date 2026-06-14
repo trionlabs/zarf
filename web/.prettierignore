@@ -8,3 +8,6 @@ dist
 .netlify
 pnpm-lock.yaml
 *.md
+
+# Generated circuit artifact
+**/static/circuits/zarf.json

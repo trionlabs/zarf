@@ -8,6 +8,7 @@
     import type { Recipient, Distribution, DistributionDraft } from '$lib/stores/types';
     import type { DurationUnit } from '@zarf/core/utils/vesting';
     import { CREATION_STEPS } from '@zarf/core/constants/wizard';
+    import { MAX_EPOCHS } from '@zarf/core/domain/epochDiscovery';
 
     // Sub-components
     import DistributionIdentity from '$lib/components/wizard/steps/DistributionIdentity.svelte';
@@ -38,8 +39,6 @@
         if (d) {
             name = d.name;
             description = d.description;
-            usRestricted = d.usRestricted;
-            euRestricted = d.euRestricted;
             poolAmount = d.poolAmount;
             poolInputValue = d.poolInputValue;
             cliffDate = d.cliffDate;
@@ -57,8 +56,6 @@
     // Form Data
     let name = $state('');
     let description = $state('');
-    let usRestricted = $state(false);
-    let euRestricted = $state(false);
 
     let poolAmount = $state<number>(0);
     let poolInputValue = $state<string>('');
@@ -87,7 +84,9 @@
 
     // --- Validation ---
     const isStep0Valid = $derived(name.length >= 3);
-    const isStep1Valid = $derived(cliffDate !== '' && duration >= 0 && poolAmount > 0);
+    const isStep1Valid = $derived(
+        cliffDate !== '' && duration >= 0 && duration <= MAX_EPOCHS && poolAmount > 0,
+    );
     const isBudgetMatch = $derived(
         poolAmount > 0 && toBaseUnits(totalAmount) === toBaseUnits(poolAmount),
     );
@@ -133,15 +132,17 @@
     const launchBlocker = $derived(
         !isStep0Valid
             ? 'Add a distribution name (at least 3 characters).'
-            : !isStep1Valid
-              ? 'Set a pool amount and vesting schedule.'
-              : recipients.length === 0
-                ? 'Add at least one recipient.'
-                : !isBudgetMatch
-                  ? 'Recipient allocations must total the pool amount.'
-                  : validationErrors.length > 0
-                    ? 'Resolve recipient errors before launching.'
-                    : '',
+            : duration > MAX_EPOCHS
+              ? `This schedule has ${duration} unlock periods; the maximum is ${MAX_EPOCHS}. Reduce the duration or pick a coarser unit.`
+              : !isStep1Valid
+                ? 'Set a pool amount and vesting schedule.'
+                : recipients.length === 0
+                  ? 'Add at least one recipient.'
+                  : !isBudgetMatch
+                    ? 'Recipient allocations must total the pool amount.'
+                    : validationErrors.length > 0
+                      ? 'Resolve recipient errors before launching.'
+                      : '',
     );
 
     // Sync editing states with StatsPanel
@@ -183,8 +184,6 @@
         const snapshot: DistributionDraft = {
             name,
             description,
-            usRestricted,
-            euRestricted,
             poolAmount,
             poolInputValue,
             cliffDate,
@@ -201,9 +200,9 @@
     // --- Actions ---
     function saveDistribution() {
         if (!isFormValid) return;
+        // Eligibility restrictions are not yet enforced (see the "Programmable
+        // Compliance — coming soon" panel); persist an empty rule set for now.
         const regulatoryRules: string[] = [];
-        if (usRestricted) regulatoryRules.push('US_RESTRICTED');
-        if (euRestricted) regulatoryRules.push('EU_RESTRICTED');
 
         const newDist: Distribution = {
             id: crypto.randomUUID(),
@@ -295,12 +294,7 @@
         <div class="flex-1 relative">
             {#if creationStep === 0}
                 <div in:slide={{ duration: 200, axis: 'x' }}>
-                    <DistributionIdentity
-                        bind:name
-                        bind:description
-                        bind:usRestricted
-                        bind:euRestricted
-                    />
+                    <DistributionIdentity bind:name bind:description />
                 </div>
             {:else if creationStep === 1}
                 <div in:slide={{ duration: 300, axis: 'x' }}>
@@ -458,15 +452,6 @@
                     </div>
                 {/if}
             </div>
-
-            <!-- Warning Footer -->
-            {#if usRestricted || euRestricted}
-                <div
-                    class="p-4 bg-zen-warning/5 text-zen-warning text-xs font-medium text-center border-t border-zen-warning/5"
-                >
-                    Regulatory Restrictions Apply
-                </div>
-            {/if}
         </div>
     </div>
 </div>

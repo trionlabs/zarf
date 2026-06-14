@@ -1,0 +1,3 @@
+# Pin formatting to defaults so `cargo fmt --check` behaves identically
+# locally and in CI regardless of toolchain drift.
+edition = "2021"

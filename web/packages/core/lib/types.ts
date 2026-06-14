@@ -36,7 +36,14 @@ export interface MerkleTreeData {
     claims: MerkleClaim[];
 }
 
-export type DurationUnit = 'minutes' | 'hours' | 'weeks' | 'months' | 'quarters' | 'years';
+export type DurationUnit =
+    | 'minutes'
+    | 'hours'
+    | 'days'
+    | 'weeks'
+    | 'months'
+    | 'quarters'
+    | 'years';
 
 export interface UnlockMarker {
     x: number;
@@ -134,7 +141,15 @@ export interface DecodedJWT {
  * Used to pass contractAddress through Google OAuth flow
  */
 export interface OAuthState {
-    /** Contract address to claim from (optional) */
+    /**
+     * Contract address to claim from (optional). Restored to the URL by the
+     * OAuth callback so the claim flow knows which campaign to resume.
+     *
+     * Note: the recipient wallet is NOT carried here. The recipient-bound
+     * re-auth binds the wallet via the single-use OAuth nonce (the marker the
+     * callback validates), and the selected wallet itself is preserved in the
+     * claim store (saveSession/recoverSession) across the redirect.
+     */
     address?: StellarContractId;
 }
 

@@ -3,14 +3,75 @@
     import { walletStore } from '@zarf/ui/stores/walletStore.svelte';
     import { Wallet, ArrowRight } from 'lucide-svelte';
     import ZenButton from '@zarf/ui/components/ui/ZenButton.svelte';
+    import {
+        decodeJwt,
+        recipientNonce,
+        redirectToGoogleWithRecipient,
+    } from '@zarf/ui/utils/googleAuth';
+    import { toMessage } from '@zarf/core/utils/error';
+    import { err } from '@zarf/core/utils/log';
+
+    let { contractAddress } = $props<{ contractAddress: string }>();
 
     let isConnected = $derived(walletStore.isConnected);
     let address = $derived(walletStore.address);
+    let isAdvancing = $state(false);
+    let error = $state<string | null>(null);
 
-    function handleContinue() {
+    async function handleContinue() {
         if (!address) return;
-        claimStore.setTargetWallet(address);
-        claimStore.nextStep();
+        isAdvancing = true;
+        error = null;
+        try {
+            claimStore.setTargetWallet(address);
+
+            // The nonce-binding circuit requires the id_token's `nonce` to equal
+            // the canonical 64-hex of the recipient field, which is only known
+            // once the wallet is selected. If the token in hand already binds
+            // this wallet, proceed; otherwise re-auth so the id_token carries
+            // the recipient-bound nonce. The re-auth is a full-page redirect
+            // (COOP forbids a state-preserving popup) and PIN material is never
+            // persisted, so the recipient re-enters their PIN once on return —
+            // after which this guard matches and the flow advances to the proof.
+            //
+            // `@zarf/core/contracts` pulls the Stellar SDK, so import it lazily
+            // (Step 3 sits in the claim route's initial-paint closure; an eager
+            // import would drag the SDK into the first bundle — claim's
+            // bundle-budget gate). Mirrors ClaimStep4Proof.
+            const { recipientId } = await import('@zarf/core/contracts');
+            const recipientFieldHex = await recipientId(contractAddress, address);
+            const requiredNonce = recipientNonce(recipientFieldHex);
+
+            const jwt = claimStore.jwt;
+            let currentNonce: string | null = null;
+            if (jwt) {
+                try {
+                    currentNonce = decodeJwt(jwt).payload.nonce ?? null;
+                } catch {
+                    currentNonce = null;
+                }
+            }
+
+            if (currentNonce === requiredNonce) {
+                claimStore.nextStep();
+                return;
+            }
+
+            const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+            if (!clientId) {
+                throw new Error('VITE_GOOGLE_CLIENT_ID is not defined');
+            }
+            redirectToGoogleWithRecipient({
+                clientId,
+                redirectUri: `${window.location.origin}/`,
+                contractAddress,
+                recipientFieldHex,
+            });
+        } catch (e) {
+            err('[Claim] Recipient-bound verification failed:', e);
+            error = toMessage(e, 'Could not start verification. Please retry.');
+            isAdvancing = false;
+        }
     }
 </script>
 
@@ -78,6 +139,10 @@
             {/if}
         </div>
 
+        {#if error}
+            <p class="text-xs text-zen-error text-center">{error}</p>
+        {/if}
+
         <!-- Action Bar -->
         <div class="pt-4 border-t border-zen-border-subtle flex items-center justify-between">
             <div class="flex items-center gap-2">
@@ -95,7 +160,7 @@
                 variant="primary"
                 size="lg"
                 class="px-8 uppercase tracking-widest text-xs font-bold group"
-                disabled={!isConnected}
+                disabled={!isConnected || isAdvancing}
                 onclick={handleContinue}
             >
                 Confirm & Proceed

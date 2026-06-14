@@ -20,6 +20,7 @@ import {
     unitToPeriodSeconds,
     calculateEndDate,
 } from '../utils/vesting';
+import { MAX_EPOCHS } from './epochDiscovery';
 
 export interface DeploySchedule {
     /** YYYY-MM-DD */
@@ -71,6 +72,35 @@ export function planScheduleSeconds(
     }
 
     return { cliffSeconds, vestingSeconds, periodSeconds, immediateUnlock };
+}
+
+/**
+ * Number of discrete unlock epochs a schedule produces. Each epoch is one
+ * merkle leaf per recipient AND one step the claimant must walk in the
+ * client-side hash-chain discovery loop (see `epochDiscovery.ts`), so this is
+ * the value bounded by `MAX_EPOCHS`.
+ */
+export function scheduleEpochCount(schedule: Pick<DeploySchedule, 'distributionDuration'>): number {
+    return schedule.distributionDuration;
+}
+
+/**
+ * Guard against building a distribution with more epochs than the claim-side
+ * discovery loop can ever surface. Without this, epochs past `MAX_EPOCHS` are
+ * minted into the merkle tree but are permanently undiscoverable — i.e. the
+ * recipient's later unlocks are silently stranded. Reuses `MAX_EPOCHS` so the
+ * generate-side cap and the discover-side cap can never drift apart.
+ */
+export function assertEpochCountWithinCap(
+    schedule: Pick<DeploySchedule, 'distributionDuration'>,
+): void {
+    const epochs = scheduleEpochCount(schedule);
+    if (epochs > MAX_EPOCHS) {
+        throw new Error(
+            `This schedule has ${epochs} unlock periods; the maximum is ${MAX_EPOCHS}. ` +
+                `Reduce the duration or choose a coarser unit (e.g. weeks or months).`,
+        );
+    }
 }
 
 /**
@@ -133,6 +163,10 @@ export function planDeploy(inputs: DeployPlanInputs, now: Date = new Date()): Pl
             'Integrity error: allocations sum does not match distribution total. Please recreate the distribution.',
         );
     }
+
+    // Hard backstop: even if the UI guard is bypassed (e.g. a restored draft),
+    // never deploy a distribution whose later epochs would be unclaimable.
+    assertEpochCountWithinCap(inputs.schedule);
 
     const { cliffSeconds, vestingSeconds, periodSeconds, immediateUnlock } = planScheduleSeconds(
         inputs.schedule,

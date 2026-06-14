@@ -181,15 +181,18 @@ async function main() {
   const publicKeyJWK = await exportKeyToJWK(publicKey);
 
   console.log('2. JWT...');
+  // The circuit binds the recipient via the OIDC nonce: nonce must be the
+  // lowercase 64-hex encoding of the recipient field.
+  const recipientNonce = testRecipient.slice(2).padStart(64, '0').toLowerCase();
   const jwt = await createJWT(privateKey, {
     email: testEmail,
     aud: testAudience,
     email_verified: true,
-    nonce: args.nonce ?? 'test-nonce',
+    nonce: args.nonce ?? recipientNonce,
   });
 
   console.log('3. JWT inputs (RSA limbs, signature, base64 offset)...');
-  const jwtInputs = await generateInputs({ jwt, pubkey: publicKeyJWK, maxSignedDataLength: 1024 });
+  const jwtInputs = await generateInputs({ jwt, pubkey: publicKeyJWK, maxSignedDataLength: 1536 });
 
   console.log('4. Compute identity_commitment + leaf (new formula)...');
   const emailBytes = stringToBytes(testEmail.toLowerCase().trim(), 64);

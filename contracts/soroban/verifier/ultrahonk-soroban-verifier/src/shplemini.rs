@@ -254,6 +254,13 @@ pub fn verify_shplemini(
 
     let recursion_separator = generate_recursion_separator(env, proof, &p0, &p1);
     let (proof_lhs, proof_rhs) = convert_pairing_points_to_g1(proof);
+    // These two G1 points are recombined from the prover's 68-bit pairing-point
+    // limbs, so unlike the proof/VK commitments they were never on-curve
+    // validated at load. The host MSM/pairing would *trap* on an off-curve
+    // point; validate here to fail closed with a clean error instead.
+    if !proof_lhs.is_valid() || !proof_rhs.is_valid() {
+        return Err("shplemini: reconstructed pairing point not on curve");
+    }
     let p0 = mul_with_separator(env, &p0, &proof_lhs, recursion_separator)?;
     let p1 = mul_with_separator(env, &p1, &proof_rhs, recursion_separator)?;
 

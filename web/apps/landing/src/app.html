@@ -19,7 +19,7 @@
         />
 
         <!-- Blocking script to prevent theme flash during hydration -->
-        <script>
+        <script nonce="%sveltekit.nonce%">
             (function () {
                 try {
                     var stored = localStorage.getItem('zarf_theme');

@@ -54,18 +54,21 @@ pub fn is_supported_log_n(log_n: usize) -> bool {
 }
 
 /// Load a bb v2 UltraKeccakHonk proof from a byte array.
-pub fn load_proof(proof_bytes: &Bytes, log_n: usize) -> Proof {
-    assert_eq!(
-        proof_bytes.len() as usize,
-        proof_bytes_for_log_n(log_n),
-        "proof bytes len"
-    );
+///
+/// Returns `None` on length mismatch or any structurally invalid G1 point
+/// (off-curve / non-canonical coordinates), so callers can surface a clean
+/// error instead of letting the host trap mid-MSM.
+pub fn load_proof(proof_bytes: &Bytes, log_n: usize) -> Option<Proof> {
+    if proof_bytes.len() as usize != proof_bytes_for_log_n(log_n) {
+        return None;
+    }
     let mut boundary = 0u32;
 
-    fn bytes_to_g1_proof_point(bytes: &Bytes, cur: &mut u32) -> G1Point {
+    fn bytes_to_g1_proof_point(bytes: &Bytes, cur: &mut u32) -> Option<G1Point> {
         let x = read_bytes::<32>(bytes, cur);
         let y = read_bytes::<32>(bytes, cur);
-        G1Point { x, y }
+        let point = G1Point { x, y };
+        point.is_valid().then_some(point)
     }
 
     // Helper: bytesToFr (read next 32 bytes as Fr)
@@ -79,20 +82,20 @@ pub fn load_proof(proof_bytes: &Bytes, log_n: usize) -> Proof {
         array::from_fn(|_| bytes_to_fr(proof_bytes, &mut boundary));
 
     // 1) w1, w2, w3
-    let w1 = bytes_to_g1_proof_point(proof_bytes, &mut boundary);
-    let w2 = bytes_to_g1_proof_point(proof_bytes, &mut boundary);
-    let w3 = bytes_to_g1_proof_point(proof_bytes, &mut boundary);
+    let w1 = bytes_to_g1_proof_point(proof_bytes, &mut boundary)?;
+    let w2 = bytes_to_g1_proof_point(proof_bytes, &mut boundary)?;
+    let w3 = bytes_to_g1_proof_point(proof_bytes, &mut boundary)?;
 
     // 2) lookup_read_counts, lookup_read_tags
-    let lookup_read_counts = bytes_to_g1_proof_point(proof_bytes, &mut boundary);
-    let lookup_read_tags = bytes_to_g1_proof_point(proof_bytes, &mut boundary);
+    let lookup_read_counts = bytes_to_g1_proof_point(proof_bytes, &mut boundary)?;
+    let lookup_read_tags = bytes_to_g1_proof_point(proof_bytes, &mut boundary)?;
 
     // 3) w4
-    let w4 = bytes_to_g1_proof_point(proof_bytes, &mut boundary);
+    let w4 = bytes_to_g1_proof_point(proof_bytes, &mut boundary)?;
 
     // 4) lookup_inverses, z_perm
-    let lookup_inverses = bytes_to_g1_proof_point(proof_bytes, &mut boundary);
-    let z_perm = bytes_to_g1_proof_point(proof_bytes, &mut boundary);
+    let lookup_inverses = bytes_to_g1_proof_point(proof_bytes, &mut boundary)?;
+    let z_perm = bytes_to_g1_proof_point(proof_bytes, &mut boundary)?;
 
     // 5) sumcheck_univariates
     let mut sumcheck_univariates =
@@ -110,7 +113,7 @@ pub fn load_proof(proof_bytes: &Bytes, log_n: usize) -> Proof {
     // 7) gemini_fold_comms
     let mut gemini_fold_comms = [G1Point::infinity(); CONST_PROOF_SIZE_LOG_N - 1];
     for fold in gemini_fold_comms.iter_mut().take(log_n - 1) {
-        *fold = bytes_to_g1_proof_point(proof_bytes, &mut boundary);
+        *fold = bytes_to_g1_proof_point(proof_bytes, &mut boundary)?;
     }
 
     // 8) gemini_a_evaluations
@@ -120,10 +123,10 @@ pub fn load_proof(proof_bytes: &Bytes, log_n: usize) -> Proof {
     }
 
     // 9) shplonk_q, kzg_quotient
-    let shplonk_q = bytes_to_g1_proof_point(proof_bytes, &mut boundary);
-    let kzg_quotient = bytes_to_g1_proof_point(proof_bytes, &mut boundary);
+    let shplonk_q = bytes_to_g1_proof_point(proof_bytes, &mut boundary)?;
+    let kzg_quotient = bytes_to_g1_proof_point(proof_bytes, &mut boundary)?;
 
-    Proof {
+    Some(Proof {
         pairing_point_object,
         w1,
         w2,
@@ -139,7 +142,7 @@ pub fn load_proof(proof_bytes: &Bytes, log_n: usize) -> Proof {
         gemini_a_evaluations,
         shplonk_q,
         kzg_quotient,
-    }
+    })
 }
 
 /// Load a VerificationKey and derive its byte hash with the local Keccak helper.
@@ -165,8 +168,11 @@ pub fn load_vk_from_bytes_with_hash(bytes: &Bytes, vk_hash: [u8; 32]) -> Option<
     fn read_point(bytes: &Bytes, idx: &mut u32) -> Option<G1Point> {
         let x = read_bytes::<32>(bytes, idx);
         let y = read_bytes::<32>(bytes, idx);
-        // Curve, subgroup checks are executed in the Soroban host.
-        Some(G1Point { x, y })
+        // The Soroban host re-checks curve membership on use but traps on
+        // failure; validating here turns a malformed VK into a clean parse
+        // error at construction time instead.
+        let point = G1Point { x, y };
+        point.is_valid().then_some(point)
     }
 
     let mut idx = 0u32;

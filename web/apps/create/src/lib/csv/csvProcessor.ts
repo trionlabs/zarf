@@ -12,7 +12,7 @@
 // CSV produces UI-draft entries (amount: number from a form field), which is the
 // `Recipient` shape, not the post-merkle on-chain `Recipient` (amount: bigint).
 import type { Recipient } from '../stores/types';
-import { normalizeEmail, isValidEmail } from '@zarf/core/utils/email';
+import { canonicalizeEmailForCommitment, isValidEmail } from '@zarf/core/utils/email';
 // Shape-only check: regex-grade Stellar address validation. A typo'd
 // address that matches the shape regex but fails the StrKey checksum
 // passes parseCSV() here and is rejected later at transaction-build
@@ -21,8 +21,12 @@ import { normalizeEmail, isValidEmail } from '@zarf/core/utils/email';
 // DistributionRecipients.svelte was 500ing on the SSR pass).
 import { isValidAddressShape as isValidAddress } from '@zarf/core/utils/addressShape';
 
-// Re-export for backward compatibility
-export { normalizeEmail };
+// `normalizeEmail` is intentionally NOT re-exported / used here: its
+// dot/plus/googlemail folding must NEVER reach the commitment path (finding
+// N3-1). The committed email is the literal Google id_token form
+// (canonicalizeEmailForCommitment = lowercase + trim only). Import
+// `normalizeEmail` directly from `@zarf/core/utils/email` for visibility/dedup
+// display only.
 
 /**
  * Normalizes address for consistent hashing and comparison.
@@ -88,7 +92,10 @@ export function parseCSV(content: string): ParseResult {
 
         // Identifier Logic: Check for email OR address
         if (isValidEmail(identifier)) {
-            const email = normalizeEmail(identifier);
+            // Commit the literal (lowercase+trim) email the recipient's Google
+            // id_token will carry — NOT a dot/plus/googlemail-folded form, which
+            // the in-circuit equality check can never reproduce (finding N3-1).
+            const email = canonicalizeEmailForCommitment(identifier);
             // Allow duplicates in the list so the total amount matches the CSV file.
             entries.push({ address: '', email, amount });
         } else if (isValidAddress(identifier)) {
@@ -180,7 +187,7 @@ export function generateSampleCSV(): string {
 alice@example.com,1000
 bob@example.com,2000
 charlie@example.com,5000
-yamancandev@gmail.com,10000`;
+dana@example.com,10000`;
 }
 
 /**

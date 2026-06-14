@@ -21,3 +21,9 @@ codegen-units = 1
 panic = "abort"
 strip = true
 overflow-checks = true
+
+[lints.clippy]
+# Soroban contract constructors/methods legitimately take many config args
+# (token, verifier, registry, schedule fields, ...) and their test harnesses
+# mirror that arity; the lint does not fit contract entrypoints.
+too_many_arguments = "allow"
