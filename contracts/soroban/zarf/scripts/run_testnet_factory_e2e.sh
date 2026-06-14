@@ -99,15 +99,22 @@ if ! stellar contract invoke \
 fi
 echo "Gate passed: verifier accepts the known-good fixture proof."
 
+# Activation-delay floor: must be >= the contract's MIN_ACTIVATION_DELAY_SECS
+# (6h = 21600s) or the constructor traps. A zero/omitted delay (the old default)
+# silently disabled the operator timelock and is now rejected. In a real deploy
+# also `set_operator` to the HOT rotation-worker key and keep `owner` on a cold
+# multisig (see docs/runbooks/circuit-redeploy-cutover.md).
+ACTIVATION_DELAY_SECS=${ACTIVATION_DELAY_SECS:-21600}
 if [[ -z "${REGISTRY_ID:-}" ]]; then
-  echo "Deploying JWK registry..."
+  echo "Deploying JWK registry (activation_delay_secs=$ACTIVATION_DELAY_SECS)..."
   REGISTRY_ID=$(
     stellar contract deploy \
       --wasm "$REGISTRY_WASM" \
       --source "$SOURCE" \
       --network "$NETWORK" \
       -- \
-      --owner "$SOURCE" | last_nonempty_line
+      --owner "$SOURCE" \
+      --activation_delay_secs "$ACTIVATION_DELAY_SECS" | last_nonempty_line
   )
 fi
 

@@ -24,6 +24,13 @@ pub const TTL_THRESHOLD: u32 = TTL_EXTEND_TO - DAY_IN_LEDGERS;
 /// Hard ceiling on the activation delay so a constructor typo cannot brick
 /// rotation entirely (Google keys live ~weeks).
 pub const MAX_ACTIVATION_DELAY_SECS: u64 = 7 * 24 * 3600;
+/// Hard floor on the activation delay so the operator timelock can never be
+/// deployed disabled. The delay IS the monitoring window in which the cold
+/// owner multisig can `cancel_pending` a compromised hot operator's malicious
+/// proposal before it activates. 6h matches the rotation worker's cron cadence
+/// and exceeds the Google id_token lifetime (<=1h). A zero/omitted delay
+/// (which silently disabled the operator/owner split) is now rejected.
+pub const MIN_ACTIVATION_DELAY_SECS: u64 = 6 * 3600;
 
 #[contract]
 pub struct JwkRegistryContract;
@@ -162,7 +169,8 @@ impl JwkRegistryContract {
         owner: Address,
         activation_delay_secs: u64,
     ) -> Result<(), Error> {
-        if activation_delay_secs > MAX_ACTIVATION_DELAY_SECS {
+        if !(MIN_ACTIVATION_DELAY_SECS..=MAX_ACTIVATION_DELAY_SECS).contains(&activation_delay_secs)
+        {
             return Err(Error::InvalidActivationDelay);
         }
         env.storage().instance().set(&DataKey::Owner, &owner);
@@ -277,18 +285,30 @@ impl JwkRegistryContract {
         let key_hash = Self::compute_hash(&env, &pubkey_limbs)?;
         Self::validate_modulus(&pubkey_limbs)?;
 
-        let activate_after = env
-            .ledger()
-            .timestamp()
-            .saturating_add(Self::get_activation_delay(env.clone()));
+        let persistent = env.storage().persistent();
+        let pending_key = DataKey::Pending(key_hash.clone());
+        let existing: Option<PendingKey> = persistent.get(&pending_key);
+        let is_new = existing.is_none();
+
+        // Re-proposing an already-pending key MUST preserve its original
+        // activation deadline. Recomputing `now + delay` on every call would
+        // let a caller that re-proposes the same hash each run (e.g. a worker
+        // that cannot read the pending entry and so keeps re-staging it) push
+        // the deadline forward indefinitely, starving the key of activation.
+        // Only a brand-new proposal starts the clock; the floor was already
+        // enforced at first proposal, so keeping the earlier deadline is safe.
+        let activate_after = match &existing {
+            Some(prev) => prev.activate_after,
+            None => env
+                .ledger()
+                .timestamp()
+                .saturating_add(Self::get_activation_delay(env.clone())),
+        };
         let pending = PendingKey {
             kid: kid.clone(),
             activate_after,
         };
 
-        let persistent = env.storage().persistent();
-        let pending_key = DataKey::Pending(key_hash.clone());
-        let is_new = !persistent.has(&pending_key);
         persistent.set(&pending_key, &pending);
         persistent.extend_ttl(&pending_key, TTL_THRESHOLD, TTL_EXTEND_TO);
         if is_new {
@@ -583,7 +603,10 @@ impl JwkRegistryContract {
         // Little-endian limb order: limb 0 holds the least significant 120
         // bits. 17 limbs cover 2040 bits, so a 2048-bit modulus needs its
         // top limb in [2^7, 2^8): only the lowest byte set, high bit on.
-        let top = pubkey_limbs.get(PUBKEY_LIMBS - 1).unwrap().to_array();
+        let top = pubkey_limbs
+            .get(PUBKEY_LIMBS - 1)
+            .ok_or(Error::InvalidKeyLength)?
+            .to_array();
         for &byte in top.iter().take(31) {
             if byte != 0 {
                 return Err(Error::InvalidModulus);
@@ -594,7 +617,10 @@ impl JwkRegistryContract {
         }
 
         // RSA moduli are products of odd primes.
-        let low = pubkey_limbs.get(0).unwrap().to_array();
+        let low = pubkey_limbs
+            .get(0)
+            .ok_or(Error::InvalidKeyLength)?
+            .to_array();
         if low[31] & 1 == 0 {
             return Err(Error::InvalidModulus);
         }

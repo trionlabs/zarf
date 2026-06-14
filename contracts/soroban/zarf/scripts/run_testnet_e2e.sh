@@ -38,15 +38,21 @@ cargo build --manifest-path "$ZARF_DIR/vesting/Cargo.toml" --target wasm32v1-non
 TOKEN_ID=$(stellar contract id asset --asset native --network "$NETWORK")
 AUDIENCE_HASH=${AUDIENCE_HASH:-$(audience_hash)}
 
+# The constructor now requires activation_delay_secs in
+# [MIN_ACTIVATION_DELAY_SECS(6h)=21600 .. MAX(7d)]; a zero/omitted delay traps
+# (Error::InvalidActivationDelay) so the operator timelock can never ship
+# disabled. Pass it explicitly (mirrors run_testnet_factory_e2e.sh).
+ACTIVATION_DELAY_SECS=${ACTIVATION_DELAY_SECS:-21600}
 if [[ -z "${REGISTRY_ID:-}" ]]; then
-  echo "Deploying JWK registry..."
+  echo "Deploying JWK registry (activation_delay_secs=$ACTIVATION_DELAY_SECS)..."
   REGISTRY_ID=$(
     stellar contract deploy \
       --wasm "$REGISTRY_WASM" \
       --source "$SOURCE" \
       --network "$NETWORK" \
       -- \
-      --owner "$SOURCE" | last_nonempty_line
+      --owner "$SOURCE" \
+      --activation_delay_secs "$ACTIVATION_DELAY_SECS" | last_nonempty_line
   )
 fi
 

@@ -7,7 +7,9 @@ use soroban_sdk::{
     token, Address, Bytes, BytesN, ConversionError, Env, IntoVal, InvokeError, String, Symbol, Val,
     Vec,
 };
-use zarf_jwk_registry::{JwkRegistryContract, JwkRegistryContractClient};
+use zarf_jwk_registry::{
+    JwkRegistryContract, JwkRegistryContractClient, MIN_ACTIVATION_DELAY_SECS,
+};
 use zarf_vesting_soroban::{
     DataKey, Error as VestingError, ZarfVestingContract, ZarfVestingContractClient, DAY_IN_LEDGERS,
     MAX_CLAIMED_BATCH, TTL_EXTEND_TO,
@@ -251,7 +253,10 @@ fn setup_claim_case(env: &Env, verifier_id: Address, funded_amount: i128) -> Cla
     let token_id = token_asset.address();
     let token_admin = token::StellarAssetClient::new(env, &token_id);
 
-    let registry_id = env.register(JwkRegistryContract, (owner.clone(), 0_u64));
+    let registry_id = env.register(
+        JwkRegistryContract,
+        (owner.clone(), MIN_ACTIVATION_DELAY_SECS),
+    );
     let registry = JwkRegistryContractClient::new(env, &registry_id);
     let limbs = limbs(env);
     registry.register_key(&String::from_str(env, "google-key-1"), &limbs);
@@ -356,7 +361,10 @@ fn claim_checks_registry_root_recipient_time_and_transfers() {
     let token_id = token_asset.address();
     let token_admin = token::StellarAssetClient::new(&env, &token_id);
 
-    let registry_id = env.register(JwkRegistryContract, (owner.clone(), 0_u64));
+    let registry_id = env.register(
+        JwkRegistryContract,
+        (owner.clone(), MIN_ACTIVATION_DELAY_SECS),
+    );
     let registry = JwkRegistryContractClient::new(&env, &registry_id);
     let limbs = limbs(&env);
     registry.register_key(&String::from_str(&env, "google-key-1"), &limbs);
@@ -432,7 +440,10 @@ fn claim_rejects_non_canonical_public_input_field() {
     let token_id = token_asset.address();
     let token_admin = token::StellarAssetClient::new(&env, &token_id);
 
-    let registry_id = env.register(JwkRegistryContract, (owner.clone(), 0_u64));
+    let registry_id = env.register(
+        JwkRegistryContract,
+        (owner.clone(), MIN_ACTIVATION_DELAY_SECS),
+    );
     let registry = JwkRegistryContractClient::new(&env, &registry_id);
     let limbs = limbs(&env);
     registry.register_key(&String::from_str(&env, "google-key-1"), &limbs);
@@ -714,7 +725,10 @@ fn set_merkle_root_re_extends_decayed_instance_ttl() {
     let token_asset = env.register_stellar_asset_contract_v2(owner.clone());
     let token_id = token_asset.address();
     let verifier_id = env.register(MockVerifier, ());
-    let registry_id = env.register(JwkRegistryContract, (owner.clone(), 0_u64));
+    let registry_id = env.register(
+        JwkRegistryContract,
+        (owner.clone(), MIN_ACTIVATION_DELAY_SECS),
+    );
     let vesting_id = env.register(
         ZarfVestingContract,
         (
@@ -799,7 +813,10 @@ fn claim_guard_blocks_reentrant_verifier_callback() {
     let token_id = token_asset.address();
     let token_admin = token::StellarAssetClient::new(&env, &token_id);
 
-    let registry_id = env.register(JwkRegistryContract, (owner.clone(), 0_u64));
+    let registry_id = env.register(
+        JwkRegistryContract,
+        (owner.clone(), MIN_ACTIVATION_DELAY_SECS),
+    );
     let registry = JwkRegistryContractClient::new(&env, &registry_id);
     let limbs = limbs(&env);
     registry.register_key(&String::from_str(&env, "google-key-1"), &limbs);
@@ -862,7 +879,10 @@ fn failed_verifier_does_not_leave_claimed_guard() {
     let token_id = token_asset.address();
     let token_admin = token::StellarAssetClient::new(&env, &token_id);
 
-    let registry_id = env.register(JwkRegistryContract, (owner.clone(), 0_u64));
+    let registry_id = env.register(
+        JwkRegistryContract,
+        (owner.clone(), MIN_ACTIVATION_DELAY_SECS),
+    );
     let registry = JwkRegistryContractClient::new(&env, &registry_id);
     let limbs = limbs(&env);
     registry.register_key(&String::from_str(&env, "google-key-1"), &limbs);
@@ -918,7 +938,10 @@ fn constructor_rejects_non_canonical_merkle_root() {
     let token_asset = env.register_stellar_asset_contract_v2(owner.clone());
     let token_id = token_asset.address();
     let verifier_id = env.register(MockVerifier, ());
-    let registry_id = env.register(JwkRegistryContract, (owner.clone(), 0_u64));
+    let registry_id = env.register(
+        JwkRegistryContract,
+        (owner.clone(), MIN_ACTIVATION_DELAY_SECS),
+    );
 
     let _ = env.register(
         ZarfVestingContract,
@@ -946,7 +969,10 @@ fn constructor_rejects_zero_audience_hash() {
     let token_asset = env.register_stellar_asset_contract_v2(owner.clone());
     let token_id = token_asset.address();
     let verifier_id = env.register(MockVerifier, ());
-    let registry_id = env.register(JwkRegistryContract, (owner.clone(), 0_u64));
+    let registry_id = env.register(
+        JwkRegistryContract,
+        (owner.clone(), MIN_ACTIVATION_DELAY_SECS),
+    );
 
     let _ = env.register(
         ZarfVestingContract,
@@ -974,7 +1000,10 @@ fn constructor_rejects_non_canonical_audience_hash() {
     let token_asset = env.register_stellar_asset_contract_v2(owner.clone());
     let token_id = token_asset.address();
     let verifier_id = env.register(MockVerifier, ());
-    let registry_id = env.register(JwkRegistryContract, (owner.clone(), 0_u64));
+    let registry_id = env.register(
+        JwkRegistryContract,
+        (owner.clone(), MIN_ACTIVATION_DELAY_SECS),
+    );
 
     let _ = env.register(
         ZarfVestingContract,
@@ -1005,7 +1034,10 @@ fn set_merkle_root_is_one_time_before_funding_only() {
     let token_asset = env.register_stellar_asset_contract_v2(owner.clone());
     let token_id = token_asset.address();
     let verifier_id = env.register(MockVerifier, ());
-    let registry_id = env.register(JwkRegistryContract, (owner.clone(), 0_u64));
+    let registry_id = env.register(
+        JwkRegistryContract,
+        (owner.clone(), MIN_ACTIVATION_DELAY_SECS),
+    );
     let vesting_id = env.register(
         ZarfVestingContract,
         (
@@ -1047,7 +1079,10 @@ fn set_merkle_root_allows_unsolicited_dust_before_root_finalization() {
     let token_id = token_asset.address();
     let token_admin = token::StellarAssetClient::new(&env, &token_id);
     let verifier_id = env.register(MockVerifier, ());
-    let registry_id = env.register(JwkRegistryContract, (owner.clone(), 0_u64));
+    let registry_id = env.register(
+        JwkRegistryContract,
+        (owner.clone(), MIN_ACTIVATION_DELAY_SECS),
+    );
     let vesting_id = env.register(
         ZarfVestingContract,
         (
@@ -1083,7 +1118,10 @@ fn set_merkle_root_rejects_zero_root() {
     let token_asset = env.register_stellar_asset_contract_v2(owner.clone());
     let token_id = token_asset.address();
     let verifier_id = env.register(MockVerifier, ());
-    let registry_id = env.register(JwkRegistryContract, (owner.clone(), 0_u64));
+    let registry_id = env.register(
+        JwkRegistryContract,
+        (owner.clone(), MIN_ACTIVATION_DELAY_SECS),
+    );
     let vesting_id = env.register(
         ZarfVestingContract,
         (
@@ -1117,7 +1155,10 @@ fn deposit_rejects_zero_merkle_root() {
     let token_asset = env.register_stellar_asset_contract_v2(owner.clone());
     let token_id = token_asset.address();
     let verifier_id = env.register(MockVerifier, ());
-    let registry_id = env.register(JwkRegistryContract, (owner.clone(), 0_u64));
+    let registry_id = env.register(
+        JwkRegistryContract,
+        (owner.clone(), MIN_ACTIVATION_DELAY_SECS),
+    );
     let vesting_id = env.register(
         ZarfVestingContract,
         (
@@ -1152,7 +1193,10 @@ fn owner_methods_require_auth_without_mock_all_auths() {
     let token_asset = env.register_stellar_asset_contract_v2(owner.clone());
     let token_id = token_asset.address();
     let verifier_id = env.register(MockVerifier, ());
-    let registry_id = env.register(JwkRegistryContract, (owner.clone(), 0_u64));
+    let registry_id = env.register(
+        JwkRegistryContract,
+        (owner.clone(), MIN_ACTIVATION_DELAY_SECS),
+    );
     let vesting_id = env.register(
         ZarfVestingContract,
         (

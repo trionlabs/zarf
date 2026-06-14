@@ -7,7 +7,7 @@ use soroban_sdk::{
 };
 use zarf_jwk_registry::{
     DataKey, Error as RegistryError, JwkRegistryContract, JwkRegistryContractClient,
-    DAY_IN_LEDGERS, MAX_ACTIVATION_DELAY_SECS, TTL_EXTEND_TO,
+    DAY_IN_LEDGERS, MAX_ACTIVATION_DELAY_SECS, MIN_ACTIVATION_DELAY_SECS, TTL_EXTEND_TO,
 };
 
 const DELAY_SECS: u64 = 6 * 3600;
@@ -21,6 +21,26 @@ fn constructor_rejects_activation_delay_over_max() {
     let env = Env::default();
     let owner = Address::generate(&env);
     env.register(JwkRegistryContract, (owner, MAX_ACTIVATION_DELAY_SECS + 1));
+}
+
+#[test]
+#[should_panic]
+fn constructor_rejects_activation_delay_below_min() {
+    // A delay below the floor would disable the operator timelock, so the
+    // constructor returns Err(InvalidActivationDelay) and traps the deploy.
+    let env = Env::default();
+    let owner = Address::generate(&env);
+    env.register(JwkRegistryContract, (owner, MIN_ACTIVATION_DELAY_SECS - 1));
+}
+
+#[test]
+#[should_panic]
+fn constructor_rejects_zero_activation_delay() {
+    // 0 is the dangerous default (an omitted constructor arg); it must trap so a
+    // timelock-disabled registry can never be deployed.
+    let env = Env::default();
+    let owner = Address::generate(&env);
+    env.register(JwkRegistryContract, (owner, 0_u64));
 }
 
 /// Limbs shaped like a real 2048-bit RSA modulus in 18x120-bit little-endian
@@ -505,6 +525,43 @@ fn propose_then_activate_after_delay() {
     assert!(client.is_kid_registered(&kid));
     assert_eq!(client.get_pending_count(), 0);
     assert!(client.get_pending(&key_hash).is_none());
+}
+
+#[test]
+fn re_propose_preserves_activation_deadline() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let (_owner, _id, client) = setup(&env);
+    let operator = Address::generate(&env);
+    client.set_operator(&operator);
+
+    let kid = String::from_str(&env, "google-key-1");
+    let limbs = limbs(&env);
+
+    let key_hash = client.propose_key(&kid, &limbs);
+    let original_deadline = client.get_pending(&key_hash).unwrap().activate_after;
+
+    // Advance partway through the timelock, then re-propose the SAME key hash.
+    env.ledger().with_mut(|l| l.timestamp += DELAY_SECS / 2);
+    let key_hash_2 = client.propose_key(&kid, &limbs);
+    assert_eq!(key_hash_2, key_hash);
+
+    // The deadline must NOT be pushed forward. Otherwise a rotation worker that
+    // re-proposes the same hash every run (e.g. because it cannot read the
+    // pending entry) would reset the timelock indefinitely and the staged key
+    // would never activate.
+    assert_eq!(
+        client.get_pending(&key_hash).unwrap().activate_after,
+        original_deadline,
+    );
+    assert_eq!(client.get_pending_count(), 1);
+
+    // Activatable at the ORIGINAL deadline despite the re-proposal.
+    env.ledger()
+        .with_mut(|l| l.timestamp = original_deadline + 1);
+    client.activate_key(&key_hash);
+    assert!(client.is_valid_key_hash(&key_hash));
 }
 
 #[test]
