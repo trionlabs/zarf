@@ -58,8 +58,8 @@ importers:
         specifier: ^2.1.11
         version: 2.1.11
       '@noir-lang/acvm_js':
-        specifier: 1.0.0-beta.18
-        version: 1.0.0-beta.18
+        specifier: 1.0.0-beta.22
+        version: 1.0.0-beta.22
       '@noir-lang/noir_js':
         specifier: 1.0.0-beta.18
         version: 1.0.0-beta.18
@@ -338,8 +338,8 @@ importers:
         specifier: ^2.1.11
         version: 2.1.11
       '@noir-lang/acvm_js':
-        specifier: 1.0.0-beta.18
-        version: 1.0.0-beta.18
+        specifier: 1.0.0-beta.22
+        version: 1.0.0-beta.22
       '@noir-lang/noir_js':
         specifier: 1.0.0-beta.18
         version: 1.0.0-beta.18
@@ -1179,6 +1179,9 @@ packages:
   '@noir-lang/acvm_js@1.0.0-beta.18':
     resolution: {integrity: sha512-QQXAaowxSzGKk+Ua7ofc2jcpvUTYSxmDuF5SzwwOFMue9+ccp9QcqOkjyyIZWjtapcenV7YCXrzcBjvEt7N8Nw==}
 
+  '@noir-lang/acvm_js@1.0.0-beta.22':
+    resolution: {integrity: sha512-2xXfSKrnskUNmPiG/Kj6yvWi1E6wJBl/1ZsmzVaHEEyJsUBf15xaSRBZR7X1361whUR2vqyG80ck2huLZPb5bA==}
+
   '@noir-lang/noir_js@1.0.0-beta.18':
     resolution: {integrity: sha512-J0VSw13U9SQpejh1sWNEjuKxjl/uJblOmWJMdlpYqCetth9oBAnKv8+IMk0bZlkrjDp22Yf8vMDkf+Qb8KBZ2Q==}
 
@@ -1212,8 +1215,8 @@ packages:
       rollup:
         optional: true
 
-  '@rollup/wasm-node@4.61.1':
-    resolution: {integrity: sha512-mSYYG8nIVGzK2rU38h9wIUncwwkP4z/qyv70+TbFDYK0u1aZIrKDEYnmNs4CBtNy5Ru4pmjo6Zi7kIhJk4RMYQ==}
+  '@rollup/wasm-node@4.62.0':
+    resolution: {integrity: sha512-TW5f2b5d8Y1DwilaxaXhPkYI1a+i1Am2+eDEf6Tu/QrPxt6kdh/4HT6y460MmzE1im71rudvEs5zLLFr7qBAtQ==}
     engines: {node: '>=18.0.0', npm: '>=8.0.0'}
     hasBin: true
 
@@ -3401,6 +3404,8 @@ snapshots:
 
   '@noir-lang/acvm_js@1.0.0-beta.18': {}
 
+  '@noir-lang/acvm_js@1.0.0-beta.22': {}
+
   '@noir-lang/noir_js@1.0.0-beta.18':
     dependencies:
       '@noir-lang/acvm_js': 1.0.0-beta.18
@@ -3432,7 +3437,7 @@ snapshots:
 
   '@rollup/plugin-virtual@3.0.2': {}
 
-  '@rollup/wasm-node@4.61.1':
+  '@rollup/wasm-node@4.62.0':
     dependencies:
       '@types/estree': 1.0.9
     optionalDependencies:
@@ -4969,7 +4974,7 @@ snapshots:
       fdir: 6.5.0(picomatch@4.0.4)
       picomatch: 4.0.4
       postcss: 8.5.15
-      rollup: '@rollup/wasm-node@4.61.1'
+      rollup: '@rollup/wasm-node@4.62.0'
       tinyglobby: 0.2.16
     optionalDependencies:
       '@types/node': 25.9.1
