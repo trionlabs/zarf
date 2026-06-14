@@ -33,6 +33,13 @@ impl Fr {
     /// Normalize to even digits before `hex::decode` so OddLength exception won't occur.
     pub fn from_str(s: &str) -> Self {
         let bytes = hex::decode(normalize_hex(s)).expect("hex decode failed");
+        // `from_str` is only ever called on compile-time field constants, but
+        // guard the `32 - len` below so a >32-byte constant fails with a clear
+        // message instead of a usize underflow + opaque slice-index panic.
+        assert!(
+            bytes.len() <= 32,
+            "Fr::from_str: hex constant exceeds 32 bytes"
+        );
         let mut padded = [0u8; 32];
         let offset = 32 - bytes.len();
         padded[offset..].copy_from_slice(&bytes);

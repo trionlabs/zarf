@@ -74,9 +74,17 @@ impl UltraHonkVerifier {
 
         // Pairing point object entries are 68-bit limbs recombined by
         // shifting in shplemini; an oversized limb would silently alias into
-        // its neighbour's bit range, so reject it here.
-        for limb in proof.pairing_point_object.iter() {
-            if !limb.fits_bits(68) {
+        // its neighbour's bit range, so reject it here. The four limbs of
+        // each coordinate are packed at shifts 0/68/136/204 into a 256-bit
+        // buffer, so the top limb of every coordinate (index 3 mod 4) only
+        // has room for bits 204..256 = 52 bits — anything above bit 52 there
+        // is silently dropped by `limbs_to_be`, aliasing distinct limb
+        // encodings onto the same reconstructed point. A canonical bb
+        // pairing-point top limb is bits 204..254 (< 2^50), so tightening the
+        // top-limb bound to 52 rejects no valid proof while closing the alias.
+        for (i, limb) in proof.pairing_point_object.iter().enumerate() {
+            let max_bits = if i % 4 == 3 { 52 } else { 68 };
+            if !limb.fits_bits(max_bits) {
                 return Err(VerifyError::InvalidInput("pairing point limb out of range"));
             }
         }
