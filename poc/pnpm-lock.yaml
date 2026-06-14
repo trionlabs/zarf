@@ -18,8 +18,8 @@ importers:
         specifier: 1.0.0-beta.17
         version: 1.0.0-beta.17
       '@noir-lang/noir_js':
-        specifier: 1.0.0-beta.17
-        version: 1.0.0-beta.17
+        specifier: 1.0.0-beta.22
+        version: 1.0.0-beta.22
       '@noir-lang/noirc_abi':
         specifier: 1.0.0-beta.17
         version: 1.0.0-beta.17
@@ -70,14 +70,23 @@ packages:
   '@noir-lang/acvm_js@1.0.0-beta.17':
     resolution: {integrity: sha512-kA1HYgBtDJnOEZUfClXcnHItrIbLnnW/UJYu3fC4g8yIy4fWMJPHVhbjLRRkZSUFQc8zsWCuWcp8M2rOJQzL8g==}
 
-  '@noir-lang/noir_js@1.0.0-beta.17':
-    resolution: {integrity: sha512-erS6NbHYI9l06mwPngr/P+8iSxqOt7PsfOC9TXD1WjkewF/Red5MVKHClKGkMF6AB87kRoaEhLbvLUv9768N7Q==}
+  '@noir-lang/acvm_js@1.0.0-beta.22':
+    resolution: {integrity: sha512-2xXfSKrnskUNmPiG/Kj6yvWi1E6wJBl/1ZsmzVaHEEyJsUBf15xaSRBZR7X1361whUR2vqyG80ck2huLZPb5bA==}
+
+  '@noir-lang/noir_js@1.0.0-beta.22':
+    resolution: {integrity: sha512-Ts+QI2fN2PsrVjx38CszFSR0TyWpip9TgJ6HM17DIK05Jku4TSKtHMIjrE6lRii4Y+JV0rn70v+TrunJmt/X4w==}
 
   '@noir-lang/noirc_abi@1.0.0-beta.17':
     resolution: {integrity: sha512-7P6+29QrFkQZH0i2+F5GkqCq4KdiOGiQXe+OSBIjuxAQPgGOU+l2dGwIzZuOhbUYfjz5DYTKRWsT9Pu7Tr1a9g==}
 
+  '@noir-lang/noirc_abi@1.0.0-beta.22':
+    resolution: {integrity: sha512-vpZtWb946eb4ZxERxY32I4Fv62SAAjhAyJpb2YzWYvnDVTyFVIvr/MSVunrM1osUP35nnRPRGuXVTWy4sBQkIg==}
+
   '@noir-lang/types@1.0.0-beta.17':
     resolution: {integrity: sha512-zCAXeNEx2xksQe0+Sn4m82M5HuM3NvZx3YV2tuSUSbqv63BFFUQ3QbzW3lYtP+OY3CNcaWSRdRIHjUqlcsTGUw==}
+
+  '@noir-lang/types@1.0.0-beta.22':
+    resolution: {integrity: sha512-PXD8cmvMT4wybDe1pUPwv2Uz1FYh9B/hdXrY5eOMf1elNVxomj2tHDDYoKI/zNDrJ1JzTL0xhbAX1vBTMMFvBw==}
 
   '@pinojs/redact@0.4.0':
     resolution: {integrity: sha512-k2ENnmBugE/rzQfEcdWHcCY+/FM3VLzH9cYEsbdsoqrvzAKRhUZeRNhAZvB8OitQJ1TBed3yqWtdjzS6wJKBwg==}
@@ -192,18 +201,26 @@ snapshots:
 
   '@noir-lang/acvm_js@1.0.0-beta.17': {}
 
-  '@noir-lang/noir_js@1.0.0-beta.17':
+  '@noir-lang/acvm_js@1.0.0-beta.22': {}
+
+  '@noir-lang/noir_js@1.0.0-beta.22':
     dependencies:
-      '@noir-lang/acvm_js': 1.0.0-beta.17
-      '@noir-lang/noirc_abi': 1.0.0-beta.17
-      '@noir-lang/types': 1.0.0-beta.17
+      '@noir-lang/acvm_js': 1.0.0-beta.22
+      '@noir-lang/noirc_abi': 1.0.0-beta.22
+      '@noir-lang/types': 1.0.0-beta.22
       pako: 2.1.0
 
   '@noir-lang/noirc_abi@1.0.0-beta.17':
     dependencies:
       '@noir-lang/types': 1.0.0-beta.17
 
+  '@noir-lang/noirc_abi@1.0.0-beta.22':
+    dependencies:
+      '@noir-lang/types': 1.0.0-beta.22
+
   '@noir-lang/types@1.0.0-beta.17': {}
+
+  '@noir-lang/types@1.0.0-beta.22': {}
 
   '@pinojs/redact@0.4.0': {}
 
