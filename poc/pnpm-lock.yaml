@@ -15,8 +15,8 @@ importers:
         specifier: ^1.8.0
         version: 1.8.0
       '@noir-lang/acvm_js':
-        specifier: 1.0.0-beta.17
-        version: 1.0.0-beta.17
+        specifier: 1.0.0-beta.22
+        version: 1.0.0-beta.22
       '@noir-lang/noir_js':
         specifier: 1.0.0-beta.17
         version: 1.0.0-beta.17
@@ -69,6 +69,9 @@ packages:
 
   '@noir-lang/acvm_js@1.0.0-beta.17':
     resolution: {integrity: sha512-kA1HYgBtDJnOEZUfClXcnHItrIbLnnW/UJYu3fC4g8yIy4fWMJPHVhbjLRRkZSUFQc8zsWCuWcp8M2rOJQzL8g==}
+
+  '@noir-lang/acvm_js@1.0.0-beta.22':
+    resolution: {integrity: sha512-2xXfSKrnskUNmPiG/Kj6yvWi1E6wJBl/1ZsmzVaHEEyJsUBf15xaSRBZR7X1361whUR2vqyG80ck2huLZPb5bA==}
 
   '@noir-lang/noir_js@1.0.0-beta.17':
     resolution: {integrity: sha512-erS6NbHYI9l06mwPngr/P+8iSxqOt7PsfOC9TXD1WjkewF/Red5MVKHClKGkMF6AB87kRoaEhLbvLUv9768N7Q==}
@@ -191,6 +194,8 @@ snapshots:
   '@noble/hashes@1.8.0': {}
 
   '@noir-lang/acvm_js@1.0.0-beta.17': {}
+
+  '@noir-lang/acvm_js@1.0.0-beta.22': {}
 
   '@noir-lang/noir_js@1.0.0-beta.17':
     dependencies:
