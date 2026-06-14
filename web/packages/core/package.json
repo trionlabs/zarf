@@ -29,7 +29,7 @@
   },
   "peerDependencies": {
     "@aztec/bb.js": "^2.1.9",
-    "@noir-lang/acvm_js": "1.0.0-beta.18",
+    "@noir-lang/acvm_js": "1.0.0-beta.22",
     "@noir-lang/noir_js": "1.0.0-beta.18",
     "@noir-lang/noirc_abi": "1.0.0-beta.18",
     "noir-jwt": "^0.4.5"
@@ -41,7 +41,7 @@
   },
   "devDependencies": {
     "@aztec/bb.js": "^2.1.11",
-    "@noir-lang/acvm_js": "1.0.0-beta.18",
+    "@noir-lang/acvm_js": "1.0.0-beta.22",
     "@noir-lang/noir_js": "1.0.0-beta.18",
     "@noir-lang/noirc_abi": "1.0.0-beta.18",
     "happy-dom": "^20.9.0",
