@@ -9,6 +9,10 @@
         // Polling every 6 hours gives us plenty of overlap while avoiding noise.
         "crons": ["0 */6 * * *"],
     },
+    // NOTE: the protocol currently runs on TESTNET only; the custom domain
+    // below intentionally fronts the testnet registry. When a mainnet registry
+    // exists, split this config with wrangler environments instead of editing
+    // these vars in place.
     "vars": {
         "GOOGLE_JWKS_URL": "https://www.googleapis.com/oauth2/v3/certs",
         "STELLAR_RPC_URL": "https://soroban-testnet.stellar.org",
@@ -16,7 +20,18 @@
         "JWK_REGISTRY_ADDRESS": "CCTN3XSQM2P7CSXY4UOBGE67DA2Q7IZSRICP3ELKGUQDL5666VDCLXXW",
         "REVOKE_REMOVED_KEYS": "true",
         "TX_POLL_ATTEMPTS": "20",
+        // Revocation safety rails (see executeRevocations in src/index.ts).
+        "MIN_ACTIVE_KEYS": "2",
+        "MAX_REVOCATIONS_PER_RUN": "1",
+        "REVOKE_GRACE_HOURS": "48",
     },
+    // Optional grace-period state: a key is only revoked after it has been
+    // missing from Google's JWKS for REVOKE_GRACE_HOURS. Create the namespace
+    // and uncomment to enable:
+    //   wrangler kv namespace create ROTATION_STATE
+    // "kv_namespaces": [
+    //     { "binding": "ROTATION_STATE", "id": "<namespace-id>" },
+    // ],
     "observability": {
         "enabled": true,
     },

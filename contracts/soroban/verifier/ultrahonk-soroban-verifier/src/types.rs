@@ -1,4 +1,19 @@
 use crate::field::Fr;
+use ark_ff::PrimeField;
+
+/// Parse a 32-byte big-endian Fq coordinate, rejecting non-canonical
+/// (>= q) encodings via round-trip.
+fn fq_from_be_canonical(bytes: &[u8; 32]) -> Option<ark_bn254::Fq> {
+    let mut le = *bytes;
+    le.reverse();
+    let value = ark_bn254::Fq::from_le_bytes_mod_order(&le);
+    let bigint = value.into_bigint();
+    let mut canonical = [0u8; 32];
+    for (i, limb) in bigint.0.iter().rev().enumerate() {
+        canonical[i * 8..(i + 1) * 8].copy_from_slice(&limb.to_be_bytes());
+    }
+    (canonical == *bytes).then_some(value)
+}
 
 pub const CONST_PROOF_SIZE_LOG_N: usize = 28;
 pub const NUMBER_OF_SUBRELATIONS: usize = 28;
@@ -94,6 +109,27 @@ impl G1Point {
             x: [0u8; 32],
             y: [0u8; 32],
         }
+    }
+
+    pub fn is_infinity(&self) -> bool {
+        self.x == [0u8; 32] && self.y == [0u8; 32]
+    }
+
+    /// Structural validity for untrusted (prover/deployer supplied) points:
+    /// the encoding is the all-zero point at infinity, or both coordinates
+    /// are canonical Fq values satisfying y^2 = x^3 + 3. BN254 G1 has
+    /// cofactor 1, so on-curve implies in-subgroup. The Soroban host
+    /// performs the same checks before use, but it *traps* on failure —
+    /// validating here lets callers return a clean error instead.
+    pub fn is_valid(&self) -> bool {
+        if self.is_infinity() {
+            return true;
+        }
+        let (Some(x), Some(y)) = (fq_from_be_canonical(&self.x), fq_from_be_canonical(&self.y))
+        else {
+            return false;
+        };
+        y * y == x * x * x + ark_bn254::Fq::from(3u64)
     }
 
     pub fn generator() -> Self {

@@ -1,8 +1,15 @@
 # .env
 .env
 
+# keys & secrets (defense in depth — none should ever exist in the tree)
+*.pem
+*.key
+*.secret
+.dev.vars*
+# block new witness files anywhere; committed contract test fixtures stay tracked
+**/Prover.toml
+
 # circuits
-circuits/Prover.toml
 circuits/target/
 target/
 node_modules/
@@ -18,10 +25,18 @@ poc/public/circuits/zarf.json
 contracts/soroban/**/target/
 test_snapshots/
 
-# notes, backlogs, docs & ai
-docs/
+# notes, backlogs & ai scratch — but committed documentation is allowed:
+# docs/ (ADRs, runbooks), package READMEs, and the governance files below.
 *.md
 !/README.md
+!**/README.md
+!/docs/**
+!/CLAUDE.md
+!/SECURITY.md
+!/CONTRIBUTING.md
+# internal audit/business doc — kept local, not part of the public codebase.
+# Must come AFTER `!/docs/**` so this re-ignore wins by last-match.
+/docs/proposal_audit.md
 _backlogs/
 reports/
 .DS_Store
@@ -36,6 +51,7 @@ test/*.dev
 .agents/
 .gemini/
 .claude/
+.claude-tmp/
 .kiro/
 .cursor/
 

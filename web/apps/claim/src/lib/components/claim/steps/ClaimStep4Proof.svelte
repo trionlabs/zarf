@@ -5,6 +5,8 @@
     import { CheckCircle, ShieldCheck, AlertTriangle, RefreshCw, Wallet } from 'lucide-svelte';
     import ZenButton from '@zarf/ui/components/ui/ZenButton.svelte';
     import { toMessage } from '@zarf/core/utils/error';
+    import { decodeJwt, recipientNonce } from '@zarf/ui/utils/googleAuth';
+    import { canonicalizeEmailForCommitment } from '@zarf/core/utils/email';
 
     let progress = $state(0);
     let statusMessage = $state('Initializing...');
@@ -75,6 +77,41 @@
             const publicKey = await getPublicKeyForJwt(jwt);
             const recipient = await recipientId(contractAddress, targetWallet);
 
+            // Defensive: the shipped circuit asserts the id_token's `nonce`
+            // equals the canonical 64-hex of this recipient field. If the token
+            // in hand is not the recipient-bound one (e.g. a stale random-nonce
+            // login), fail loud with an actionable message instead of a cryptic
+            // witness-generation abort deep inside the prover.
+            const expectedNonce = recipientNonce(recipient);
+            let tokenNonce: string | null = null;
+            try {
+                tokenNonce = decodeJwt(jwt).payload.nonce ?? null;
+            } catch {
+                tokenNonce = null;
+            }
+            if (tokenNonce !== expectedNonce) {
+                throw new Error(
+                    'Sign-in is not bound to this wallet. Please re-confirm your wallet to re-verify.',
+                );
+            }
+
+            // Defensive: the circuit asserts `expected_email == jwt.email`
+            // byte-exact and hashes that literal value into the leaf, while the
+            // prover commits the lowercase+trim form. Google emits the `email`
+            // claim lowercased for consumer accounts, but a Workspace/hosted-
+            // domain primary can carry uppercase — in which case NO witness can
+            // satisfy both the byte-exact JWT assertion and the (lowercased)
+            // leaf, and the prover would abort opaquely. Surface it as an
+            // actionable error. The real close is a case-folding circuit
+            // revision (next coordinated VK redeploy).
+            if (email && email !== canonicalizeEmailForCommitment(email)) {
+                throw new Error(
+                    'Your Google email is not in a claimable form for this distribution ' +
+                        '(it contains uppercase letters or whitespace). This distribution ' +
+                        'version can only prove all-lowercase addresses.',
+                );
+            }
+
             statusMessage = 'Initializing ZK Worker...';
             progress = 40;
 
@@ -82,7 +119,7 @@
                 jwt,
                 publicKey,
                 {
-                    email: email.toLowerCase().trim(),
+                    email: canonicalizeEmailForCommitment(email),
                     salt,
                     amount,
                     merkleProof,

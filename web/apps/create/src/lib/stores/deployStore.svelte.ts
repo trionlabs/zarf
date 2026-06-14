@@ -36,6 +36,12 @@ export class DeployState {
     metadataCid = $state<string | null>(null);
     schedulePlanAtMs = $state<number | null>(null);
 
+    // Evidence of an interrupted earlier attempt, restored from the WAL.
+    // Display-only: warns the user that on-chain transactions may already
+    // exist for this distribution before they start a fresh attempt.
+    priorApproveTxHash = $state<string | null>(null);
+    priorCreateTxHash = $state<string | null>(null);
+
     // External guards (Derived)
     canContinueToStep2 = $derived(!!this.merkleResult && !!this.metadataCid);
     canContinueToStep3 = $derived(this.isBackupDownloaded && this.isBackupConfirmed);
@@ -54,21 +60,22 @@ export class DeployState {
     }
 
     // Persistence Logic ("Write-Ahead Log")
+    //
+    // v3: the merkle tree is deliberately NOT persisted. It carries every
+    // recipient's email, PIN, and per-epoch secret — exactly the material an
+    // attacker wants — and regeneration mints fresh random PINs, so a tree
+    // restored out of sync with the downloaded backup CSV could deploy a
+    // distribution whose secrets nobody holds. A reload therefore restarts
+    // the deploy flow from Step 1; only on-chain evidence (tx hashes)
+    // survives so an interrupted attempt is never silently forgotten.
     private save() {
         if (typeof window === 'undefined' || !this.distribution?.id) return;
 
         try {
             const state = {
-                version: 2,
-                currentStep: this.currentStep,
-                merkleResult: this.merkleResult, // Critical: contains salts
-                isBackupDownloaded: this.isBackupDownloaded,
-                isBackupConfirmed: this.isBackupConfirmed,
-                // Recovery fields
-                approveTxHash: this.approveTxHash,
-                createTxHash: this.createTxHash,
-                metadataCid: this.metadataCid,
-                schedulePlanAtMs: this.schedulePlanAtMs,
+                version: 3,
+                approveTxHash: this.approveTxHash ?? this.priorApproveTxHash,
+                createTxHash: this.createTxHash ?? this.priorCreateTxHash,
                 timestamp: Date.now(),
             };
             const key = this.storageKey(this.distribution.id);
@@ -88,33 +95,23 @@ export class DeployState {
 
             const state = safeParse(raw);
 
-            // Validate TTL (e.g., 24 hours). If too old, discard (security/stale data)
-            const ONE_DAY = 24 * 60 * 60 * 1000;
-            if (state.timestamp && Date.now() - state.timestamp > ONE_DAY) {
+            // Older versions (v2) persisted the full merkle tree incl.
+            // recipient PII — purge them on sight.
+            if (!state || typeof state !== 'object' || state.version !== 3) {
                 localStorage.removeItem(key);
                 return;
             }
 
-            if (state && typeof state === 'object') {
-                if (state.version !== 2) {
-                    localStorage.removeItem(key);
-                    return;
-                }
-
-                const restoredStep = Number(state.currentStep);
-                this.currentStep =
-                    restoredStep >= 1 && restoredStep <= 4 ? (restoredStep as DeployStep) : 1;
-                this.merkleResult = state.merkleResult;
-                this.isBackupDownloaded = !!state.isBackupDownloaded;
-                this.isBackupConfirmed = !!state.isBackupConfirmed;
-
-                // Restore recovery state
-                this.schedulePlanAtMs =
-                    typeof state.schedulePlanAtMs === 'number' ? state.schedulePlanAtMs : null;
-                this.approveTxHash = state.approveTxHash || null;
-                this.createTxHash = state.createTxHash || null;
-                this.metadataCid = this.schedulePlanAtMs ? state.metadataCid || null : null;
+            // Discard stale evidence after 7 days (a completed deploy removes
+            // the entry anyway via setDeployed).
+            const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000;
+            if (state.timestamp && Date.now() - state.timestamp > SEVEN_DAYS) {
+                localStorage.removeItem(key);
+                return;
             }
+
+            this.priorApproveTxHash = state.approveTxHash || null;
+            this.priorCreateTxHash = state.createTxHash || null;
         } catch (e) {
             warn('Failed to load deploy state', e);
         }
@@ -260,6 +257,8 @@ export class DeployState {
         this.createTxHash = null;
         this.metadataCid = null;
         this.schedulePlanAtMs = null;
+        this.priorApproveTxHash = null;
+        this.priorCreateTxHash = null;
 
         if (typeof window !== 'undefined' && this.distribution?.id) {
             localStorage.removeItem(this.storageKey(this.distribution.id));

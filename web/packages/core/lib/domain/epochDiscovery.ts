@@ -58,8 +58,18 @@ export interface DiscoveryResult {
     epochs: DiscoveredEpoch[];
 }
 
-/** Default safety cap on the discovery loop. Beyond this, we assume something's wrong. */
-export const MAX_EPOCHS = 200;
+/**
+ * Cap on the per-user discovery walk, and the single source of truth for the
+ * create-side epoch limit (a distribution cannot be built with more epochs than
+ * this — see `deployPlanner.assertEpochCountWithinCap` — so later unlocks can
+ * never be silently stranded). Sized to one year of daily unlocks (366).
+ *
+ * The walk is a serial pedersen hash-chain; measured ~4.5 ms/epoch in-browser,
+ * so 366 ≈ 1.7s one-time behind the discovery loading state. The independent
+ * hard ceiling on TOTAL leaves (recipients × epochs) is `TREE_DEPTH = 20`
+ * ⇒ 2^20, enforced in `services/distribution.ts`.
+ */
+export const MAX_EPOCHS = 366;
 
 /**
  * Build the lookup map from the distribution's commitments. We index by

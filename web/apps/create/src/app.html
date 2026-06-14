@@ -7,7 +7,7 @@
         <link rel="manifest" href="%sveltekit.assets%/manifest.json" />
 
         <!-- SES/Svelte 5 Compatibility Patch: runtime defensive shim against extension lockdown -->
-        <script>
+        <script nonce="%sveltekit.nonce%">
             (function () {
                 if (typeof window === 'undefined') return;
                 // Patch Object.getOwnPropertyDescriptor to fool Svelte 5 when SES locks down intrinsics
@@ -55,7 +55,7 @@
         />
 
         <!-- DOM Preservation - MUST RUN FIRST before any extensions can lockdown -->
-        <script>
+        <script nonce="%sveltekit.nonce%">
             (function () {
                 // Capture native DOM getters before browser extensions can freeze them
                 var nodeProto = Node.prototype;
@@ -92,7 +92,7 @@
         </script>
 
         <!-- Theme script to prevent flash during hydration -->
-        <script>
+        <script nonce="%sveltekit.nonce%">
             (function () {
                 try {
                     var stored = localStorage.getItem('zarf_theme');

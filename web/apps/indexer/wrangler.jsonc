@@ -5,7 +5,22 @@
     "main": "src/index.ts",
     "compatibility_date": "2025-01-15",
     "vars": {
+        // localhost origins are a dev convenience; override in production via
+        // the dashboard or `wrangler deploy --var ALLOWED_ORIGINS:...`.
         "ALLOWED_ORIGINS": "http://localhost:5173,http://localhost:5174,http://localhost:5175,https://create.zarf.to,https://claim.zarf.to",
+    },
+    // Per-IP burst control: one uncached GET can fan out to ~200 RPC
+    // simulations, so unauthenticated callers can otherwise amplify traffic
+    // into the configured RPC endpoint at will.
+    "unsafe": {
+        "bindings": [
+            {
+                "type": "ratelimit",
+                "name": "REQUEST_LIMITER",
+                "namespace_id": "2003",
+                "simple": { "limit": 60, "period": 60 },
+            },
+        ],
     },
     "observability": {
         "enabled": true,

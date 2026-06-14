@@ -1,14 +1,18 @@
 use jwt::JWT;
 use std::hash::pedersen_hash;
 
-// Max length of the signed JWT data (header.payload in base64)
-global MAX_DATA_LENGTH: u32 = 1024;
+// Max length of the signed JWT data (header.payload in base64).
+// Sized for a real Google id_token that also carries the 64-char `nonce`
+// claim this circuit binds; 1024 was tight for production tokens.
+global MAX_DATA_LENGTH: u32 = 1536;
 // Max email length (e.g., "alice@example.com")
 global MAX_EMAIL_LENGTH: u32 = 64;
 // Max Google OAuth client ID length.
 global MAX_AUDIENCE_LENGTH: u32 = 128;
 // Max accepted issuer length: "https://accounts.google.com"
 global MAX_ISSUER_LENGTH: u32 = 27;
+// OIDC nonce: lowercase 64-hex encoding of the recipient field.
+global NONCE_LENGTH: u32 = 64;
 // Merkle tree depth (supports 2^20 = 1M users)
 global TREE_DEPTH: u32 = 20;
 
@@ -54,6 +58,34 @@ fn assert_expected_audience(
 
 fn assert_verified_email(email_verified: bool) {
     assert(email_verified == true, "email not verified");
+}
+
+/// Decode one lowercase ASCII hex digit ('0'-'9', 'a'-'f') to its value.
+/// Asserts the byte is a valid lowercase hex digit (rejects uppercase and
+/// any non-hex byte) so the nonce encoding is canonical.
+fn hex_digit_value(c: u8) -> Field {
+    let is_digit = (c >= 48) & (c <= 57); // '0'..'9'
+    let is_lower = (c >= 97) & (c <= 102); // 'a'..'f'
+    assert(is_digit | is_lower, "nonce must be lowercase hex");
+    if is_digit {
+        (c - 48) as Field
+    } else {
+        (c - 97 + 10) as Field
+    }
+}
+
+/// Bind the OIDC `nonce` claim to the recipient: the JWT (signed by Google)
+/// must carry nonce == lowercase 64-hex of `recipient`. A stolen id_token
+/// therefore only proves for the recipient the victim requested, closing the
+/// token-theft claim-redirection path.
+fn assert_nonce_binds_recipient(nonce: BoundedVec<u8, NONCE_LENGTH>, recipient: Field) {
+    assert(nonce.len() == NONCE_LENGTH, "nonce must be 64 hex chars");
+    let storage = nonce.storage();
+    let mut acc: Field = 0;
+    for i in 0..NONCE_LENGTH {
+        acc = acc * 16 + hex_digit_value(storage[i]);
+    }
+    assert(acc == recipient, "nonce does not bind recipient");
 }
 
 /// Compute leaf hash: pedersen(identity_commitment, amount, unlock_time)
@@ -135,6 +167,12 @@ fn main(
     assert_verified_email(email_verified);
     jwt.assert_claim_string("email".as_bytes(), expected_email);
     let jwt_exp: u64 = jwt.get_claim_number("exp".as_bytes());
+
+    // Bind the recipient into the Google-signed token via the OIDC nonce, so
+    // a leaked id_token cannot be replayed to redirect the claim to an
+    // attacker-chosen wallet (the recipient is otherwise a free private input).
+    let nonce: BoundedVec<u8, NONCE_LENGTH> = jwt.get_claim_string("nonce".as_bytes());
+    assert_nonce_binds_recipient(nonce, recipient);
 
     // 3. Compute email hash (intermediate value, NOT exposed publicly)
     let email_hash = hash_bounded_bytes(expected_email);
@@ -221,6 +259,34 @@ fn test_expected_audience_rejects_mismatch() {
 #[test(should_fail_with = "email not verified")]
 fn test_email_verified_rejects_false() {
     assert_verified_email(false);
+}
+
+fn nonce_from_hex(hex: str<64>) -> BoundedVec<u8, NONCE_LENGTH> {
+    let mut nonce: BoundedVec<u8, NONCE_LENGTH> = BoundedVec::new();
+    for byte in hex.as_bytes() {
+        nonce.push(byte);
+    }
+    nonce
+}
+
+#[test]
+fn test_nonce_binds_matching_recipient() {
+    // 0x...000a11ce encoded as 64 lowercase hex chars.
+    let nonce = nonce_from_hex("00000000000000000000000000000000000000000000000000000000000a11ce");
+    assert_nonce_binds_recipient(nonce, 0x0a11ce);
+}
+
+#[test(should_fail_with = "nonce does not bind recipient")]
+fn test_nonce_rejects_wrong_recipient() {
+    let nonce = nonce_from_hex("00000000000000000000000000000000000000000000000000000000000a11ce");
+    assert_nonce_binds_recipient(nonce, 0x0a11cf);
+}
+
+#[test(should_fail_with = "nonce must be lowercase hex")]
+fn test_nonce_rejects_uppercase_hex() {
+    // Same value but uppercase 'E' -- must be rejected as non-canonical.
+    let nonce = nonce_from_hex("00000000000000000000000000000000000000000000000000000000000A11CE");
+    assert_nonce_binds_recipient(nonce, 0x0a11ce);
 }
 
 #[test]

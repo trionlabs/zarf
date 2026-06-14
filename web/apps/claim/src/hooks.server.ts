@@ -33,6 +33,7 @@ function connectSources(): string {
         import.meta.env.VITE_STELLAR_MAINNET_RPC_URL,
         import.meta.env.VITE_STELLAR_MAINNET_HORIZON_URL,
         import.meta.env.VITE_INDEXER_URL,
+        import.meta.env.VITE_TELEMETRY_ENDPOINT,
     ]
         .map(originFrom)
         .filter((origin): origin is string => Boolean(origin));
@@ -46,11 +47,29 @@ const connectSrc = dev
     ? `connect-src ${connectSources()} http://localhost:* ws://localhost:*`
     : `connect-src ${connectSources()}`;
 
+// script-src comes from SvelteKit's kit.csp (svelte.config.js): it carries
+// the per-request nonce for the framework's inline bootstrap and the
+// nonce'd app.html scripts. The fallback only fires if kit.csp is removed —
+// strict, so a misconfiguration fails closed instead of reopening
+// 'unsafe-inline'.
+const FALLBACK_SCRIPT_SRC = "script-src 'self' 'wasm-unsafe-eval' blob:";
+
 export const handle: Handle = async ({ event, resolve }) => {
     const response = await resolve(event);
+    const kitCsp = response.headers.get('Content-Security-Policy');
+    // Extract ONLY the script-src directive from SvelteKit's CSP (it carries the
+    // per-request nonce) rather than assuming the whole header is script-src. If
+    // kit.csp ever emits more than one directive, this avoids leaking its other
+    // directives into our script-src slot and shadowing the ones set below.
+    // Fails closed to the strict fallback when absent.
+    const kitScriptSrc = kitCsp
+        ?.split(';')
+        .map((directive) => directive.trim())
+        .find((directive) => directive === 'script-src' || directive.startsWith('script-src '));
+    const scriptSrc = kitScriptSrc || FALLBACK_SCRIPT_SRC;
     response.headers.set(
         'Content-Security-Policy',
-        `default-src 'self'; script-src 'self' 'wasm-unsafe-eval' 'unsafe-eval' 'unsafe-inline' blob: https://cdn.jsdelivr.net https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; ${connectSrc}; img-src 'self' data: https:; worker-src 'self' blob:; base-uri 'self'; form-action 'self';`,
+        `default-src 'self'; ${scriptSrc}; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; ${connectSrc}; img-src 'self' data: https:; worker-src 'self' blob:; base-uri 'self'; form-action 'self';`,
     );
     // Non-CSP defense-in-depth headers. HSTS is two years + includeSubDomains;
     // safe because all *.zarf.to subdomains are HTTPS via Cloudflare. `preload`

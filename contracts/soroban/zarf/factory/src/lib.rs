@@ -40,6 +40,7 @@ pub enum Error {
     InvalidMerkleRoot = 5,
     InvalidAudience = 6,
     TokenTransferMismatch = 7,
+    MerkleRootAlreadyUsed = 8,
 }
 
 #[contracttype]
@@ -58,6 +59,11 @@ pub enum DataKey {
     /// Same `DeploymentInfo` layout (and same caveat) as `DeploymentAt`.
     OwnerDeploymentAt(Address, u32),
     MetadataCid(Address),
+    /// Marks a merkle root already consumed by a factory-created campaign, so
+    /// two campaigns can never share one. A proof is bound to (merkle_root,
+    /// audience_hash) but NOT to a vesting contract address, so identically
+    /// rooted siblings would each accept the same proof.
+    UsedRoot(BytesN<32>),
 }
 
 #[contractevent(topics = ["vesting_created"])]
@@ -138,8 +144,14 @@ impl ZarfVestingFactoryContract {
     ) -> Result<Address, Error> {
         owner.require_auth();
         Self::validate_metadata(recipient_count, total_amount, false)?;
-        Self::validate_initial_root(&merkle_root, false)?;
+        // Require a canonical, non-zero root even on the unfunded path: a
+        // deferred (zero) root would skip the `UsedRoot` reservation below,
+        // letting a later vesting-side `set_merkle_root` collide with a root
+        // already consumed by another campaign (L-1 replay). The funded path
+        // already required this; both paths now agree.
+        Self::validate_initial_root(&merkle_root, true)?;
         Self::validate_nonzero_field(&audience_hash)?;
+        Self::reserve_merkle_root(&env, &merkle_root)?;
 
         let vesting = Self::deploy_vesting(
             &env,
@@ -182,6 +194,7 @@ impl ZarfVestingFactoryContract {
         Self::validate_metadata(recipient_count, total_amount, true)?;
         Self::validate_initial_root(&merkle_root, true)?;
         Self::validate_nonzero_field(&audience_hash)?;
+        Self::reserve_merkle_root(&env, &merkle_root)?;
 
         let vesting = Self::deploy_vesting(
             &env,
@@ -369,6 +382,36 @@ impl ZarfVestingFactoryContract {
             metadata_cid,
         }
         .publish(env);
+    }
+
+    /// Reserve a merkle root so no two factory campaigns can share one.
+    ///
+    /// A proof is bound to (merkle_root, audience_hash) but NOT to a specific
+    /// vesting contract address, so two funded contracts with the same root
+    /// would each accept the same proof — letting a recipient draw the same
+    /// allocation from both. Reserving the root at creation closes this for
+    /// every factory-created campaign.
+    ///
+    /// Both create paths now reject a zero/deferred root up front
+    /// (`validate_initial_root(.., true)`), so this fails CLOSED on a zero root
+    /// rather than silently skipping the reservation. The only remaining
+    /// cross-contract replay surface is a *standalone* (non-factory) vesting:
+    /// two of those sharing one (merkle_root, audience_hash) sit outside the
+    /// factory's view. Full closure requires binding the proof to the contract
+    /// instance in the circuit (a VK-redeploy event).
+    fn reserve_merkle_root(env: &Env, merkle_root: &BytesN<32>) -> Result<(), Error> {
+        if Self::is_zero_root(merkle_root) {
+            return Err(Error::InvalidMerkleRoot);
+        }
+        let key = DataKey::UsedRoot(merkle_root.clone());
+        if env.storage().persistent().has(&key) {
+            return Err(Error::MerkleRootAlreadyUsed);
+        }
+        env.storage().persistent().set(&key, &true);
+        env.storage()
+            .persistent()
+            .extend_ttl(&key, TTL_THRESHOLD, TTL_EXTEND_TO);
+        Ok(())
     }
 
     fn validate_metadata(

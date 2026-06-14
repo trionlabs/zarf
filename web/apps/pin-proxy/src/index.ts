@@ -21,10 +21,21 @@ import { Keypair, StrKey } from '@stellar/stellar-sdk';
 import { readBodyWithLimit, verifyCidAgainstBytes } from '@zarf/core/utils/cidVerify';
 import { Buffer } from 'buffer';
 
+/** Cloudflare Workers rate-limiting binding (wrangler `unsafe.bindings`). */
+interface RateLimiter {
+    limit(options: { key: string }): Promise<{ success: boolean }>;
+}
+
 interface Env {
     PINATA_JWT: string;
     ALLOWED_ORIGINS: string;
     MAX_BODY_BYTES: string;
+    // Optional: per-IP and per-owner limits on /pin. Pin auth only proves
+    // possession of *some* keypair, so without limits anyone can fill the
+    // Pinata account with throwaway identities. Missing bindings degrade
+    // to no limiting (deploys never break on absent bindings).
+    PIN_IP_LIMITER?: RateLimiter;
+    PIN_OWNER_LIMITER?: RateLimiter;
 }
 
 interface ClaimList {
@@ -84,6 +95,18 @@ async function handlePin(
     env: Env,
     corsHeaders: Record<string, string>,
 ): Promise<Response> {
+    // Per-IP limit first: CF-Connecting-IP is set by Cloudflare and cannot be
+    // spoofed, so this is the real volume/DoS backstop. The per-owner limit is
+    // applied AFTER auth below (keying it on the raw, unverified X-Zarf-Owner
+    // here let an attacker rotate the header per request to evade the cap).
+    if (env.PIN_IP_LIMITER) {
+        const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
+        const { success } = await env.PIN_IP_LIMITER.limit({ key: ip });
+        if (!success) {
+            return json({ error: 'rate_limited' }, 429, corsHeaders);
+        }
+    }
+
     const maxBytes = Number(env.MAX_BODY_BYTES) || 1_048_576;
     const contentLength = Number(request.headers.get('Content-Length') || '0');
     if (contentLength > maxBytes) {
@@ -119,6 +142,18 @@ async function handlePin(
             authError.status,
             corsHeaders,
         );
+    }
+
+    // Per-owner rate limit AFTER auth, keyed on the now-VERIFIED owner.
+    // validatePinAuth proved the caller controls this X-Zarf-Owner key
+    // (signature check), so it can no longer be rotated per request to evade
+    // the per-identity cap that bounds Pinata-account abuse.
+    if (env.PIN_OWNER_LIMITER) {
+        const owner = request.headers.get('X-Zarf-Owner') || 'unknown';
+        const { success } = await env.PIN_OWNER_LIMITER.limit({ key: owner });
+        if (!success) {
+            return json({ error: 'rate_limited' }, 429, corsHeaders);
+        }
     }
 
     if (!env.PINATA_JWT) {
@@ -207,7 +242,7 @@ async function handleIpfsRead(url: URL, corsHeaders: Record<string, string>): Pr
     return json({ error: 'ipfs_gateway_error', detail: errors.join('; ') }, 502, corsHeaders);
 }
 
-function validateClaimList(body: unknown): string | null {
+export function validateClaimList(body: unknown): string | null {
     if (!body || typeof body !== 'object') return 'not_an_object';
     const obj = body as Record<string, unknown>;
 
@@ -283,7 +318,7 @@ async function validatePinAuth(
     return verified ? null : { status: 401, reason: 'invalid_signature' };
 }
 
-function buildPinAuthMessage(input: {
+export function buildPinAuthMessage(input: {
     owner: string;
     merkleRoot: string;
     bodyHash: string;
@@ -298,7 +333,7 @@ function buildPinAuthMessage(input: {
     ].join('\n');
 }
 
-async function sha256Hex(value: string): Promise<string> {
+export async function sha256Hex(value: string): Promise<string> {
     const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
     return Array.from(new Uint8Array(digest))
         .map((byte) => byte.toString(16).padStart(2, '0'))
@@ -313,7 +348,7 @@ async function sep53MessageHash(message: string): Promise<Buffer> {
     return Buffer.from(digest);
 }
 
-function decodeSignature(raw: string): Buffer | null {
+export function decodeSignature(raw: string): Buffer | null {
     if (raw.length > 512) return null;
     const hex = raw.startsWith('0x') ? raw.slice(2) : raw;
     if (/^[0-9a-fA-F]{128}$/.test(hex)) {
@@ -334,7 +369,7 @@ function decodeSignature(raw: string): Buffer | null {
     }
 }
 
-function validateCid(raw: string): string | null {
+export function validateCid(raw: string): string | null {
     let decoded: string;
     try {
         decoded = decodeURIComponent(raw).trim();
@@ -349,13 +384,15 @@ function validateCid(raw: string): string | null {
     return cidV0.test(cid) || cidV1Base32.test(cid) ? cid : null;
 }
 
-function buildCorsHeaders(origin: string | null, env: Env): Record<string, string> {
+export function buildCorsHeaders(origin: string | null, env: Env): Record<string, string> {
     const allowed = (env.ALLOWED_ORIGINS || '')
         .split(',')
         .map((o) => o.trim())
         .filter(Boolean);
 
-    const allowOrigin = origin && allowed.includes(origin) ? origin : allowed[0] || '*';
+    // Unmatched origins get the first allow-listed origin (a deny for the
+    // requesting page) — never '*', even when the var is misconfigured/empty.
+    const allowOrigin = origin && allowed.includes(origin) ? origin : (allowed[0] ?? 'null');
 
     return {
         'Access-Control-Allow-Origin': allowOrigin,

@@ -121,13 +121,8 @@ fn generate_relation_parameters_challenges(
     vk_hash: &[u8; 32],
     public_inputs_size: u64,
 ) -> (RelationParameters, Fr) {
-    let (eta, eta_two, eta_three, previous_challenge) = generate_eta_challenge(
-        env,
-        proof,
-        public_inputs,
-        vk_hash,
-        public_inputs_size,
-    );
+    let (eta, eta_two, eta_three, previous_challenge) =
+        generate_eta_challenge(env, proof, public_inputs, vk_hash, public_inputs_size);
     let (beta, gamma, next_previous_challenge) =
         generate_beta_and_gamma_challenges(env, previous_challenge, proof);
     let rp = RelationParameters {
@@ -249,8 +244,7 @@ pub fn generate_transcript(
     let (alphas, previous_challenge) = generate_alpha_challenges(env, previous_challenge, proof);
 
     // 3) gate challenges
-    let (gate_chals, previous_challenge) =
-        generate_gate_challenges(env, previous_challenge, log_n);
+    let (gate_chals, previous_challenge) = generate_gate_challenges(env, previous_challenge, log_n);
 
     // 4) sumcheck challenges
     let (u_chals, previous_challenge) =

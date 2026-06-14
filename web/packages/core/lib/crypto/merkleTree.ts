@@ -14,7 +14,13 @@ import { browser } from '../utils/ssr';
 
 import type { Barretenberg } from '@aztec/bb.js';
 import type { HexString, MerkleTreeData, MerkleProof, MerkleClaim, Schedule } from '../types';
-import { TREE_DEPTH, MAX_EMAIL_LENGTH, MAX_AUDIENCE_LENGTH } from '../constants';
+import {
+    TREE_DEPTH,
+    MAX_EMAIL_LENGTH,
+    MAX_AUDIENCE_LENGTH,
+    PIN_GENERATED_LENGTH,
+} from '../constants';
+import { unitToPeriodSeconds } from '../utils/vesting';
 
 // ============================================================================
 // Barretenberg Singleton
@@ -131,9 +137,7 @@ export function fieldToHex32(value: bigint): HexString {
 
 export async function hashAudience(audience: string): Promise<HexString> {
     if (!audience) throw new Error('Google OAuth client ID is required');
-    return fieldToHex32(
-        await pedersenHashBytes(stringToBytes(audience, MAX_AUDIENCE_LENGTH)),
-    );
+    return fieldToHex32(await pedersenHashBytes(stringToBytes(audience, MAX_AUDIENCE_LENGTH)));
 }
 
 /**
@@ -251,7 +255,10 @@ export async function computeIdentityCommitment(
 ): Promise<bigint> {
     const bb = await initBarretenberg();
 
-    // 1. Hash the email (as bytes)
+    // 1. Hash the email (as bytes). Canonical commit form is lowercase + trim
+    // ONLY (== canonicalizeEmailForCommitment); it must equal the literal Google
+    // id_token email the circuit asserts byte-exact (circuits/src/main.nr), so
+    // NO dot/plus/googlemail folding here — see finding N3-1.
     const emailBytes = stringToBytes(email.toLowerCase().trim(), MAX_EMAIL_LENGTH);
     const emailHash = await pedersenHashBytes(emailBytes);
 
@@ -300,25 +307,37 @@ export async function computeIdentityCommitment(
  * ```
  */
 /**
- * Generate a random salt within BN254 field modulus.
+ * Generate a random recipient PIN (master salt).
  *
- * @returns Random 8-character alphanumeric code
+ * 12 chars over a 55-symbol alphabet ≈ 69 bits of entropy — enough that a
+ * known target email's identity commitment cannot be confirmed by brute
+ * force over the PIN space. Rejection sampling removes the modulo bias a
+ * plain `byte % alphabet.length` would introduce. Existing shorter PINs
+ * keep working: discovery hashes whatever string the user enters.
+ *
+ * @returns Random 12-character alphanumeric code
  */
 export function generateSecureCode(): string {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789'; // Base58-like (no I, l, O, 0)
-    const length = 8;
-    const randomValues = new Uint8Array(length);
+    const length = PIN_GENERATED_LENGTH;
+    // Largest multiple of the alphabet size below 256; bytes at or above it
+    // are rejected so every symbol stays equally likely (220 = 4 * 55).
+    const rejectionBound = 256 - (256 % chars.length);
 
     // Web Crypto is universally available in every runtime this module
     // reaches (modern browsers, Node 16+, Cloudflare workerd). No fallback
     // path — an environment that wouldn't expose crypto.getRandomValues
     // couldn't reach this line anyway, since bb.js, Buffer polyfill, and
     // the Pedersen WASM all assume the same baseline.
-    crypto.getRandomValues(randomValues);
-
     let result = '';
-    for (let i = 0; i < length; i++) {
-        result += chars[randomValues[i] % chars.length];
+    const buffer = new Uint8Array(length * 2);
+    while (result.length < length) {
+        crypto.getRandomValues(buffer);
+        for (const byte of buffer) {
+            if (byte >= rejectionBound) continue;
+            result += chars[byte % chars.length];
+            if (result.length === length) break;
+        }
     }
     return result;
 }
@@ -606,28 +625,11 @@ export async function processWhitelist(
     // If durationUnit is months, period is roughly 30 days.
     const epochs = schedule.distributionDuration;
 
-    // Calculate Period Length in Seconds
-    let periodSeconds = 0;
-    switch (schedule.durationUnit) {
-        case 'minutes':
-            periodSeconds = 60;
-            break;
-        case 'hours':
-            periodSeconds = 3600;
-            break;
-        case 'weeks':
-            periodSeconds = 7 * 24 * 3600;
-            break;
-        case 'months':
-            periodSeconds = 30 * 24 * 3600;
-            break;
-        case 'quarters':
-            periodSeconds = 90 * 24 * 3600;
-            break;
-        case 'years':
-            periodSeconds = 365 * 24 * 3600;
-            break;
-    }
+    // Period length in seconds. Single source of truth shared with the deploy
+    // planner; exhaustive over DurationUnit, so a newly-added unit throws here
+    // instead of silently leaving periodSeconds = 0 (which would collapse every
+    // epoch onto the cliff timestamp).
+    const periodSeconds = Number(unitToPeriodSeconds(schedule.durationUnit));
 
     const bb = await initBarretenberg(); // Need BB for manual hashing in loop
 
@@ -670,9 +672,16 @@ export async function processWhitelist(
             const identityCommitmentBigInt = await computeIdentityCommitment(email, currentSecret);
             const identityCommitment = '0x' + identityCommitmentBigInt.toString(16);
 
-            // Compute Leaf: H(EpochCommitment, Amount, UnlockTime)
-            // Pass BigInt secret directly
-            const leaf = await computeLeaf(email, currentAmount, currentSecret, unlockTime);
+            // Compute Leaf: H(EpochCommitment, Amount, UnlockTime). Reuse the
+            // identity commitment computed just above instead of recomputing it
+            // inside computeLeaf (which re-runs 3 Pedersen hashes per leaf);
+            // computeLeafFromCommitment hashes only the final leaf. Identical
+            // output: BigInt(identityCommitment) === identityCommitmentBigInt.
+            const leaf = await computeLeafFromCommitment(
+                identityCommitment,
+                currentAmount,
+                unlockTime,
+            );
 
             claims.push({
                 email: email.toLowerCase().trim(),

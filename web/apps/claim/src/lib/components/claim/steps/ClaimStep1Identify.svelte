@@ -5,7 +5,7 @@
     // We import from merkleTree which handles the Barretenberg WASM loading
     import { Lock, Mail, KeyRound, Loader2, ArrowRight, LogOut } from 'lucide-svelte';
     import { redirectToGoogle } from '@zarf/ui/utils/googleAuth';
-    import { PIN_LENGTH } from '@zarf/core/constants';
+    import { PIN_MIN_LENGTH, PIN_MAX_LENGTH } from '@zarf/core/constants';
     import { onMount } from 'svelte';
     import ZenInput from '@zarf/ui/components/ui/ZenInput.svelte';
     import ZenButton from '@zarf/ui/components/ui/ZenButton.svelte';
@@ -39,14 +39,14 @@
     });
 
     // Derived state form submission eligibility
-    let canSubmit = $derived(isAuthenticated && pin.length >= PIN_LENGTH && !isUnlocking);
+    let canSubmit = $derived(isAuthenticated && pin.length >= PIN_MIN_LENGTH && !isUnlocking);
 
     function handleGoogleLogin() {
         redirectToGoogle(contractAddress);
     }
 
     async function handleUnlock() {
-        if (!email || !pin || pin.length < PIN_LENGTH || !jwt) return;
+        if (!email || !pin || pin.length < PIN_MIN_LENGTH || !jwt) return;
 
         isUnlocking = true;
         error = null;
@@ -164,8 +164,8 @@
                 <ZenInput
                     type="password"
                     class="input-lg pl-11 tracking-widest font-mono placeholder:font-sans placeholder:tracking-normal"
-                    placeholder={`Enter ${PIN_LENGTH}-char PIN`}
-                    maxlength={PIN_LENGTH}
+                    placeholder="Enter your PIN"
+                    maxlength={PIN_MAX_LENGTH}
                     bind:value={pin}
                     {error}
                     icon={KeyRound}

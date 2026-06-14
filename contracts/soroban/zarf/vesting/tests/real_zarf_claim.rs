@@ -4,7 +4,9 @@ use soroban_sdk::{
     token, Address, Bytes, BytesN, Env, String, Vec,
 };
 use std::rc::Rc;
-use zarf_jwk_registry::{JwkRegistryContract, JwkRegistryContractClient};
+use zarf_jwk_registry::{
+    JwkRegistryContract, JwkRegistryContractClient, MIN_ACTIVATION_DELAY_SECS,
+};
 use zarf_vesting_soroban::{ZarfVestingContract, ZarfVestingContractClient};
 
 const ALICE: &str = "GC6TCMKAV55B5M3ESAJZLEJXSD2KF6UGWXCIFZDB7VURMTLYW724ITS4";
@@ -116,7 +118,10 @@ fn real_zarf_proof_claims_through_real_ultrahonk_verifier() {
     let token = token::TokenClient::new(&env, &token_id);
 
     let verifier_id = env.register(UltraHonkVerifierContract, (vk, vk_hash));
-    let registry_id = env.register(JwkRegistryContract, (owner.clone(),));
+    let registry_id = env.register(
+        JwkRegistryContract,
+        (owner.clone(), MIN_ACTIVATION_DELAY_SECS),
+    );
     let registry = JwkRegistryContractClient::new(&env, &registry_id);
 
     registry.register_key(

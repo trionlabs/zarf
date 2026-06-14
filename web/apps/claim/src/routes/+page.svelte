@@ -79,29 +79,49 @@
         }
     });
 
-    onMount(() => {
+    onMount(async () => {
         // 1. Handle OAuth Redirect Callback
         const idToken = extractTokenFromUrl();
         if (idToken) {
             try {
                 // Decode to get email for display/validation
                 const { payload } = decodeJwt(idToken);
+                const oauthState = extractStateFromUrl();
 
-                // Gate the token's claims against the configured Google
-                // client — rejects forged or wrong-app JWTs at the trust
-                // boundary before any caller reads payload.email.
-                // A non-null nonce is mandatory at fresh callback: a cold
-                // tab with no stored nonce means the token was injected
-                // (not initiated by this tab), so we refuse before any
-                // claim is trusted.
+                // A single-use pending-flow marker (written before the redirect)
+                // is mandatory on BOTH paths: a cold tab with no stored nonce
+                // means the token was injected, not initiated by this tab, so we
+                // refuse before any claim is trusted. This is what blocks replay
+                // of a captured recipient-bound id_token whose nonce — being a
+                // deterministic function of public (contract, wallet) — an
+                // attacker could otherwise reproduce in a fresh tab.
                 const storedNonce = consumeStoredNonce();
                 if (storedNonce === null) {
                     throw new Error('OAuth callback without pending flow');
                 }
+
+                // The stored marker IS the expected nonce for both paths:
+                // initiateGoogleLogin wrote a single-use random nonce, and
+                // redirectToGoogleWithRecipient wrote the deterministic recipient
+                // nonce (recipientNonce(recipientId(contract, wallet))). We do
+                // NOT recompute the recipient nonce via an indexer round-trip
+                // here — that adds a network failure mode inside this
+                // token-consuming callback (a transient indexer error would
+                // throw, discard the single-use id_token, and strand the user
+                // with no recovery), while the recomputed value is exactly the
+                // stored one. The only thing a recompute could catch is a
+                // sessionStorage-write attacker — i.e. XSS, who has already won
+                // (and who can trivially write the public, deterministic
+                // recipient nonce anyway).
+                const expectedNonce = storedNonce;
+
+                // Gate the token's claims against the configured Google
+                // client — rejects forged or wrong-app JWTs at the trust
+                // boundary before any caller reads payload.email.
                 validateGoogleClaims(payload, {
                     clientId: import.meta.env.VITE_GOOGLE_CLIENT_ID ?? '',
                     mode: 'callback',
-                    expectedNonce: storedNonce,
+                    expectedNonce,
                 });
 
                 // Store in AuthStore (Session only)
@@ -112,7 +132,6 @@
                 });
 
                 // 2. Restore contractAddress from OAuth state
-                const oauthState = extractStateFromUrl();
                 if (oauthState?.address) {
                     // Preserve address in URL for the claim flow
                     // eslint-disable-next-line svelte/prefer-svelte-reactivity -- local URL builder, never read reactively

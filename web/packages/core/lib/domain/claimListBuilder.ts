@@ -33,6 +33,13 @@ export interface ClaimListJson {
         | { amount: string; unlockTime: number; index: number }[]
     >;
     emailHashes: string[];
+    /**
+     * Sum of all claim amounts (base units, decimal string). Lets clients
+     * compare the advertised allocation total against the vesting contract's
+     * actual token balance and warn about under-funded campaigns. Optional:
+     * documents pinned before this field exists omit it.
+     */
+    totalAmount?: string;
 }
 
 export interface BuildClaimListInputs {
@@ -91,6 +98,8 @@ export async function buildClaimList(inputs: BuildClaimListInputs): Promise<Clai
     const totalPeriods =
         inputs.periodSeconds > 0n ? Number(inputs.vestingSeconds / inputs.periodSeconds) : 0;
 
+    const totalAmount = sortedByIndex.reduce((sum, c) => sum + c.amount, 0n).toString();
+
     return {
         merkleRoot: bigintToHex32(inputs.root),
         schedule: {
@@ -103,6 +112,7 @@ export async function buildClaimList(inputs: BuildClaimListInputs): Promise<Clai
         leaves,
         commitments,
         emailHashes,
+        totalAmount,
     };
 }
 
@@ -124,5 +134,7 @@ export function serializeClaimList(doc: ClaimListJson): string {
         leaves: doc.leaves,
         commitments: doc.commitments,
         emailHashes: doc.emailHashes,
+        // Optional field last so docs without it keep their historical bytes.
+        ...(doc.totalAmount !== undefined ? { totalAmount: doc.totalAmount } : {}),
     });
 }

@@ -140,14 +140,20 @@
                 return 'Every Minute';
             case 'hours':
                 return 'Hourly';
+            case 'days':
+                return 'Daily';
             case 'weeks':
                 return 'Weekly';
             case 'months':
                 return 'Monthly';
             case 'quarters':
                 return 'Quarterly';
-            default:
+            case 'years':
                 return 'Yearly';
+            default: {
+                const _exhaustive: never = durationUnit;
+                return String(_exhaustive);
+            }
         }
     });
 

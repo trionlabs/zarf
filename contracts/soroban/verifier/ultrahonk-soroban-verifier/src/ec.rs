@@ -64,7 +64,10 @@ pub fn g1_msm(env: &Env, coms: &[G1Point], scalars: &[Fr]) -> Result<Bn254G1Affi
         vs.push_back(fr_to_bn254(env, s));
     }
     if vp.is_empty() {
-        return Ok(Bn254G1Affine::from_array(env, &G1Point::infinity().to_bytes()));
+        return Ok(Bn254G1Affine::from_array(
+            env,
+            &G1Point::infinity().to_bytes(),
+        ));
     }
     Ok(bn.g1_msm(vp, vs))
 }
