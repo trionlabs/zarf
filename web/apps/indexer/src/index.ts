@@ -329,6 +329,10 @@ async function withEdgeCache(
     const url = new URL(request.url);
     const bypass = url.searchParams.get('refresh') !== null;
     url.searchParams.delete('refresh');
+    // Strip any client-supplied `cachekey` before we (maybe) set our own, so a
+    // request cannot fragment the shared cache namespace (or shadow a route's
+    // intended key) with arbitrary values. Mirrors the `refresh` handling.
+    url.searchParams.delete('cachekey');
     if (cacheKeyExtra) url.searchParams.set('cachekey', cacheKeyExtra);
     const cacheKey = new Request(url.toString(), { method: 'GET' });
     const cache = caches.default;

@@ -510,7 +510,7 @@ async function revokeKey(
     }
 }
 
-interface RevocationContext {
+export interface RevocationContext {
     currentKeys: ConvertedGoogleKey[];
     currentHashes: Set<HexString>;
     registryKeys: RegistryKey[];
@@ -530,8 +530,27 @@ interface RevocationContext {
  * 3. At most MAX_REVOCATIONS_PER_RUN keys are revoked per run.
  * 4. Revocations never drop the active key count below MIN_ACTIVE_KEYS.
  */
-async function executeRevocations(env: Env, ctx: RevocationContext): Promise<RegistryAction[]> {
+export async function executeRevocations(
+    env: Env,
+    ctx: RevocationContext,
+): Promise<RegistryAction[]> {
     const actions: RegistryAction[] = [];
+
+    // Clear grace markers for any registry key present in the current Google
+    // JWKS — unconditionally, BEFORE any early-return. A key that disappeared
+    // (marker set) then reappeared must be un-marked even on a run where nothing
+    // else is stale; otherwise a later disappearance reads the stale marker and
+    // is revoked on its first missing run, bypassing the grace window entirely.
+    // Clearing only ever DELAYS a revocation, so it is safe even on a
+    // short/empty response — only keys actually present are cleared.
+    if (env.ROTATION_STATE && !ctx.dryRun) {
+        for (const key of ctx.registryKeys) {
+            if (ctx.currentHashes.has(key.keyHash)) {
+                await env.ROTATION_STATE.delete(graceMarkerKey(key.keyHash));
+            }
+        }
+    }
+
     const staleKeys = ctx.registryKeys.filter(
         (key) => key.active && !ctx.currentHashes.has(key.keyHash),
     );
@@ -546,15 +565,6 @@ async function executeRevocations(env: Env, ctx: RevocationContext): Promise<Reg
             reason: `revocations_skipped_google_returned_${ctx.currentKeys.length}_keys`,
         });
         return actions;
-    }
-
-    // Clear grace markers for keys that are present again.
-    if (env.ROTATION_STATE && !ctx.dryRun) {
-        for (const key of ctx.registryKeys) {
-            if (ctx.currentHashes.has(key.keyHash)) {
-                await env.ROTATION_STATE.delete(graceMarkerKey(key.keyHash));
-            }
-        }
     }
 
     const maxRevocations = parsePositiveInt(
@@ -642,7 +652,7 @@ async function checkGraceWindow(
     return Date.now() - firstMissingAt >= graceMs ? 'elapsed' : 'pending';
 }
 
-function graceMarkerKey(keyHash: HexString): string {
+export function graceMarkerKey(keyHash: HexString): string {
     return `firstMissingAt:${keyHash}`;
 }
 
@@ -684,6 +694,7 @@ async function loadRegistryKeys(env: Env): Promise<RegistryKey[]> {
 async function loadPendingKeys(env: Env): Promise<PendingEntry[]> {
     const count = Number(scValToNative(await simulateRegistryCall(env, 'get_pending_count')));
     const pendings: PendingEntry[] = [];
+    let unreadable = 0;
 
     for (let index = 0; index < count; index += 1) {
         try {
@@ -703,8 +714,18 @@ async function loadPendingKeys(env: Env): Promise<PendingEntry[]> {
                 activateAfter: Number(native.activate_after ?? 0),
             });
         } catch (error) {
+            unreadable += 1;
             console.error('[jwk-rotation] skipping unreadable pending index', index, error);
         }
+    }
+
+    // Every pending index failing is a systemic RPC/registry outage, not
+    // archival. Abort rather than returning an empty pending view: an empty
+    // view makes the worker re-propose every live key instead of activating the
+    // already-staged ones, and (since a re-propose no longer resets the
+    // timelock) needlessly churns the registry. Mirrors loadRegistryKeys.
+    if (count > 0 && unreadable === count) {
+        throw new Error(`All ${count} pending indices failed to read; aborting rotation`);
     }
 
     return pendings;
