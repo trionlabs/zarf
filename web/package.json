@@ -26,6 +26,7 @@
     "check:budget": "node scripts/check-bundle-budget.mjs",
     "check:any": "node scripts/check-any-allow-list.mjs",
     "check:console": "node scripts/check-console-allow-list.mjs",
+    "check:merkle-vectors": "node scripts/check-merkle-vectors.mjs",
     "lint": "eslint .",
     "format:check": "prettier --check .",
     "format:write": "prettier --write .",

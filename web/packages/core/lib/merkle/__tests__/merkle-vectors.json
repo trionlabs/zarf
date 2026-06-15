@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 1,
+  "format": {
+    "hash": "keccak256",
+    "leaf": "0x00 | index_be32 | claimant.to_xdr | amount_be128",
+    "node": "0x01 | sorted(L,R)",
+    "fieldReduction": "NONE"
+  },
+  "trees": [
+    {
+      "name": "single-g",
+      "recipientCount": 1,
+      "root": "0x15833fb496ba645f89731cf3442d52723af949a66e9f7cebdd4b24086d34d0ca",
+      "cases": [
+        {
+          "index": 0,
+          "address": "GC6TCMKAV55B5M3ESAJZLEJXSD2KF6UGWXCIFZDB7VURMTLYW724ITS4",
+          "amount": "1",
+          "leaf": "0x15833fb496ba645f89731cf3442d52723af949a66e9f7cebdd4b24086d34d0ca",
+          "proof": []
+        }
+      ]
+    },
+    {
+      "name": "odd-three-mixed",
+      "recipientCount": 3,
+      "root": "0xbb5ef0181f1f7eb9a41c483a8c4109f048848c7ed83407e16bd038c39a80e2c8",
+      "cases": [
+        {
+          "index": 0,
+          "address": "GC6TCMKAV55B5M3ESAJZLEJXSD2KF6UGWXCIFZDB7VURMTLYW724ITS4",
+          "amount": "100",
+          "leaf": "0xf847277dae558f8e9eccb30bbf52b835d64ebb7394d63687b265c765cac5dafa",
+          "proof": [
+            "0x54c43abf0681ae5cacf5da2121fd6532ee843058f084d420d126958299e20017",
+            "0x7bcd81ac9fcecae4a5438d3452ab9aa3577339cb45099f10eca87bb10a228e90"
+          ]
+        },
+        {
+          "index": 1,
+          "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+          "amount": "170141183460469231731687303715884105727",
+          "leaf": "0x54c43abf0681ae5cacf5da2121fd6532ee843058f084d420d126958299e20017",
+          "proof": [
+            "0xf847277dae558f8e9eccb30bbf52b835d64ebb7394d63687b265c765cac5dafa",
+            "0x7bcd81ac9fcecae4a5438d3452ab9aa3577339cb45099f10eca87bb10a228e90"
+          ]
+        },
+        {
+          "index": 2,
+          "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4",
+          "amount": "1",
+          "leaf": "0x7bcd81ac9fcecae4a5438d3452ab9aa3577339cb45099f10eca87bb10a228e90",
+          "proof": [
+            "0x2ea3af4b448de0680ad08a819362c44e3cfe91feec1c7729a5dc1ec864b7dd37"
+          ]
+        }
+      ]
+    }
+  ]
+}

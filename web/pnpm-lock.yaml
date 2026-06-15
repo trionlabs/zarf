@@ -315,6 +315,9 @@ importers:
 
   packages/core:
     dependencies:
+      '@noble/hashes':
+        specifier: ^1.8.0
+        version: 1.8.0
       '@stellar/freighter-api':
         specifier: ^6.0.1
         version: 6.0.1
@@ -1203,8 +1206,8 @@ packages:
       rollup:
         optional: true
 
-  '@rollup/wasm-node@4.61.1':
-    resolution: {integrity: sha512-mSYYG8nIVGzK2rU38h9wIUncwwkP4z/qyv70+TbFDYK0u1aZIrKDEYnmNs4CBtNy5Ru4pmjo6Zi7kIhJk4RMYQ==}
+  '@rollup/wasm-node@4.62.0':
+    resolution: {integrity: sha512-TW5f2b5d8Y1DwilaxaXhPkYI1a+i1Am2+eDEf6Tu/QrPxt6kdh/4HT6y460MmzE1im71rudvEs5zLLFr7qBAtQ==}
     engines: {node: '>=18.0.0', npm: '>=8.0.0'}
     hasBin: true
 
@@ -3423,7 +3426,7 @@ snapshots:
 
   '@rollup/plugin-virtual@3.0.2': {}
 
-  '@rollup/wasm-node@4.61.1':
+  '@rollup/wasm-node@4.62.0':
     dependencies:
       '@types/estree': 1.0.9
     optionalDependencies:
@@ -4960,7 +4963,7 @@ snapshots:
       fdir: 6.5.0(picomatch@4.0.4)
       picomatch: 4.0.4
       postcss: 8.5.15
-      rollup: '@rollup/wasm-node@4.61.1'
+      rollup: '@rollup/wasm-node@4.62.0'
       tinyglobby: 0.2.16
     optionalDependencies:
       '@types/node': 25.9.1
