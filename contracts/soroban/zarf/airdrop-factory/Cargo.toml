@@ -1,0 +1,26 @@
+[package]
+name = "zarf-airdrop-factory-soroban"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+soroban-sdk = { version = "26.0.0-rc.1", default-features = false, features = ["alloc"] }
+
+[dev-dependencies]
+soroban-sdk = { version = "26.0.0-rc.1", default-features = false, features = ["alloc", "testutils"] }
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+overflow-checks = true
+
+[lints.clippy]
+# Soroban factory entrypoints legitimately take many config args (create_airdrop
+# forwards the full instance config plus the salt + metadata_cid).
+too_many_arguments = "allow"
