@@ -14,7 +14,7 @@
  * @module services/airdropClaim
  */
 import { fetchIpfsJson, IpfsFetchError } from '@zarf/core/utils/ipfsFetch';
-import { leafHash, verifyProof, type AirdropClaimListJson } from '@zarf/core/merkle';
+import type { AirdropClaimListJson } from '@zarf/core/merkle';
 import { normalizeAirdropAddress } from '@zarf/core/utils/airdropAddress';
 
 const HEX_32 = /^0x[0-9a-f]{64}$/;
@@ -113,11 +113,6 @@ export function findClaim(doc: AirdropClaimListJson, address: string): MatchedCl
     if (index < 0) return null;
     const c = doc.claims[index];
     return { index, address: c.address, amount: c.amount, proof: c.proof };
-}
-
-/** Client-side Merkle proof check — instant eligibility feedback before any tx. */
-export function verifyClaimProof(doc: AirdropClaimListJson, claim: MatchedClaim): boolean {
-    return verifyProof(doc.root, leafHash(claim.index, claim.address, claim.amount), claim.proof);
 }
 
 /** The single-screen claim states (doc 07 §4). */

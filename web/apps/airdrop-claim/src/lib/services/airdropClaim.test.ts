@@ -3,7 +3,6 @@ import { buildClaimList, type AirdropClaimListJson } from '@zarf/core/merkle';
 import {
     validateClaimList,
     findClaim,
-    verifyClaimProof,
     loadClaimList,
     mapLoadError,
     deriveClaimStatus,
@@ -11,6 +10,7 @@ import {
     type ClaimStatusInputs,
     type MatchedClaim,
 } from './airdropClaim';
+import { verifyClaimProof } from './proof';
 
 // Self-contained module stub: provides the mock fetch + a faithful
 // IpfsFetchError (the service only imports these two from ipfsFetch).

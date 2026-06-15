@@ -12,14 +12,17 @@
     import { sanitizeBlockchainError } from '@zarf/ui/utils/errorSanitizer';
     import { formatTokenAmount } from '@zarf/core/utils/amount';
     import { getContractExplorerUrl, getExplorerUrl } from '@zarf/core/contracts/explorer';
-    import type { AirdropConfig } from '@zarf/core/contracts';
-    import type { AirdropClaimListJson } from '@zarf/core/merkle';
     import {
         loadClaimList,
         findClaim,
-        verifyClaimProof,
         deriveClaimStatus,
+        type MatchedClaim,
     } from '$lib/services/airdropClaim';
+
+    // Type-only aliases via import() so neither stellar-sdk-pulling module
+    // (@zarf/core/contracts, @zarf/core/merkle) lands in the eager bundle.
+    type AirdropConfig = import('@zarf/core/contracts').AirdropConfig;
+    type AirdropClaimListJson = import('@zarf/core/merkle').AirdropClaimListJson;
 
     // --- URL context (?a=<airdrop>&cid=<cid>[&addr=<preview>]) ---
     const airdropId = $derived(page.url.searchParams.get('a') ?? '');
@@ -50,9 +53,10 @@
     const walletAddr = $derived(walletStore.isConnected ? walletStore.address : null);
     const appNetwork = $derived(networkStore.activeId === 'mainnet' ? 'mainnet' : 'testnet');
 
-    // Wallet-path match + client proof check (instant, pure).
+    // Wallet-path match (instant, pure — findClaim is stellar-sdk-free).
     const matched = $derived(doc && walletAddr ? findClaim(doc, walletAddr) : null);
-    const proofValid = $derived(doc && matched ? verifyClaimProof(doc, matched) : null);
+    // Set after the lazy proof module loads (it pulls stellar-sdk via merkle).
+    let proofValid = $state<boolean | null>(null);
 
     // Root-binding (trap #1): the list root must equal the on-chain config root.
     const rootMatches = $derived(config && doc ? config.merkleRoot === doc.root : null);
@@ -87,6 +91,7 @@
         chainReadFailed = false;
         txHash = null;
         txError = null;
+        proofValid = null;
         lastReadKey = null;
     }
 
@@ -106,32 +111,35 @@
             .finally(() => (loading = false));
     });
 
-    // --- read on-chain config + claimed bit once the wallet's claim verifies ---
+    // --- lazy-verify the proof + read on-chain config/claimed once matched ---
+    // Both the proof module (merkle) and the contracts module pull stellar-sdk,
+    // so they load HERE — after the wallet connects — not on initial paint.
     let lastReadKey = $state<string | null>(null);
     $effect(() => {
-        if (!doc || !walletAddr || !matched || proofValid !== true) return;
+        if (!doc || !walletAddr || !matched) return;
         const key = `${doc.airdrop}:${matched.index}:${walletAddr}`;
         if (key === lastReadKey) return;
         lastReadKey = key;
+        proofValid = null;
         config = null;
         isClaimedOnChain = null;
         chainReadFailed = false;
-        void readOnChain(doc, walletAddr, matched.index, doc.token);
+        void verifyAndRead(doc, walletAddr, matched);
     });
 
-    async function readOnChain(
-        d: AirdropClaimListJson,
-        source: string,
-        index: number,
-        token: string,
-    ) {
+    async function verifyAndRead(d: AirdropClaimListJson, source: string, m: MatchedClaim) {
         try {
-            const { getAirdropConfig, isAirdropClaimed, readTokenMetaRpc } =
-                await import('@zarf/core/contracts');
+            const [{ verifyClaimProof }, contracts] = await Promise.all([
+                import('$lib/services/proof'),
+                import('@zarf/core/contracts'),
+            ]);
+            const ok = verifyClaimProof(d, m);
+            proofValid = ok;
+            if (!ok) return; // invalid-list — no point reading on-chain
             const [cfg, claimed, meta] = await Promise.all([
-                getAirdropConfig(source, d.airdrop),
-                isAirdropClaimed(source, d.airdrop, index),
-                readTokenMetaRpc(source, token),
+                contracts.getAirdropConfig(source, d.airdrop),
+                contracts.isAirdropClaimed(source, d.airdrop, m.index),
+                contracts.readTokenMetaRpc(source, d.token),
             ]);
             config = cfg;
             isClaimedOnChain = claimed;
