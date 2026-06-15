@@ -562,6 +562,16 @@ export async function getTokenBalanceRpc(
     return BigInt(scValToNative(retval) as bigint | number | string);
 }
 
+/**
+ * Latest ledger sequence via RPC (indexer-free; cf. the indexer-backed
+ * `getLatestLedgerSequence`). Used to compute a token-allowance expiration
+ * ledger in the airdrop deploy flow.
+ */
+export async function getLatestLedgerRpc(): Promise<number> {
+    const latest = await server().getLatestLedger();
+    return latest.sequence;
+}
+
 export async function getLatestLedgerSequence(): Promise<number> {
     const indexed = await fetchIndexerJson<IndexerLatestLedger>(
         indexerNetworkPath('/ledger/latest'),

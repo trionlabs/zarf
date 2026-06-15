@@ -13,9 +13,15 @@
  */
 import { buildClaimList } from '@zarf/core/merkle';
 import type { Row } from '@zarf/core/merkle';
-import { predictAirdropAddress } from '@zarf/core/contracts';
+import {
+    approveTokenAllowance,
+    createAirdrop,
+    getLatestLedgerRpc,
+    predictAirdropAddress,
+} from '@zarf/core/contracts';
+import type { CreateAirdropParams } from '@zarf/core/contracts';
 import { parseTokenAmount } from '@zarf/core/utils/amount';
-import type { StellarAddress, StellarContractId } from '@zarf/core/types';
+import type { StellarAddress, StellarContractId, TransactionHash } from '@zarf/core/types';
 import { normalizeAirdropAddress } from '$lib/csv/airdropCsv';
 import { pinAirdropClaimList } from './pinService';
 import type { RecipientRow } from '$lib/stores/types';
@@ -101,4 +107,55 @@ export async function prepareCampaign(input: PrepareInput): Promise<PrepareResul
         metadataCid: cid,
         total,
     };
+}
+
+const ALLOWANCE_TTL_LEDGERS = 100_000;
+
+/** Let RPC state propagate before the next simulation reads it. */
+function delay(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+export interface ApproveInput {
+    token: StellarContractId;
+    owner: StellarAddress;
+    factoryAddress: StellarContractId;
+    /** Total to fund, in token base units. */
+    total: bigint;
+}
+
+/**
+ * Phase 2: approve the factory to move `total` of the token. The expiration
+ * ledger is read via RPC (indexer-free). Errors propagate raw — the UI layer
+ * sanitizes them for display.
+ */
+export async function approveCampaign(
+    input: ApproveInput,
+    onSubmitted?: (hash: TransactionHash) => void,
+): Promise<TransactionHash> {
+    const latest = await getLatestLedgerRpc();
+    return approveTokenAllowance(
+        {
+            tokenAddress: input.token,
+            owner: input.owner,
+            spender: input.factoryAddress,
+            amount: input.total,
+            expirationLedger: latest + ALLOWANCE_TTL_LEDGERS,
+        },
+        onSubmitted,
+    );
+}
+
+/**
+ * Phase 3: deploy + atomically fund the airdrop instance via the factory. A
+ * short settle delay lets the approval propagate before `create_airdrop`
+ * simulates against it.
+ */
+export async function createCampaign(
+    params: CreateAirdropParams,
+    onSubmitted?: (hash: TransactionHash) => void,
+): Promise<TransactionHash> {
+    await delay(1500);
+    const { hash } = await createAirdrop(params, onSubmitted);
+    return hash;
 }
