@@ -143,9 +143,11 @@ export interface ClaimStatusInputs {
     walletWrongNetwork: boolean;
     /** findClaim(doc, walletAddress); null when no wallet or not found. */
     matched: MatchedClaim | null;
+    /** doc.airdrop === the URL ?a= anchor; null until the doc loads (trap #1). */
+    addressMatches: boolean | null;
     /** Client-side proof check; null until a claim is matched. */
     proofValid: boolean | null;
-    /** doc.root === on-chain config.merkleRoot; null until config is read (trap #1). */
+    /** doc.root === ?a= instance's on-chain config.merkleRoot; null until read (trap #1). */
     rootMatches: boolean | null;
     /** On-chain deadline (unix seconds, 0 = none); null until read. */
     deadline: number | null;
@@ -177,8 +179,10 @@ export function deriveClaimStatus(i: ClaimStatusInputs): ClaimStatus {
 
     if (!i.matched) return 'not-in-list';
 
-    // Integrity: the client proof must verify AND the list root must match the
-    // on-chain airdrop (binds this CID to this `?a=` instance — trap #1).
+    // Integrity (trap #1): the document must name the ?a= airdrop (addressMatches),
+    // the client proof must verify, AND the list root must match the ?a= instance's
+    // on-chain root. All reads/claim run against ?a=, so these bind the CID to it.
+    if (i.addressMatches === false) return 'invalid-list';
     if (i.proofValid === false) return 'invalid-list';
     if (i.rootMatches === false) return 'invalid-list';
 

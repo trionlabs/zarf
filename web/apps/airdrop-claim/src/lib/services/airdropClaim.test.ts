@@ -139,6 +139,7 @@ describe('deriveClaimStatus', () => {
         walletConnected: true,
         walletWrongNetwork: false,
         matched,
+        addressMatches: true,
         proofValid: true,
         rootMatches: true,
         deadline: 0,
@@ -194,7 +195,8 @@ describe('deriveClaimStatus', () => {
         expect(deriveClaimStatus({ ...base(), matched: null })).toBe('not-in-list');
     });
 
-    it('invalid-list when the client proof fails or the root does not bind on-chain', () => {
+    it('invalid-list when the doc lies about the airdrop, the proof fails, or the root mismatches', () => {
+        expect(deriveClaimStatus({ ...base(), addressMatches: false })).toBe('invalid-list');
         expect(deriveClaimStatus({ ...base(), proofValid: false })).toBe('invalid-list');
         expect(deriveClaimStatus({ ...base(), rootMatches: false })).toBe('invalid-list');
     });
