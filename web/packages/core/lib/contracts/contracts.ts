@@ -10,6 +10,7 @@ import {
     TransactionBuilder,
     nativeToScVal,
     rpc,
+    scValToNative,
     xdr,
 } from '@stellar/stellar-sdk';
 import { Buffer } from 'buffer';
@@ -522,6 +523,43 @@ export async function predictAirdropAddress(
         scBytesN32(salt),
     ]);
     return StellarSdkAddress.fromScVal(retval).toString() as StellarContractId;
+}
+
+/**
+ * Read a token's display metadata (name/symbol/decimals) straight from the
+ * contract via RPC simulation. Indexer-free (D13): the standalone airdrop tool
+ * treats the token contract as the source of truth, unlike the indexer-backed
+ * `readTokenContract`. `source` must be an existing account (the connected
+ * wallet) — `simulateRead` anchors the simulation on a real source account.
+ */
+export async function readTokenMetaRpc(
+    source: StellarAddress,
+    token: StellarContractId,
+): Promise<{ name: string; symbol: string; decimals: number }> {
+    const [nameVal, symbolVal, decimalsVal] = await Promise.all([
+        simulateRead(source, token, 'name', []),
+        simulateRead(source, token, 'symbol', []),
+        simulateRead(source, token, 'decimals', []),
+    ]);
+    return {
+        name: String(scValToNative(nameVal)),
+        symbol: String(scValToNative(symbolVal)),
+        decimals: Number(scValToNative(decimalsVal)),
+    };
+}
+
+/**
+ * Read a token balance straight from the contract via RPC simulation
+ * (indexer-free; cf. the indexer-backed `getTokenBalance`). `source` must be an
+ * existing account (the connected wallet) to anchor the simulation.
+ */
+export async function getTokenBalanceRpc(
+    source: StellarAddress,
+    token: StellarContractId,
+    owner: StellarAddress,
+): Promise<bigint> {
+    const retval = await simulateRead(source, token, 'balance', [scAddress(owner)]);
+    return BigInt(scValToNative(retval) as bigint | number | string);
 }
 
 export async function getLatestLedgerSequence(): Promise<number> {

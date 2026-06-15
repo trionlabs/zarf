@@ -1,28 +1,35 @@
 <script lang="ts">
-    // Scaffold placeholder. Proves the M2/M3 core surface integrates (typecheck):
-    // the airdrop factory contract params, the merkle row type, the config getter.
-    // The real wizard (Token -> Recipients -> Review & Deploy) is M4 T4-T8.
-    import type { CreateAirdropParams } from '@zarf/core/contracts';
-    import type { Row } from '@zarf/core/merkle';
-    import { getAirdropFactoryAddress } from '@zarf/core/config/runtime';
+    import { goto } from '$app/navigation';
+    import { ArrowRight, LayoutGrid, Coins } from 'lucide-svelte';
+    import ZenButton from '@zarf/ui/components/ui/ZenButton.svelte';
+    import { campaignStore } from '$lib/stores/campaignStore.svelte';
 
-    let factory: string | undefined;
-    try {
-        factory = getAirdropFactoryAddress();
-    } catch {
-        factory = undefined;
-    }
-
-    // Reference the imported types so they're part of the typecheck graph.
-    const _params: CreateAirdropParams | undefined = undefined;
-    const _row: Row | undefined = undefined;
-    void _params;
-    void _row;
+    const campaignCount = $derived(campaignStore.campaigns.length);
 </script>
 
-<main class="mx-auto max-w-2xl p-8">
-    <h1 class="text-2xl font-semibold">Airdrop — Create</h1>
-    <p class="mt-2 text-sm opacity-70">
-        Scaffold. Airdrop factory: {factory ?? 'not configured'}.
-    </p>
-</main>
+<div
+    class="mx-auto flex min-h-[70vh] max-w-2xl flex-col items-center justify-center gap-8 px-6 text-center"
+>
+    <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-zen-fg/5">
+        <Coins class="h-7 w-7 text-zen-fg" />
+    </div>
+    <div class="space-y-3">
+        <h1 class="text-3xl font-semibold tracking-tight text-zen-fg sm:text-4xl">
+            Distribute tokens to a list of wallets
+        </h1>
+        <p class="mx-auto max-w-md text-sm text-zen-fg-muted">
+            Pick a token, paste your recipients, and publish a claimable distribution. Each wallet
+            claims its share — no per-recipient transactions, no spreadsheets to chase.
+        </p>
+    </div>
+    <div class="flex flex-wrap items-center justify-center gap-3">
+        <ZenButton variant="primary" onclick={() => goto('/wizard/step-0')}>
+            Create a distribution <ArrowRight class="ml-1 h-4 w-4" />
+        </ZenButton>
+        {#if campaignCount > 0}
+            <ZenButton variant="ghost" onclick={() => goto('/distributions')}>
+                <LayoutGrid class="mr-1 h-4 w-4" /> My distributions ({campaignCount})
+            </ZenButton>
+        {/if}
+    </div>
+</div>

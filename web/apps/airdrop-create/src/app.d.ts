@@ -7,6 +7,10 @@
 
 interface ImportMetaEnv {
     readonly [key: string]: string | boolean | undefined;
+    // Declared (though this app never uses Google auth) so the shared
+    // ZarfNavbar → googleAuth.ts import narrows to `string`, not the index
+    // signature's `string | boolean | undefined`.
+    readonly VITE_GOOGLE_CLIENT_ID?: string;
     readonly VITE_INDEXER_URL?: string;
     readonly VITE_PIN_PROXY_URL?: string;
     readonly VITE_TELEMETRY_ENDPOINT?: string;
