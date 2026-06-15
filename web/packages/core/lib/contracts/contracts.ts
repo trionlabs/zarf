@@ -572,6 +572,117 @@ export async function getLatestLedgerRpc(): Promise<number> {
     return latest.sequence;
 }
 
+export interface ClaimAirdropParams {
+    /** Airdrop instance contract address (`C…`). */
+    airdrop: StellarContractId;
+    /** Claim-list array position (= bitmap index; doc 09 §6). */
+    index: number;
+    /** Recipient strkey (`G…`/`C…`); signs and pays its own fee. */
+    claimant: StellarAddress;
+    /** Amount in the token's smallest unit. */
+    amount: bigint;
+    /** Leaf→root sibling hashes, each a 32-byte `0x`-hex string (doc 09 §4). */
+    proof: string[];
+}
+
+/**
+ * Build the instance `claim` ScVal argument list in the exact positional order
+ * the contract expects (02 §3.6): index, claimant, amount, proof. The proof is
+ * a `Vec<BytesN<32>>`. Exported so the ordering + proof-vec encoding can be
+ * unit-tested without a live network.
+ */
+export function buildClaimAirdropArgs(params: ClaimAirdropParams): xdr.ScVal[] {
+    return [
+        scU32(params.index),
+        scAddress(params.claimant),
+        scI128(params.amount),
+        xdr.ScVal.scvVec(params.proof.map((sibling) => scBytesN32(sibling))),
+    ];
+}
+
+/**
+ * Claim an airdrop allocation from a deployed instance. The claimant signs and
+ * pays their own fee (`claimant.require_auth()`); the contract re-verifies the
+ * Merkle proof against its stored root, so a tampered claim-list cannot drain
+ * funds. Structurally mirrors the ZK `submitClaim`.
+ */
+export async function claimAirdrop(
+    params: ClaimAirdropParams,
+    onSubmitted?: (hash: TransactionHash) => void,
+): Promise<TransactionResult & { receipt: rpc.Api.GetTransactionResponse }> {
+    const { hash, receipt } = await invoke(
+        params.claimant,
+        params.airdrop,
+        'claim',
+        buildClaimAirdropArgs(params),
+        onSubmitted,
+    );
+    return { hash, receipt };
+}
+
+/** Decoded airdrop instance config (02 §3.2). */
+export interface AirdropConfig {
+    admin: StellarAddress;
+    token: StellarContractId;
+    merkleRoot: `0x${string}`;
+    total: bigint;
+    /** Claim deadline as a unix timestamp in seconds; 0 = no deadline. */
+    deadline: number;
+    locked: boolean;
+}
+
+/**
+ * Decode the instance `config()` return value (a `Config` struct = `ScMap`)
+ * into a typed object. Walks the map by field name and decodes each field by
+ * its known type — deliberately NOT relying on `scValToNative`'s address
+ * handling. Split out from `getAirdropConfig` so it can be unit-tested against
+ * a synthetic ScVal without a live network.
+ */
+export function decodeAirdropConfig(retval: xdr.ScVal): AirdropConfig {
+    const entries = retval.map();
+    if (!entries) throw new Error('Airdrop config: expected a struct (ScMap)');
+    const byKey = new Map<string, xdr.ScVal>();
+    for (const entry of entries) byKey.set(entry.key().sym().toString(), entry.val());
+    const field = (name: string): xdr.ScVal => {
+        const value = byKey.get(name);
+        if (!value) throw new Error(`Airdrop config: missing field ${name}`);
+        return value;
+    };
+    return {
+        admin: StellarSdkAddress.fromScVal(field('admin')).toString() as StellarAddress,
+        token: StellarSdkAddress.fromScVal(field('token')).toString() as StellarContractId,
+        merkleRoot: `0x${Buffer.from(field('merkle_root').bytes()).toString('hex')}`,
+        total: BigInt(scValToNative(field('total')) as bigint | number | string),
+        deadline: Number(scValToNative(field('deadline')) as bigint | number),
+        locked: field('locked').b(),
+    };
+}
+
+/**
+ * Read a deployed airdrop instance's config (admin/token/root/total/deadline/
+ * locked) via RPC simulation. Indexer-free (D13/D14): the contract is the
+ * source of truth. `source` must be an existing account (the connected wallet).
+ */
+export async function getAirdropConfig(
+    source: StellarAddress,
+    airdrop: StellarContractId,
+): Promise<AirdropConfig> {
+    return decodeAirdropConfig(await simulateRead(source, airdrop, 'config', []));
+}
+
+/**
+ * Whether the leaf at `index` is already claimed, via RPC simulation of the
+ * instance's `is_claimed` view. `source` must be an existing account.
+ */
+export async function isAirdropClaimed(
+    source: StellarAddress,
+    airdrop: StellarContractId,
+    index: number,
+): Promise<boolean> {
+    const retval = await simulateRead(source, airdrop, 'is_claimed', [scU32(index)]);
+    return Boolean(scValToNative(retval));
+}
+
 export async function getLatestLedgerSequence(): Promise<number> {
     const indexed = await fetchIndexerJson<IndexerLatestLedger>(
         indexerNetworkPath('/ledger/latest'),
