@@ -1,0 +1,84 @@
+/**
+ * Airdrop CSV ingestion — a fork of the vesting `csvProcessor` address path.
+ *
+ * LOAD-BEARING DIFFERENCE (07 §3.2): addresses are normalized to **UPPERCASE**,
+ * never lowercase. Stellar strkeys are case-sensitive uppercase base32. The
+ * vesting `csvProcessor.normalizeAddress()` lowercases — harmless for its
+ * email-based leaves — but the airdrop leaf hashes
+ * `Address.fromString(addr).toScVal().toXDR()`, and a lowercased strkey THROWS
+ * inside `Address.fromString`, silently breaking that recipient's claim. The
+ * Rust<->JS differential vectors do NOT catch this (they are generated from
+ * uppercase fixtures), so it is pinned here + in `airdropCsv.test.ts`.
+ */
+import { isValidAddressShape } from '@zarf/core/utils/addressShape';
+
+export interface AirdropRecipient {
+    /** Canonical UPPERCASE Stellar address. */
+    address: string;
+    /** Token amount as a UI number (converted to i128 base units at merkle time). */
+    amount: number;
+}
+
+export interface AirdropParseResult {
+    entries: AirdropRecipient[];
+    errors: string[];
+}
+
+/** Canonicalize a Stellar address for hashing: trim + UPPERCASE (never lowercase). */
+export function normalizeAirdropAddress(address: string): string {
+    return address.trim().toUpperCase();
+}
+
+/** Parse `address,amount` rows. Airdrop is address-only (no email path). */
+export function parseAirdropCSV(content: string): AirdropParseResult {
+    const lines = content.trim().split('\n');
+    const entries: AirdropRecipient[] = [];
+    const errors: string[] = [];
+
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) continue;
+
+        // Skip a header row if present (a strkey never contains these words).
+        const lower = line.toLowerCase();
+        if (i === 0 && (lower.includes('address') || lower.includes('amount'))) {
+            continue;
+        }
+
+        const parts = line.split(',').map((p) => p.trim());
+        if (parts.length < 2) {
+            errors.push(`Line ${i + 1}: expected "address,amount" — "${line}"`);
+            continue;
+        }
+
+        const [rawAddress, amountStr] = parts;
+        const address = normalizeAirdropAddress(rawAddress);
+
+        const amount = Number(amountStr);
+        if (!Number.isFinite(amount) || amount <= 0) {
+            errors.push(`Line ${i + 1}: amount must be a positive number — "${amountStr}"`);
+            continue;
+        }
+        // Shape-only (regex) check; the exact StrKey checksum is enforced when
+        // the merkle leaf calls Address.fromString at tree-build time.
+        if (!isValidAddressShape(address)) {
+            errors.push(`Line ${i + 1}: invalid Stellar address — "${rawAddress}"`);
+            continue;
+        }
+
+        entries.push({ address, amount });
+    }
+
+    // Duplicate detection by address (airdrop is address-keyed, not email).
+    const counts = new Map<string, number>();
+    for (const e of entries) {
+        counts.set(e.address, (counts.get(e.address) ?? 0) + 1);
+    }
+    for (const [address, count] of counts) {
+        if (count > 1) {
+            errors.push(`Duplicate address: ${address} (${count} occurrences)`);
+        }
+    }
+
+    return { entries, errors };
+}

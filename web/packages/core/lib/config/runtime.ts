@@ -21,6 +21,8 @@ export interface StellarRuntimeConfig {
     horizonUrl?: string;
     networkPassphrase?: string;
     factoryAddress?: StellarContractId;
+    /** The standalone airdrop factory (`zarf-airdrop-factory`); separate from the ZK `factoryAddress`. */
+    airdropFactoryAddress?: StellarContractId;
     vestingAddress?: StellarContractId;
     jwkRegistryAddress?: StellarContractId;
     verifierAddress?: StellarContractId;
@@ -74,7 +76,9 @@ function isConfigured(config: StellarRuntimeConfig): boolean {
         config.rpcUrl &&
         config.horizonUrl &&
         config.networkPassphrase &&
-        config.factoryAddress &&
+        // Either factory satisfies "configured": the ZK vesting factory (create/
+        // claim apps) or the standalone airdrop factory (airdrop-create app).
+        (config.factoryAddress || config.airdropFactoryAddress) &&
         config.explorerBaseUrl,
     );
 }
@@ -129,6 +133,11 @@ export function getCoreConfig(): CoreRuntimeConfig {
 
 export function getStellarConfig(): StellarRuntimeConfig {
     return getActiveNetworkConfig();
+}
+
+/** The standalone airdrop factory address for the active network, if configured. */
+export function getAirdropFactoryAddress(): StellarContractId | undefined {
+    return getActiveNetworkConfig().airdropFactoryAddress;
 }
 
 export function getConfiguredStellarNetworks(): StellarNetworkOption[] {

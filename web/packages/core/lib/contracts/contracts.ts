@@ -163,6 +163,14 @@ function scU32(value: number): xdr.ScVal {
     return nativeToScVal(value, { type: 'u32' });
 }
 
+function scU64(value: number | bigint): xdr.ScVal {
+    return nativeToScVal(value, { type: 'u64' });
+}
+
+function scBool(value: boolean): xdr.ScVal {
+    return xdr.ScVal.scvBool(value);
+}
+
 async function invoke(
     sourceAddress: StellarAddress,
     contractId: StellarContractId,
@@ -195,6 +203,34 @@ async function invoke(
     }
 
     return { hash: sent.hash, receipt };
+}
+
+/** Read-only contract call via RPC simulation (no signing or submission). */
+async function simulateRead(
+    sourceAddress: StellarAddress,
+    contractId: StellarContractId,
+    method: string,
+    args: xdr.ScVal[],
+): Promise<xdr.ScVal> {
+    const s = server();
+    const source = await s.getAccount(sourceAddress);
+    const tx = new TransactionBuilder(source, {
+        fee: BASE_FEE,
+        networkPassphrase: cfg().networkPassphrase,
+    })
+        .setTimeout(30)
+        .addOperation(new Contract(contractId).call(method, ...args))
+        .build();
+
+    const sim = await s.simulateTransaction(tx);
+    if (rpc.Api.isSimulationError(sim)) {
+        throw new Error(`Simulation failed: ${sim.error}`);
+    }
+    const retval = sim.result?.retval;
+    if (!retval) {
+        throw new Error('Simulation returned no value');
+    }
+    return retval;
 }
 
 export async function readVestingContract(
@@ -412,6 +448,80 @@ export async function predictVestingAddress(
         ),
     );
     return indexed.address;
+}
+
+// ---- Airdrop factory (standalone; separate from the ZK vesting factory above) ----
+
+export interface CreateAirdropParams {
+    factoryAddress: StellarContractId;
+    owner: StellarAddress;
+    token: StellarContractId;
+    merkleRoot: `0x${string}`;
+    total: bigint;
+    /** Claim deadline as a unix timestamp in seconds; 0 = no deadline. */
+    deadline: number;
+    locked: boolean;
+    recipientCount: number;
+    salt: `0x${string}`;
+    metadataCid: string;
+}
+
+/**
+ * Build the `create_airdrop` ScVal argument list in the exact positional order
+ * the contract expects (02 §2.5): owner, token, merkle_root, total, deadline,
+ * locked, recipient_count, salt, metadata_cid. Exported so the ordering can be
+ * unit-tested without a live network.
+ */
+export function buildCreateAirdropArgs(params: CreateAirdropParams): xdr.ScVal[] {
+    return [
+        scAddress(params.owner),
+        scAddress(params.token),
+        scBytesN32(params.merkleRoot),
+        scI128(params.total),
+        scU64(params.deadline),
+        scBool(params.locked),
+        scU32(params.recipientCount),
+        scBytesN32(params.salt),
+        scString(params.metadataCid),
+    ];
+}
+
+/**
+ * Deploy + atomically fund an airdrop instance via the airdrop factory. The
+ * caller already holds the predicted address (from `predictAirdropAddress`) to
+ * build/pin the claim-list, so this returns only the tx hash; the deployed
+ * address equals the predicted one (proven by the factory's M2 tests).
+ */
+export async function createAirdrop(
+    params: CreateAirdropParams,
+    onSubmitted?: (hash: TransactionHash) => void,
+): Promise<{ hash: TransactionHash }> {
+    const { hash } = await invoke(
+        params.owner,
+        params.factoryAddress,
+        'create_airdrop',
+        buildCreateAirdropArgs(params),
+        onSubmitted,
+    );
+    return { hash };
+}
+
+/**
+ * Predict the deterministic instance address for `(owner, salt)` by simulating
+ * the factory's `predict_airdrop_address` view. The airdrop tool has no indexer
+ * in v1, so this reads the contract directly via RPC simulation — the contract
+ * is the source of truth (cf. the indexer-backed `predictVestingAddress`).
+ */
+export async function predictAirdropAddress(
+    factoryAddress: StellarContractId,
+    owner: StellarAddress,
+    salt: `0x${string}`,
+): Promise<StellarContractId> {
+    const retval = await simulateRead(owner, factoryAddress, 'predict_airdrop_address', [
+        scAddress(owner),
+        scBytesN32(salt),
+    ]);
+    return StellarSdkAddress.fromScVal(retval).toString() as StellarContractId;
 }
 
 export async function getLatestLedgerSequence(): Promise<number> {
