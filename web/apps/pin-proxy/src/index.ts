@@ -35,6 +35,18 @@ interface ClaimList {
     [key: string]: unknown;
 }
 
+/** The standalone airdrop claim-list shape (doc 09 §6): `root`/`claims`, no `schedule`. */
+interface AirdropClaimList {
+    v: number;
+    network: string;
+    airdrop: string;
+    token: string;
+    root: string;
+    format: unknown;
+    claims: Array<{ address: string; amount: string; proof: string[] }>;
+    [key: string]: unknown;
+}
+
 interface PinataResponse {
     IpfsHash: string;
     PinSize: number;
@@ -69,6 +81,10 @@ export default {
 
         if (url.pathname === '/pin' && request.method === 'POST') {
             return handlePin(request, env, corsHeaders);
+        }
+
+        if (url.pathname === '/pin-airdrop' && request.method === 'POST') {
+            return handlePinAirdrop(request, env, corsHeaders);
         }
 
         if (url.pathname.startsWith('/ipfs/') && request.method === 'GET') {
@@ -137,6 +153,85 @@ async function handlePin(
                 pinataContent: body,
                 pinataMetadata: {
                     name: `zarf-claim-list-${body.merkleRoot}`,
+                },
+            }),
+        });
+    } catch {
+        return json({ error: 'pinata_unreachable' }, 502, corsHeaders);
+    }
+
+    if (!pinataRes.ok) {
+        const detail = await safeText(pinataRes);
+        return json({ error: 'pinata_error', status: pinataRes.status, detail }, 502, corsHeaders);
+    }
+
+    const data = (await pinataRes.json()) as PinataResponse;
+    return json({ cid: data.IpfsHash, size: data.PinSize }, 200, corsHeaders);
+}
+
+/**
+ * Pin an airdrop claim-list (doc 09 §6 shape). Additive sibling of `handlePin`;
+ * the vesting `/pin` route is untouched (D4). Auth is the shared
+ * `validatePinAuth`, bound to the claim-list `root`.
+ */
+async function handlePinAirdrop(
+    request: Request,
+    env: Env,
+    corsHeaders: Record<string, string>,
+): Promise<Response> {
+    const maxBytes = Number(env.MAX_BODY_BYTES) || 1_048_576;
+    const contentLength = Number(request.headers.get('Content-Length') || '0');
+    if (contentLength > maxBytes) {
+        return json({ error: 'payload_too_large', maxBytes }, 413, corsHeaders);
+    }
+
+    const contentType = request.headers.get('Content-Type') || '';
+    if (!contentType.includes('application/json')) {
+        return json({ error: 'unsupported_media_type' }, 415, corsHeaders);
+    }
+
+    let raw: string;
+    let body: AirdropClaimList;
+    try {
+        raw = await request.text();
+        if (new TextEncoder().encode(raw).length > maxBytes) {
+            return json({ error: 'payload_too_large', maxBytes }, 413, corsHeaders);
+        }
+        body = JSON.parse(raw);
+    } catch {
+        return json({ error: 'invalid_json' }, 400, corsHeaders);
+    }
+
+    const validationError = validateAirdropClaimList(body);
+    if (validationError) {
+        return json({ error: 'invalid_claim_list', reason: validationError }, 400, corsHeaders);
+    }
+
+    const authError = await validatePinAuth(request, raw, body.root);
+    if (authError) {
+        return json(
+            { error: 'unauthorized_pin', reason: authError.reason },
+            authError.status,
+            corsHeaders,
+        );
+    }
+
+    if (!env.PINATA_JWT) {
+        return json({ error: 'pinata_not_configured' }, 500, corsHeaders);
+    }
+
+    let pinataRes: Response;
+    try {
+        pinataRes = await fetch(PINATA_PIN_URL, {
+            method: 'POST',
+            headers: {
+                Authorization: `Bearer ${env.PINATA_JWT}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                pinataContent: body,
+                pinataMetadata: {
+                    name: `zarf-airdrop-list-${body.root}`,
                 },
             }),
         });
@@ -222,6 +317,41 @@ function validateClaimList(body: unknown): string | null {
     }
     if (!obj.schedule || typeof obj.schedule !== 'object') {
         return 'missing_schedule';
+    }
+    return null;
+}
+
+/**
+ * Validate the airdrop claim-list shape (doc 09 §6): `v`/`network`/`airdrop`/
+ * `token`/`root`/`format`/`claims`, with a 0x-hex root and per-claim proofs.
+ * No `schedule` (that is the vesting shape). Additive — `validateClaimList`
+ * stays untouched.
+ */
+function validateAirdropClaimList(body: unknown): string | null {
+    if (!body || typeof body !== 'object') return 'not_an_object';
+    const obj = body as Record<string, unknown>;
+
+    if (obj.v !== 1) return 'invalid_version';
+    if (obj.network !== 'testnet' && obj.network !== 'mainnet') return 'invalid_network';
+    if (typeof obj.airdrop !== 'string' || obj.airdrop.length === 0) return 'missing_airdrop';
+    if (typeof obj.token !== 'string' || obj.token.length === 0) return 'missing_token';
+    if (typeof obj.root !== 'string' || !HEX_32.test(obj.root)) return 'missing_or_invalid_root';
+    if (!obj.format || typeof obj.format !== 'object') return 'missing_format';
+    if (!Array.isArray(obj.claims) || obj.claims.length === 0) return 'missing_or_empty_claims';
+
+    for (const entry of obj.claims) {
+        if (!entry || typeof entry !== 'object') return 'invalid_claim';
+        const claim = entry as Record<string, unknown>;
+        if (typeof claim.address !== 'string' || claim.address.length === 0) {
+            return 'invalid_claim_address';
+        }
+        if (typeof claim.amount !== 'string' || !/^\d+$/.test(claim.amount)) {
+            return 'invalid_claim_amount';
+        }
+        if (!Array.isArray(claim.proof)) return 'invalid_claim_proof';
+        if (claim.proof.some((node) => typeof node !== 'string' || !HEX_32.test(node))) {
+            return 'invalid_proof_node';
+        }
     }
     return null;
 }
