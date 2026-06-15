@@ -13,6 +13,8 @@ interface ImportMetaEnv {
     readonly VITE_GOOGLE_CLIENT_ID?: string;
     readonly VITE_INDEXER_URL?: string;
     readonly VITE_PIN_PROXY_URL?: string;
+    /** Base URL of the airdrop-claim app (M5); the done page builds share links from it. */
+    readonly VITE_AIRDROP_CLAIM_URL?: string;
     readonly VITE_TELEMETRY_ENDPOINT?: string;
     readonly VITE_STELLAR_DEFAULT_NETWORK?: string;
     readonly VITE_STELLAR_TESTNET_RPC_URL?: string;

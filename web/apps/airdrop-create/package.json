@@ -18,6 +18,7 @@
     "@sveltejs/kit": "^2.61.1",
     "@sveltejs/vite-plugin-svelte": "^6.2.4",
     "@tailwindcss/vite": "^4.3.0",
+    "@types/qrcode": "^1.5.6",
     "buffer": "^6.0.3",
     "svelte": "^5.55.9",
     "svelte-check": "^4.4.8",
@@ -30,6 +31,7 @@
   "dependencies": {
     "@zarf/core": "workspace:*",
     "@zarf/ui": "workspace:*",
-    "lucide-svelte": "^0.563.0"
+    "lucide-svelte": "^0.563.0",
+    "qrcode": "^1.5.4"
   }
 }
