@@ -29,6 +29,10 @@ const BUDGETS = {
     landing: { initialGz: 79 * KB, totalGz: 100 * KB },
     claim: { initialGz: 123 * KB, totalGz: 13250 * KB },
     create: { initialGz: 456 * KB, totalGz: 6350 * KB },
+    // airdrop-create: first client landing of the keccak Merkle bundle (D7).
+    // Lean — stellar-sdk stays off every route's eager closure (lazy-imported in
+    // the deploy step). Floor 2026-06-15: initial 79.7 KB, total 393.4 KB.
+    'airdrop-create': { initialGz: 84 * KB, totalGz: 450 * KB },
 };
 
 const WEB_ROOT = resolve(import.meta.dirname, '..');
