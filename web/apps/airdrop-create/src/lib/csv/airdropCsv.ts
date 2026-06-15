@@ -8,9 +8,11 @@
  * `Address.fromString(addr).toScVal().toXDR()`, and a lowercased strkey THROWS
  * inside `Address.fromString`, silently breaking that recipient's claim. The
  * Rust<->JS differential vectors do NOT catch this (they are generated from
- * uppercase fixtures), so it is pinned here + in `airdropCsv.test.ts`.
+ * uppercase fixtures), so the shared normalizer is pinned in `@zarf/core`
+ * (`utils/airdropAddress`) and consumed identically by the airdrop-claim app.
  */
 import { isValidAddressShape } from '@zarf/core/utils/addressShape';
+import { normalizeAirdropAddress } from '@zarf/core/utils/airdropAddress';
 
 export interface AirdropRecipient {
     /** Canonical UPPERCASE Stellar address. */
@@ -24,10 +26,9 @@ export interface AirdropParseResult {
     errors: string[];
 }
 
-/** Canonicalize a Stellar address for hashing: trim + UPPERCASE (never lowercase). */
-export function normalizeAirdropAddress(address: string): string {
-    return address.trim().toUpperCase();
-}
+// Re-exported so this producer and the airdrop-claim consumer share ONE
+// normalization (the load-bearing UPPERCASE rule lives in @zarf/core).
+export { normalizeAirdropAddress };
 
 /** Parse `address,amount` rows. Airdrop is address-only (no email path). */
 export function parseAirdropCSV(content: string): AirdropParseResult {
