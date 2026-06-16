@@ -24,7 +24,13 @@
     // Type-only aliases via import() so neither stellar-sdk-pulling module
     // (@zarf/core/contracts, @zarf/core/merkle) lands in the eager bundle.
     type AirdropConfig = import('@zarf/core/contracts').AirdropConfig;
+    type AirdropProgress = import('@zarf/core/contracts').AirdropProgress;
     type AirdropClaimListJson = import('@zarf/core/merkle').AirdropClaimListJson;
+
+    // Above this recipient count, the live counter reads once (+ after the user's
+    // own claim) instead of polling — an RPC-direct sweep is ceil(N/80) reads, so
+    // unbounded polling would hammer the RPC. The indexer (M7) makes it cheap.
+    const PROGRESS_REFRESH_MAX_RECIPIENTS = 1000;
 
     // --- URL context (?a=<airdrop>&cid=<cid>[&addr=<preview>]) ---
     // ?a= is the TRUST ANCHOR: the airdrop instance the link author named. ALL
@@ -50,6 +56,9 @@
     let tokenSymbol = $state<string | null>(null);
     let proofValid = $state<boolean | null>(null);
     let chainReadFailed = $state(false);
+
+    // --- live transparency counter (read from verifiedAirdrop, the ?a= anchor) ---
+    let progress = $state<AirdropProgress | null>(null);
 
     // --- claim tx (gated to the wallet that submitted it) ---
     let submitting = $state(false);
@@ -120,6 +129,8 @@
         loadFailed = false;
         loadErrorMsg = null;
         clearOnChainState();
+        progress = null;
+        lastProgressKey = null;
         txHash = null;
         txError = null;
         claimWallet = null;
@@ -194,6 +205,45 @@
             if (key !== lastReadKey) return;
             warn('[airdrop-claim] on-chain read failed', e);
             chainReadFailed = true;
+        }
+    }
+
+    // --- live "M claimed" counter (independent of the user's own eligibility) ---
+    // Reads bitmap progress from verifiedAirdrop (?a=, the trust anchor), keyed so
+    // it re-reads after the user's claim lands (txHash) and, for modestly-sized
+    // airdrops, on the 30s clock. Needs a source account, so it runs post-connect
+    // (matching the config/total read). Non-fatal: failures leave the last value.
+    let lastProgressKey = $state<string | null>(null);
+    $effect(() => {
+        if (!doc || !walletAddr) {
+            progress = null;
+            lastProgressKey = null;
+            return;
+        }
+        // Reading `nowSec` only for small airdrops makes it a reactive dependency
+        // there (→ 30s refresh) and not otherwise (→ read once + on claim).
+        const refreshable = doc.claims.length <= PROGRESS_REFRESH_MAX_RECIPIENTS;
+        const clockPart = refreshable ? nowSec : 'once';
+        const key = `${verifiedAirdrop}:${walletAddr}:${clockPart}:${txHash ?? ''}`;
+        if (key === lastProgressKey) return;
+        lastProgressKey = key;
+        void readProgress(doc, walletAddr, key);
+    });
+
+    async function readProgress(d: AirdropClaimListJson, source: string, key: string) {
+        try {
+            const contracts = await import('@zarf/core/contracts');
+            if (key !== lastProgressKey) return; // superseded
+            const p = await contracts.getAirdropProgress(verifiedAirdrop, {
+                source,
+                recipientCount: d.claims.length,
+                claimList: d, // enables claimedAmount + precise under-funded
+            });
+            if (key !== lastProgressKey) return;
+            progress = p;
+        } catch (e) {
+            if (key !== lastProgressKey) return;
+            warn('[airdrop-claim] progress read failed', e);
         }
     }
 
@@ -276,7 +326,10 @@
                     <h1 class="text-lg font-semibold tracking-tight text-zen-fg">Airdrop</h1>
                     {#if doc}
                         <p class="mt-0.5 text-xs text-zen-fg-muted">
-                            {doc.claims.length} recipients{#if config}
+                            {doc.claims.length} recipients{#if progress}
+                                · <span class="tabular-nums text-zen-fg"
+                                    >{progress.claimedCount}</span
+                                > claimed{/if}{#if config}
                                 · {fmt(config.total.toString())}
                                 {symbol} total{/if}
                         </p>
@@ -288,6 +341,26 @@
                     </ZenBadge>
                 {/if}
             </header>
+
+            {#if progress}
+                <!-- Live claim progress (bitmap-derived from the ?a= instance) -->
+                <div class="space-y-1.5">
+                    <div class="h-1.5 overflow-hidden rounded-full bg-zen-fg/10">
+                        <div
+                            class="h-full rounded-full bg-zen-success transition-[width] duration-500"
+                            style="width: {Math.min(
+                                100,
+                                Math.round(progress.claimedFraction * 100),
+                            )}%"
+                        ></div>
+                    </div>
+                    {#if progress.underFunded}
+                        <p class="text-xs text-zen-warning">
+                            ⚠ This airdrop may not hold enough to cover all unclaimed allocations.
+                        </p>
+                    {/if}
+                </div>
+            {/if}
 
             <!-- State machine body (live region: status changes are announced) -->
             <div aria-live="polite">
