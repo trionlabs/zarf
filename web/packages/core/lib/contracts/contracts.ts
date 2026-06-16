@@ -713,9 +713,11 @@ export interface AirdropProgress {
     /** Live `token.balance(instance)`. */
     contractBalance: bigint;
     /** The instance no longer holds enough to cover what it still owes (04 §S4).
-     *  Precise when `claimedAmount` is known; otherwise flags only the
-     *  unambiguous "nothing claimed yet but balance already short". */
-    underFunded: boolean;
+     *  Precise when `claimedAmount` is known. Without it (no claim-list), this is
+     *  only sound while nothing has been claimed yet; once a claim lands and the
+     *  per-leaf amounts are unknown, funding can't be judged → `null` ("unknown")
+     *  rather than a false "funded". */
+    underFunded: boolean | null;
     /** On-chain claim deadline (unix seconds; 0 = none) — a UI hint only. */
     deadline: number;
     /** On-chain lock flag. */
@@ -778,10 +780,15 @@ export function summarizeAirdropProgress(input: {
 }): AirdropProgress {
     const claimedFraction =
         input.recipientCount > 0 ? input.claimedCount / input.recipientCount : 0;
+    // Precise when amounts are known; sound (no false "funded") otherwise: a short
+    // balance with nothing claimed is definitely under-funded, but after a claim
+    // lands without per-leaf amounts the shortfall is unknowable → null.
     const underFunded =
         input.claimedAmount !== null
             ? input.contractBalance + input.claimedAmount < input.totalAmount
-            : input.claimedCount === 0 && input.contractBalance < input.totalAmount;
+            : input.claimedCount === 0
+              ? input.contractBalance < input.totalAmount
+              : null;
     return {
         claimedCount: input.claimedCount,
         recipientCount: input.recipientCount,
@@ -868,10 +875,11 @@ export async function getAirdropProgress(
             source: 'indexer',
         });
     } catch (err) {
-        // Fail open to RPC-direct. "Not configured" is the expected standalone case
-        // (D13) — only surface genuinely unexpected indexer failures.
+        // Fail open to RPC-direct. A missing indexer URL (the expected standalone
+        // case, D13) is silent; an actual request failure (4xx/5xx/network) is a
+        // genuinely unexpected error worth surfacing — and is NOT "unavailable".
         if (!(err instanceof IndexerUnavailableError)) {
-            warn('airdrop progress: indexer unavailable, using RPC-direct', err);
+            warn('airdrop progress: indexer request failed, using RPC-direct', err);
         }
     }
 

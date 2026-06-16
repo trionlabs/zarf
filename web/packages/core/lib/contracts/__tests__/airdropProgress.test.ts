@@ -122,8 +122,8 @@ describe('summarizeAirdropProgress', () => {
         );
     });
 
-    it('flags under-funded coarsely (no amounts) only when nothing has been claimed yet', () => {
-        // indexer path: claimedAmount unknown, balance short, zero claimed → flag
+    it('without amounts: flags a short balance only with zero claims, else reports unknown', () => {
+        // indexer path: claimedAmount unknown, balance short, zero claimed → definitely under-funded
         expect(
             summarizeAirdropProgress({
                 ...base,
@@ -133,7 +133,8 @@ describe('summarizeAirdropProgress', () => {
                 source: 'indexer',
             }).underFunded,
         ).toBe(true);
-        // ...but a low balance after a claim is expected, so do NOT false-flag
+        // ...but once a claim lands, a low balance is expected AND the shortfall is
+        // unknowable without per-leaf amounts → null (never a false "funded").
         expect(
             summarizeAirdropProgress({
                 ...base,
@@ -142,7 +143,7 @@ describe('summarizeAirdropProgress', () => {
                 contractBalance: 9_000n,
                 source: 'indexer',
             }).underFunded,
-        ).toBe(false);
+        ).toBeNull();
     });
 
     it('passes through the on-chain facts and provenance', () => {

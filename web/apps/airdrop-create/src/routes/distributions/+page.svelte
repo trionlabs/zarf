@@ -206,6 +206,11 @@
                                             )}%"
                                         ></div>
                                     </div>
+                                    {#if p.underFunded === true}
+                                        <p class="mt-1 text-xs text-zen-warning">
+                                            ⚠ Under-funded — top up before recipients claim.
+                                        </p>
+                                    {/if}
                                 {/if}
                             </div>
                             <div class="flex flex-col items-end gap-1 text-xs">
