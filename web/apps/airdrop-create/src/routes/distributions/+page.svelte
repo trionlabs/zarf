@@ -4,13 +4,55 @@
     import ZenButton from '@zarf/ui/components/ui/ZenButton.svelte';
     import ZenCard from '@zarf/ui/components/ui/ZenCard.svelte';
     import ZenBadge from '@zarf/ui/components/ui/ZenBadge.svelte';
-    import { getContractExplorerUrl } from '@zarf/core/contracts/explorer';
+    import { walletStore } from '@zarf/ui/stores/walletStore.svelte';
+    import { sanitizeBlockchainError, type ErrorRule } from '@zarf/ui/utils/errorSanitizer';
+    import { getContractExplorerUrl, getExplorerUrl } from '@zarf/core/contracts/explorer';
     import { formatTokenAmount } from '@zarf/core/utils/amount';
+    import { warn } from '@zarf/core/utils/log';
     import { campaignStore } from '$lib/stores/campaignStore.svelte';
     import type { Campaign } from '$lib/stores/types';
+    import type { StellarAddress } from '@zarf/core';
+
+    // Type-only alias via import() so @zarf/core/contracts (stellar-sdk) stays
+    // out of this route's eager bundle — the helpers are dynamic-imported below.
+    type AirdropProgress = import('@zarf/core/contracts').AirdropProgress;
 
     const campaigns = $derived(campaignStore.campaigns);
     const nowSec = Math.floor(Date.now() / 1000);
+    const walletAddr = $derived(
+        walletStore.isConnected ? (walletStore.address as StellarAddress) : null,
+    );
+
+    // --- live claimed counters (read once per wallet + launched-set, then after a
+    // reclaim). No polling: an RPC-direct sweep is ceil(N/80) reads per campaign,
+    // so the dashboard reads sequentially on connect rather than on a timer (the
+    // indexer makes this cheap in M7). ---
+    let progressById = $state<Record<string, AirdropProgress>>({});
+    let lastProgressKey = $state<string | null>(null);
+    $effect(() => {
+        const launched = campaigns.filter((c) => c.state === 'launched');
+        if (!walletAddr || launched.length === 0) return;
+        const key = `${walletAddr}:${launched.map((c) => c.id).join(',')}`;
+        if (key === lastProgressKey) return;
+        lastProgressKey = key;
+        void loadProgress(launched, walletAddr);
+    });
+
+    async function readProgress(c: Campaign, source: StellarAddress) {
+        try {
+            const { getAirdropProgress } = await import('@zarf/core/contracts');
+            const p = await getAirdropProgress(c.airdropAddress, {
+                source,
+                recipientCount: c.recipientCount,
+            });
+            progressById = { ...progressById, [c.id]: p };
+        } catch (e) {
+            warn('[airdrop-create] progress read failed', c.airdropAddress, e);
+        }
+    }
+    async function loadProgress(list: Campaign[], source: StellarAddress) {
+        for (const c of list) await readProgress(c, source);
+    }
 
     function deadlineLabel(c: Campaign): string {
         if (c.deadline === 0) return 'No deadline';
@@ -39,7 +81,24 @@
     }
 
     let copiedId = $state<string | null>(null);
-    let reclaimNoteId = $state<string | null>(null);
+
+    // --- reclaim (withdraw_unclaimed) tx state ---
+    let reclaimingId = $state<string | null>(null);
+    let reclaimError = $state<{ id: string; message: string } | null>(null);
+    let reclaimedTx = $state<Record<string, string>>({});
+
+    // The instance's withdraw reverts (surfaced over RPC as numeric
+    // `Error(Contract, #N)`) → actionable copy. 02 §3.7 error codes.
+    const RECLAIM_ERROR_RULES: ErrorRule[] = [
+        {
+            match: /NotYetWithdrawable|Contract, ?#4\b/i,
+            message: 'These funds aren’t withdrawable yet — they unlock after the deadline.',
+        },
+        {
+            match: /NothingToWithdraw|Contract, ?#7\b/i,
+            message: 'There’s nothing left to reclaim.',
+        },
+    ];
 
     function claimLink(c: Campaign): string {
         const base =
@@ -52,10 +111,31 @@
         copiedId = c.id;
         setTimeout(() => (copiedId = null), 2000);
     }
-    function onReclaim(c: Campaign) {
-        // The on-chain reclaim is wired with the claim release (M5/M6).
-        reclaimNoteId = c.id;
-        setTimeout(() => (reclaimNoteId = null), 4000);
+
+    async function onReclaim(c: Campaign) {
+        if (!walletAddr || reclaimingId) return;
+        reclaimingId = c.id;
+        reclaimError = null;
+        try {
+            const { withdrawAirdrop } = await import('@zarf/core/contracts');
+            // admin signs + pays the fee; `to` defaults to the admin (reclaim to self).
+            const { hash } = await withdrawAirdrop({
+                airdrop: c.airdropAddress,
+                admin: walletAddr,
+            });
+            reclaimedTx = { ...reclaimedTx, [c.id]: hash };
+            void readProgress(c, walletAddr); // balance swept → refresh the counter
+        } catch (e) {
+            reclaimError = {
+                id: c.id,
+                message: sanitizeBlockchainError(e, {
+                    customRules: RECLAIM_ERROR_RULES,
+                    fallback: 'Reclaim failed — please try again.',
+                }),
+            };
+        } finally {
+            reclaimingId = null;
+        }
     }
 </script>
 
@@ -89,6 +169,8 @@
     {:else}
         <ul class="space-y-3">
             {#each campaigns as c (c.id)}
+                {@const p = progressById[c.id]}
+                {@const reTx = reclaimedTx[c.id]}
                 <li>
                     <ZenCard class="space-y-3 p-5">
                         <div class="flex items-start justify-between gap-4">
@@ -107,8 +189,24 @@
                                     </ZenBadge>
                                 </div>
                                 <p class="mt-0.5 text-xs text-zen-fg-muted">
-                                    {c.recipientCount} recipients
+                                    {c.recipientCount} recipients{#if p}
+                                        · <span class="tabular-nums text-zen-fg"
+                                            >{p.claimedCount}</span
+                                        > claimed{/if}
                                 </p>
+                                {#if p}
+                                    <div
+                                        class="mt-1.5 h-1 w-32 overflow-hidden rounded-full bg-zen-fg/10"
+                                    >
+                                        <div
+                                            class="h-full rounded-full bg-zen-success"
+                                            style="width: {Math.min(
+                                                100,
+                                                Math.round(p.claimedFraction * 100),
+                                            )}%"
+                                        ></div>
+                                    </div>
+                                {/if}
                             </div>
                             <div class="flex flex-col items-end gap-1 text-xs">
                                 <span class="inline-flex items-center gap-1 text-zen-fg-muted">
@@ -144,8 +242,13 @@
                                 <ZenButton
                                     variant="ghost"
                                     size="sm"
-                                    disabled={!canReclaim(c)}
-                                    title={reclaimHint(c)}
+                                    loading={reclaimingId === c.id}
+                                    disabled={!canReclaim(c) ||
+                                        !walletAddr ||
+                                        reclaimingId === c.id}
+                                    title={!walletAddr
+                                        ? 'Connect your wallet to reclaim.'
+                                        : reclaimHint(c)}
                                     onclick={() => onReclaim(c)}
                                 >
                                     Reclaim
@@ -153,10 +256,20 @@
                             </div>
                         </div>
 
-                        {#if reclaimNoteId === c.id}
-                            <p class="text-xs text-zen-fg-muted">
-                                On-chain reclaim ships with the claim release.
+                        {#if reTx}
+                            <p class="text-xs text-zen-success">
+                                Reclaimed.
+                                <a
+                                    href={getExplorerUrl(reTx)}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    class="inline-flex items-center gap-1 hover:underline"
+                                >
+                                    View transaction <ExternalLink class="h-3 w-3" />
+                                </a>
                             </p>
+                        {:else if reclaimError && reclaimError.id === c.id}
+                            <p class="text-xs text-zen-error">{reclaimError.message}</p>
                         {:else if reclaimHint(c) && !canReclaim(c)}
                             <p class="text-xs text-zen-fg-faint">{reclaimHint(c)}</p>
                         {/if}
