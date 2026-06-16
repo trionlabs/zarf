@@ -187,6 +187,21 @@ fn generate_merkle_vectors() {
     let c1 = Address::generate(&env);
     let c2 = Address::generate(&env);
 
+    // Extra recipients for the structural-coverage trees (MP-1): an even/balanced
+    // n=4 (every node paired — ZERO lone-node promotions, depth 2) and an n=5
+    // (lone-node promotion at an INTERNAL level, depth 3, proofLen 3). These
+    // `generate`s come AFTER c1/c2 so the deterministic address counter leaves the
+    // single-g and odd-three-mixed vectors byte-identical.
+    let g_even = Address::from_string(&SString::from_str(&env, ALICE));
+    let e1 = Address::generate(&env);
+    let e2 = Address::generate(&env);
+    let e3 = Address::generate(&env);
+    let g_deep = Address::from_string(&SString::from_str(&env, ALICE));
+    let d1 = Address::generate(&env);
+    let d2 = Address::generate(&env);
+    let d3 = Address::generate(&env);
+    let d4 = Address::generate(&env);
+
     let i128_max: i128 = I128_MAX_STR.parse().unwrap();
 
     let vectors = Vectors {
@@ -205,6 +220,19 @@ fn generate_merkle_vectors() {
                 &env,
                 "odd-three-mixed",
                 &[(g, 100), (c1, i128_max), (c2, 1)]
+            ),
+            // even/balanced n=4: depth 2, every node paired (no lone-node promotion)
+            make_tree(
+                &env,
+                "even-four-balanced",
+                &[(g_even, 4), (e1, 3), (e2, 2), (e3, 1)]
+            ),
+            // n=5: lone-node promotion at an INTERNAL level (levelIdx 1) -> depth 3,
+            // max proofLen 3 — the path neither single-g nor odd-three exercise.
+            make_tree(
+                &env,
+                "five-internal-promo",
+                &[(g_deep, 5), (d1, 4), (d2, 3), (d3, 2), (d4, 1)]
             ),
         ],
     };

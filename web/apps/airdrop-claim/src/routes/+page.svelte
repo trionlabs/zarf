@@ -251,11 +251,11 @@
     // `Error(Contract, #N)`) to actionable copy instead of a generic retry.
     const CLAIM_ERROR_RULES: ErrorRule[] = [
         {
-            match: /AlreadyClaimed|Contract, ?#1\b|already.?claimed/i,
+            match: /Error\(Contract, ?#1\)/i, // AlreadyClaimed
             message: 'This allocation has already been claimed.',
         },
         {
-            match: /Expired|Contract, ?#3\b|claim window/i,
+            match: /Error\(Contract, ?#3\)/i, // Expired
             message: 'The claim window for this airdrop has closed.',
         },
     ];

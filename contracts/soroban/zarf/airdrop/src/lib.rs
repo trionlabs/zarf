@@ -24,8 +24,11 @@ pub const TTL_EXTEND_TO: u32 = 120 * DAY_IN_LEDGERS;
 /// Re-extend only once TTL has decayed by ~a day, so steady traffic pays the rent
 /// bump at most once a day instead of on every invocation.
 pub const TTL_THRESHOLD: u32 = TTL_EXTEND_TO - DAY_IN_LEDGERS;
-/// Cap for `claimed_statuses`, counted in bitmap indices. Each word holds 128
-/// indices, so 80 indices is well under the ~100 footprint-entries-per-tx cap.
+/// Cap for `claimed_statuses`. Each `ClaimedWord` entry covers 128 contiguous
+/// indices, so an 80-index window touches at most 2 read-footprint entries
+/// (`ClaimedWord(start/128)`..`ClaimedWord((start+limit)/128)`) — well under the
+/// ~100 footprint-entries-per-tx cap. 80 bounds per-call instruction cost, not
+/// the footprint.
 pub const MAX_PAGE_LIMIT: u32 = 80;
 /// Bits per claimed-bitmap word (`u128`).
 const BITMAP_WORD_BITS: u32 = 128;
@@ -47,7 +50,8 @@ pub enum Error {
     NotInitialized = 8,
     InvalidAmount = 9,
     TokenTransferMismatch = 10,
-    InvalidLimit = 11, // claimed_statuses limit > MAX_PAGE_LIMIT
+    InvalidLimit = 11,    // claimed_statuses limit > MAX_PAGE_LIMIT
+    InvalidDeadline = 12, // constructor: deadline already in the past
 }
 
 #[contracttype]
@@ -89,9 +93,10 @@ pub struct Withdrawn {
 
 #[contractimpl]
 impl MerkleAirdrop {
-    /// Atomic init at deploy. Validates `total > 0` and a nonzero root (defense in
-    /// depth — the factory checks these too). No BN254 canonical-field check: the
-    /// root is a raw keccak256 digest, not a BN254 scalar.
+    /// Atomic init at deploy. Validates `total > 0`, a nonzero root, and a
+    /// not-already-past `deadline` (defense in depth — the factory checks these
+    /// too). No BN254 canonical-field check: the root is a raw keccak256 digest,
+    /// not a BN254 scalar.
     pub fn __constructor(
         env: Env,
         admin: Address,
@@ -106,6 +111,11 @@ impl MerkleAirdrop {
         }
         if Self::is_zero_root(&merkle_root) {
             return Err(Error::InvalidProof);
+        }
+        // Reject an already-past deadline so a direct (non-factory) deploy can't
+        // mint a born-expired instance (the factory enforces this at its gate).
+        if deadline != 0 && deadline <= env.ledger().timestamp() {
+            return Err(Error::InvalidDeadline);
         }
         let cfg = Config {
             admin,

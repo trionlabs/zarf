@@ -91,11 +91,11 @@
     // `Error(Contract, #N)`) → actionable copy. 02 §3.7 error codes.
     const RECLAIM_ERROR_RULES: ErrorRule[] = [
         {
-            match: /NotYetWithdrawable|Contract, ?#4\b/i,
+            match: /Error\(Contract, ?#4\)/i, // NotYetWithdrawable
             message: 'These funds aren’t withdrawable yet — they unlock after the deadline.',
         },
         {
-            match: /NothingToWithdraw|Contract, ?#7\b/i,
+            match: /Error\(Contract, ?#7\)/i, // NothingToWithdraw
             message: 'There’s nothing left to reclaim.',
         },
     ];

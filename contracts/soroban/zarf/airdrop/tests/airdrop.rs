@@ -181,6 +181,25 @@ fn constructor_rejects_zero_root() {
     env.register(MerkleAirdrop, (admin, token, zero, 100i128, 0u64, false));
 }
 
+#[test]
+#[should_panic]
+fn constructor_rejects_past_deadline() {
+    // Defense in depth (the factory guards this too): a direct deploy with a
+    // deadline at or before `now` is born-expired -> InvalidDeadline. Pins the
+    // boundary at equality (`deadline <= now`), matching the factory's gate.
+    let env = Env::default();
+    env.ledger().set_timestamp(1_000);
+    let admin = Address::generate(&env);
+    let token = env
+        .register_stellar_asset_contract_v2(admin.clone())
+        .address();
+    let root: BytesN<32> = BytesN::from_array(&env, &[7u8; 32]);
+    env.register(
+        MerkleAirdrop,
+        (admin, token, root, 100i128, 1_000u64, false),
+    );
+}
+
 // ---- 3-6. claim ----
 
 #[test]
