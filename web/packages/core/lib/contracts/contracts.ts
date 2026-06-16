@@ -16,7 +16,11 @@ import {
 import { Buffer } from 'buffer';
 import { getStellarConfig } from '../config/runtime';
 import type { StellarRuntimeConfig } from '../config/runtime';
-import { fetchIndexerJson, indexerNetworkPath } from '../utils/indexerClient';
+import {
+    fetchIndexerJson,
+    indexerNetworkPath,
+    IndexerUnavailableError,
+} from '../utils/indexerClient';
 import { warn } from '../utils/log';
 import { validateTokenDecimals } from '../utils/tokenDecimals';
 import type {
@@ -681,6 +685,251 @@ export async function isAirdropClaimed(
 ): Promise<boolean> {
     const retval = await simulateRead(source, airdrop, 'is_claimed', [scU32(index)]);
     return Boolean(scValToNative(retval));
+}
+
+// ---- Airdrop progress (live claimed counter; doc 10 §3.3) ----
+
+/**
+ * Max indices per `claimed_statuses(start, limit)` read — mirrors the instance's
+ * `MAX_PAGE_LIMIT` (contracts/.../airdrop/src/lib.rs:29). A larger window reverts
+ * `InvalidLimit`. Each bitmap word holds 128 indices, so 80 stays within one word.
+ */
+export const MAX_CLAIMED_PAGE = 80;
+
+/** Aggregated live progress for one airdrop instance (doc 10 §3.3). */
+export interface AirdropProgress {
+    /** Claimed leaves in `[0, recipientCount)` — `popcount(bitmap)`, monotone. */
+    claimedCount: number;
+    /** Recipient total — NOT on-chain (config omits it); caller supplies it from
+     *  the claim-list length (09 §6) or localStorage campaign metadata. */
+    recipientCount: number;
+    /** `claimedCount / recipientCount` in `[0, 1]` (0 when `recipientCount === 0`). */
+    claimedFraction: number;
+    /** Token-denominated claimed sum (smallest unit); `null` unless a claim-list
+     *  was supplied (the bitmap alone has no amounts). */
+    claimedAmount: bigint | null;
+    /** On-chain `config.total` (the promised distribution). */
+    totalAmount: bigint;
+    /** Live `token.balance(instance)`. */
+    contractBalance: bigint;
+    /** The instance no longer holds enough to cover what it still owes (04 §S4).
+     *  Precise when `claimedAmount` is known; otherwise flags only the
+     *  unambiguous "nothing claimed yet but balance already short". */
+    underFunded: boolean;
+    /** On-chain claim deadline (unix seconds; 0 = none) — a UI hint only. */
+    deadline: number;
+    /** On-chain lock flag. */
+    locked: boolean;
+    /** Where the figures came from (transparency / debugging). */
+    source: 'indexer' | 'rpc';
+}
+
+/**
+ * Split `recipientCount` into `claimed_statuses(start, limit)` windows of at most
+ * `MAX_CLAIMED_PAGE`. Pure (no network) so the chunk boundaries are unit-testable.
+ */
+export function airdropStatusChunks(
+    recipientCount: number,
+): Array<{ start: number; limit: number }> {
+    const chunks: Array<{ start: number; limit: number }> = [];
+    for (let start = 0; start < recipientCount; start += MAX_CLAIMED_PAGE) {
+        chunks.push({ start, limit: Math.min(MAX_CLAIMED_PAGE, recipientCount - start) });
+    }
+    return chunks;
+}
+
+/**
+ * Tally a claimed bitmap (optionally summing token amounts) over `[0,
+ * recipientCount)`. Pure: the load-bearing "bitmap × claim-list" aggregation
+ * (doc 10 §3.3), unit-tested without a network. `statuses` may be longer than
+ * `recipientCount` (the contract pads the final window); only the live range
+ * counts. `amounts[i]` is the smallest-unit allocation for leaf `i`.
+ */
+export function tallyClaimed(
+    statuses: readonly boolean[],
+    recipientCount: number,
+    amounts?: readonly bigint[] | null,
+): { claimedCount: number; claimedAmount: bigint | null } {
+    let claimedCount = 0;
+    let claimedAmount: bigint | null = amounts ? 0n : null;
+    for (let i = 0; i < recipientCount; i++) {
+        if (statuses[i]) {
+            claimedCount++;
+            if (amounts && claimedAmount !== null) claimedAmount += amounts[i] ?? 0n;
+        }
+    }
+    return { claimedCount, claimedAmount };
+}
+
+/**
+ * Assemble an {@link AirdropProgress} from a tallied count + on-chain facts.
+ * Pure (no network) so the fraction + under-funded derivation is unit-testable
+ * against synthetic inputs from either the RPC or indexer path.
+ */
+export function summarizeAirdropProgress(input: {
+    claimedCount: number;
+    recipientCount: number;
+    claimedAmount: bigint | null;
+    totalAmount: bigint;
+    contractBalance: bigint;
+    deadline: number;
+    locked: boolean;
+    source: 'indexer' | 'rpc';
+}): AirdropProgress {
+    const claimedFraction =
+        input.recipientCount > 0 ? input.claimedCount / input.recipientCount : 0;
+    const underFunded =
+        input.claimedAmount !== null
+            ? input.contractBalance + input.claimedAmount < input.totalAmount
+            : input.claimedCount === 0 && input.contractBalance < input.totalAmount;
+    return {
+        claimedCount: input.claimedCount,
+        recipientCount: input.recipientCount,
+        claimedFraction,
+        claimedAmount: input.claimedAmount,
+        totalAmount: input.totalAmount,
+        contractBalance: input.contractBalance,
+        underFunded,
+        deadline: input.deadline,
+        locked: input.locked,
+        source: input.source,
+    };
+}
+
+/**
+ * Read the full claimed bitmap over `[0, recipientCount)` via chunked
+ * `claimed_statuses` RPC simulations (window-independent, on-chain canonical).
+ * `source` must be an existing account (the connected wallet) to anchor the
+ * simulation. Indexer-free; the per-IP/cached fast path lives in
+ * {@link getAirdropProgress}.
+ */
+export async function airdropClaimedStatuses(
+    source: StellarAddress,
+    airdrop: StellarContractId,
+    recipientCount: number,
+): Promise<boolean[]> {
+    const statuses: boolean[] = [];
+    for (const { start, limit } of airdropStatusChunks(recipientCount)) {
+        const retval = await simulateRead(source, airdrop, 'claimed_statuses', [
+            scU32(start),
+            scU32(limit),
+        ]);
+        for (const b of (scValToNative(retval) as unknown[]) ?? []) statuses.push(Boolean(b));
+    }
+    return statuses;
+}
+
+/** Indexer `/airdrop/:addr/progress` JSON shape (i128 fields as decimal strings). */
+interface IndexerAirdropProgress {
+    claimedCount: number;
+    recipientCount: number;
+    totalAmount: string;
+    contractBalance: string;
+    deadline: number;
+    locked: boolean;
+}
+
+export interface GetAirdropProgressOptions {
+    /** Existing source account (connected wallet) anchoring RPC simulations. */
+    source: StellarAddress;
+    /** Recipient total (config omits it) — claim-list length or campaign metadata. */
+    recipientCount: number;
+    /** Claim-list (amounts aligned by leaf index); enables `claimedAmount`/precise
+     *  under-funded. Structural to avoid a `@zarf/core/merkle` dependency here. */
+    claimList?: { claims: ReadonlyArray<{ amount: string }> } | null;
+}
+
+/**
+ * Live progress for an airdrop instance: indexer-preferred (cache/offload for
+ * popular airdrops), failing open to RPC-direct so the counter works with no
+ * indexer deployed (the standalone tool's default, D13). The headline
+ * (claimedCount/fraction) is bitmap-derived and window-independent; the indexer
+ * path returns counts only, so `claimedAmount` is RPC-direct + claim-list only.
+ */
+export async function getAirdropProgress(
+    airdrop: StellarContractId,
+    opts: GetAirdropProgressOptions,
+): Promise<AirdropProgress> {
+    const amounts = opts.claimList ? opts.claimList.claims.map((c) => BigInt(c.amount)) : null;
+
+    try {
+        const indexed = await fetchIndexerJson<IndexerAirdropProgress>(
+            indexerNetworkPath(`/airdrop/${encodeURIComponent(airdrop)}/progress`),
+            { recipients: opts.recipientCount },
+        );
+        return summarizeAirdropProgress({
+            claimedCount: Math.min(indexed.claimedCount, opts.recipientCount),
+            recipientCount: opts.recipientCount,
+            claimedAmount: null,
+            totalAmount: BigInt(indexed.totalAmount),
+            contractBalance: BigInt(indexed.contractBalance),
+            deadline: indexed.deadline,
+            locked: indexed.locked,
+            source: 'indexer',
+        });
+    } catch (err) {
+        // Fail open to RPC-direct. "Not configured" is the expected standalone case
+        // (D13) — only surface genuinely unexpected indexer failures.
+        if (!(err instanceof IndexerUnavailableError)) {
+            warn('airdrop progress: indexer unavailable, using RPC-direct', err);
+        }
+    }
+
+    const config = await getAirdropConfig(opts.source, airdrop);
+    const [statuses, contractBalance] = await Promise.all([
+        airdropClaimedStatuses(opts.source, airdrop, opts.recipientCount),
+        getTokenBalanceRpc(opts.source, config.token, airdrop),
+    ]);
+    const { claimedCount, claimedAmount } = tallyClaimed(statuses, opts.recipientCount, amounts);
+    return summarizeAirdropProgress({
+        claimedCount,
+        recipientCount: opts.recipientCount,
+        claimedAmount,
+        totalAmount: config.total,
+        contractBalance,
+        deadline: config.deadline,
+        locked: config.locked,
+        source: 'rpc',
+    });
+}
+
+// ---- Airdrop reclaim (admin withdraws unclaimed funds; 02 §3.7) ----
+
+export interface WithdrawAirdropParams {
+    /** Airdrop instance contract address (`C…`). */
+    airdrop: StellarContractId;
+    /** Instance admin — signs (`admin.require_auth()`) and pays the fee. */
+    admin: StellarAddress;
+    /** Destination for the swept balance; defaults to `admin` (reclaim to self). */
+    to?: StellarAddress;
+}
+
+/**
+ * Build the `withdraw_unclaimed` ScVal argument list (02 §3.7): a single
+ * `to: Address`. Exported so the encoding can be unit-tested without a network.
+ */
+export function buildWithdrawAirdropArgs(params: WithdrawAirdropParams): xdr.ScVal[] {
+    return [scAddress(params.to ?? params.admin)];
+}
+
+/**
+ * Sweep an airdrop instance's unclaimed balance to `to` (default: the admin).
+ * The contract gates this on `admin.require_auth()` and its own
+ * locked/deadline rules (reverts `NotYetWithdrawable`/`NothingToWithdraw`), so
+ * the UI `canReclaim` hint is advisory only. Mirrors {@link claimAirdrop}.
+ */
+export async function withdrawAirdrop(
+    params: WithdrawAirdropParams,
+    onSubmitted?: (hash: TransactionHash) => void,
+): Promise<TransactionResult & { receipt: rpc.Api.GetTransactionResponse }> {
+    const { hash, receipt } = await invoke(
+        params.admin,
+        params.airdrop,
+        'withdraw_unclaimed',
+        buildWithdrawAirdropArgs(params),
+        onSubmitted,
+    );
+    return { hash, receipt };
 }
 
 export async function getLatestLedgerSequence(): Promise<number> {
