@@ -730,3 +730,133 @@ mod proptests {
         }
     }
 }
+
+// ============================================================================
+// M8 (T8) — resource / fee profile (doc 06 §8.4, doc 05). Operator-local,
+// `#[ignore]`. Native `env.cost_estimate()` (metering is auto-enabled). The
+// instance is deployed by the factory as real WASM, so claim/withdraw VM costs
+// are metered; the factory itself is a native test contract, so create_airdrop
+// slightly UNDERESTIMATES the factory's own execution (the instance deploy IS
+// metered). Per-claim cost scales with proof length (= log2(N)), so a depth-D
+// proof is synthesized in O(D) instead of building 2^D real leaves.
+//
+// Run: cargo test -p zarf-airdrop-factory-soroban --test factory \
+//        -- --ignored --nocapture fee_profile
+// ============================================================================
+mod fee_sim {
+    use super::*;
+
+    /// Sorted-pair node hash (mirror of the instance contract's hash_node).
+    fn hash_node(env: &Env, a: &BytesN<32>, b: &BytesN<32>) -> BytesN<32> {
+        let (lo, hi) = if a.to_array() <= b.to_array() {
+            (a, b)
+        } else {
+            (b, a)
+        };
+        let mut buf = Bytes::new(env);
+        buf.append(&Bytes::from_array(env, &[0x01]));
+        buf.append(&Bytes::from_array(env, &lo.to_array()));
+        buf.append(&Bytes::from_array(env, &hi.to_array()));
+        env.crypto().keccak256(&buf).to_bytes()
+    }
+
+    /// Fold `leaf` with `depth` arbitrary siblings to get the matching root and
+    /// a depth-length proof — verify_merkle folds identically, so a real claim
+    /// succeeds with this proof WITHOUT materializing 2^depth leaves.
+    fn synthetic_proof(env: &Env, leaf: &BytesN<32>, depth: u32) -> (BytesN<32>, Vec<BytesN<32>>) {
+        let mut node = leaf.clone();
+        let mut proof = Vec::new(env);
+        for i in 0..depth {
+            let sibling =
+                BytesN::from_array(env, &[(i as u8).wrapping_mul(7).wrapping_add(0x11); 32]);
+            proof.push_back(sibling.clone());
+            node = hash_node(env, &node, &sibling);
+        }
+        (node, proof) // node == root
+    }
+
+    fn report(label: &str, env: &Env) {
+        let r = env.cost_estimate().resources();
+        let f = env.cost_estimate().fee();
+        let rent = f.persistent_entry_rent + f.temporary_entry_rent;
+        std::println!(
+            "{label}\n    cpu_insns={} mem={}B | disk_read_entries={} mem_read_entries={} write_entries={} disk_read_bytes={} write_bytes={} events={}B\n    fee_total={} stroops (~{:.5} XLM): exec+io={} stroops, rent={} stroops (persistent={}, temp={})\n    mainnet limits: insns {}/600000000, write_bytes {}/132096, write_entries {}/50, disk_read_entries {}/100",
+            r.instructions, r.mem_bytes, r.disk_read_entries, r.memory_read_entries, r.write_entries,
+            r.disk_read_bytes, r.write_bytes, r.contract_events_size_bytes,
+            f.total, f.total as f64 / 1e7, f.total - rent, rent, f.persistent_entry_rent, f.temporary_entry_rent,
+            r.instructions, r.write_bytes, r.write_entries, r.disk_read_entries,
+        );
+    }
+
+    #[test]
+    #[ignore]
+    fn fee_profile() {
+        let amount = 1_000_000_i128;
+
+        // create_airdrop + claim at proof depths 10 / 14 / 17 (~1k / 16k / 131k).
+        for depth in [10u32, 14, 17] {
+            let env = Env::default();
+            let (factory, factory_id, token) = setup(&env);
+            let owner = Address::generate(&env);
+            let claimant = Address::generate(&env);
+            fund_owner(&env, &token, &owner, &factory_id, amount);
+
+            let base_leaf = leaf(&env, 0, &claimant, amount);
+            let (root, proof) = synthetic_proof(&env, &base_leaf, depth);
+            let recipient_count = 1u32 << depth;
+
+            let instance = factory.create_airdrop(
+                &owner,
+                &token,
+                &root,
+                &amount,
+                &0u64,
+                &false,
+                &recipient_count,
+                &test_salt(&env, depth as u8),
+                &cid(&env),
+            );
+            report(
+                &std::format!(
+                    "create_airdrop (N=2^{}={}, deploy+fund)",
+                    depth,
+                    recipient_count
+                ),
+                &env,
+            );
+
+            airdrop::Client::new(&env, &instance).claim(&0u32, &claimant, &amount, &proof);
+            report(
+                &std::format!(
+                    "claim (proof depth={} ~ {} recipients)",
+                    depth,
+                    recipient_count
+                ),
+                &env,
+            );
+        }
+
+        // withdraw_unclaimed (full sweep) on an unlocked, fully-unclaimed instance.
+        let env = Env::default();
+        let (factory, factory_id, token) = setup(&env);
+        let owner = Address::generate(&env);
+        let claimant = Address::generate(&env);
+        fund_owner(&env, &token, &owner, &factory_id, amount);
+        let base_leaf = leaf(&env, 0, &claimant, amount);
+        let (root, _) = synthetic_proof(&env, &base_leaf, 17);
+        let instance = factory.create_airdrop(
+            &owner,
+            &token,
+            &root,
+            &amount,
+            &0u64,
+            &false,
+            &131_072u32,
+            &test_salt(&env, 99),
+            &cid(&env),
+        );
+        let sink = Address::generate(&env);
+        airdrop::Client::new(&env, &instance).withdraw_unclaimed(&sink);
+        report("withdraw_unclaimed (full sweep)", &env);
+    }
+}
