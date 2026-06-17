@@ -567,6 +567,69 @@ fn claim_extends_claimedword_and_instance_ttl() {
 }
 
 // ============================================================================
+// M8 (T4 feedback) — close the real test-gaps `cargo mutants` surfaced.
+//
+// The instance mutation pass left 8 mutants MISSED. Three were genuine gaps in
+// the example/T3.5/property corpus (below). The other five are equivalent and
+// uncatchable by construction: `word_bit` (index / 128, index % 128) is a
+// symmetric bijection used for BOTH read and write, so `/ -> *` preserves the
+// round-trip; and the four `unset_claimed` mutants only run on claim's Err path,
+// which the host transaction-reverts regardless, so the explicit bit-rollback is
+// redundant belt-and-suspenders (lib.rs claim comment) — unobservable.
+// ============================================================================
+
+/// `now == deadline` is still claimable — expiry is strictly AFTER the deadline
+/// (deadline is inclusive). Catches `lib.rs:147` `now > deadline` -> `>=`.
+#[test]
+fn claim_at_exact_deadline_succeeds() {
+    let c = setup(&[1_000], 1_000, false); // deadline = 1000
+    c.env.ledger().set_timestamp(1_000); // now == deadline
+    let (idx, addr, amount, proof) = c.recipients[0].clone();
+    c.client()
+        .claim(&idx, &addr, &amount, &soroban_proof(&c.env, &proof));
+    assert!(c.client().is_claimed(&0));
+}
+
+/// `deadline == 0` means "no expiry": a far-future ledger time must NOT expire
+/// the claim. Catches `lib.rs:147` `deadline > 0` -> `>= 0` (which would expire
+/// every claim at now>0 when no deadline is set — and mainnet `now` is always >0).
+#[test]
+fn claim_with_no_deadline_never_expires() {
+    let c = setup(&[1_000], 0, false); // deadline = 0 (no expiry)
+    c.env.ledger().set_timestamp(10_000_000); // far-future ledger time
+    let (idx, addr, amount, proof) = c.recipients[0].clone();
+    c.client()
+        .claim(&idx, &addr, &amount, &soroban_proof(&c.env, &proof));
+    assert!(c.client().is_claimed(&0));
+}
+
+/// withdraw_unclaimed's balance-guard must also reject a short-crediting
+/// (fee-on-transfer) token — mirroring the claim-side guard. Catches
+/// `lib.rs:216` `||` -> `&&` (which would only fire if BOTH balance legs failed).
+#[test]
+fn withdraw_fee_on_transfer_short_credit_is_mismatch() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let token = env.register(FeeOnTransferToken, ());
+    let admin = Address::generate(&env);
+    let amount: i128 = 1_000;
+    let recipient = Address::generate(&env); // never claims; we only sweep
+    let (root, _proofs) = build_tree(&env, &[leaf(&env, 0, &recipient, amount)]);
+    let contract = env.register(
+        MerkleAirdrop,
+        (admin, token.clone(), root, amount, 0u64, false), // unlocked -> withdrawable now
+    );
+    FeeOnTransferTokenClient::new(&env, &token).mint(&contract, &amount);
+
+    let sink = Address::generate(&env);
+    let client = MerkleAirdropClient::new(&env, &contract);
+    assert_eq!(
+        client.try_withdraw_unclaimed(&sink),
+        Err(Ok(Error::TokenTransferMismatch))
+    );
+}
+
+// ============================================================================
 // M8 (T3) — property-based tests (`proptest`, doc 06 §6 P1-P5).
 //
 // The example tests above pin one hand-picked case each. These sweep randomized
