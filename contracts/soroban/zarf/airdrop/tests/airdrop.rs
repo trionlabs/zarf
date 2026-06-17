@@ -163,6 +163,17 @@ fn constructor_stores_config() {
 }
 
 #[test]
+fn view_getters_mirror_config() {
+    // The three convenience view getters (admin/token/merkle_root) are public
+    // API an indexer or frontend calls; they must mirror the stored Config.
+    let c = setup(&[100, 200], 0, false);
+    let client = c.client();
+    assert_eq!(client.admin(), c.admin);
+    assert_eq!(client.token(), c.token);
+    assert_eq!(client.merkle_root(), client.config().merkle_root);
+}
+
+#[test]
 #[should_panic]
 fn constructor_rejects_zero_total() {
     let env = Env::default();
