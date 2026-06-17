@@ -11,6 +11,8 @@ soroban-sdk = { version = "26.0.0-rc.1", default-features = false, features = ["
 
 [dev-dependencies]
 soroban-sdk = { version = "26.0.0-rc.1", default-features = false, features = ["alloc", "testutils"] }
+# M8 T3: property-based test (funding atomicity, doc 06 §6). Dev-only.
+proptest = "1"
 
 [profile.release]
 opt-level = "s"

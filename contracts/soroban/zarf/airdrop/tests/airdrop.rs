@@ -565,3 +565,226 @@ fn claim_extends_claimedword_and_instance_ttl() {
         .as_contract(&c.contract, || c.env.storage().instance().get_ttl());
     assert_eq!(instance_ttl, TTL_EXTEND_TO);
 }
+
+// ============================================================================
+// M8 (T3) — property-based tests (`proptest`, doc 06 §6 P1-P5).
+//
+// The example tests above pin one hand-picked case each. These sweep randomized
+// recipient sets / claim subsets / claim orders and assert the load-bearing
+// value + bitmap invariants hold for ALL of them. Each case builds a fresh `Env`
+// + a real Merkle tree via `setup`, so case counts are deliberately modest;
+// `PROPTEST_CASES=<n>` raises them for a deeper (manual/nightly) sweep.
+// ============================================================================
+mod proptests {
+    use super::*;
+    use proptest::prelude::*;
+    use proptest::sample::Index;
+
+    /// `PROPTEST_CASES` (if set) overrides the per-property default, so a deeper
+    /// sweep needs no source edit.
+    fn case_count(default: u32) -> u32 {
+        std::env::var("PROPTEST_CASES")
+            .ok()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(default)
+    }
+
+    // P1 — Σ(payout) == Σ(claimed amounts) ≤ total; instance debited exactly.
+    proptest! {
+        #![proptest_config(ProptestConfig { cases: case_count(32), ..ProptestConfig::default() })]
+        #[test]
+        fn p1_sum_claimed_le_funded(
+            rows in prop::collection::vec((1i128..=1_000_000_000i128, any::<bool>()), 1..=12usize),
+        ) {
+            let amounts: StdVec<i128> = rows.iter().map(|(a, _)| *a).collect();
+            let total: i128 = amounts.iter().sum();
+            let c = setup(&amounts, 0, false);
+
+            let mut sum_claimed: i128 = 0;
+            for (i, (idx, addr, amount, proof)) in c.recipients.iter().enumerate() {
+                if rows[i].1 {
+                    c.client().claim(idx, addr, amount, &soroban_proof(&c.env, proof));
+                    sum_claimed += *amount;
+                }
+            }
+
+            let sum_payout: i128 = c
+                .recipients
+                .iter()
+                .map(|(_, addr, _, _)| balance(&c.env, &c.token, addr))
+                .sum();
+            prop_assert_eq!(sum_payout, sum_claimed);
+            prop_assert!(sum_claimed <= total);
+            prop_assert_eq!(balance(&c.env, &c.token, &c.contract), total - sum_claimed);
+        }
+    }
+
+    // P2 — claiming the same index twice: 2nd call AlreadyClaimed, no double-pay.
+    proptest! {
+        #![proptest_config(ProptestConfig { cases: case_count(32), ..ProptestConfig::default() })]
+        #[test]
+        fn p2_claim_idempotent(
+            amounts in prop::collection::vec(1i128..=1_000_000_000i128, 1..=12usize),
+            pick in any::<Index>(),
+        ) {
+            let c = setup(&amounts, 0, false);
+            let (idx, addr, amount, proof) = c.recipients[pick.index(c.recipients.len())].clone();
+            let p = soroban_proof(&c.env, &proof);
+
+            c.client().claim(&idx, &addr, &amount, &p);
+            let bal = balance(&c.env, &c.token, &addr);
+            let inst = balance(&c.env, &c.token, &c.contract);
+            prop_assert!(c.client().is_claimed(&idx));
+
+            // The bit-check (lib.rs:153) precedes proof-verify (lib.rs:158), so the
+            // second call errs AlreadyClaimed (not InvalidProof); nothing moves.
+            prop_assert_eq!(
+                c.client().try_claim(&idx, &addr, &amount, &p),
+                Err(Ok(Error::AlreadyClaimed))
+            );
+            prop_assert_eq!(balance(&c.env, &c.token, &addr), bal);
+            prop_assert_eq!(balance(&c.env, &c.token, &c.contract), inst);
+            prop_assert!(c.client().is_claimed(&idx));
+        }
+    }
+
+    // P3 — claiming a fixed subset in any order yields identical final state.
+    proptest! {
+        #![proptest_config(ProptestConfig { cases: case_count(16), ..ProptestConfig::default() })]
+        #[test]
+        fn p3_order_independence(
+            amounts in prop::collection::vec(1i128..=1_000_000_000i128, 1..=10usize),
+            mask in prop::collection::vec(any::<bool>(), 10usize),
+            order_keys in prop::collection::vec(any::<u64>(), 10usize),
+        ) {
+            let n = amounts.len();
+            let subset: StdVec<usize> = (0..n).filter(|&i| mask[i]).collect();
+            let mut permuted = subset.clone();
+            permuted.sort_by_key(|&i| order_keys[i]);
+
+            // Instance A claims the subset in ascending-index order...
+            let a = setup(&amounts, 0, false);
+            for &i in &subset {
+                let (idx, addr, amount, proof) = &a.recipients[i];
+                a.client().claim(idx, addr, amount, &soroban_proof(&a.env, proof));
+            }
+            // ...instance B claims the SAME subset in a key-derived permutation.
+            let b = setup(&amounts, 0, false);
+            for &i in &permuted {
+                let (idx, addr, amount, proof) = &b.recipients[i];
+                b.client().claim(idx, addr, amount, &soroban_proof(&b.env, proof));
+            }
+
+            // Identical per-recipient payout, identical pool remainder, identical bitmap.
+            for i in 0..n {
+                prop_assert_eq!(
+                    balance(&a.env, &a.token, &a.recipients[i].1),
+                    balance(&b.env, &b.token, &b.recipients[i].1)
+                );
+            }
+            let total: i128 = amounts.iter().sum();
+            let claimed: i128 = subset.iter().map(|&i| amounts[i]).sum();
+            prop_assert_eq!(balance(&a.env, &a.token, &a.contract), total - claimed);
+            prop_assert_eq!(balance(&b.env, &b.token, &b.contract), total - claimed);
+
+            let lim = n as u32; // n ≤ 10 < MAX_PAGE_LIMIT(80)
+            let sa: StdVec<bool> = a.client().claimed_statuses(&0, &lim).iter().collect();
+            let sb: StdVec<bool> = b.client().claimed_statuses(&0, &lim).iter().collect();
+            prop_assert_eq!(sa, sb);
+        }
+    }
+
+    // P4 — claims + (when withdrawable) withdraw_unclaimed conserves `total`.
+    proptest! {
+        #![proptest_config(ProptestConfig { cases: case_count(16), ..ProptestConfig::default() })]
+        #[test]
+        fn p4_withdraw_plus_claims_eq_total(
+            amounts in prop::collection::vec(1i128..=1_000_000_000i128, 1..=10usize),
+            mask in prop::collection::vec(any::<bool>(), 10usize),
+            locked in any::<bool>(),
+            use_deadline in any::<bool>(),
+        ) {
+            let n = amounts.len();
+            let deadline: u64 = if use_deadline { 1_000_000 } else { 0 };
+            // Never claim the last recipient -> the pool always retains a positive
+            // remainder, so each withdrawable leg sweeps a real (non-empty) balance.
+            let subset: StdVec<usize> = (0..n).filter(|&i| i + 1 < n && mask[i]).collect();
+
+            let c = setup(&amounts, deadline, locked);
+            let mut claimed: i128 = 0;
+            for &i in &subset {
+                let (idx, addr, amount, proof) = &c.recipients[i];
+                c.client().claim(idx, addr, amount, &soroban_proof(&c.env, proof));
+                claimed += *amount;
+            }
+            let total: i128 = amounts.iter().sum();
+            let remainder = total - claimed;
+            prop_assert!(remainder > 0);
+
+            let sink = Address::generate(&c.env);
+            if !locked {
+                // Unlocked: withdrawable at any time.
+                c.client().withdraw_unclaimed(&sink);
+                prop_assert_eq!(balance(&c.env, &c.token, &c.contract), 0);
+                prop_assert_eq!(balance(&c.env, &c.token, &sink), remainder);
+                prop_assert_eq!(claimed + balance(&c.env, &c.token, &sink), total);
+            } else if deadline != 0 {
+                // Locked + future deadline: blocked now, allowed strictly after it.
+                prop_assert_eq!(
+                    c.client().try_withdraw_unclaimed(&sink),
+                    Err(Ok(Error::NotYetWithdrawable))
+                );
+                c.env.ledger().set_timestamp(deadline + 1);
+                c.client().withdraw_unclaimed(&sink);
+                prop_assert_eq!(balance(&c.env, &c.token, &c.contract), 0);
+                prop_assert_eq!(balance(&c.env, &c.token, &sink), remainder);
+                prop_assert_eq!(claimed + balance(&c.env, &c.token, &sink), total);
+            } else {
+                // Locked + no deadline (trustless): permanently non-withdrawable;
+                // the pool keeps the unclaimed remainder forever (INV-1 holds).
+                prop_assert_eq!(
+                    c.client().try_withdraw_unclaimed(&sink),
+                    Err(Ok(Error::NotYetWithdrawable))
+                );
+                prop_assert_eq!(balance(&c.env, &c.token, &c.contract), remainder);
+            }
+        }
+    }
+
+    // P5 — claiming index i sets ONLY bit i; no cross-index / cross-word aliasing.
+    // N=260 straddles TWO u128 word boundaries (indices 128 and 256), so the
+    // {127,128} and {255,256} cross-word neighbor pairs are both exercised. Bits
+    // are read back via the paged `claimed_statuses` view (cheap, and also covers
+    // an 80-wide window straddling a word boundary).
+    proptest! {
+        #![proptest_config(ProptestConfig { cases: case_count(16), ..ProptestConfig::default() })]
+        #[test]
+        fn p5_bitmap_no_aliasing(
+            claim_indices in prop::collection::hash_set(0usize..260usize, 0..=8usize),
+        ) {
+            const N: usize = 260;
+            let amounts = std::vec![1_000i128; N];
+            let c = setup(&amounts, 0, false);
+
+            for &i in &claim_indices {
+                let (idx, addr, amount, proof) = &c.recipients[i];
+                c.client().claim(idx, addr, amount, &soroban_proof(&c.env, proof));
+            }
+
+            // Read the whole bitmap back through paged windows (limit ≤ MAX_PAGE_LIMIT=80).
+            let mut got: StdVec<bool> = StdVec::new();
+            let mut start: u32 = 0;
+            while (start as usize) < N {
+                let lim = core::cmp::min(80u32, N as u32 - start);
+                for b in c.client().claimed_statuses(&start, &lim).iter() {
+                    got.push(b);
+                }
+                start += lim;
+            }
+            for (i, &g) in got.iter().enumerate() {
+                let want = claim_indices.contains(&i);
+                prop_assert_eq!(g, want, "bit {} should be {}", i, want);
+            }
+        }
+    }
+}

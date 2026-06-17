@@ -640,3 +640,93 @@ fn create_airdrop_extends_ttls() {
     let instance_ttl = env.as_contract(&factory_id, || env.storage().instance().get_ttl());
     assert_eq!(instance_ttl, TTL_EXTEND_TO);
 }
+
+// ============================================================================
+// M8 (T3) — funding-atomicity property (`proptest`, doc 06 §6).
+//
+// Sweeps create_airdrop across randomized (total, recipient_count, deadline,
+// locked) and three funding legs, asserting the INV-9 guarantee: an instance is
+// funded with EXACTLY `total`, or the whole call unwinds (no deploy, no
+// registry entry, funds untouched). The unwind error is TokenTransferMismatch —
+// repr 7 in THIS factory enum (the instance's is 10; distinct enums).
+// `PROPTEST_CASES=<n>` raises the case count for a deeper sweep.
+// ============================================================================
+mod proptests {
+    use super::*;
+    use proptest::prelude::*;
+
+    fn case_count(default: u32) -> u32 {
+        std::env::var("PROPTEST_CASES")
+            .ok()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(default)
+    }
+
+    proptest! {
+        #![proptest_config(ProptestConfig { cases: case_count(48), ..ProptestConfig::default() })]
+        #[test]
+        fn factory_funds_exactly_total_or_unwinds(
+            total in 1i128..=1_000_000_000i128,
+            recipient_count in 1u32..=100_000u32,
+            use_deadline in any::<bool>(),
+            locked in any::<bool>(),
+            leg in 0u8..3u8,
+            salt_n in any::<u8>(),
+        ) {
+            let env = Env::default();
+            let (factory, factory_id, sac) = setup(&env);
+            let owner = Address::generate(&env);
+            let root = nonzero_root(&env, 10);
+            let salt = test_salt(&env, salt_n);
+            let deadline: u64 = if use_deadline { 1_000_000 } else { 0 };
+
+            match leg {
+                0 => {
+                    // Exact-fund leg: owner approves >= total -> instance gets total.
+                    let token_client = token::TokenClient::new(&env, &sac);
+                    fund_owner(&env, &sac, &owner, &factory_id, total);
+                    let predicted = factory.predict_airdrop_address(&owner, &salt);
+                    let instance = factory.create_airdrop(
+                        &owner, &sac, &root, &total, &deadline, &locked,
+                        &recipient_count, &salt, &cid(&env),
+                    );
+                    prop_assert_eq!(&instance, &predicted);
+                    prop_assert_eq!(token_client.balance(&instance), total);
+                    prop_assert_eq!(token_client.balance(&owner), 0i128);
+                    prop_assert_eq!(factory.get_deployment_count(), 1u32);
+                    prop_assert_eq!(factory.get_deployment(&0), instance);
+                }
+                1 => {
+                    // No-allowance leg: transfer_from reverts -> full unwind.
+                    let token_client = token::TokenClient::new(&env, &sac);
+                    token::StellarAssetClient::new(&env, &sac).mint(&owner, &total);
+                    let predicted = factory.predict_airdrop_address(&owner, &salt);
+                    let res = factory.try_create_airdrop(
+                        &owner, &sac, &root, &total, &deadline, &locked,
+                        &recipient_count, &salt, &cid(&env),
+                    );
+                    prop_assert!(res.is_err());
+                    prop_assert_eq!(token_client.balance(&owner), total);
+                    prop_assert_eq!(token_client.balance(&predicted), 0i128);
+                    prop_assert_eq!(factory.get_deployment_count(), 0u32);
+                    prop_assert!(factory.try_get_deployment(&0).is_err());
+                }
+                _ => {
+                    // Fee-on-transfer leg: short-credit trips the funding guard ->
+                    // TokenTransferMismatch (repr 7), full unwind.
+                    let mock_id = env.register(FeeOnTransferToken, ());
+                    let mock = FeeOnTransferTokenClient::new(&env, &mock_id);
+                    mock.mint(&owner, &total);
+                    mock.approve(&owner, &factory_id, &total, &1000);
+                    let res = factory.try_create_airdrop(
+                        &owner, &mock_id, &root, &total, &deadline, &locked,
+                        &recipient_count, &salt, &cid(&env),
+                    );
+                    prop_assert_eq!(res, Err(Ok(FactoryError::TokenTransferMismatch)));
+                    prop_assert_eq!(factory.get_deployment_count(), 0u32);
+                    prop_assert!(factory.try_get_deployment(&0).is_err());
+                }
+            }
+        }
+    }
+}
