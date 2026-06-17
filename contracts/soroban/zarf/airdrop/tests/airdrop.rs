@@ -9,11 +9,11 @@ use std::vec::Vec as StdVec;
 use soroban_sdk::{
     testutils::{
         storage::{Instance, Persistent},
-        Address as _, Events as _, Ledger, MockAuth, MockAuthInvoke,
+        Address as _, Events as _, Ledger, MockAuth, MockAuthInvoke, MuxedAddress as _,
     },
     token, vec,
     xdr::ToXdr,
-    Address, Bytes, BytesN, Env, Event, IntoVal, Vec,
+    Address, Bytes, BytesN, Env, Event, IntoVal, MuxedAddress, Vec,
 };
 use zarf_airdrop_soroban::{
     Claimed, Config, DataKey, Error, MerkleAirdrop, MerkleAirdropClient, Withdrawn, TTL_EXTEND_TO,
@@ -627,6 +627,154 @@ fn withdraw_fee_on_transfer_short_credit_is_mismatch() {
         client.try_withdraw_unclaimed(&sink),
         Err(Ok(Error::TokenTransferMismatch))
     );
+}
+
+// ============================================================================
+// M8 (T6) — MuxedAddress claimant (doc 06 §14, D8 closure). The contract takes
+// `claimant: Address` (base), resolves the leaf from the base, pays out to the
+// muxed `(&claimant).into()`, and guards on the base balance. Native via
+// `testutils::MuxedAddress::{generate,new}` (only account G… addresses can be
+// multiplexed). A faithful recording mock credits the base and pins the muxed
+// payout target; real-SAC muxed-transfer fidelity (which needs a trustline) is
+// a fork concern, doc 06 §14.2.
+// ============================================================================
+
+/// Faithful recording token: credits the base exactly (so the contract's
+/// balance-guard passes) AND records the muxed payout target, so a test can
+/// prove the payout went to the muxed-of-base. (`cargo mutants` does not mutate
+/// the `(&claimant).into()` conversion, so this is its only coverage.)
+mod recording_token {
+    use soroban_sdk::{contract, contractimpl, symbol_short, Address, Env, MuxedAddress};
+
+    #[contract]
+    pub struct RecordingToken;
+
+    #[contractimpl]
+    impl RecordingToken {
+        pub fn mint(env: Env, to: Address, amount: i128) {
+            let b: i128 = env.storage().instance().get(&to).unwrap_or(0);
+            env.storage().instance().set(&to, &(b + amount));
+        }
+        pub fn balance(env: Env, id: Address) -> i128 {
+            env.storage().instance().get(&id).unwrap_or(0)
+        }
+        pub fn transfer(env: Env, from: Address, to: MuxedAddress, amount: i128) {
+            let base = to.address(); // resolve the muxed target's base account
+            env.storage()
+                .instance()
+                .set(&symbol_short!("last_to"), &base);
+            let fb: i128 = env.storage().instance().get(&from).unwrap_or(0);
+            env.storage().instance().set(&from, &(fb - amount));
+            let tb: i128 = env.storage().instance().get(&base).unwrap_or(0);
+            env.storage().instance().set(&base, &(tb + amount)); // faithful credit
+        }
+        pub fn last_to(env: Env) -> Address {
+            env.storage()
+                .instance()
+                .get(&symbol_short!("last_to"))
+                .unwrap()
+        }
+    }
+}
+use recording_token::{RecordingToken, RecordingTokenClient};
+
+/// MX1 — a claimant with a multiplexed identity is still leaf-resolved (and
+/// claimed) on its BASE account only.
+#[test]
+fn muxed_claim_resolves_leaf_from_base() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let token = env.register(RecordingToken, ());
+    let recording = RecordingTokenClient::new(&env, &token);
+
+    let amount: i128 = 1_000;
+    // A real account base (G…) of an arbitrary muxed address; the claimant
+    // carries a multiplexed identity (memo 42) but the leaf and the claim call
+    // are keyed on the base only.
+    let base = MuxedAddress::generate(&env).address();
+    let muxed = MuxedAddress::new(&base, 42u64);
+    assert_eq!(muxed.address(), base);
+
+    let (root, proofs) = build_tree(&env, &[leaf(&env, 0, &base, amount)]);
+    let admin = Address::generate(&env);
+    let contract = env.register(
+        MerkleAirdrop,
+        (admin, token.clone(), root, amount, 0u64, false),
+    );
+    recording.mint(&contract, &amount);
+
+    let client = MerkleAirdropClient::new(&env, &contract);
+    client.claim(&0, &base, &amount, &soroban_proof(&env, &proofs[0]));
+    assert!(client.is_claimed(&0));
+    assert_eq!(recording.balance(&base), amount);
+}
+
+/// MX2 — the payout target is the muxed derived from the base (recorded via the
+/// mock) AND the base account is credited the full amount.
+#[test]
+fn muxed_payout_targets_muxed_of_base_and_credits_base() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let token = env.register(RecordingToken, ());
+    let recording = RecordingTokenClient::new(&env, &token);
+
+    let amount: i128 = 1_000;
+    let claimant = Address::generate(&env);
+    let (root, proofs) = build_tree(&env, &[leaf(&env, 0, &claimant, amount)]);
+    let admin = Address::generate(&env);
+    let contract = env.register(
+        MerkleAirdrop,
+        (admin, token.clone(), root, amount, 0u64, false),
+    );
+    recording.mint(&contract, &amount);
+
+    let client = MerkleAirdropClient::new(&env, &contract);
+    client.claim(&0, &claimant, &amount, &soroban_proof(&env, &proofs[0]));
+
+    // The contract paid out to the MuxedAddress derived from the base claimant
+    // (`(&claimant).into()`), whose base resolves back to the claimant...
+    assert_eq!(recording.last_to(), claimant);
+    // ...and the base account received the full amount.
+    assert_eq!(recording.balance(&claimant), amount);
+    assert!(client.is_claimed(&0));
+}
+
+/// MX3 — the multiplexing id never enters the leaf/bitmap (keyed by base+index),
+/// so a different memo-id cannot bypass the double-claim guard (INV-11).
+#[test]
+fn muxed_id_not_in_leaf_blocks_double_claim() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let token = env.register(RecordingToken, ());
+    let recording = RecordingTokenClient::new(&env, &token);
+
+    let amount: i128 = 1_000;
+    let base = MuxedAddress::generate(&env).address();
+    // Two muxed addresses share the SAME base; only the memo-id differs.
+    let mx1 = MuxedAddress::new(&base, 1u64);
+    let mx2 = MuxedAddress::new(&base, 2u64);
+    assert_eq!(mx1.address(), base);
+    assert_eq!(mx2.address(), base);
+
+    // The leaf is computed from the base only — the memo-id never enters it.
+    let (root, proofs) = build_tree(&env, &[leaf(&env, 0, &base, amount)]);
+    let admin = Address::generate(&env);
+    let contract = env.register(
+        MerkleAirdrop,
+        (admin, token.clone(), root, amount, 0u64, false),
+    );
+    recording.mint(&contract, &amount);
+
+    let client = MerkleAirdropClient::new(&env, &contract);
+    let p = soroban_proof(&env, &proofs[0]);
+    client.claim(&0, &base, &amount, &p); // first claim ok
+                                          // A different memo-id cannot open a second claim slot — re-claiming
+                                          // index 0 is rejected because the bitmap is keyed by (base, index).
+    assert_eq!(
+        client.try_claim(&0, &base, &amount, &p),
+        Err(Ok(Error::AlreadyClaimed))
+    );
+    assert_eq!(recording.balance(&base), amount); // paid exactly once
 }
 
 // ============================================================================
