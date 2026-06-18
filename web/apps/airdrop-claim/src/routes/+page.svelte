@@ -64,6 +64,9 @@
     let submitting = $state(false);
     let txHash = $state<string | null>(null);
     let txError = $state<string | null>(null);
+    /** True when the revert is terminal (AlreadyClaimed/Expired) — retrying
+     *  re-submits the same deterministic failure, so we hide the retry CTA. */
+    let txTerminal = $state(false);
     let claimWallet = $state<string | null>(null);
 
     // Reactive clock so 'expired' flips while the tab stays open (the contract
@@ -264,6 +267,7 @@
         if (!doc || !walletAddr || !matched || submitting) return;
         submitting = true;
         txError = null;
+        txTerminal = false;
         claimWallet = walletAddr;
         try {
             const { claimAirdrop } = await import('@zarf/core/contracts');
@@ -276,6 +280,10 @@
             });
             txHash = hash;
         } catch (e) {
+            // AlreadyClaimed (#1) / Expired (#3) are terminal: the same input
+            // reverts identically, so suppress the retry CTA below.
+            const raw = String((e as { message?: string })?.message ?? e);
+            txTerminal = /Error\(Contract, ?#(1|3)\)/i.test(raw);
             txError = sanitizeBlockchainError(e, {
                 customRules: CLAIM_ERROR_RULES,
                 fallback: 'Claim failed — please try again.',
@@ -481,17 +489,19 @@
                         {#if status === 'tx-error' && txError}
                             <ZenAlert variant="error">{txError}</ZenAlert>
                         {/if}
-                        <ZenButton
-                            variant="primary"
-                            onclick={handleClaim}
-                            loading={submitting}
-                            disabled={submitting}
-                        >
-                            {status === 'tx-error' ? 'Try claim again' : 'Claim'}
-                        </ZenButton>
-                        <p class="text-center text-xs text-zen-fg-faint">
-                            You pay a small network fee in XLM.
-                        </p>
+                        {#if !txTerminal}
+                            <ZenButton
+                                variant="primary"
+                                onclick={handleClaim}
+                                loading={submitting}
+                                disabled={submitting}
+                            >
+                                {status === 'tx-error' ? 'Try claim again' : 'Claim'}
+                            </ZenButton>
+                            <p class="text-center text-xs text-zen-fg-faint">
+                                You pay a small network fee in XLM.
+                            </p>
+                        {/if}
                     </div>
                 {/if}
             </div>

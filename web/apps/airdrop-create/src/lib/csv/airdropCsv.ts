@@ -13,12 +13,14 @@
  */
 import { isValidAddressShape } from '@zarf/core/utils/addressShape';
 import { normalizeAirdropAddress } from '@zarf/core/utils/airdropAddress';
+import { isPositiveAmountString } from '@zarf/core/utils/amount';
 
 export interface AirdropRecipient {
     /** Canonical UPPERCASE Stellar address. */
     address: string;
-    /** Token amount as a UI number (converted to i128 base units at merkle time). */
-    amount: number;
+    /** Raw decimal-string amount (converted to i128 base units at merkle time;
+     *  kept as a string so values above 2^53 base units are not rounded). */
+    amount: string;
 }
 
 export interface AirdropParseResult {
@@ -55,9 +57,11 @@ export function parseAirdropCSV(content: string): AirdropParseResult {
         const [rawAddress, amountStr] = parts;
         const address = normalizeAirdropAddress(rawAddress);
 
-        const amount = Number(amountStr);
-        if (!Number.isFinite(amount) || amount <= 0) {
-            errors.push(`Line ${i + 1}: amount must be a positive number — "${amountStr}"`);
+        // Grammar-only check (positive decimal string, no exponent / float
+        // rounding); the exact decimals/i128-range are enforced against the
+        // token at step-1 and at tree-build time. Store the ORIGINAL string.
+        if (!isPositiveAmountString(amountStr)) {
+            errors.push(`Line ${i + 1}: amount must be a positive decimal — "${amountStr}"`);
             continue;
         }
         // Shape-only (regex) check; the exact StrKey checksum is enforced when
@@ -67,7 +71,7 @@ export function parseAirdropCSV(content: string): AirdropParseResult {
             continue;
         }
 
-        entries.push({ address, amount });
+        entries.push({ address, amount: amountStr });
     }
 
     // Duplicate detection by address (airdrop is address-keyed, not email).

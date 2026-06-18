@@ -21,6 +21,10 @@ export class PinError extends Error {
     constructor(
         message: string,
         public readonly cause?: unknown,
+        /** True only for transport-level failures (timeout / unreachable) that a
+         *  retry could plausibly fix. A non-2xx HTTP response is deterministic
+         *  (bad signature, malformed body, auth rejected) and is NOT retried. */
+        public readonly transient = false,
     ) {
         super(message);
         this.name = 'PinError';
@@ -114,9 +118,9 @@ async function postPin(
         });
     } catch (err) {
         if ((err as Error)?.name === 'AbortError') {
-            throw new PinError(`Pin request timed out after ${timeoutMs}ms`);
+            throw new PinError(`Pin request timed out after ${timeoutMs}ms`, err, true);
         }
-        throw new PinError('Pin proxy unreachable', err);
+        throw new PinError('Pin proxy unreachable', err, true);
     } finally {
         clearTimeout(timer);
     }
@@ -145,8 +149,10 @@ async function postPin(
 
 /**
  * Pin an airdrop claim-list to IPFS via the proxy worker. Retries once on
- * transient network failure; pinning is idempotent (same content = same CID),
- * so a retry returns the same CID.
+ * transient network failure ONLY (timeout / unreachable); pinning is idempotent
+ * (same content = same CID), so a retry returns the same CID. A deterministic
+ * 4xx/5xx (bad signature, auth, malformed body) is not retried — a second
+ * identical signed POST would fail the same way.
  */
 export async function pinAirdropClaimList(
     doc: AirdropClaimListJson,
@@ -160,7 +166,7 @@ export async function pinAirdropClaimList(
         const res = await postPin(body, timeoutMs, authHeaders);
         return { cid: res.cid };
     } catch (err) {
-        if (!(err instanceof PinError)) throw err;
+        if (!(err instanceof PinError) || !err.transient) throw err;
         const res = await postPin(body, timeoutMs, authHeaders);
         return { cid: res.cid };
     }

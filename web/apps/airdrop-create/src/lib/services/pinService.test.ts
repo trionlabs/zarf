@@ -77,4 +77,12 @@ describe('pinAirdropClaimList', () => {
         expect(cid).toBe('bafyRETRY');
         expect(fetchMock).toHaveBeenCalledTimes(2);
     });
+
+    it('does NOT retry a deterministic 4xx (no duplicate signed POST)', async () => {
+        const fetchMock = vi.fn(async () => new Response('bad signature', { status: 401 }));
+        vi.stubGlobal('fetch', fetchMock);
+
+        await expect(pinAirdropClaimList(DOC, { owner: OWNER })).rejects.toThrow(/401/);
+        expect(fetchMock).toHaveBeenCalledOnce();
+    });
 });

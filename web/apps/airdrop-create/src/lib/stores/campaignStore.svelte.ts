@@ -53,8 +53,11 @@ let state = $state<WizardState>(structuredClone(initialState));
 /** Recipient count of the in-flight draft. */
 const recipientCount = $derived(state.recipients.length);
 
-/** Σ of the draft amounts in UI units (base-unit total is computed at prepare). */
-const totalAmountUi = $derived(state.recipients.reduce((sum, r) => sum + r.amount, 0));
+/** Σ of the draft amounts in UI units (display-only; the base-unit total is
+ *  computed exactly via parseTokenAmount/sumBaseUnits at prepare). */
+const totalAmountUi = $derived(
+    state.recipients.reduce((sum, r) => sum + (Number(r.amount) || 0), 0),
+);
 
 // ---- Persistence ------------------------------------------------------------
 

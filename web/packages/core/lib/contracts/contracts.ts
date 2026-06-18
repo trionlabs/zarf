@@ -691,8 +691,10 @@ export async function isAirdropClaimed(
 
 /**
  * Max indices per `claimed_statuses(start, limit)` read — mirrors the instance's
- * `MAX_PAGE_LIMIT` (contracts/.../airdrop/src/lib.rs:29). A larger window reverts
- * `InvalidLimit`. Each bitmap word holds 128 indices, so 80 stays within one word.
+ * `MAX_PAGE_LIMIT` (contracts/.../airdrop/src/lib.rs:32). A larger window reverts
+ * `InvalidLimit`. The cap bounds per-call instruction cost; `claimed_statuses`
+ * reads each index independently, so a window may legitimately span multiple
+ * bitmap words (it is not constrained to a single 128-bit word).
  */
 export const MAX_CLAIMED_PAGE = 80;
 

@@ -17,7 +17,12 @@
     import ZenCheckbox from '@zarf/ui/components/ui/ZenCheckbox.svelte';
     import { walletStore } from '@zarf/ui/stores/walletStore.svelte';
     import { isValidAddressShape } from '@zarf/core/utils/addressShape';
-    import { parseTokenAmount, formatTokenAmount } from '@zarf/core/utils/amount';
+    import {
+        parseTokenAmount,
+        formatTokenAmount,
+        isPositiveAmountString,
+        isValidTokenAmount,
+    } from '@zarf/core/utils/amount';
     import { getTokenBalanceRpc } from '@zarf/core/contracts';
     import { warn } from '@zarf/core/utils/log';
     import { campaignStore } from '$lib/stores/campaignStore.svelte';
@@ -61,8 +66,11 @@
             recipients.every(
                 (r) =>
                     isValidAddressShape(normalizeAirdropAddress(r.address)) &&
-                    Number.isFinite(r.amount) &&
-                    r.amount > 0 &&
+                    // Full check once decimals are known (precision + i128 range);
+                    // grammar-only while the token is still loading.
+                    (decimals === null
+                        ? isPositiveAmountString(r.amount)
+                        : isValidTokenAmount(r.amount, decimals)) &&
                     !dupAddrs.has(normalizeAirdropAddress(r.address)),
             ),
     );
@@ -81,8 +89,8 @@
         if (decimals === null) return null;
         try {
             return recipients.reduce((sum, r) => {
-                if (!(Number.isFinite(r.amount) && r.amount > 0)) return sum;
-                return sum + parseTokenAmount(String(r.amount), decimals);
+                if (!isPositiveAmountString(r.amount)) return sum;
+                return sum + parseTokenAmount(r.amount, decimals);
             }, 0n);
         } catch {
             return null; // e.g. an amount with more decimal places than the token allows
@@ -214,9 +222,14 @@
                 </div>
             {:else if balanceError}
                 <div class="p-4 text-sm text-zen-warning">{balanceError}</div>
-            {:else if requiredBase === null}
+            {:else if decimals === null}
                 <div class="p-4 text-xs text-zen-fg-muted">
                     Token details are still loading — the balance check will appear shortly.
+                </div>
+            {:else if requiredBase === null}
+                <div class="p-4 text-sm text-zen-warning">
+                    One or more amounts are invalid — fix the highlighted rows to see the balance
+                    check.
                 </div>
             {:else if balance !== null && decimals !== null}
                 <div class="grid grid-cols-2 divide-x divide-zen-border-subtle">

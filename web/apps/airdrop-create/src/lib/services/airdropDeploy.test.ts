@@ -22,16 +22,24 @@ const TOKEN = 'CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC' as Stel
 
 describe('buildMerkleRows / sumBaseUnits', () => {
     it('uppercases addresses and converts UI amounts to i128 base units', () => {
-        const rows = buildMerkleRows([{ address: REC_G.toLowerCase(), amount: 1.5 }], 7);
+        const rows = buildMerkleRows([{ address: REC_G.toLowerCase(), amount: '1.5' }], 7);
         expect(rows[0].address).toBe(REC_G); // re-uppercased (load-bearing)
         expect(rows[0].amount).toBe('15000000'); // 1.5 * 10^7
+    });
+
+    it('preserves large integer amounts exactly (no 2^53 float rounding)', () => {
+        // A 0-decimal token amount above Number.MAX_SAFE_INTEGER: a numeric
+        // RecipientRow.amount would have rounded this before reaching the leaf.
+        const big = '123456789012345678';
+        const rows = buildMerkleRows([{ address: REC_G, amount: big }], 0);
+        expect(rows[0].amount).toBe(big); // exact; Number(big) !== big
     });
 
     it('sums base units exactly (no IEEE-754 drift)', () => {
         const rows = buildMerkleRows(
             [
-                { address: REC_G, amount: 1 },
-                { address: TOKEN, amount: 2 },
+                { address: REC_G, amount: '1' },
+                { address: TOKEN, amount: '2' },
             ],
             7,
         );
@@ -48,8 +56,8 @@ describe('prepareCampaign', () => {
             network: 'testnet',
             salt: `0x${'00'.repeat(32)}`,
             recipients: [
-                { address: REC_G, amount: 1 },
-                { address: TOKEN, amount: 2 },
+                { address: REC_G, amount: '1' },
+                { address: TOKEN, amount: '2' },
             ],
             decimals: 7,
         });

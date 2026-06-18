@@ -124,6 +124,35 @@ describe('pin-proxy /pin-airdrop (T6, additive)', () => {
         expect(out.reason).toBe('missing_or_invalid_root');
     });
 
+    it('rejects each malformed claim-list field with its specific reason (pre-auth 400)', async () => {
+        const claimsOf = (d: Record<string, unknown>) => d.claims as Array<Record<string, unknown>>;
+        const cases: Array<[string, (d: Record<string, unknown>) => void]> = [
+            ['invalid_version', (d) => void (d.v = 2)],
+            ['invalid_network', (d) => void (d.network = 'mainnetx')],
+            ['missing_airdrop', (d) => void (d.airdrop = '')],
+            ['missing_token', (d) => void (d.token = '')],
+            ['missing_format', (d) => void delete d.format],
+            ['missing_or_empty_claims', (d) => void (d.claims = [])],
+            ['invalid_claim', (d) => void (d.claims = [null])],
+            ['invalid_claim_address', (d) => void (claimsOf(d)[0].address = '')],
+            ['invalid_claim_amount', (d) => void (claimsOf(d)[0].amount = '1.5')],
+            ['invalid_claim_proof', (d) => void (claimsOf(d)[0].proof = 'nope')],
+            ['invalid_proof_node', (d) => void (claimsOf(d)[0].proof = ['zz'])],
+        ];
+        for (const [reason, mutate] of cases) {
+            const doc = airdropDoc(ROOT);
+            mutate(doc);
+            const res = await worker.fetch(
+                post('/pin-airdrop', { 'Content-Type': 'application/json' }, JSON.stringify(doc)),
+                ENV,
+            );
+            expect(res.status, reason).toBe(400);
+            const out = (await res.json()) as PinResult;
+            expect(out.error, reason).toBe('invalid_claim_list');
+            expect(out.reason, reason).toBe(reason);
+        }
+    });
+
     it('rejects a pin with missing auth headers (401)', async () => {
         const body = JSON.stringify(airdropDoc(ROOT));
         const res = await worker.fetch(

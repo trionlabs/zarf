@@ -43,7 +43,7 @@ export function generateSalt(): `0x${string}` {
 export function buildMerkleRows(recipients: RecipientRow[], decimals: number): Row[] {
     return recipients.map((r) => ({
         address: normalizeAirdropAddress(r.address),
-        amount: parseTokenAmount(String(r.amount), decimals).toString(),
+        amount: parseTokenAmount(r.amount, decimals).toString(),
     }));
 }
 

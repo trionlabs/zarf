@@ -2,6 +2,7 @@
     import { Plus, Trash2, Upload, ClipboardPaste, AlertTriangle, X } from 'lucide-svelte';
     import ZenButton from '@zarf/ui/components/ui/ZenButton.svelte';
     import { isValidAddressShape } from '@zarf/core/utils/addressShape';
+    import { isPositiveAmountString } from '@zarf/core/utils/amount';
     import { formatAmount } from '@zarf/core/utils/format';
     import { parseAirdropCSV, normalizeAirdropAddress } from '$lib/csv/airdropCsv';
     import { findDuplicateAddresses } from '$lib/recipients';
@@ -24,20 +25,22 @@
         return isValidAddressShape(normalizeAirdropAddress(r.address));
     }
     function amtOk(r: RecipientRow): boolean {
-        return Number.isFinite(r.amount) && r.amount > 0;
+        return isPositiveAmountString(r.amount);
     }
     function isDup(r: RecipientRow): boolean {
         return duplicateAddrs.has(normalizeAirdropAddress(r.address));
     }
 
-    const total = $derived(recipients.reduce((s, r) => s + (amtOk(r) ? r.amount : 0), 0));
+    // Display-only running total (the load-bearing base-unit total is computed
+    // via parseTokenAmount/sumBaseUnits at prepare; Number() here is for the UI).
+    const total = $derived(recipients.reduce((s, r) => s + (amtOk(r) ? Number(r.amount) : 0), 0));
     const invalidCount = $derived(
         recipients.filter((r) => !addrOk(r) || !amtOk(r) || isDup(r)).length,
     );
 
     // ---- Row mutation --------------------------------------------------------
     function addRow() {
-        recipients = [...recipients, { address: '', amount: 0 }];
+        recipients = [...recipients, { address: '', amount: '' }];
     }
     function deleteRow(i: number) {
         recipients = recipients.filter((_, k) => k !== i);
@@ -183,10 +186,9 @@
                             : ''}"
                     />
                     <input
-                        type="number"
+                        type="text"
+                        inputmode="decimal"
                         bind:value={row.amount}
-                        min="0"
-                        step="any"
                         aria-label={`Recipient ${i + 1} amount`}
                         aria-invalid={badAmt}
                         class="w-full bg-transparent text-right font-mono text-xs tabular-nums text-zen-fg focus:outline-none {badAmt

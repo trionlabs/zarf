@@ -22,13 +22,15 @@ export interface TokenDetails {
 }
 
 /**
- * One recipient row as entered in the grid. `amount` is a UI number; it is
- * converted to the token's i128 base units (a decimal string) at tree-build
- * time using `tokenDecimals`. `address` is the canonical UPPERCASE strkey.
+ * One recipient row as entered in the grid. `amount` is the raw decimal STRING
+ * the user typed (not a JS number — a numeric type silently rounds integers
+ * above 2^53 base units before they reach the leaf). It is validated against the
+ * token's decimals and converted to i128 base units at tree-build time via
+ * `parseTokenAmount`. `address` is the canonical UPPERCASE strkey.
  */
 export interface RecipientRow {
     address: string;
-    amount: number;
+    amount: string;
 }
 
 /** A campaign's lifecycle. */

@@ -46,6 +46,19 @@ describe('parseAirdropCSV', () => {
     it('skips a header row', () => {
         const { entries } = parseAirdropCSV(`address,amount\n${UPPER},100`);
         expect(entries).toHaveLength(1);
-        expect(entries[0].amount).toBe(100);
+        expect(entries[0].amount).toBe('100');
+    });
+
+    it('preserves large integer amounts exactly as strings (no 2^53 rounding)', () => {
+        const big = '123456789012345678'; // > Number.MAX_SAFE_INTEGER
+        const { entries, errors } = parseAirdropCSV(`${UPPER},${big}`);
+        expect(errors).toHaveLength(0);
+        expect(entries[0].amount).toBe(big); // exact; Number(big) would round
+    });
+
+    it('rejects exponent-notation amounts', () => {
+        const { entries, errors } = parseAirdropCSV(`${UPPER},1e21`);
+        expect(entries).toHaveLength(0);
+        expect(errors.some((e) => e.includes('positive decimal'))).toBe(true);
     });
 });

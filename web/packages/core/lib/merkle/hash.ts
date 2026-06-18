@@ -22,6 +22,9 @@ export function toHex(bytes: Uint8Array): string {
 export function fromHex(hex: string): Uint8Array {
     const h = hex.startsWith('0x') ? hex.slice(2) : hex;
     if (h.length !== 64) throw new Error(`expected 32-byte hex, got ${h.length} chars`);
+    // Reject non-hex characters: parseInt('zz', 16) yields NaN, which would
+    // silently coerce to a 0 byte. Fail closed like the Rust `from_hex0x`.
+    if (!/^[0-9a-fA-F]{64}$/.test(h)) throw new Error('expected hex characters');
     const out = new Uint8Array(32);
     for (let i = 0; i < 32; i++) out[i] = parseInt(h.slice(i * 2, i * 2 + 2), 16);
     return out;
