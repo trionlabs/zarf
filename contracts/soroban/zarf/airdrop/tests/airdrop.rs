@@ -242,6 +242,27 @@ fn claim_twice_is_rejected() {
 }
 
 #[test]
+fn already_claimed_precedes_proof_check() {
+    // The double-claim bit guard (lib.rs:153) runs BEFORE proof verification
+    // (lib.rs:158): re-claiming a claimed index returns AlreadyClaimed even with
+    // a deliberately INVALID proof. A bogus proof is the only input that
+    // distinguishes the two orderings (a valid proof yields AlreadyClaimed under
+    // either order), so this is what actually pins the documented precedence.
+    let c = setup(&[1_000, 2_000], 0, false);
+    let (idx, addr, amount, proof) = c.recipients[0].clone();
+    c.client()
+        .claim(&idx, &addr, &amount, &soroban_proof(&c.env, &proof));
+
+    // An all-zero sibling cannot fold to the real root, so if proof-verify ran
+    // first this would be InvalidProof; the bit guard short-circuits it instead.
+    let bogus = vec![&c.env, BytesN::from_array(&c.env, &[0u8; 32])];
+    assert_eq!(
+        c.client().try_claim(&idx, &addr, &amount, &bogus),
+        Err(Ok(Error::AlreadyClaimed))
+    );
+}
+
+#[test]
 fn claim_wrong_amount_is_invalid_proof() {
     let c = setup(&[1_000], 0, false);
     let (idx, addr, _amount, proof) = c.recipients[0].clone();
@@ -250,6 +271,40 @@ fn claim_wrong_amount_is_invalid_proof() {
             .try_claim(&idx, &addr, &999, &soroban_proof(&c.env, &proof)),
         Err(Ok(Error::InvalidProof))
     );
+}
+
+#[test]
+fn foreign_valid_proof_cannot_claim_another_leaf() {
+    // Core anti-theft property: the leaf binds (index, claimant, amount), so a
+    // proof that is VALID for recipient B cannot be redirected to claim under
+    // A's index/address/amount (or any cross-mix). The recomputed leaf differs,
+    // so the foreign proof no longer folds to the root -> InvalidProof. Without
+    // this, a mutant dropping index or claimant from the leaf preimage would
+    // pass every other test (each of which uses a self-consistent tuple).
+    let c = setup(&[100, 250], 0, false);
+    let (idx0, addr0, amt0, _proof0) = c.recipients[0].clone();
+    let (idx1, addr1, amt1, proof1) = c.recipients[1].clone();
+    let p1 = soroban_proof(&c.env, &proof1);
+
+    // A's own (index, addr, amount) but carrying B's (valid-for-B) proof.
+    assert_eq!(
+        c.client().try_claim(&idx0, &addr0, &amt0, &p1),
+        Err(Ok(Error::InvalidProof))
+    );
+    // A's address claiming B's index/amount with B's proof (claimant is bound).
+    assert_eq!(
+        c.client().try_claim(&idx1, &addr0, &amt1, &p1),
+        Err(Ok(Error::InvalidProof))
+    );
+    // B's address/amount claimed at A's index with B's proof (index is bound).
+    assert_eq!(
+        c.client().try_claim(&idx0, &addr1, &amt1, &p1),
+        Err(Ok(Error::InvalidProof))
+    );
+    // No payout, no claimed bit set on either index.
+    assert_eq!(balance(&c.env, &c.token, &addr0), 0);
+    assert!(!c.client().is_claimed(&idx0));
+    assert!(!c.client().is_claimed(&idx1));
 }
 
 #[test]

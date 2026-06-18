@@ -209,10 +209,16 @@ impl MerkleAirdrop {
             return Err(Error::NothingToWithdraw);
         }
 
+        let before_contract = token_client.balance(&contract);
         let before_to = token_client.balance(&to);
         let to_mux: MuxedAddress = (&to).into();
         token_client.transfer(&contract, &to_mux, &balance);
-        if balance.checked_sub(balance) != Some(token_client.balance(&contract))
+        // Balance-delta guard mirroring claim (lib.rs:177): the contract must
+        // shed exactly `balance` and `to` must gain it, else a fee-on-transfer /
+        // short-crediting token moved a different amount. (`before_contract`
+        // equals `balance` today since this is a full sweep, but the symmetric
+        // form stays correct if the swept amount ever diverges from the balance.)
+        if before_contract.checked_sub(balance) != Some(token_client.balance(&contract))
             || before_to.checked_add(balance) != Some(token_client.balance(&to))
         {
             return Err(Error::TokenTransferMismatch);
