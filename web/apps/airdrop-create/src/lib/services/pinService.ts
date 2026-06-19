@@ -132,7 +132,15 @@ async function postPin(
         } catch {
             // ignore
         }
-        throw new PinError(`Pin proxy returned ${res.status}: ${detail.slice(0, 200)}`);
+        // 5xx / 429 are transient upstream failures (the proxy returns 502 for a
+        // Pinata outage/throttle); pinning is idempotent, so retry those. A 4xx
+        // is deterministic (bad signature/body/auth) and is NOT retried.
+        const transient = res.status >= 500 || res.status === 429;
+        throw new PinError(
+            `Pin proxy returned ${res.status}: ${detail.slice(0, 200)}`,
+            undefined,
+            transient,
+        );
     }
 
     let json: unknown;
@@ -149,10 +157,11 @@ async function postPin(
 
 /**
  * Pin an airdrop claim-list to IPFS via the proxy worker. Retries once on
- * transient network failure ONLY (timeout / unreachable); pinning is idempotent
+ * transient failures only — a client→proxy network error/timeout, or a 5xx/429
+ * from the proxy (e.g. a Pinata outage surfaced as 502); pinning is idempotent
  * (same content = same CID), so a retry returns the same CID. A deterministic
- * 4xx/5xx (bad signature, auth, malformed body) is not retried — a second
- * identical signed POST would fail the same way.
+ * 4xx (bad signature, auth, malformed body) is NOT retried — a second identical
+ * signed POST would fail the same way.
  */
 export async function pinAirdropClaimList(
     doc: AirdropClaimListJson,

@@ -489,7 +489,7 @@
                         {#if status === 'tx-error' && txError}
                             <ZenAlert variant="error">{txError}</ZenAlert>
                         {/if}
-                        {#if !txTerminal}
+                        {#if !(txTerminal && claimedHere)}
                             <ZenButton
                                 variant="primary"
                                 onclick={handleClaim}

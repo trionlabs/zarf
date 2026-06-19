@@ -17,8 +17,10 @@ import { warn } from '@zarf/core/utils/log';
 import type { ActiveDeploy, Campaign, RecipientRow, TokenDetails, WizardState } from './types';
 
 const STORAGE_KEY = 'zarf_airdrop_wizard';
-/** Bump when the persisted shape changes incompatibly (drops old blobs). */
-const SCHEMA_VERSION = 1;
+/** Bump when the persisted shape changes incompatibly (drops old blobs).
+ *  v2: RecipientRow.amount became a string (was a number) — a restored numeric
+ *  amount would throw in isPositiveAmountString(value.trim()) during grid render. */
+const SCHEMA_VERSION = 2;
 /** A deploy WAL older than this is discarded on restore (stale recovery). */
 const WAL_TTL_MS = 24 * 60 * 60 * 1000;
 

@@ -85,4 +85,20 @@ describe('pinAirdropClaimList', () => {
         await expect(pinAirdropClaimList(DOC, { owner: OWNER })).rejects.toThrow(/401/);
         expect(fetchMock).toHaveBeenCalledOnce();
     });
+
+    it('retries a transient 5xx (proxy 502 = Pinata outage; pinning is idempotent)', async () => {
+        const fetchMock = vi
+            .fn()
+            .mockResolvedValueOnce(
+                new Response(JSON.stringify({ error: 'pinata_unreachable' }), { status: 502 }),
+            )
+            .mockResolvedValueOnce(
+                new Response(JSON.stringify({ cid: 'bafy502' }), { status: 200 }),
+            );
+        vi.stubGlobal('fetch', fetchMock);
+
+        const { cid } = await pinAirdropClaimList(DOC, { owner: OWNER });
+        expect(cid).toBe('bafy502');
+        expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
 });
