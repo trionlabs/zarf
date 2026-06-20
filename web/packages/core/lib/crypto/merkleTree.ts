@@ -421,6 +421,16 @@ export async function buildMerkleTree(leaves: bigint[]): Promise<{
         throw new Error('Cannot build Merkle tree with no leaves');
     }
 
+    // The circuit verifies a fixed-depth (TREE_DEPTH) Merkle path. More than
+    // 2**TREE_DEPTH leaves would build a deeper tree whose root no proof can
+    // ever satisfy — silently producing a funded-but-unclaimable distribution.
+    // Fail loudly at build time instead.
+    if (leaves.length > 2 ** TREE_DEPTH) {
+        throw new Error(
+            `Too many leaves: ${leaves.length} exceeds the maximum of ${2 ** TREE_DEPTH} (2**${TREE_DEPTH})`,
+        );
+    }
+
     const empty = await getEmptyHashes();
 
     // Calculate minimal tree depth (next power of 2)
