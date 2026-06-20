@@ -8,6 +8,7 @@
  */
 
 import { browser } from '../utils/ssr';
+import { normalizeEmail } from '../utils/email';
 
 // Buffer polyfill is handled by hooks.client.ts in each app
 // This ensures Buffer is available before bb.js loads
@@ -251,8 +252,11 @@ export async function computeIdentityCommitment(
 ): Promise<bigint> {
     const bb = await initBarretenberg();
 
-    // 1. Hash the email (as bytes)
-    const emailBytes = stringToBytes(email.toLowerCase().trim(), MAX_EMAIL_LENGTH);
+    // 1. Hash the email (as bytes). Use the SINGLE shared canonicalizer so the
+    // create (leaf) side and the claim side hash byte-identical email bytes.
+    // normalizeEmail = lowercase+trim ONLY; it must NOT diverge from the bytes
+    // the Noir circuit binds to the JWT `email` claim (see utils/email.ts).
+    const emailBytes = stringToBytes(normalizeEmail(email), MAX_EMAIL_LENGTH);
     const emailHash = await pedersenHashBytes(emailBytes);
 
     let codeHash: bigint;
@@ -675,7 +679,7 @@ export async function processWhitelist(
             const leaf = await computeLeaf(email, currentAmount, currentSecret, unlockTime);
 
             claims.push({
-                email: email.toLowerCase().trim(),
+                email: normalizeEmail(email),
                 amount: currentAmount,
                 salt: '0x' + currentSecret.toString(16), // Store secret as Hex String of the Field Element
                 pin: masterSalt, // Store original PIN for CSV export

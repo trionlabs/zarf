@@ -5,6 +5,7 @@
     import { CheckCircle, ShieldCheck, AlertTriangle, RefreshCw, Wallet } from 'lucide-svelte';
     import ZenButton from '@zarf/ui/components/ui/ZenButton.svelte';
     import { toMessage } from '@zarf/core/utils/error';
+    import { normalizeEmail } from '@zarf/core/utils/email';
 
     let progress = $state(0);
     let statusMessage = $state('Initializing...');
@@ -82,7 +83,7 @@
                 jwt,
                 publicKey,
                 {
-                    email: email.toLowerCase().trim(),
+                    email: normalizeEmail(email),
                     salt,
                     amount,
                     merkleProof,

@@ -19,38 +19,32 @@ export function isValidEmail(email: string): boolean {
 }
 
 /**
- * Normalize email for consistent hashing
- * - Lowercase
- * - Trim whitespace
- * - Remove dots from Gmail local part (Gmail ignores dots)
- * - Remove plus addressing (alice+tag@co.com → alice@co.com)
+ * Canonicalize an email for identity hashing — the SINGLE normalizer shared by
+ * the create (whitelist/leaf) and claim (identity-commitment/proof) paths.
+ *
+ * Lowercase + trim ONLY. Deliberately does NOT strip Gmail dots or `+tags`.
+ *
+ * Why no dot/plus stripping: at CLAIM time the email is the verified Google JWT
+ * `email` claim, and the Noir circuit binds it via
+ * `jwt.assert_claim_string("email", expected_email)` and derives the leaf's
+ * `email_hash` from those exact bytes (circuits/src/main.nr). Google does not
+ * canonicalize the JWT email (it returns the user's literal address, e.g.
+ * `a.l.i.c.e@gmail.com`). If create pre-stripped dots/tags, the leaf's
+ * `email_hash` would never match the JWT-derived hash, and the allocation would
+ * be permanently unclaimable. So the leaf side MUST hash the same bytes the JWT
+ * carries — lowercase+trim is the only safe transform.
  *
  * @param email - Raw email address
- * @returns Normalized email for hashing
+ * @returns Canonical email for hashing (lowercase, trimmed)
  *
  * @example
  * ```typescript
- * normalizeEmail('Alice.Smith@gmail.com') // 'alicesmith@gmail.com'
- * normalizeEmail('bob+work@example.com')  // 'bob@example.com'
+ * normalizeEmail('Alice.Smith@gmail.com') // 'alice.smith@gmail.com'
+ * normalizeEmail('  Bob+Work@Example.com ') // 'bob+work@example.com'
  * ```
  */
 export function normalizeEmail(email: string): string {
-    let e = email.toLowerCase().trim();
-
-    // Gmail: dots in local part are ignored
-    if (e.endsWith('@gmail.com')) {
-        const [local, domain] = e.split('@');
-        e = local.replace(/\./g, '') + '@' + domain;
-    }
-
-    // Strip plus addressing: alice+tag@co.com → alice@co.com
-    const plusIdx = e.indexOf('+');
-    if (plusIdx > 0) {
-        const atIdx = e.indexOf('@');
-        e = e.slice(0, plusIdx) + e.slice(atIdx);
-    }
-
-    return e;
+    return email.toLowerCase().trim();
 }
 
 /**
