@@ -356,6 +356,59 @@ fn create_airdrop_rejects_invalid_inputs_without_funding() {
 }
 
 #[test]
+fn total_below_recipient_count_is_rejected_without_funding() {
+    // Floor-bind: every leaf amount is `>= 1` and there are `recipient_count`
+    // leaves, so an honest `Σ amount >= recipient_count`. A declared
+    // `total < recipient_count` is provably under-funded vs the declared
+    // recipient set and must be rejected (InvalidAmount) before any deploy/fund.
+    let env = Env::default();
+    let (factory, factory_id, token) = setup(&env);
+    let token_client = token::TokenClient::new(&env, &token);
+
+    let owner = Address::generate(&env);
+    let amount = 1_000_i128;
+    fund_owner(&env, &token, &owner, &factory_id, amount);
+
+    let good = nonzero_root(&env, 11);
+    let c = cid(&env);
+
+    // total (2) < recipient_count (3) -> InvalidAmount, no deploy, no transfer.
+    assert!(matches!(
+        factory.try_create_airdrop(
+            &owner,
+            &token,
+            &good,
+            &2i128,
+            &0u64,
+            &false,
+            &3u32,
+            &test_salt(&env, 7),
+            &c
+        ),
+        Err(Ok(FactoryError::InvalidAmount))
+    ));
+
+    // Boundary: total == recipient_count is ACCEPTED (the minimal honest sum,
+    // every leaf == 1). Pins the `<` boundary against a `<`->`<=` mutation.
+    let a = factory.create_airdrop(
+        &owner,
+        &token,
+        &good,
+        &3i128,
+        &0u64,
+        &false,
+        &3u32,
+        &test_salt(&env, 8),
+        &c,
+    );
+    assert_eq!(token_client.balance(&a), 3);
+    assert_eq!(factory.get_deployment_count(), 1);
+    // The rejected call short-circuited before transfer_from: owner only lost the
+    // 3 pulled by the accepted boundary deploy.
+    assert_eq!(token_client.balance(&owner), amount - 3);
+}
+
+#[test]
 fn future_and_unset_deadlines_are_accepted() {
     let env = Env::default();
     let (factory, factory_id, token) = setup(&env);
@@ -679,6 +732,12 @@ mod proptests {
             let root = nonzero_root(&env, 10);
             let salt = test_salt(&env, salt_n);
             let deadline: u64 = if use_deadline { 1_000_000 } else { 0 };
+            // Respect the create_airdrop floor-bind (`total >= recipient_count`):
+            // these legs exercise funding atomicity, not the floor check, so clamp
+            // the count to `total` (total <= 1e9 < u32::MAX) — otherwise a drawn
+            // `total < recipient_count` would short-circuit with InvalidAmount and
+            // mask the funding-path assertions below.
+            let recipient_count = recipient_count.min(total as u32);
 
             match leg {
                 0 => {

@@ -85,9 +85,16 @@ pub struct AirdropCreated {
     pub owner: Address,
     #[topic]
     pub token: Address,
+    /// Funded amount transferred into the instance. Equals `Σ leaf amount` only
+    /// by the TRUSTED OFF-CHAIN SOLVENCY INVARIANT — the Merkle root commits
+    /// per-leaf `(index, address, amount)`, so the factory cannot sum the leaves
+    /// without every proof and verifies only `total >= recipient_count` and the
+    /// exact credited balance (`create_airdrop` floor-bind + funding guard).
     pub total_amount: i128,
-    /// Off-chain metadata only — the instance does not verify the recipient
-    /// count on-chain; it is surfaced here for the indexer.
+    /// Off-chain metadata for the indexer: the instance never stores or verifies
+    /// a recipient count. The factory only floor-binds it via
+    /// `total >= recipient_count` (each leaf amount is `>= 1`); the exact leaf
+    /// count is not provable on-chain.
     pub recipient_count: u32,
     pub merkle_root: BytesN<32>,
     /// 0 = no deadline.
@@ -164,6 +171,24 @@ impl ZarfAirdropFactoryContract {
             return Err(Error::InvalidRecipientCount);
         }
         if total <= 0 {
+            return Err(Error::InvalidAmount);
+        }
+        // Floor-bind `total` to `recipient_count`: every leaf amount is `>= 1`
+        // (the instance `claim` rejects `amount <= 0`, lib.rs:150, and the JS
+        // claim-list builder rejects `amount <= 0`), and the tree commits exactly
+        // `recipient_count` leaves, so an honest `Σ amount >= recipient_count`.
+        // A declared `total < recipient_count` is therefore provably under-funded
+        // versus the declared recipient set — reject before any deploy/funding.
+        // This is the only side of the leaf-sum that is cheaply enforceable
+        // on-chain; the exact `total == Σ amount` equality is a TRUSTED OFF-CHAIN
+        // SOLVENCY INVARIANT (see the `total` note in `AirdropCreated`): the root
+        // commits per-leaf `(index, address, amount)` and the contract cannot sum
+        // the leaves without every proof, so it can verify neither over- nor exact
+        // funding. Residual risk is bounded: over-declared `total` (Σ < total)
+        // strands the surplus, recoverable by the admin via `withdraw_unclaimed`;
+        // under-declared `total` (Σ > total) is naturally capped by the funded
+        // balance (last claimants fail the transfer — first-come-first-served).
+        if total < i128::from(recipient_count) {
             return Err(Error::InvalidAmount);
         }
         if Self::is_zero_root(&merkle_root) {
