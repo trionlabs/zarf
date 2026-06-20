@@ -110,8 +110,6 @@ export interface Distribution {
 export interface DistributionDraft {
     name: string;
     description: string;
-    usRestricted: boolean;
-    euRestricted: boolean;
     poolAmount: number;
     poolInputValue: string;
     cliffDate: string;

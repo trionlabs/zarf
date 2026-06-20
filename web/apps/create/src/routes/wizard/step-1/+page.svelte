@@ -38,8 +38,6 @@
         if (d) {
             name = d.name;
             description = d.description;
-            usRestricted = d.usRestricted;
-            euRestricted = d.euRestricted;
             poolAmount = d.poolAmount;
             poolInputValue = d.poolInputValue;
             cliffDate = d.cliffDate;
@@ -57,8 +55,6 @@
     // Form Data
     let name = $state('');
     let description = $state('');
-    let usRestricted = $state(false);
-    let euRestricted = $state(false);
 
     let poolAmount = $state<number>(0);
     let poolInputValue = $state<string>('');
@@ -183,8 +179,6 @@
         const snapshot: DistributionDraft = {
             name,
             description,
-            usRestricted,
-            euRestricted,
             poolAmount,
             poolInputValue,
             cliffDate,
@@ -202,8 +196,6 @@
     function saveDistribution() {
         if (!isFormValid) return;
         const regulatoryRules: string[] = [];
-        if (usRestricted) regulatoryRules.push('US_RESTRICTED');
-        if (euRestricted) regulatoryRules.push('EU_RESTRICTED');
 
         const newDist: Distribution = {
             id: crypto.randomUUID(),
@@ -295,12 +287,7 @@
         <div class="flex-1 relative">
             {#if creationStep === 0}
                 <div in:slide={{ duration: 200, axis: 'x' }}>
-                    <DistributionIdentity
-                        bind:name
-                        bind:description
-                        bind:usRestricted
-                        bind:euRestricted
-                    />
+                    <DistributionIdentity bind:name bind:description />
                 </div>
             {:else if creationStep === 1}
                 <div in:slide={{ duration: 300, axis: 'x' }}>
@@ -458,15 +445,6 @@
                     </div>
                 {/if}
             </div>
-
-            <!-- Warning Footer -->
-            {#if usRestricted || euRestricted}
-                <div
-                    class="p-4 bg-zen-warning/5 text-zen-warning text-xs font-medium text-center border-t border-zen-warning/5"
-                >
-                    Regulatory Restrictions Apply
-                </div>
-            {/if}
         </div>
     </div>
 </div>

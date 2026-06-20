@@ -1,19 +1,19 @@
 <script lang="ts">
-    import { Shield } from 'lucide-svelte';
+    import { Shield, Lock } from 'lucide-svelte';
     import ZenInput from '@zarf/ui/components/ui/ZenInput.svelte';
-    import ZenCheckbox from '@zarf/ui/components/ui/ZenCheckbox.svelte';
 
-    let {
-        name = $bindable(),
-        description = $bindable(),
-        usRestricted = $bindable(),
-        euRestricted = $bindable(),
-    } = $props<{
+    let { name = $bindable(), description = $bindable() } = $props<{
         name: string;
         description: string;
-        usRestricted: boolean;
-        euRestricted: boolean;
     }>();
+
+    // Roadmap: privacy-preserving eligibility attestations, proven inside the claim circuit.
+    const upcomingCompliance = [
+        { label: 'Proof-of-personhood', hint: 'One verified human, one claim' },
+        { label: 'Jurisdiction gating', hint: 'Restrict by nationality, proven in-circuit' },
+        { label: 'Age verification', hint: 'Require 18+ without revealing date of birth' },
+        { label: 'Sanctions screening', hint: 'Screen against OFAC / denylists' },
+    ];
 </script>
 
 <div class="max-w-md space-y-6">
@@ -40,15 +40,26 @@
         <div class="flex items-center gap-2 mb-1">
             <Shield class="w-3.5 h-3.5 text-zen-fg-subtle" />
             <span class="text-xs font-bold uppercase tracking-widest text-zen-fg-subtle"
-                >Regional Restrictions</span
+                >Programmable Compliance</span
+            >
+            <span
+                class="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full border border-zen-border-subtle text-zen-fg-subtle"
+                >Coming soon</span
             >
         </div>
         <p class="text-xs text-zen-fg-subtle mb-3">
-            Wallets in these regions can't claim from this distribution.
+            Enforced within the privacy circuit. Rolling out incrementally.
         </p>
-        <div class="flex flex-wrap gap-4">
-            <ZenCheckbox label="Block United States" bind:checked={usRestricted} />
-            <ZenCheckbox label="Block European Union" bind:checked={euRestricted} />
+        <div class="flex flex-wrap gap-2">
+            {#each upcomingCompliance as item (item.label)}
+                <span
+                    class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-zen-border-subtle bg-zen-fg/[0.02] text-xs text-zen-fg-subtle"
+                    title={item.hint}
+                >
+                    <Lock class="w-3 h-3" />
+                    {item.label}
+                </span>
+            {/each}
         </div>
     </div>
 </div>
