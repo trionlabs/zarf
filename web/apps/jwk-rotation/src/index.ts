@@ -19,6 +19,18 @@ const LIMB_BITS = 120n;
 const LIMB_COUNT = 18;
 const FIELD_BYTES = 32;
 
+// Best-effort per-isolate rate limit for the admin-gated routes (/rotate, /state).
+// This worker holds REGISTRY_OWNER_SECRET — the trust root — so it is the
+// highest-value secret in the system; we throttle FAILED admin attempts per IP
+// to blunt online brute-forcing of ADMIN_TOKEN. Workers run many short-lived
+// isolates, so this caps a single hot isolate, not the fleet; it is a
+// defence-in-depth layer behind the constant-time token compare. Fixed window,
+// keyed by CF client IP.
+const ADMIN_RL_MAX_FAILURES = 10; // failed admin attempts per window per IP per isolate
+const ADMIN_RL_WINDOW_MS = 60_000;
+const ADMIN_RL_MAX_KEYS = 5_000; // prune trigger to bound isolate memory
+const adminFailureState = new Map<string, { count: number; resetAt: number }>();
+
 interface Env {
     STELLAR_RPC_URL: string;
     STELLAR_NETWORK_PASSPHRASE: string;
@@ -99,7 +111,7 @@ export default {
         }
 
         if (url.pathname === '/state' && request.method === 'GET') {
-            const auth = requireAdmin(request, env);
+            const auth = await requireAdmin(request, env);
             if (auth) return auth;
             validateConfig(env);
             const [jwks, registryKeys] = await Promise.all([
@@ -115,7 +127,7 @@ export default {
         }
 
         if (url.pathname === '/rotate' && request.method === 'POST') {
-            const auth = requireAdmin(request, env);
+            const auth = await requireAdmin(request, env);
             if (auth) return auth;
 
             const dryRun = parseBoolean(url.searchParams.get('dryRun'), false);
@@ -471,17 +483,66 @@ function validateConfig(env: Env): void {
     }
 }
 
-function requireAdmin(request: Request, env: Env): Response | null {
+async function requireAdmin(request: Request, env: Env): Promise<Response | null> {
     if (!env.ADMIN_TOKEN) {
         return json({ error: 'admin_token_not_configured' }, 503);
     }
 
+    const ip = request.headers.get('CF-Connecting-IP') ?? 'unknown';
+    if (isAdminRateLimited(ip)) {
+        return json({ error: 'rate_limited' }, 429, { 'Retry-After': '60' });
+    }
+
     const auth = request.headers.get('Authorization') || '';
-    if (auth !== `Bearer ${env.ADMIN_TOKEN}`) {
+    const ok = await constantTimeEqual(auth, `Bearer ${env.ADMIN_TOKEN}`);
+    if (!ok) {
+        recordAdminFailure(ip);
         return json({ error: 'unauthorized' }, 401);
     }
 
     return null;
+}
+
+// Length-independent, constant-time comparison: SHA-256 both sides (so the
+// digests are fixed-length regardless of input length, leaking no length
+// signal) then XOR-accumulate every byte before a single zero-check. The random
+// per-process HMAC-less digest is sufficient here because both operands are
+// already opaque secrets; we only need to deny a timing side-channel on the
+// byte-by-byte compare that `!==` would expose.
+async function constantTimeEqual(a: string, b: string): Promise<boolean> {
+    const encoder = new TextEncoder();
+    const [da, db] = await Promise.all([
+        crypto.subtle.digest('SHA-256', encoder.encode(a)),
+        crypto.subtle.digest('SHA-256', encoder.encode(b)),
+    ]);
+    const va = new Uint8Array(da);
+    const vb = new Uint8Array(db);
+    let diff = 0;
+    for (let i = 0; i < va.length; i += 1) {
+        diff |= va[i] ^ vb[i];
+    }
+    return diff === 0;
+}
+
+function isAdminRateLimited(ip: string): boolean {
+    const entry = adminFailureState.get(ip);
+    if (!entry || Date.now() >= entry.resetAt) return false;
+    return entry.count >= ADMIN_RL_MAX_FAILURES;
+}
+
+function recordAdminFailure(ip: string): void {
+    const now = Date.now();
+    if (adminFailureState.size > ADMIN_RL_MAX_KEYS) {
+        for (const [key, value] of adminFailureState) {
+            if (now >= value.resetAt) adminFailureState.delete(key);
+        }
+    }
+    const entry = adminFailureState.get(ip);
+    if (!entry || now >= entry.resetAt) {
+        adminFailureState.set(ip, { count: 1, resetAt: now + ADMIN_RL_WINDOW_MS });
+        return;
+    }
+    entry.count += 1;
 }
 
 async function sendAlert(env: Env, event: string, report: RotationReport): Promise<void> {
@@ -571,9 +632,9 @@ function concatBytes(chunks: Uint8Array[]): Uint8Array {
     return out;
 }
 
-function json(body: unknown, status = 200): Response {
+function json(body: unknown, status = 200, headers?: Record<string, string>): Response {
     return new Response(JSON.stringify(body, null, 2), {
         status,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...headers },
     });
 }
