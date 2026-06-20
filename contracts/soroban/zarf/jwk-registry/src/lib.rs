@@ -32,6 +32,20 @@ pub const MAX_ACTIVATION_DELAY_SECS: u64 = 7 * 24 * 3600;
 /// (which silently disabled the operator/owner split) is now rejected.
 pub const MIN_ACTIVATION_DELAY_SECS: u64 = 6 * 3600;
 
+/// Hard ceiling on the number of *simultaneously valid* signing keys. Every
+/// valid key can mint claims for every campaign, so the live key set IS the
+/// trust surface. Google publishes only a couple of RSA signing keys at a time
+/// (a handful during a rotation overlap), so 32 sits far above any legitimate
+/// steady state while still bounding the blast radius: a buggy or compromised
+/// rotation worker cannot inflate the set of keys that must each be trusted and
+/// individually revoked. The cap counts only *currently valid* keys —
+/// re-registering an already-valid key (the rotation job's steady-state op) and
+/// revoked keys do not count — so it tracks the live trust surface, never the
+/// cumulative history, and therefore can never brick rotation as keys turn
+/// over. Enforced fail-closed on every path that makes a key valid, including
+/// the permissionless `activate_key`.
+pub const MAX_ACTIVE_KEYS: u32 = 32;
+
 #[contract]
 pub struct JwkRegistryContract;
 
@@ -48,6 +62,7 @@ pub enum Error {
     InvalidModulus = 7,
     InvalidActivationDelay = 8,
     PendingOwnerNotSet = 9,
+    KeyLimitReached = 10,
 }
 
 #[contracttype]
@@ -59,7 +74,14 @@ pub enum DataKey {
     PendingOwner,
     Key(BytesN<32>),
     Kid(String),
+    /// Cumulative count of distinct hashes ever enumerated (includes revoked
+    /// slots). Drives `KeyAt` indexing; never decreases.
     KeyCount,
+    /// Count of *currently valid* keys. Incremented on every false->true
+    /// transition in `store_key`, decremented on revocation. Bounded by
+    /// `MAX_ACTIVE_KEYS` — this is the live trust surface, distinct from the
+    /// monotonic `KeyCount`.
+    ActiveKeyCount,
     KeyAt(u32),
     /// Reverse lookup hash -> enumeration index, so re-registering or
     /// revoking a key can re-extend its `KeyAt` entry's TTL without scanning.
@@ -175,6 +197,9 @@ impl JwkRegistryContract {
         }
         env.storage().instance().set(&DataKey::Owner, &owner);
         env.storage().instance().set(&DataKey::KeyCount, &0_u32);
+        env.storage()
+            .instance()
+            .set(&DataKey::ActiveKeyCount, &0_u32);
         env.storage().instance().set(&DataKey::PendingCount, &0_u32);
         env.storage()
             .instance()
@@ -272,7 +297,7 @@ impl JwkRegistryContract {
         let key_hash = Self::compute_hash(&env, &pubkey_limbs)?;
         Self::validate_modulus(&pubkey_limbs)?;
         Self::remove_pending(&env, &key_hash);
-        Self::store_key(&env, kid, key_hash.clone());
+        Self::store_key(&env, kid, key_hash.clone())?;
         Ok(key_hash)
     }
 
@@ -343,7 +368,7 @@ impl JwkRegistryContract {
         }
 
         Self::remove_pending(&env, &key_hash);
-        Self::store_key(&env, pending.kid, key_hash.clone());
+        Self::store_key(&env, pending.kid, key_hash.clone())?;
         KeyActivated { key_hash }.publish(&env);
         Ok(())
     }
@@ -381,8 +406,26 @@ impl JwkRegistryContract {
             .ok_or(Error::PendingNotFound)
     }
 
-    fn store_key(env: &Env, kid: String, key_hash: BytesN<32>) {
+    fn store_key(env: &Env, kid: String, key_hash: BytesN<32>) -> Result<(), Error> {
         let persistent = env.storage().persistent();
+
+        // A key that is not currently valid (brand-new, or previously revoked
+        // and now being re-registered/activated) is about to enter the live
+        // trust set. Enforce the active-key ceiling on exactly that transition,
+        // fail-closed and on every path (owner register AND permissionless
+        // activate). Re-registering an already-valid key — the rotation job's
+        // steady-state — must stay free, or the cap would block routine TTL
+        // re-extension once the set is full. Reading the count before any
+        // mutation keeps a rejected call side-effect-free (and a top-level Err
+        // reverts the whole invocation regardless).
+        let was_valid = persistent
+            .get::<DataKey, bool>(&DataKey::Key(key_hash.clone()))
+            .unwrap_or(false);
+        let active = Self::active_key_count(env);
+        if !was_valid && active >= MAX_ACTIVE_KEYS {
+            return Err(Error::KeyLimitReached);
+        }
+
         // Gate the enumeration slot on "has this hash EVER been enumerated"
         // (KeyIndex presence), not on current validity: re-registering a
         // previously revoked key must reuse its slot, not append a duplicate.
@@ -407,6 +450,13 @@ impl JwkRegistryContract {
         let key = DataKey::Key(key_hash.clone());
         persistent.set(&key, &true);
         persistent.extend_ttl(&key, TTL_THRESHOLD, TTL_EXTEND_TO);
+        if !was_valid {
+            // This key just entered the live set; keep the active-key counter in
+            // lockstep so the ceiling and `get_active_key_count` stay accurate.
+            env.storage()
+                .instance()
+                .set(&DataKey::ActiveKeyCount, &(active + 1));
+        }
         let kid_key = DataKey::Kid(kid.clone());
         persistent.set(&kid_key, &key_hash);
         persistent.extend_ttl(&kid_key, TTL_THRESHOLD, TTL_EXTEND_TO);
@@ -416,6 +466,7 @@ impl JwkRegistryContract {
             kid,
         }
         .publish(env);
+        Ok(())
     }
 
     /// Owner revocation (immediate).
@@ -451,6 +502,13 @@ impl JwkRegistryContract {
         env.storage()
             .persistent()
             .extend_ttl(&key, TTL_THRESHOLD, TTL_EXTEND_TO);
+        // This entry guards on `is_valid_key_hash` above, so reaching here is
+        // always a true->false transition: drop the active-key counter so the
+        // ceiling reflects reality and a later activation can reuse the slot.
+        env.storage().instance().set(
+            &DataKey::ActiveKeyCount,
+            &Self::active_key_count(env).saturating_sub(1),
+        );
         Self::extend_enumeration_ttl(env, &key_hash);
         Self::extend_contract_ttl(env);
         KeyRevoked { key_hash }.publish(env);
@@ -475,6 +533,13 @@ impl JwkRegistryContract {
 
     pub fn get_registered_key_count(env: Env) -> u32 {
         Self::key_count(&env)
+    }
+
+    /// Number of currently-valid keys (the live trust surface), capped at
+    /// `MAX_ACTIVE_KEYS`. Distinct from `get_registered_key_count`, which counts
+    /// every hash ever enumerated, revoked ones included.
+    pub fn get_active_key_count(env: Env) -> u32 {
+        Self::active_key_count(&env)
     }
 
     pub fn get_registered_key(env: Env, index: u32) -> Result<BytesN<32>, Error> {
@@ -582,6 +647,13 @@ impl JwkRegistryContract {
         env.storage()
             .instance()
             .get(&DataKey::KeyCount)
+            .unwrap_or(0_u32)
+    }
+
+    fn active_key_count(env: &Env) -> u32 {
+        env.storage()
+            .instance()
+            .get(&DataKey::ActiveKeyCount)
             .unwrap_or(0_u32)
     }
 
