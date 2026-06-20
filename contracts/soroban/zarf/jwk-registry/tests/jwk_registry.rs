@@ -7,8 +7,8 @@ use soroban_sdk::{
 };
 use zarf_jwk_registry::{
     DataKey, Error as RegistryError, JwkRegistryContract, JwkRegistryContractClient,
-    DAY_IN_LEDGERS, MAX_ACTIVATION_DELAY_SECS, MAX_ACTIVE_KEYS, MIN_ACTIVATION_DELAY_SECS,
-    TTL_EXTEND_TO,
+    DAY_IN_LEDGERS, MAX_ACTIVATION_DELAY_SECS, MAX_ACTIVE_KEYS, MAX_PENDING_KEYS,
+    MIN_ACTIVATION_DELAY_SECS, TTL_EXTEND_TO,
 };
 
 const DELAY_SECS: u64 = 6 * 3600;
@@ -914,4 +914,178 @@ fn active_key_cap_blocks_permissionless_activation_and_preserves_pending() {
     client.activate_key(&pending_hash);
     assert!(client.is_valid_key_hash(&pending_hash));
     assert_eq!(client.get_active_key_count(), MAX_ACTIVE_KEYS);
+}
+
+#[test]
+fn pending_cap_blocks_unbounded_staging_but_not_re_proposals() {
+    // A compromised/buggy operator must not be able to stage an unbounded
+    // pending set (storage griefing). Filling the pending set to the ceiling
+    // then proposing one more DISTINCT hash fails closed with no state change;
+    // re-proposing an ALREADY-pending hash (the worker's steady-state retry)
+    // must stay allowed even at the cap, or routine rotation would brick.
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let (_owner, _id, client) = setup(&env);
+    let operator = Address::generate(&env);
+    client.set_operator(&operator);
+
+    // Fill the pending set to the ceiling with MAX_PENDING_KEYS distinct hashes.
+    let first_hash = client.propose_key(&String::from_str(&env, "k1"), &limbs_with_seed(&env, 1));
+    for seed in 2..=(MAX_PENDING_KEYS as u8) {
+        client.propose_key(&String::from_str(&env, "k"), &limbs_with_seed(&env, seed));
+    }
+    assert_eq!(client.get_pending_count(), MAX_PENDING_KEYS);
+
+    // One more DISTINCT proposal exceeds the ceiling: fail closed, no change.
+    let overflow_seed = (MAX_PENDING_KEYS as u8) + 1;
+    match client.try_propose_key(
+        &String::from_str(&env, "overflow"),
+        &limbs_with_seed(&env, overflow_seed),
+    ) {
+        Err(Ok(RegistryError::PendingLimitReached)) => {}
+        other => panic!("expected PendingLimitReached at the cap, got {:?}", other),
+    }
+    assert_eq!(client.get_pending_count(), MAX_PENDING_KEYS);
+    assert!(client
+        .get_pending(&client.compute_key_hash(&limbs_with_seed(&env, overflow_seed)))
+        .is_none());
+
+    // Re-proposing an already-pending hash does not consume a slot, so it stays
+    // allowed at the ceiling — the rotation worker is never bricked.
+    let re = client.propose_key(&String::from_str(&env, "k1"), &limbs_with_seed(&env, 1));
+    assert_eq!(re, first_hash);
+    assert_eq!(client.get_pending_count(), MAX_PENDING_KEYS);
+
+    // Cancelling one frees exactly one slot, and the overflow proposal then fits.
+    client.cancel_pending(&first_hash);
+    assert_eq!(client.get_pending_count(), MAX_PENDING_KEYS - 1);
+    client.propose_key(
+        &String::from_str(&env, "overflow"),
+        &limbs_with_seed(&env, overflow_seed),
+    );
+    assert_eq!(client.get_pending_count(), MAX_PENDING_KEYS);
+}
+
+#[test]
+fn owner_can_batch_cancel_all_pending() {
+    // Incident response: the owner drains the entire pending set in one call
+    // (O(1)-ish remediation) instead of one cancel_pending per hash. After the
+    // drain the enumeration is empty and no staged key can later activate.
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let (_owner, _id, client) = setup(&env);
+    let operator = Address::generate(&env);
+    client.set_operator(&operator);
+
+    // Stage several distinct proposals.
+    let mut hashes = Vec::new(&env);
+    for seed in 1..=5_u8 {
+        hashes.push_back(
+            client.propose_key(&String::from_str(&env, "k"), &limbs_with_seed(&env, seed)),
+        );
+    }
+    assert_eq!(client.get_pending_count(), 5);
+
+    // One call clears them all.
+    client.cancel_all_pending();
+    assert_eq!(client.get_pending_count(), 0);
+    for h in hashes.iter() {
+        assert!(client.get_pending(&h).is_none());
+        assert!(!client.is_valid_key_hash(&h));
+    }
+    // The enumeration is fully drained: index 0 no longer resolves.
+    assert!(client.try_get_pending_at(&0).is_err());
+
+    // No staged key can be activated after the batch cancel, even past the delay.
+    env.ledger().with_mut(|l| l.timestamp += DELAY_SECS + 1);
+    for h in hashes.iter() {
+        match client.try_activate_key(&h) {
+            Err(Ok(RegistryError::PendingNotFound)) => {}
+            other => panic!(
+                "expected PendingNotFound after batch cancel, got {:?}",
+                other
+            ),
+        }
+    }
+
+    // Idempotent: calling it again on an empty set is a no-op, not an error.
+    client.cancel_all_pending();
+    assert_eq!(client.get_pending_count(), 0);
+
+    // The enumeration is clean enough to keep working: a fresh proposal lands
+    // at index 0, proving PendingCount/PendingAt were reset, not corrupted.
+    let fresh = client.propose_key(&String::from_str(&env, "fresh"), &limbs_with_seed(&env, 9));
+    assert_eq!(client.get_pending_count(), 1);
+    assert_eq!(client.get_pending_at(&0), fresh);
+}
+
+#[test]
+fn batch_cancel_all_pending_requires_owner_auth() {
+    // cancel_all_pending is an owner-only lever: a non-owner signature must not
+    // satisfy it, and the pending set must be left untouched.
+    let env = Env::default();
+
+    let owner = Address::generate(&env);
+    let operator = Address::generate(&env);
+    let stranger = Address::generate(&env);
+    let id = env.register(JwkRegistryContract, (owner.clone(), DELAY_SECS));
+    let client = JwkRegistryContractClient::new(&env, &id);
+
+    client
+        .mock_auths(&[MockAuth {
+            address: &owner,
+            invoke: &MockAuthInvoke {
+                contract: &id,
+                fn_name: "set_operator",
+                args: (&operator,).into_val(&env),
+                sub_invokes: &[],
+            },
+        }])
+        .set_operator(&operator);
+
+    let kid = String::from_str(&env, "google-key-1");
+    let limbs = limbs(&env);
+    client
+        .mock_auths(&[MockAuth {
+            address: &operator,
+            invoke: &MockAuthInvoke {
+                contract: &id,
+                fn_name: "propose_key",
+                args: (&kid, &limbs).into_val(&env),
+                sub_invokes: &[],
+            },
+        }])
+        .propose_key(&kid, &limbs);
+    assert_eq!(client.get_pending_count(), 1);
+
+    // A stranger's signature does not satisfy the owner-only batch cancel.
+    assert!(client
+        .mock_auths(&[MockAuth {
+            address: &stranger,
+            invoke: &MockAuthInvoke {
+                contract: &id,
+                fn_name: "cancel_all_pending",
+                args: ().into_val(&env),
+                sub_invokes: &[],
+            },
+        }])
+        .try_cancel_all_pending()
+        .is_err());
+    assert_eq!(client.get_pending_count(), 1);
+
+    // The owner can.
+    client
+        .mock_auths(&[MockAuth {
+            address: &owner,
+            invoke: &MockAuthInvoke {
+                contract: &id,
+                fn_name: "cancel_all_pending",
+                args: ().into_val(&env),
+                sub_invokes: &[],
+            },
+        }])
+        .cancel_all_pending();
+    assert_eq!(client.get_pending_count(), 0);
 }
