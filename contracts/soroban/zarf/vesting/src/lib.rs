@@ -128,6 +128,21 @@ pub struct Claimed {
 
 #[contractimpl]
 impl ZarfVestingContract {
+    /// Wires the campaign's immutable trust anchors.
+    ///
+    /// SECURITY (by design): `verifier` and `jwk_registry` are stored verbatim
+    /// and are NOT validated here — the contract cannot tell a correct verifier
+    /// from a malicious one by inspection, and a probe call would only prove the
+    /// address answers, not that it enforces the right circuit/VK. The intended
+    /// deployment path is the `factory`, which constructs every campaign with
+    /// the SAME canonical, audited verifier + registry addresses (and the
+    /// factory E2E gate verifies a known-good fixture proof against the freshly
+    /// deployed verifier BEFORE wiring it in). A campaign deployed directly,
+    /// bypassing the factory, inherits full responsibility for passing the
+    /// canonical addresses: a wrong/hostile `verifier` accepts forged proofs and
+    /// a wrong `jwk_registry` trusts attacker keys — either drains the campaign.
+    /// Both are immutable after construction (no setter), so this is a
+    /// deploy-time invariant the deployer MUST verify, not a runtime control.
     pub fn __constructor(
         env: Env,
         owner: Address,
