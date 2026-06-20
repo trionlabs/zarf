@@ -647,6 +647,50 @@ fn owner_can_cancel_a_pending_key() {
 }
 
 #[test]
+fn revoking_a_key_clears_its_pending_proposal() {
+    // Regression: a revocation must also drop any outstanding proposal for the
+    // same hash, or the permissionless `activate_key` could resurrect the
+    // just-revoked key after the delay — defeating fail-safe revocation.
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let (_owner, _id, client) = setup(&env);
+    let operator = Address::generate(&env);
+    client.set_operator(&operator);
+
+    let kid = String::from_str(&env, "google-key-1");
+    let limbs = limbs(&env);
+
+    // Stage and activate the key so it is live on-chain.
+    let key_hash = client.propose_key(&kid, &limbs);
+    env.ledger().with_mut(|l| l.timestamp += DELAY_SECS + 1);
+    client.activate_key(&key_hash);
+    assert!(client.is_valid_key_hash(&key_hash));
+
+    // The rotation worker re-proposes the same (already-active) hash — a normal
+    // occurrence — so a fresh Pending entry now coexists with the live key.
+    let key_hash_again = client.propose_key(&kid, &limbs);
+    assert_eq!(key_hash_again, key_hash);
+    assert_eq!(client.get_pending_count(), 1);
+
+    // Incident response: the owner revokes the key.
+    client.revoke_key(&key_hash);
+    assert!(!client.is_valid_key_hash(&key_hash));
+
+    // The revocation must have cleared the pending proposal too.
+    assert_eq!(client.get_pending_count(), 0);
+    assert!(client.get_pending(&key_hash).is_none());
+
+    // So a permissionless activate after the delay cannot bring it back.
+    env.ledger().with_mut(|l| l.timestamp += DELAY_SECS + 1);
+    match client.try_activate_key(&key_hash) {
+        Err(Ok(RegistryError::PendingNotFound)) => {}
+        other => panic!("expected PendingNotFound after revoke, got {:?}", other),
+    }
+    assert!(!client.is_valid_key_hash(&key_hash));
+}
+
+#[test]
 fn pending_enumeration_swap_removes() {
     let env = Env::default();
     env.mock_all_auths();

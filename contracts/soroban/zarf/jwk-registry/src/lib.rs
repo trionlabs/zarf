@@ -436,6 +436,13 @@ impl JwkRegistryContract {
             return Err(Error::KeyNotFound);
         }
 
+        // A revocation must also clear any outstanding proposal for the same
+        // hash. Otherwise `activate_key` (permissionless, once the delay
+        // elapses) would resurrect the just-revoked key from the surviving
+        // `Pending` entry — defeating the fail-safe revocation guarantee during
+        // exactly the incident-response window it exists for.
+        Self::remove_pending(env, &key_hash);
+
         let key = DataKey::Key(key_hash.clone());
         env.storage().persistent().set(&key, &false);
         // Keep the explicit `false` alive: an archived revocation reads the
