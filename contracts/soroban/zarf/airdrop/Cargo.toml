@@ -7,10 +7,10 @@ edition = "2021"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-soroban-sdk = { version = "26.0.0-rc.1", default-features = false, features = ["alloc"] }
+soroban-sdk = { version = "26.1.0", default-features = false, features = ["alloc"] }
 
 [dev-dependencies]
-soroban-sdk = { version = "26.0.0-rc.1", default-features = false, features = ["alloc", "testutils"] }
+soroban-sdk = { version = "26.1.0", default-features = false, features = ["alloc", "testutils"] }
 # Test-only: generate + parse the canonical Rust<->JS merkle-vectors.json fixture.
 # Dev-dependency only — does NOT affect the wasm32v1-none cdylib build.
 serde = { version = "1", features = ["derive"] }
