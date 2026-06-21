@@ -25,6 +25,8 @@ interface Env {
     PINATA_JWT: string;
     ALLOWED_ORIGINS: string;
     MAX_BODY_BYTES: string;
+    /** Optional ceiling on claim-list entries; defaults to DEFAULT_MAX_CLAIM_ENTRIES. */
+    MAX_CLAIM_ENTRIES?: string;
 }
 
 interface ClaimList {
@@ -65,6 +67,27 @@ const IPFS_READ_GATEWAYS = [
 ];
 const MAX_GATEWAY_RESPONSE_BYTES = 8 * 1024 * 1024;
 
+// Per-isolate fixed-window rate limit for the write (pin) routes. This is the
+// primary defence against Pinata quota/cost abuse: the SEP-53 owner signature
+// only proves key-POSSESSION (a fresh Keypair.random() signs its own body and
+// passes), not authorization, so without a request cap an attacker could loop
+// valid pins and burn the project's paid Pinata quota. Workers run many
+// short-lived isolates, so this caps a single hot isolate, not the fleet —
+// fleet-wide limits belong at the Cloudflare WAF — but it bounds per-IP cost.
+// Keyed by CF client IP; mirrors the indexer's rateLimitAirdrop.
+const PIN_RL_MAX = 20; // pin requests per window per IP per isolate
+const PIN_RL_WINDOW_MS = 60_000;
+const PIN_RL_MAX_KEYS = 5_000; // prune trigger to bound isolate memory
+const pinRateState = new Map<string, { count: number; resetAt: number }>();
+
+// Deterministic ceiling on claim-list entries, independent of byte size: bounds
+// the JSON parse + per-entry work regardless of how MAX_BODY_BYTES is tuned. The
+// default sits well above any realistic distribution (the body-size cap binds
+// first under the default MAX_BODY_BYTES) so it never rejects a legitimate
+// airdrop — it is the meaningful backstop when an operator RAISES MAX_BODY_BYTES
+// for a large list. Override via env.MAX_CLAIM_ENTRIES.
+const DEFAULT_MAX_CLAIM_ENTRIES = 100_000;
+
 export default {
     async fetch(request: Request, env: Env): Promise<Response> {
         const url = new URL(request.url);
@@ -100,6 +123,9 @@ async function handlePin(
     env: Env,
     corsHeaders: Record<string, string>,
 ): Promise<Response> {
+    const limited = rateLimitPin(request, corsHeaders);
+    if (limited) return limited;
+
     const maxBytes = Number(env.MAX_BODY_BYTES) || 1_048_576;
     const contentLength = Number(request.headers.get('Content-Length') || '0');
     if (contentLength > maxBytes) {
@@ -123,7 +149,8 @@ async function handlePin(
         return json({ error: 'invalid_json' }, 400, corsHeaders);
     }
 
-    const validationError = validateClaimList(body);
+    const maxEntries = Number(env.MAX_CLAIM_ENTRIES) || DEFAULT_MAX_CLAIM_ENTRIES;
+    const validationError = validateClaimList(body, maxEntries);
     if (validationError) {
         return json({ error: 'invalid_claim_list', reason: validationError }, 400, corsHeaders);
     }
@@ -179,6 +206,9 @@ async function handlePinAirdrop(
     env: Env,
     corsHeaders: Record<string, string>,
 ): Promise<Response> {
+    const limited = rateLimitPin(request, corsHeaders);
+    if (limited) return limited;
+
     const maxBytes = Number(env.MAX_BODY_BYTES) || 1_048_576;
     const contentLength = Number(request.headers.get('Content-Length') || '0');
     if (contentLength > maxBytes) {
@@ -202,7 +232,8 @@ async function handlePinAirdrop(
         return json({ error: 'invalid_json' }, 400, corsHeaders);
     }
 
-    const validationError = validateAirdropClaimList(body);
+    const maxEntries = Number(env.MAX_CLAIM_ENTRIES) || DEFAULT_MAX_CLAIM_ENTRIES;
+    const validationError = validateAirdropClaimList(body, maxEntries);
     if (validationError) {
         return json({ error: 'invalid_claim_list', reason: validationError }, 400, corsHeaders);
     }
@@ -302,7 +333,7 @@ async function handleIpfsRead(url: URL, corsHeaders: Record<string, string>): Pr
     return json({ error: 'ipfs_gateway_error', detail: errors.join('; ') }, 502, corsHeaders);
 }
 
-function validateClaimList(body: unknown): string | null {
+function validateClaimList(body: unknown, maxEntries: number): string | null {
     if (!body || typeof body !== 'object') return 'not_an_object';
     const obj = body as Record<string, unknown>;
 
@@ -311,6 +342,9 @@ function validateClaimList(body: unknown): string | null {
     }
     if (!Array.isArray(obj.leaves) || obj.leaves.length === 0) {
         return 'missing_or_empty_leaves';
+    }
+    if (obj.leaves.length > maxEntries) {
+        return 'too_many_leaves';
     }
     if (obj.leaves.some((leaf) => typeof leaf !== 'string' || !HEX_32.test(leaf))) {
         return 'invalid_leaf';
@@ -327,7 +361,7 @@ function validateClaimList(body: unknown): string | null {
  * No `schedule` (that is the vesting shape). Additive — `validateClaimList`
  * stays untouched.
  */
-function validateAirdropClaimList(body: unknown): string | null {
+function validateAirdropClaimList(body: unknown, maxEntries: number): string | null {
     if (!body || typeof body !== 'object') return 'not_an_object';
     const obj = body as Record<string, unknown>;
 
@@ -338,6 +372,7 @@ function validateAirdropClaimList(body: unknown): string | null {
     if (typeof obj.root !== 'string' || !HEX_32.test(obj.root)) return 'missing_or_invalid_root';
     if (!obj.format || typeof obj.format !== 'object') return 'missing_format';
     if (!Array.isArray(obj.claims) || obj.claims.length === 0) return 'missing_or_empty_claims';
+    if (obj.claims.length > maxEntries) return 'too_many_claims';
 
     for (const entry of obj.claims) {
         if (!entry || typeof entry !== 'object') return 'invalid_claim';
@@ -495,6 +530,31 @@ function buildCorsHeaders(origin: string | null, env: Env): Record<string, strin
         'Access-Control-Max-Age': '86400',
         Vary: 'Origin',
     };
+}
+
+/**
+ * Best-effort per-isolate, per-IP fixed-window rate limit for the pin routes.
+ * Returns a 429 Response when the IP has exceeded the window, else null (and
+ * records the hit). Memory is bounded by pruning expired entries past a key cap.
+ */
+function rateLimitPin(request: Request, corsHeaders: Record<string, string>): Response | null {
+    const now = Date.now();
+    const ip = request.headers.get('CF-Connecting-IP') ?? 'unknown';
+    if (pinRateState.size > PIN_RL_MAX_KEYS) {
+        for (const [key, value] of pinRateState) {
+            if (now >= value.resetAt) pinRateState.delete(key);
+        }
+    }
+    const entry = pinRateState.get(ip);
+    if (!entry || now >= entry.resetAt) {
+        pinRateState.set(ip, { count: 1, resetAt: now + PIN_RL_WINDOW_MS });
+        return null;
+    }
+    if (entry.count >= PIN_RL_MAX) {
+        return json({ error: 'rate_limited' }, 429, { ...corsHeaders, 'Retry-After': '60' });
+    }
+    entry.count += 1;
+    return null;
 }
 
 function json(body: unknown, status: number, extraHeaders: Record<string, string> = {}): Response {

@@ -77,8 +77,16 @@ function vestingDoc(root: string): Record<string, unknown> {
     return { merkleRoot: root, leaves: [`0x${'ef'.repeat(32)}`], schedule: { cliff: 0 } };
 }
 
+let reqSeq = 0;
 function post(path: string, headers: Record<string, string>, body: string): Request {
-    return new Request(`https://proxy.example${path}`, { method: 'POST', headers, body });
+    // Give each request a distinct client IP unless the caller pinned one, so
+    // the per-IP pin rate limit never makes independent tests collide.
+    let h = headers;
+    if (!('CF-Connecting-IP' in headers)) {
+        const n = reqSeq++;
+        h = { ...headers, 'CF-Connecting-IP': `10.42.${(n >> 8) & 255}.${n & 255}` };
+    }
+    return new Request(`https://proxy.example${path}`, { method: 'POST', headers: h, body });
 }
 
 type PinResult = { cid?: string; error?: string; reason?: string };
@@ -198,5 +206,79 @@ describe('pin-proxy /pin (vesting route — zero touch)', () => {
         const res = await worker.fetch(post('/pin', await authHeaders(kp, ROOT, body), body), ENV);
         expect(res.status).toBe(200);
         expect(((await res.json()) as PinResult).cid).toBe('bafyPINNED');
+    });
+});
+
+describe('pin-proxy abuse caps (F2)', () => {
+    beforeEach(() => {
+        vi.stubGlobal(
+            'fetch',
+            vi.fn(
+                async () =>
+                    new Response(
+                        JSON.stringify({ IpfsHash: 'bafyPINNED', PinSize: 99, Timestamp: 'now' }),
+                        { status: 200 },
+                    ),
+            ),
+        );
+    });
+    afterEach(() => {
+        vi.unstubAllGlobals();
+        vi.clearAllMocks();
+    });
+
+    it('rate-limits a single IP after 20 pin attempts (429 + Retry-After)', async () => {
+        const ip = '203.0.113.7';
+        const hdrs = { 'Content-Type': 'application/json', 'CF-Connecting-IP': ip };
+        // The first 20 pass the rate gate (then 400 on the empty body) — never 429.
+        for (let i = 0; i < 20; i += 1) {
+            const res = await worker.fetch(post('/pin', hdrs, '{}'), ENV);
+            expect(res.status, `attempt ${i + 1}`).not.toBe(429);
+        }
+        const limited = await worker.fetch(post('/pin', hdrs, '{}'), ENV);
+        expect(limited.status).toBe(429);
+        expect(((await limited.json()) as PinResult).error).toBe('rate_limited');
+        expect(limited.headers.get('Retry-After')).toBe('60');
+    });
+
+    it('does not rate-limit a different, unseen IP', async () => {
+        const res = await worker.fetch(
+            post('/pin', { 'Content-Type': 'application/json', 'CF-Connecting-IP': '203.0.113.8' }, '{}'),
+            ENV,
+        );
+        expect(res.status).not.toBe(429);
+    });
+
+    it('rejects a vesting claim-list exceeding MAX_CLAIM_ENTRIES (pre-auth 400)', async () => {
+        const env = { ...ENV, MAX_CLAIM_ENTRIES: '1' };
+        const doc = {
+            merkleRoot: ROOT,
+            leaves: [`0x${'ef'.repeat(32)}`, `0x${'ab'.repeat(32)}`],
+            schedule: { cliff: 0 },
+        };
+        const res = await worker.fetch(
+            post('/pin', { 'Content-Type': 'application/json' }, JSON.stringify(doc)),
+            env,
+        );
+        expect(res.status).toBe(400);
+        const out = (await res.json()) as PinResult;
+        expect(out.error).toBe('invalid_claim_list');
+        expect(out.reason).toBe('too_many_leaves');
+    });
+
+    it('rejects an airdrop claim-list exceeding MAX_CLAIM_ENTRIES (pre-auth 400)', async () => {
+        const env = { ...ENV, MAX_CLAIM_ENTRIES: '1' };
+        const doc = airdropDoc(ROOT);
+        (doc.claims as Array<Record<string, unknown>>).push({
+            address: 'GC6TCMKAV55B5M3ESAJZLEJXSD2KF6UGWXCIFZDB7VURMTLYW724ITS4',
+            amount: '5',
+            proof: [PROOF_NODE],
+        });
+        const res = await worker.fetch(
+            post('/pin-airdrop', { 'Content-Type': 'application/json' }, JSON.stringify(doc)),
+            env,
+        );
+        expect(res.status).toBe(400);
+        expect(((await res.json()) as PinResult).reason).toBe('too_many_claims');
     });
 });
