@@ -286,7 +286,7 @@
     // the non-reactive runtime singleton, so depend on networkStore.activeId to
     // recompute when the user toggles networks (same trick the presets use).
     const explorerUrl = $derived.by(() => {
-        networkStore.activeId;
+        void networkStore.activeId; // touch the reactive dep so this recomputes on network toggle
         return tokenAddress ? getContractExplorerUrl(tokenAddress) : '#';
     });
 
