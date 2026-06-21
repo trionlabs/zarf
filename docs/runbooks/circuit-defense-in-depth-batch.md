@@ -1,9 +1,33 @@
 # Circuit defense-in-depth batch (coordinated VK regen)
 
-**Status:** planned, not yet applied. **Severity of every item below: Low /
+**Status: APPLIED on `hardening/web-infra` (2026-06-21).** All four items are
+resolved and folded into a single VK regen:
+- **Item 1** — fixed in-circuit (owner chose the `< p` injective decode over the
+  accepted-risk ADR). Implemented by comparing the nonce's 32 decoded bytes
+  against `recipient.to_be_bytes::<32>()` (canonical, value `< p`), which admits
+  the full `[0, p)` recipient range while rejecting non-canonical preimages.
+  **Adversarially verified SOUND** (no funds-lock / no injectivity gap; Noir
+  `to_be_bytes` confirmed canonical against stdlib docs).
+- **Item 2** — fixed in-circuit (`assert(is_right * (is_right - 1) == 0)`).
+- **Items 3 & 4** — reviewed, **no change needed** (offset is bound by the
+  signature-verified span; `jwt_exp` is a u64 that cannot alias into Field and
+  overflows in-circuit on a malformed claim). Rationale documented inline at the
+  call sites in `circuits/src/main.nr`.
+
+New `vk_hash` after the batch: `0x120d37a4a2a7c13da4369006e00bc4fcd0ce82cdfcca87ce60c5fd1fb03dfefc`
+(was `0x27aeb147...` for the M1 nonce-binding VK). `nargo test` 15 green (incl.
+3 new regression cases); full Rust suite green against the regenerated fixtures
+(verifier 9, vesting 24, registry 28, factory 15). The on-chain cutover itself
+(deploy order, OAuth round-trip) still follows
+[`circuit-redeploy-cutover.md`](circuit-redeploy-cutover.md) and the PR stays
+**draft / do-not-merge** until contracts redeploy first.
+
+**Severity of every item below: Low /
 defense-in-depth — none is a theft vector.** They are batched here so they ship
 as ONE circuit change and ONE coordinated redeploy, never piecemeal (any circuit
 edit regenerates the VK; see [`circuit-redeploy-cutover.md`](circuit-redeploy-cutover.md)).
+
+The per-item analysis below is retained for the record.
 
 ## Why these are Low, not Critical
 

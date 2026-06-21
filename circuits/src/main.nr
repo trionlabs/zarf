@@ -78,14 +78,29 @@ fn hex_digit_value(c: u8) -> Field {
 /// must carry nonce == lowercase 64-hex of `recipient`. A stolen id_token
 /// therefore only proves for the recipient the victim requested, closing the
 /// token-theft claim-redirection path.
+///
+/// Defense-in-depth Item 1 (injective decoding): the previous decoder folded the
+/// 64 hex digits into a Field with `acc = acc * 16 + digit`, accumulating up to
+/// 256 bits into the BN254 scalar (p ~= 2^253.6). Non-canonical preimages whose
+/// integer value is >= p wrapped mod p, so up to ~4 distinct 64-hex strings
+/// aliased the same recipient. We now compare against the recipient's CANONICAL
+/// 32-byte big-endian encoding: `recipient` is a Field in [0, p), so
+/// `to_be_bytes::<32>` is its unique representative and a nonce whose integer
+/// value is >= p can never equal it. This admits the FULL [0, p) recipient range
+/// (no digit is constrained to zero) while making the encoding injective.
 fn assert_nonce_binds_recipient(nonce: BoundedVec<u8, NONCE_LENGTH>, recipient: Field) {
     assert(nonce.len() == NONCE_LENGTH, "nonce must be 64 hex chars");
     let storage = nonce.storage();
-    let mut acc: Field = 0;
-    for i in 0..NONCE_LENGTH {
-        acc = acc * 16 + hex_digit_value(storage[i]);
+    let recipient_bytes: [u8; 32] = recipient.to_be_bytes();
+    // Each byte is two lowercase-hex digits, high nibble first; 32 bytes ==
+    // 64 digits == NONCE_LENGTH. `hi * 16 + lo` is at most 255, so this Field
+    // arithmetic cannot wrap.
+    for i in 0..32 {
+        let hi = hex_digit_value(storage[2 * i]);
+        let lo = hex_digit_value(storage[2 * i + 1]);
+        let byte = hi * 16 + lo;
+        assert(byte == recipient_bytes[i] as Field, "nonce does not bind recipient");
     }
-    assert(acc == recipient, "nonce does not bind recipient");
 }
 
 /// Compute leaf hash: pedersen(identity_commitment, amount, unlock_time)
@@ -103,6 +118,12 @@ fn verify_merkle_proof(
     for i in 0..TREE_DEPTH {
         let sibling = siblings[i];
         let is_right = path_indices[i];
+        // Defense-in-depth Item 2: constrain the path index to boolean. Without
+        // this, any value other than 1 silently takes the "left" branch, so a
+        // non-boolean witness is a second encoding of the same proof
+        // (malleability). It cannot forge a wrong root, but the JS/contract side
+        // only ever emits 0/1, so we pin that here.
+        assert(is_right * (is_right - 1) == 0, "path index must be 0 or 1");
         // If is_right == 1, current is on right, so hash(sibling, current)
         // If is_right == 0, current is on left, so hash(current, sibling)
         let left = if is_right == 1 { sibling } else { current };
@@ -149,6 +170,14 @@ fn main(
     unlock_time: pub Field,
 ) -> pub (Field, Field, Field, Field, Field) {
     // 1. Initialize and verify the JWT
+    // Defense-in-depth Item 3 (reviewed, no change): `base64_decode_offset` is a
+    // prover input, but `jwt.verify()` RSA-checks the SHA-256 of the entire
+    // signed `data` (header.payload), so the prover cannot introduce unsigned
+    // bytes. The offset only selects where base64 decoding of the claims region
+    // starts WITHIN that signature-verified span; a shifted offset can only pick
+    // a different window of Google-signed bytes, and a real id_token carries
+    // exactly one iss/aud/email/nonce. The offset is therefore bound by the
+    // signature, not attacker-controllable to smuggle a different claims region.
     let jwt: JWT<MAX_DATA_LENGTH> = JWT::init(
         data,
         base64_decode_offset,
@@ -166,6 +195,13 @@ fn main(
     let email_verified = jwt.get_claim_bool("email_verified".as_bytes());
     assert_verified_email(email_verified);
     jwt.assert_claim_string("email".as_bytes(), expected_email);
+    // Defense-in-depth Item 4 (reviewed, no change): `get_claim_number` parses
+    // the `exp` claim via `str_to_u64`, so the result is a u64. The later
+    // `jwt_exp as Field` widening cannot alias (u64 max 2^64-1 << p ~= 2^253.6,
+    // so distinct u64s map to distinct Fields), and an over-long / malformed exp
+    // overflows the u64 accumulation in-circuit (a constraint failure) rather
+    // than silently producing a small Field. The contract's expiry gate thus
+    // always sees a faithful u64-ranged value.
     let jwt_exp: u64 = jwt.get_claim_number("exp".as_bytes());
 
     // Bind the recipient into the Google-signed token via the OIDC nonce, so
@@ -287,6 +323,38 @@ fn test_nonce_rejects_uppercase_hex() {
     // Same value but uppercase 'E' -- must be rejected as non-canonical.
     let nonce = nonce_from_hex("00000000000000000000000000000000000000000000000000000000000A11CE");
     assert_nonce_binds_recipient(nonce, 0x0a11ce);
+}
+
+#[test(should_fail_with = "nonce does not bind recipient")]
+fn test_nonce_rejects_noncanonical_preimage() {
+    // Item 1 regression: the BN254 scalar field modulus p, in 64 lowercase hex.
+    // Its integer value is >= p, but p mod p == 0, so the OLD accumulate-into-
+    // Field decoder bound it to recipient 0. The injective decoder must reject
+    // it: p's canonical bytes differ from to_be_bytes::<32>(0) (all zero).
+    let nonce = nonce_from_hex("30644e72e131a029b85045b68181585d2833e84879b9709143e1f593f0000001");
+    assert_nonce_binds_recipient(nonce, 0);
+}
+
+#[test]
+fn test_nonce_binds_large_canonical_recipient() {
+    // Item 1 funds-lock guard: a recipient just below p must STILL be accepted,
+    // i.e. the injectivity check must not be over-tight. p - 1 =
+    // 0x...f0000000.
+    let nonce = nonce_from_hex("30644e72e131a029b85045b68181585d2833e84879b9709143e1f593f0000000");
+    assert_nonce_binds_recipient(
+        nonce,
+        0x30644e72e131a029b85045b68181585d2833e84879b9709143e1f593f0000000,
+    );
+}
+
+#[test(should_fail_with = "path index must be 0 or 1")]
+fn test_merkle_rejects_non_boolean_path_index() {
+    // Item 2 regression: a path index of 2 must be rejected. Without the boolean
+    // constraint it would silently take the "left" branch (witness malleability).
+    let siblings: [Field; TREE_DEPTH] = [0; TREE_DEPTH];
+    let mut path_indices: [Field; TREE_DEPTH] = [0; TREE_DEPTH];
+    path_indices[0] = 2;
+    let _ = verify_merkle_proof(1, siblings, path_indices);
 }
 
 #[test]
