@@ -1,9 +1,9 @@
 #![no_std]
 
 use soroban_sdk::{
-    contract, contracterror, contractevent, contractimpl, contracttype, crypto::BnScalar, token,
-    xdr::ToXdr, Address, Bytes, BytesN, Env, IntoVal, InvokeError, MuxedAddress, String, Symbol,
-    Val, Vec,
+    contract, contracterror, contractevent, contractimpl, contracttype, crypto::bn254::Bn254Fr,
+    token, xdr::ToXdr, Address, Bytes, BytesN, Env, IntoVal, InvokeError, MuxedAddress, String,
+    Symbol, Val, Vec,
 };
 
 const FIELD_BYTES: u32 = 32;
@@ -587,7 +587,7 @@ impl ZarfVestingContract {
     fn recipient_field(env: &Env, recipient: &Address) -> BytesN<32> {
         let address_xdr = recipient.clone().to_xdr(env);
         let digest = env.crypto().keccak256(&address_xdr).to_bytes();
-        BnScalar::from_bytes(digest).to_bytes()
+        Bn254Fr::from_bytes(digest).to_bytes()
     }
 
     fn field_to_u64(field: &BytesN<32>) -> Result<u64, Error> {
