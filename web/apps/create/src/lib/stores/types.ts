@@ -50,14 +50,18 @@ export interface TokenDetails {
 /**
  * Whitelist recipient entry — wizard-form draft shape.
  *
- * NOTE: this is the user-facing input (amount: number from a form field).
- * It is NOT the same as `MerkleClaim` (the post-processing on-chain shape with
- * amount: bigint). Conversion happens at the boundary when the merkle tree is
- * generated.
+ * NOTE: `amount` is the RAW decimal STRING exactly as it appeared in the CSV.
+ * It is deliberately NOT a number: it must be carried unchanged to the merkle
+ * boundary (DeployStep1 → parseTokenAmount) so a value above 2^53 base units, or
+ * one that would stringify to exponential notation, is never silently rounded
+ * before it reaches the leaf. It is NOT the same as `MerkleClaim` (the
+ * post-processing on-chain shape with amount: bigint); conversion to base units
+ * happens when the merkle tree is generated. UI sums (budget bar) may Number()
+ * it — that's display-only and tolerant of rounding.
  */
 export interface Recipient {
     email: string; // Email is the mandatory identifier (create.zarf.to is email-only)
-    amount: number;
+    amount: string; // RAW CSV decimal string — see note above; do not coerce early
     leafIndex?: number; // assigned after merkle generation
     salt?: string;
 }

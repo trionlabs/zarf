@@ -62,3 +62,30 @@ describe('parseAirdropCSV', () => {
         expect(errors.some((e) => e.includes('positive decimal'))).toBe(true);
     });
 });
+
+describe('parseAirdropCSV — column-count strictness (eval finding #1 parity with ZK parser)', () => {
+    it('rejects a thousands-separated amount instead of silently reading "1" (1000x under-allocation)', () => {
+        // The pre-fix `parts.length < 2` split `addr,1,000` into 3 columns and
+        // read amount="1" — a silent 1000x under-allocation baked into an
+        // immutable on-chain leaf. Now rejected.
+        const { entries, errors } = parseAirdropCSV(`${UPPER},1,000`);
+        expect(entries).toHaveLength(0);
+        expect(errors[0]).toMatch(/expected "address,amount"/);
+    });
+
+    it('rejects a row with a trailing extra column instead of dropping it', () => {
+        const { entries, errors } = parseAirdropCSV(`${UPPER},100,note`);
+        expect(entries).toHaveLength(0);
+        expect(errors[0]).toMatch(/expected "address,amount"/);
+    });
+
+    it('keeps a first-row recipient — data-shape header detection, not substring matching', () => {
+        // The old `lower.includes('address'|'amount')` heuristic could drop a
+        // real first-row strkey whose base32 body spelled those letters; the
+        // shared grammar keys on a numeric amount column instead.
+        const { entries, errors } = parseAirdropCSV(`${UPPER},100`);
+        expect(errors).toHaveLength(0);
+        expect(entries).toHaveLength(1);
+        expect(entries[0].address).toBe(UPPER);
+    });
+});

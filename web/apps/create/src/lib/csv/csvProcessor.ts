@@ -8,11 +8,12 @@
  * @module csv/csvProcessor
  */
 
-// CSV produces UI-draft entries (amount: number from a form field), which is the
-// `Recipient` shape, not the post-merkle on-chain `Recipient` (amount: bigint).
+// CSV produces UI-draft entries (amount is the RAW decimal STRING from the file,
+// carried unchanged to the merkle boundary), which is the `Recipient` shape, not
+// the post-merkle on-chain `MerkleClaim` (amount: bigint).
 import type { Recipient } from '../stores/types';
 import { normalizeEmail, isValidEmail } from '@zarf/core/utils/email';
-import { isPositiveAmountString } from '@zarf/core/utils/amount';
+import { classifyCsvRow } from '@zarf/core/utils/csvRow';
 import { MAX_EMAIL_LENGTH } from '@zarf/core/constants';
 // Re-export for backward compatibility
 export { normalizeEmail };
@@ -40,52 +41,28 @@ export function parseCSV(content: string): ParseResult {
     const errors: string[] = [];
 
     for (let i = 0; i < lines.length; i++) {
-        const line = lines[i].trim();
-
-        // Skip empty lines
-        if (!line) continue;
-
-        const parts = line.split(',').map((p) => p.trim());
-
-        // Skip a header row ONLY when NEITHER column is data-shaped — i.e. the
-        // first column is not a valid email AND the second is not a positive
-        // amount (e.g. "email,amount"). Substring matching
-        // ('email'/'amount'/'number') was unsafe: it silently dropped real
-        // recipients whose address contains a keyword, e.g.
-        // `team@amountpartners.com,500`. Requiring BOTH columns to be non-data
-        // also means a malformed FIRST data row (valid email, bad amount) falls
-        // through and surfaces its error instead of being eaten as a header.
-        if (
-            i === 0 &&
-            (parts.length < 2 || (!isValidEmail(parts[0]) && !isPositiveAmountString(parts[1])))
-        ) {
+        // Shared row grammar (blank-skip, data-shape header detection, exact-2
+        // columns, positive-decimal amount) — identical to the airdrop parser so
+        // the two can never drift. See @zarf/core/utils/csvRow.
+        const outcome = classifyCsvRow(lines[i], i, isValidEmail);
+        if (outcome.kind === 'skip') continue;
+        if (outcome.kind === 'badColumns') {
+            errors.push(
+                `Line ${i + 1}: Invalid format (expected exactly "email,amount") - "${lines[i].trim()}"`,
+            );
             continue;
         }
-
-        // Require EXACTLY `email,amount`. The old `< 2` (a minimum) let
-        // `alice@example.com,1,000` through as amount="1" — a silent 1000x
-        // under-allocation — and silently discarded any trailing columns.
-        if (parts.length !== 2) {
+        if (outcome.kind === 'badAmount') {
             errors.push(
-                `Line ${i + 1}: Invalid format (expected exactly "email,amount") - "${line}"`,
+                `Line ${i + 1}: Invalid amount (must be a positive decimal) - "${outcome.amountStr}"`,
             );
             continue;
         }
 
-        const [identifier, amountStr] = parts;
+        const { identifier, amountStr } = outcome;
 
-        // Amount: strict positive-decimal grammar (no exponent, no IEEE-754
-        // rounding). Mirrors the sibling airdrop parser so both CSV paths
-        // accept the same amount grammar; `parseFloat` accepted `1e3`/`100abc`.
-        if (!isPositiveAmountString(amountStr)) {
-            errors.push(
-                `Line ${i + 1}: Invalid amount (must be a positive decimal) - "${amountStr}"`,
-            );
-            continue;
-        }
-        const amount = Number(amountStr);
-
-        // Email ONLY (create.zarf.to is email-only).
+        // Email ONLY (create.zarf.to is email-only). classifyCsvRow only used the
+        // predicate for header detection (row 0), so re-validate every row here.
         if (!isValidEmail(identifier)) {
             errors.push(`Line ${i + 1}: Invalid email format - "${identifier}"`);
             continue;
@@ -104,9 +81,12 @@ export function parseCSV(content: string): ParseResult {
             continue;
         }
 
-        // Allow duplicates in the list so the total matches the CSV file;
-        // duplicates are reported below and block deploy at step-1.
-        entries.push({ email, amount });
+        // Carry the RAW amount string end-to-end (no Number() round-trip) so a
+        // value above 2^53 base units, or one that would stringify to exponential
+        // notation, is never silently rounded before it reaches the merkle leaf.
+        // Duplicates are allowed in the list (reported below; they block deploy
+        // at step-1).
+        entries.push({ email, amount: amountStr });
     }
 
     // Post-processing: Detect duplicates for error reporting. `email` is the

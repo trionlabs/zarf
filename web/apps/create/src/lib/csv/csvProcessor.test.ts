@@ -6,19 +6,28 @@ describe('parseCSV — happy path', () => {
     it('parses a `email,amount` row and normalizes the email (lowercase+trim)', () => {
         const { entries, errors } = parseCSV('  Alice@Example.com , 1000 ');
         expect(errors).toEqual([]);
-        expect(entries).toEqual([{ email: 'alice@example.com', amount: 1000 }]);
+        // amount is the RAW string (carried unchanged to the leaf), not a Number.
+        expect(entries).toEqual([{ email: 'alice@example.com', amount: '1000' }]);
     });
 
     it('skips a real header row (non-numeric amount column)', () => {
         const { entries, errors } = parseCSV('email,amount\nbob@example.com,5');
         expect(errors).toEqual([]);
-        expect(entries).toEqual([{ email: 'bob@example.com', amount: 5 }]);
+        expect(entries).toEqual([{ email: 'bob@example.com', amount: '5' }]);
     });
 
     it('accepts fractional amounts', () => {
         const { entries, errors } = parseCSV('a@b.com,0.5');
         expect(errors).toEqual([]);
-        expect(entries).toEqual([{ email: 'a@b.com', amount: 0.5 }]);
+        expect(entries).toEqual([{ email: 'a@b.com', amount: '0.5' }]);
+    });
+
+    it('preserves a huge integer amount as an exact string (no 2^53 rounding)', () => {
+        // 9007199254740993 = 2^53 + 1; Number() would round it to ...992.
+        const big = '9007199254740993';
+        const { entries, errors } = parseCSV(`whale@example.com,${big}`);
+        expect(errors).toEqual([]);
+        expect(entries[0].amount).toBe(big); // exact, not 9007199254740992
     });
 });
 
@@ -29,7 +38,7 @@ describe('parseCSV — header heuristic does not eat real recipients (review #5)
         // a data row, not a header.
         const { entries, errors } = parseCSV('team@amountpartners.com,500');
         expect(errors).toEqual([]);
-        expect(entries).toEqual([{ email: 'team@amountpartners.com', amount: 500 }]);
+        expect(entries).toEqual([{ email: 'team@amountpartners.com', amount: '500' }]);
     });
 
     it('also keeps numbers@/email-domain recipients on row 0', () => {

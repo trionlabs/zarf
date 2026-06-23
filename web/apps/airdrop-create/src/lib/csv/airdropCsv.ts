@@ -13,7 +13,7 @@
  */
 import { isValidAddressShape } from '@zarf/core/utils/addressShape';
 import { normalizeAirdropAddress } from '@zarf/core/utils/airdropAddress';
-import { isPositiveAmountString } from '@zarf/core/utils/amount';
+import { classifyCsvRow } from '@zarf/core/utils/csvRow';
 
 export interface AirdropRecipient {
     /** Canonical UPPERCASE Stellar address. */
@@ -39,39 +39,38 @@ export function parseAirdropCSV(content: string): AirdropParseResult {
     const errors: string[] = [];
 
     for (let i = 0; i < lines.length; i++) {
-        const line = lines[i].trim();
-        if (!line) continue;
-
-        // Skip a header row if present (a strkey never contains these words).
-        const lower = line.toLowerCase();
-        if (i === 0 && (lower.includes('address') || lower.includes('amount'))) {
+        // Shared row grammar (blank-skip, data-shape header detection, exact-2
+        // columns, positive-decimal amount) — identical to the ZK/email parser so
+        // the two can never drift. The old `parts.length < 2` silently truncated
+        // `addr,1,000` to amount="1", and substring header matching dropped a
+        // first-row strkey whose base32 body spelled ADDRESS/AMOUNT. See
+        // @zarf/core/utils/csvRow.
+        const outcome = classifyCsvRow(lines[i], i, (s) =>
+            isValidAddressShape(normalizeAirdropAddress(s)),
+        );
+        if (outcome.kind === 'skip') continue;
+        if (outcome.kind === 'badColumns') {
+            errors.push(`Line ${i + 1}: expected "address,amount" — "${lines[i].trim()}"`);
+            continue;
+        }
+        if (outcome.kind === 'badAmount') {
+            errors.push(
+                `Line ${i + 1}: amount must be a positive decimal — "${outcome.amountStr}"`,
+            );
             continue;
         }
 
-        const parts = line.split(',').map((p) => p.trim());
-        if (parts.length < 2) {
-            errors.push(`Line ${i + 1}: expected "address,amount" — "${line}"`);
-            continue;
-        }
+        const address = normalizeAirdropAddress(outcome.identifier);
 
-        const [rawAddress, amountStr] = parts;
-        const address = normalizeAirdropAddress(rawAddress);
-
-        // Grammar-only check (positive decimal string, no exponent / float
-        // rounding); the exact decimals/i128-range are enforced against the
-        // token at step-1 and at tree-build time. Store the ORIGINAL string.
-        if (!isPositiveAmountString(amountStr)) {
-            errors.push(`Line ${i + 1}: amount must be a positive decimal — "${amountStr}"`);
-            continue;
-        }
         // Shape-only (regex) check; the exact StrKey checksum is enforced when
         // the merkle leaf calls Address.fromString at tree-build time.
         if (!isValidAddressShape(address)) {
-            errors.push(`Line ${i + 1}: invalid Stellar address — "${rawAddress}"`);
+            errors.push(`Line ${i + 1}: invalid Stellar address — "${outcome.identifier}"`);
             continue;
         }
 
-        entries.push({ address, amount: amountStr });
+        // Store the ORIGINAL amount string (i128-range enforced at tree-build).
+        entries.push({ address, amount: outcome.amountStr });
     }
 
     // Duplicate detection by address (airdrop is address-keyed, not email).

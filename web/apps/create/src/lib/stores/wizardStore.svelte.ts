@@ -57,7 +57,9 @@ let state = $state<WizardState>(structuredClone(initialState));
 
 const totalRecipientsAmount = $derived(
     state.distributions.reduce((total, dist) => {
-        return total + dist.recipients.reduce((sum, r) => sum + r.amount, 0);
+        // Number() here is display/aggregate only — the exact string reaches the
+        // leaf at DeployStep1; budget rounding at this scale is immaterial.
+        return total + dist.recipients.reduce((sum, r) => sum + Number(r.amount), 0);
     }, 0),
 );
 

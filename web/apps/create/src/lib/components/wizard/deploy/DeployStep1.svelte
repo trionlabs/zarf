@@ -64,8 +64,12 @@
             // This ensures the Merkle Root matches the on-chain values.
             const entries = distribution.recipients.map((r) => ({
                 email: r.email || '',
-                // We pass BigInt directly to avoid precision loss
-                amount: parseTokenAmount(String(r.amount), tokenDecimals),
+                // r.amount is the RAW CSV decimal string; feed it to
+                // parseTokenAmount unchanged (no String(Number(...)) round-trip)
+                // so large/exponential values reach the leaf at full precision.
+                // Legacy drafts may still carry a number — parseTokenAmount
+                // accepts both.
+                amount: parseTokenAmount(r.amount, tokenDecimals),
             }));
 
             // ADR-023: Discrete Vesting - Generator needs Schedule
@@ -171,9 +175,15 @@
         {#if isGeneratingMerkle}
             <div class="flex flex-col items-center gap-4" in:fly={{ y: 10 }}>
                 <div class="relative flex items-center justify-center">
-                    <div class="absolute w-16 h-16 rounded-full bg-zen-primary/5 blur-md animate-pulse-glow"></div>
-                    <div class="w-12 h-12 rounded-full border border-zen-border flex items-center justify-center">
-                        <div class="w-5 h-5 border-2 border-zen-primary border-t-transparent rounded-full animate-spin"></div>
+                    <div
+                        class="absolute w-16 h-16 rounded-full bg-zen-primary/5 blur-md animate-pulse-glow"
+                    ></div>
+                    <div
+                        class="w-12 h-12 rounded-full border border-zen-border flex items-center justify-center"
+                    >
+                        <div
+                            class="w-5 h-5 border-2 border-zen-primary border-t-transparent rounded-full animate-spin"
+                        ></div>
                     </div>
                 </div>
                 <div>
@@ -186,10 +196,16 @@
         {:else if merkleError}
             <div class="text-zen-error flex flex-col items-center gap-2" in:fly={{ y: 10 }}>
                 <div class="relative flex items-center justify-center mb-2">
-                    <div class="absolute w-16 h-16 rounded-full bg-zen-error/10 blur-xl animate-pulse-glow"></div>
-                    <div class="w-12 h-12 rounded-full border border-zen-error/20 bg-zen-bg-elevated backdrop-blur-sm flex items-center justify-center relative animate-float">
+                    <div
+                        class="absolute w-16 h-16 rounded-full bg-zen-error/10 blur-xl animate-pulse-glow"
+                    ></div>
+                    <div
+                        class="w-12 h-12 rounded-full border border-zen-error/20 bg-zen-bg-elevated backdrop-blur-sm flex items-center justify-center relative animate-float"
+                    >
                         <AlertTriangle class="w-5 h-5 text-zen-error" />
-                        <span class="absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-zen-error animate-pulse"></span>
+                        <span
+                            class="absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-zen-error animate-pulse"
+                        ></span>
                     </div>
                 </div>
                 <h3 class="font-bold">Generation Failed</h3>
@@ -201,9 +217,15 @@
         {:else if isPinning}
             <div class="flex flex-col items-center gap-4" in:fly={{ y: 10 }}>
                 <div class="relative flex items-center justify-center">
-                    <div class="absolute w-16 h-16 rounded-full bg-zen-primary/5 blur-md animate-pulse-glow"></div>
-                    <div class="w-12 h-12 rounded-full border border-zen-border flex items-center justify-center">
-                        <div class="w-5 h-5 border-2 border-zen-primary border-t-transparent rounded-full animate-spin"></div>
+                    <div
+                        class="absolute w-16 h-16 rounded-full bg-zen-primary/5 blur-md animate-pulse-glow"
+                    ></div>
+                    <div
+                        class="w-12 h-12 rounded-full border border-zen-border flex items-center justify-center"
+                    >
+                        <div
+                            class="w-5 h-5 border-2 border-zen-primary border-t-transparent rounded-full animate-spin"
+                        ></div>
                     </div>
                 </div>
                 <div>
@@ -216,10 +238,16 @@
         {:else if pinError}
             <div class="text-zen-error flex flex-col items-center gap-2" in:fly={{ y: 10 }}>
                 <div class="relative flex items-center justify-center mb-2">
-                    <div class="absolute w-16 h-16 rounded-full bg-zen-error/10 blur-xl animate-pulse-glow"></div>
-                    <div class="w-12 h-12 rounded-full border border-zen-error/20 bg-zen-bg-elevated backdrop-blur-sm flex items-center justify-center relative animate-float">
+                    <div
+                        class="absolute w-16 h-16 rounded-full bg-zen-error/10 blur-xl animate-pulse-glow"
+                    ></div>
+                    <div
+                        class="w-12 h-12 rounded-full border border-zen-error/20 bg-zen-bg-elevated backdrop-blur-sm flex items-center justify-center relative animate-float"
+                    >
                         <AlertTriangle class="w-5 h-5 text-zen-error" />
-                        <span class="absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-zen-error animate-pulse"></span>
+                        <span
+                            class="absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-zen-error animate-pulse"
+                        ></span>
                     </div>
                 </div>
                 <h3 class="font-bold">Pinning Failed</h3>
@@ -231,10 +259,16 @@
         {:else if merkleResult && !metadataCid && !walletAddress}
             <div class="flex flex-col items-center gap-4" in:fly={{ y: 10 }}>
                 <div class="relative flex items-center justify-center mb-2">
-                    <div class="absolute w-16 h-16 rounded-full bg-zen-primary/10 blur-xl animate-pulse-glow"></div>
-                    <div class="w-12 h-12 rounded-full border border-zen-border bg-zen-bg-elevated backdrop-blur-sm flex items-center justify-center relative animate-float">
+                    <div
+                        class="absolute w-16 h-16 rounded-full bg-zen-primary/10 blur-xl animate-pulse-glow"
+                    ></div>
+                    <div
+                        class="w-12 h-12 rounded-full border border-zen-border bg-zen-bg-elevated backdrop-blur-sm flex items-center justify-center relative animate-float"
+                    >
                         <Wallet class="w-5 h-5 text-zen-primary" />
-                        <span class="absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-zen-primary animate-pulse"></span>
+                        <span
+                            class="absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-zen-primary animate-pulse"
+                        ></span>
                     </div>
                 </div>
                 <div>
@@ -258,10 +292,16 @@
         {:else if merkleResult && !metadataCid && isWrongNetwork}
             <div class="text-zen-error flex flex-col items-center gap-2" in:fly={{ y: 10 }}>
                 <div class="relative flex items-center justify-center mb-2">
-                    <div class="absolute w-16 h-16 rounded-full bg-zen-error/10 blur-xl animate-pulse-glow"></div>
-                    <div class="w-12 h-12 rounded-full border border-zen-error/20 bg-zen-bg-elevated backdrop-blur-sm flex items-center justify-center relative animate-float">
+                    <div
+                        class="absolute w-16 h-16 rounded-full bg-zen-error/10 blur-xl animate-pulse-glow"
+                    ></div>
+                    <div
+                        class="w-12 h-12 rounded-full border border-zen-error/20 bg-zen-bg-elevated backdrop-blur-sm flex items-center justify-center relative animate-float"
+                    >
                         <AlertTriangle class="w-5 h-5 text-zen-error" />
-                        <span class="absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-zen-error animate-pulse"></span>
+                        <span
+                            class="absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-zen-error animate-pulse"
+                        ></span>
                     </div>
                 </div>
                 <h3 class="font-bold">Wrong Network</h3>
@@ -272,10 +312,16 @@
         {:else if merkleResult && metadataCid}
             <div class="text-zen-success flex flex-col items-center gap-2" in:fly={{ y: 10 }}>
                 <div class="relative flex items-center justify-center mb-2">
-                    <div class="absolute w-16 h-16 rounded-full bg-zen-success/15 blur-xl animate-pulse-glow"></div>
-                    <div class="w-12 h-12 rounded-full border border-zen-success/20 bg-zen-bg-elevated backdrop-blur-sm flex items-center justify-center relative animate-float">
+                    <div
+                        class="absolute w-16 h-16 rounded-full bg-zen-success/15 blur-xl animate-pulse-glow"
+                    ></div>
+                    <div
+                        class="w-12 h-12 rounded-full border border-zen-success/20 bg-zen-bg-elevated backdrop-blur-sm flex items-center justify-center relative animate-float"
+                    >
                         <CheckCircle2 class="w-5 h-5 text-zen-success" />
-                        <span class="absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-zen-success animate-pulse"></span>
+                        <span
+                            class="absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-zen-success animate-pulse"
+                        ></span>
                     </div>
                 </div>
                 <h3 class="font-bold">Ready for Deployment</h3>
@@ -295,8 +341,12 @@
         {:else}
             <div class="flex flex-col items-center gap-4">
                 <div class="relative flex items-center justify-center">
-                    <div class="absolute w-12 h-12 rounded-full bg-zen-primary/5 blur-sm animate-pulse-glow"></div>
-                    <div class="w-8 h-8 border-2 border-zen-primary border-t-transparent rounded-full animate-spin"></div>
+                    <div
+                        class="absolute w-12 h-12 rounded-full bg-zen-primary/5 blur-sm animate-pulse-glow"
+                    ></div>
+                    <div
+                        class="w-8 h-8 border-2 border-zen-primary border-t-transparent rounded-full animate-spin"
+                    ></div>
                 </div>
                 <p class="text-sm text-zen-fg-subtle">Loading distribution data...</p>
             </div>
@@ -306,16 +356,18 @@
 
 <style>
     @keyframes float {
-        0%, 100% {
+        0%,
+        100% {
             transform: translateY(0px);
         }
         50% {
             transform: translateY(-4px);
         }
     }
-    
+
     @keyframes pulse-glow {
-        0%, 100% {
+        0%,
+        100% {
             opacity: 0.35;
             transform: scale(0.95);
         }
