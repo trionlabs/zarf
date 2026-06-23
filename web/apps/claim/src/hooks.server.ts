@@ -48,9 +48,22 @@ const connectSrc = dev
 
 export const handle: Handle = async ({ event, resolve }) => {
     const response = await resolve(event);
+    // CSP — note the deliberate ASYMMETRY with create.zarf.to (which dropped
+    // 'unsafe-eval'): claim.zarf.to runs the FULL Noir prover, and
+    // @noir-lang/acvm_js@1.0.0-beta.18 ships a wasm-bindgen shim
+    //   imports.wbg.__wbg_newnoargs = (a,b) => new Function(getStringFromWasm0(a,b))
+    // (web/acvm_js.js:712). `new Function` is gated by 'unsafe-eval', and the ACVM
+    // can invoke that shim during witness generation. Dropping 'unsafe-eval' here
+    // would only surface at proof time — every claim would break in production —
+    // so it is RETAINED pending a full end-to-end proof run under the narrowed
+    // policy in a real browser (blocked on a deployed test campaign + OAuth).
+    // This is the eval-posture split working as designed: create (Pedersen/bb.js
+    // only, proven eval-free) hardens; claim (Noir ACVM) cannot yet.
+    // 'cdn.jsdelivr.net' WAS dropped — verified unused (prover WASM + circuit are
+    // served same-origin from /wasm and /circuits; bb.js needs no CDN).
     response.headers.set(
         'Content-Security-Policy',
-        `default-src 'self'; script-src 'self' 'wasm-unsafe-eval' 'unsafe-eval' 'unsafe-inline' blob: https://cdn.jsdelivr.net https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; ${connectSrc}; img-src 'self' data: https:; worker-src 'self' blob:; base-uri 'self'; form-action 'self';`,
+        `default-src 'self'; script-src 'self' 'wasm-unsafe-eval' 'unsafe-eval' 'unsafe-inline' blob: https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; ${connectSrc}; img-src 'self' data: https:; worker-src 'self' blob:; base-uri 'self'; form-action 'self';`,
     );
     // Non-CSP defense-in-depth headers. HSTS is two years + includeSubDomains;
     // safe because all *.zarf.to subdomains are HTTPS via Cloudflare. `preload`
