@@ -41,3 +41,6 @@ test/*.dev
 
 #plans
 plans/
+
+#video
+video/
