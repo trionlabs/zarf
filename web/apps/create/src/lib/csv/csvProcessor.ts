@@ -2,8 +2,7 @@
  * CSV Processing Utilities for Whitelist Management
  *
  * Handles parsing, validation, and normalization of whitelist CSV files.
- * Supported formats:
- * - address,amount
+ * Supported format (create.zarf.to is email-only):
  * - email,amount
  *
  * @module csv/csvProcessor
@@ -13,23 +12,10 @@
 // `Recipient` shape, not the post-merkle on-chain `Recipient` (amount: bigint).
 import type { Recipient } from '../stores/types';
 import { normalizeEmail, isValidEmail } from '@zarf/core/utils/email';
-// Shape-only check: regex-grade Stellar address validation. A typo'd
-// address that matches the shape regex but fails the StrKey checksum
-// passes parseCSV() here and is rejected later at transaction-build
-// time. Trade-off accepted so this module doesn't drag stellar-sdk
-// into SSR via parseCSV's top-level import (step-1's
-// DistributionRecipients.svelte was 500ing on the SSR pass).
-import { isValidAddressShape as isValidAddress } from '@zarf/core/utils/addressShape';
-
+import { isPositiveAmountString } from '@zarf/core/utils/amount';
+import { MAX_EMAIL_LENGTH } from '@zarf/core/constants';
 // Re-export for backward compatibility
 export { normalizeEmail };
-
-/**
- * Normalizes address for consistent hashing and comparison.
- */
-export function normalizeAddress(address: string): string {
-    return address.toLowerCase().trim();
-}
 
 // ============================================================================
 // CSV Parsing
@@ -59,61 +45,82 @@ export function parseCSV(content: string): ParseResult {
         // Skip empty lines
         if (!line) continue;
 
-        // Skip header row if present (case-insensitive)
-        const lineLower = line.toLowerCase();
+        const parts = line.split(',').map((p) => p.trim());
+
+        // Skip a header row ONLY when NEITHER column is data-shaped — i.e. the
+        // first column is not a valid email AND the second is not a positive
+        // amount (e.g. "email,amount"). Substring matching
+        // ('email'/'amount'/'number') was unsafe: it silently dropped real
+        // recipients whose address contains a keyword, e.g.
+        // `team@amountpartners.com,500`. Requiring BOTH columns to be non-data
+        // also means a malformed FIRST data row (valid email, bad amount) falls
+        // through and surfaces its error instead of being eaten as a header.
         if (
             i === 0 &&
-            (lineLower.includes('email') ||
-                lineLower.includes('amount') ||
-                lineLower.includes('number'))
+            (parts.length < 2 || (!isValidEmail(parts[0]) && !isPositiveAmountString(parts[1])))
         ) {
             continue;
         }
 
-        const parts = line.split(',').map((p) => p.trim());
-
-        if (parts.length < 2) {
-            errors.push(`Line ${i + 1}: Invalid format (expected email, amount) - "${line}"`);
+        // Require EXACTLY `email,amount`. The old `< 2` (a minimum) let
+        // `alice@example.com,1,000` through as amount="1" — a silent 1000x
+        // under-allocation — and silently discarded any trailing columns.
+        if (parts.length !== 2) {
+            errors.push(
+                `Line ${i + 1}: Invalid format (expected exactly "email,amount") - "${line}"`,
+            );
             continue;
         }
 
         const [identifier, amountStr] = parts;
 
-        // Parse and validate amount
-        const amount = parseFloat(amountStr);
-        if (isNaN(amount) || amount <= 0) {
-            errors.push(`Line ${i + 1}: Invalid amount (must be positive number) - "${amountStr}"`);
-            continue;
-        }
-
-        // Identifier Logic: Check for email OR address
-        if (isValidEmail(identifier)) {
-            const email = normalizeEmail(identifier);
-            // Allow duplicates in the list so the total amount matches the CSV file.
-            entries.push({ address: '', email, amount });
-        } else if (isValidAddress(identifier)) {
-            entries.push({ address: normalizeAddress(identifier), amount });
-        } else {
+        // Amount: strict positive-decimal grammar (no exponent, no IEEE-754
+        // rounding). Mirrors the sibling airdrop parser so both CSV paths
+        // accept the same amount grammar; `parseFloat` accepted `1e3`/`100abc`.
+        if (!isPositiveAmountString(amountStr)) {
             errors.push(
-                `Line ${i + 1}: Invalid format (expected email or address) - "${identifier}"`,
+                `Line ${i + 1}: Invalid amount (must be a positive decimal) - "${amountStr}"`,
             );
             continue;
         }
+        const amount = Number(amountStr);
+
+        // Email ONLY (create.zarf.to is email-only).
+        if (!isValidEmail(identifier)) {
+            errors.push(`Line ${i + 1}: Invalid email format - "${identifier}"`);
+            continue;
+        }
+        const email = normalizeEmail(identifier);
+
+        // Bound the email to MAX_EMAIL_LENGTH bytes. The leaf hashes
+        // stringToBytes(email, MAX_EMAIL_LENGTH), which SILENTLY TRUNCATES; at
+        // claim time the Google JWT carries the full email and derives a
+        // different email_hash, so an over-length leaf is permanently
+        // unclaimable. Reject it here instead of minting a dead allocation.
+        if (new TextEncoder().encode(email).length > MAX_EMAIL_LENGTH) {
+            errors.push(
+                `Line ${i + 1}: Email exceeds ${MAX_EMAIL_LENGTH} bytes (would be unclaimable) - "${identifier}"`,
+            );
+            continue;
+        }
+
+        // Allow duplicates in the list so the total matches the CSV file;
+        // duplicates are reported below and block deploy at step-1.
+        entries.push({ email, amount });
     }
 
-    // Post-processing: Detect duplicates for error reporting
+    // Post-processing: Detect duplicates for error reporting. `email` is the
+    // mandatory identifier, so every entry has a non-empty one — no guard.
     const emailCounts = new Map<string, number>();
-    entries.forEach((e) => {
-        if (e.email) {
-            emailCounts.set(e.email, (emailCounts.get(e.email) || 0) + 1);
-        }
-    });
+    for (const e of entries) {
+        emailCounts.set(e.email, (emailCounts.get(e.email) || 0) + 1);
+    }
 
-    emailCounts.forEach((count, email) => {
+    for (const [email, count] of emailCounts) {
         if (count > 1) {
             errors.push(`Duplicate email found: ${email} (${count} occurrences)`);
         }
-    });
+    }
 
     return { entries, errors };
 }

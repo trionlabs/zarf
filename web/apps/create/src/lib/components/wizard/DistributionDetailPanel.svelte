@@ -152,7 +152,7 @@
                         class="flex items-center justify-between p-2 rounded-lg bg-zen-fg/[0.03] text-sm"
                     >
                         <span class="font-mono text-xs truncate max-w-[120px]">
-                            {recipient.email || recipient.address?.slice(0, 10) + '...'}
+                            {recipient.email}
                         </span>
                         <span class="font-mono text-xs text-zen-fg-subtle">
                             {formatAmount(recipient.amount)}

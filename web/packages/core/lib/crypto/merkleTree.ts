@@ -132,9 +132,7 @@ export function fieldToHex32(value: bigint): HexString {
 
 export async function hashAudience(audience: string): Promise<HexString> {
     if (!audience) throw new Error('Google OAuth client ID is required');
-    return fieldToHex32(
-        await pedersenHashBytes(stringToBytes(audience, MAX_AUDIENCE_LENGTH)),
-    );
+    return fieldToHex32(await pedersenHashBytes(stringToBytes(audience, MAX_AUDIENCE_LENGTH)));
 }
 
 /**
@@ -638,6 +636,24 @@ export async function processWhitelist(
     // Process each user
     for (let i = 0; i < entries.length; i++) {
         const { email, amount, pin } = entries[i];
+
+        // Fail closed before any leaf is generated: the leaf hashes
+        // stringToBytes(email, MAX_EMAIL_LENGTH), which treats '' as a valid
+        // (but forever-unclaimable) leaf and SILENTLY TRUNCATES anything over
+        // MAX_EMAIL_LENGTH bytes — at claim time the Google JWT carries the
+        // full email, so a truncated/empty leaf can never be matched. Reject
+        // such entries here rather than mint an allocation no one can ever
+        // claim (e.g. a legacy address-only draft restored from localStorage
+        // with no email, or an over-length address that slipped past the CSV).
+        const normalizedEmail = typeof email === 'string' ? normalizeEmail(email) : '';
+        if (
+            !normalizedEmail ||
+            new TextEncoder().encode(normalizedEmail).length > MAX_EMAIL_LENGTH
+        ) {
+            throw new Error(
+                `processWhitelist: recipient ${i} has an invalid email (must be non-empty and ≤ ${MAX_EMAIL_LENGTH} bytes)`,
+            );
+        }
 
         // Master Salt (PIN) for the user
         // Use provided PIN or generate random one

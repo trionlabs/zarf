@@ -56,8 +56,7 @@ export interface TokenDetails {
  * generated.
  */
 export interface Recipient {
-    address: string; // Keep as primary identifier, but might be empty if email is used initially
-    email?: string; // Add optional email field
+    email: string; // Email is the mandatory identifier (create.zarf.to is email-only)
     amount: number;
     leafIndex?: number; // assigned after merkle generation
     salt?: string;
