@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Keypair } from '@stellar/stellar-sdk';
 import { Buffer } from 'buffer';
-import worker from './index';
+import worker, { buildCorsHeaders } from './index';
 
 const SEP53_PREFIX = 'Stellar Signed Message:\n';
 const PIN_AUTH_VERSION = 'zarf-pin-v1';
@@ -243,7 +243,11 @@ describe('pin-proxy abuse caps (F2)', () => {
 
     it('does not rate-limit a different, unseen IP', async () => {
         const res = await worker.fetch(
-            post('/pin', { 'Content-Type': 'application/json', 'CF-Connecting-IP': '203.0.113.8' }, '{}'),
+            post(
+                '/pin',
+                { 'Content-Type': 'application/json', 'CF-Connecting-IP': '203.0.113.8' },
+                '{}',
+            ),
             ENV,
         );
         expect(res.status).not.toBe(429);
@@ -280,5 +284,38 @@ describe('pin-proxy abuse caps (F2)', () => {
         );
         expect(res.status).toBe(400);
         expect(((await res.json()) as PinResult).reason).toBe('too_many_claims');
+    });
+});
+
+describe('buildCorsHeaders (fail-closed — write worker must never fail open)', () => {
+    const env = { ALLOWED_ORIGINS: 'https://a.example,https://airdrop.zarf.to' } as Parameters<
+        typeof buildCorsHeaders
+    >[1];
+
+    it('echoes an allow-listed origin', () => {
+        expect(buildCorsHeaders('https://a.example', env)['Access-Control-Allow-Origin']).toBe(
+            'https://a.example',
+        );
+        expect(
+            buildCorsHeaders('https://airdrop.zarf.to', env)['Access-Control-Allow-Origin'],
+        ).toBe('https://airdrop.zarf.to');
+    });
+
+    it('emits NO Access-Control-Allow-Origin for a non-allow-listed origin (no allowed[0] echo)', () => {
+        expect(
+            buildCorsHeaders('https://evil.example', env)['Access-Control-Allow-Origin'],
+        ).toBeUndefined();
+    });
+
+    it('emits NO Access-Control-Allow-Origin when Origin is absent', () => {
+        expect(buildCorsHeaders(null, env)['Access-Control-Allow-Origin']).toBeUndefined();
+    });
+
+    it('never emits a literal "*" when ALLOWED_ORIGINS is unset', () => {
+        const headers = buildCorsHeaders(
+            'https://evil.example',
+            {} as Parameters<typeof buildCorsHeaders>[1],
+        );
+        expect(headers['Access-Control-Allow-Origin']).toBeUndefined();
     });
 });

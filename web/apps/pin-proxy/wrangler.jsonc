@@ -5,7 +5,7 @@
     "main": "src/index.ts",
     "compatibility_date": "2025-01-15",
     "vars": {
-        "ALLOWED_ORIGINS": "http://localhost:5173,http://localhost:5174,http://localhost:5175,https://create.zarf.to,https://claim.zarf.to",
+        "ALLOWED_ORIGINS": "http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost:5176,http://localhost:5177,https://create.zarf.to,https://claim.zarf.to,https://airdrop.zarf.to",
         "MAX_BODY_BYTES": "1048576",
     },
     "observability": {

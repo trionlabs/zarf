@@ -1,6 +1,5 @@
 <script lang="ts">
     import { onMount } from 'svelte';
-    import { extractStateFromUrl } from '$lib/utils/oauth';
     import ThemeToggle from '@zarf/ui/components/layout/ThemeToggle.svelte';
     import Tooltip from '@zarf/ui/components/ui/Tooltip.svelte';
     import Hero from '@zarf/ui/components/landing/Hero.svelte';
@@ -9,57 +8,20 @@
     import UseCases from '@zarf/ui/components/landing/UseCases.svelte';
     import ZarfLogo from '@zarf/ui/components/brand/ZarfLogo.svelte';
     import ZenButton from '@zarf/ui/components/ui/ZenButton.svelte';
-    import { dev } from '@zarf/core/utils/log';
 
-    const DEBUG = import.meta.env.DEV;
+    // NOTE: this shell (zarf.to) deliberately does NOT read or forward the OAuth
+    // id_token. OAuth's redirect_uri is `${window.location.origin}/`, so the
+    // callback returns to the initiating origin (claim.zarf.to), which handles
+    // its own #id_token via extractTokenFromUrl. A legacy callback relay used to
+    // live here and forward the raw JWT fragment to claim.zarf.to; it never fired
+    // (no flow sets redirect_uri to zarf.to) and made the "shell never touches
+    // the JWT" audit-scope guarantee false in code. Removed — keep it that way.
 
     let scrollPosition = $state(0);
     let mounted = $state(false);
 
     onMount(() => {
         mounted = true;
-    });
-
-    onMount(() => {
-        const hash = window.location.hash;
-
-        // 1. Handle Successful OAuth Callback
-        if (hash.includes('id_token=')) {
-            dev('[Landing] Detected ID Token, processing redirect...');
-
-            // Parse state to restore context (e.g. contract address)
-            const oauthState = extractStateFromUrl();
-            const addressQuery = oauthState?.address ? `?address=${oauthState.address}` : '';
-
-            // Forward to claim subdomain with state and hash
-            const target = `https://claim.zarf.to${addressQuery}${hash}`;
-            dev('[Landing] Redirecting to:', target);
-            window.location.replace(target);
-            return;
-        }
-
-        // 2. Handle OAuth Errors (e.g. access_denied, interaction_required)
-        if (hash.includes('error=')) {
-            if (DEBUG) {
-                console.warn('[Landing] OAuth Error detected:', hash);
-            }
-
-            const oauthState = extractStateFromUrl();
-
-            // Redirect back to claim page with generic error param.
-            // We strip the specific error hash to avoid raw error exposure,
-            // but add clean query param for Claim app to handle.
-            // URL + searchParams handles the empty-address case correctly;
-            // the previous template literal emitted `claim.zarf.to&error=…`
-            // (missing query separator) when no address was preserved.
-            const redirect = new URL('https://claim.zarf.to');
-            if (oauthState?.address) {
-                redirect.searchParams.set('address', oauthState.address);
-            }
-            redirect.searchParams.set('error', 'auth_failed');
-            window.location.replace(redirect.toString());
-            return;
-        }
     });
 </script>
 

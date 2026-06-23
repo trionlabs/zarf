@@ -514,22 +514,30 @@ function validateCid(raw: string): string | null {
     return cidV0.test(cid) || cidV1Base32.test(cid) ? cid : null;
 }
 
-function buildCorsHeaders(origin: string | null, env: Env): Record<string, string> {
+// Fail-closed CORS (mirrors the indexer): advertise Access-Control-Allow-Origin
+// ONLY when the request Origin is on the allow-list. The previous
+// `allowed[0] || '*'` fallback echoed an allow-listed origin — or a literal `*`
+// when ALLOWED_ORIGINS was unset — to EVERY caller, on a state-changing POST
+// worker (the write path was weaker than the indexer's read path, the opposite
+// of what it should be). With no matching ACAO the browser blocks the
+// cross-origin response, which is the intended deny.
+export function buildCorsHeaders(origin: string | null, env: Env): Record<string, string> {
     const allowed = (env.ALLOWED_ORIGINS || '')
         .split(',')
         .map((o) => o.trim())
         .filter(Boolean);
 
-    const allowOrigin = origin && allowed.includes(origin) ? origin : allowed[0] || '*';
-
-    return {
-        'Access-Control-Allow-Origin': allowOrigin,
+    const headers: Record<string, string> = {
         'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
         'Access-Control-Allow-Headers':
             'Content-Type, X-Zarf-Owner, X-Zarf-Issued-At, X-Zarf-Body-SHA256, X-Zarf-Signature',
         'Access-Control-Max-Age': '86400',
         Vary: 'Origin',
     };
+    if (origin && allowed.includes(origin)) {
+        headers['Access-Control-Allow-Origin'] = origin;
+    }
+    return headers;
 }
 
 /**
