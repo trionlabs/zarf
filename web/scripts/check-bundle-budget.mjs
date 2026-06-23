@@ -26,7 +26,10 @@ import { resolve, basename, join } from 'node:path';
 const KB = 1024;
 
 const BUDGETS = {
-    landing: { initialGz: 79 * KB, totalGz: 100 * KB },
+    // landing: /create chooser route added 2026-06-23 (double-mode T1). Its eager
+    // closure reuses already-shared parts (ZarfLogo/ThemeToggle/ZenButton); the
+    // irreducible new-route manifest entry nudges worst-route initial to 79.1 KB.
+    landing: { initialGz: 80 * KB, totalGz: 100 * KB },
     claim: { initialGz: 123 * KB, totalGz: 13250 * KB },
     create: { initialGz: 456 * KB, totalGz: 6350 * KB },
     // airdrop-create: first client landing of the keccak Merkle bundle (D7).
