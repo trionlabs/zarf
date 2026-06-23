@@ -99,6 +99,21 @@ function restore() {
             const parsed = JSON.parse(saved) as WizardState;
             // Validate minimal structure; default `draft` for pre-migration blobs.
             if (parsed.distributions && Array.isArray(parsed.distributions)) {
+                // Migrate legacy drafts that persisted Recipient.amount as a NUMBER
+                // (pre amount-as-string) so the hydrated value matches the declared
+                // `string` type. Consumers already tolerate both, but this keeps the
+                // runtime honest. (An astronomical legacy number >=1e21 stringifies
+                // to exponential and would still fail parseTokenAmount at deploy —
+                // pre-existing, fails closed, not worth special-casing.)
+                for (const dist of parsed.distributions) {
+                    if (Array.isArray(dist?.recipients)) {
+                        for (const r of dist.recipients) {
+                            if (typeof (r as { amount: unknown }).amount === 'number') {
+                                r.amount = String((r as { amount: unknown }).amount);
+                            }
+                        }
+                    }
+                }
                 state = { ...parsed, draft: parsed.draft ?? null };
             }
         }

@@ -20,6 +20,8 @@
     // Set the Pinata JWT as a secret (NOT a var):
     //   wrangler secret put PINATA_JWT
     //
-    // For production, override ALLOWED_ORIGINS via dashboard or:
-    //   wrangler deploy --var ALLOWED_ORIGINS:"https://create.zarf.to"
+    // For production, override ALLOWED_ORIGINS via dashboard or wrangler --var.
+    // CORS now FAILS CLOSED (no '*' fallback), so an override must list the FULL
+    // set — narrowing to one origin hard-blocks the rest:
+    //   --var ALLOWED_ORIGINS:"https://create.zarf.to,https://claim.zarf.to,https://airdrop.zarf.to"
 }

@@ -67,8 +67,8 @@
                 // r.amount is the RAW CSV decimal string; feed it to
                 // parseTokenAmount unchanged (no String(Number(...)) round-trip)
                 // so large/exponential values reach the leaf at full precision.
-                // Legacy drafts may still carry a number — parseTokenAmount
-                // accepts both.
+                // (Legacy number-typed drafts are coerced to strings in
+                // wizardStore.restore(), so a string reaches here in practice.)
                 amount: parseTokenAmount(r.amount, tokenDecimals),
             }));
 

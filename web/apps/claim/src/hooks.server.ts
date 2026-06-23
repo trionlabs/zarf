@@ -12,6 +12,12 @@ const COMMON_CONNECT_ORIGINS = [
     'https://www.googleapis.com',
     'https://horizon-testnet.stellar.org',
     'https://horizon.stellar.org',
+    // UltraHonk SRS: bb.js (UltraHonkBackend, constructed with no crsPath in
+    // proof.worker.ts) fetches g1.dat/g2.dat from crs.aztec.network on a cold
+    // IndexedDB cache (net_crs.js). Without this, the FIRST claim on a fresh
+    // browser is connect-src-blocked at proof time. Returning browsers cache the
+    // SRS in IndexedDB, which is why this stayed latent.
+    'https://crs.aztec.network',
 ];
 
 function originFrom(value: string | boolean | undefined): string | null {
@@ -59,8 +65,13 @@ export const handle: Handle = async ({ event, resolve }) => {
     // policy in a real browser (blocked on a deployed test campaign + OAuth).
     // This is the eval-posture split working as designed: create (Pedersen/bb.js
     // only, proven eval-free) hardens; claim (Noir ACVM) cannot yet.
-    // 'cdn.jsdelivr.net' WAS dropped — verified unused (prover WASM + circuit are
-    // served same-origin from /wasm and /circuits; bb.js needs no CDN).
+    // 'cdn.jsdelivr.net' WAS dropped from script-src — verified unused (the acvm
+    // /noirc_abi WASM is served same-origin from /wasm, the circuit from
+    // /circuits). NOTE: this is script-src only; bb.js is NOT fully self-hosted —
+    // it fetches the UltraHonk SRS from https://crs.aztec.network on a cold cache,
+    // which is allow-listed in connect-src (see COMMON_CONNECT_ORIGINS above), NOT
+    // here. The full prover path (incl. the retained 'unsafe-eval' and the SRS
+    // fetch) still needs one real end-to-end cold-browser proof to be certified.
     response.headers.set(
         'Content-Security-Policy',
         `default-src 'self'; script-src 'self' 'wasm-unsafe-eval' 'unsafe-eval' 'unsafe-inline' blob: https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; ${connectSrc}; img-src 'self' data: https:; worker-src 'self' blob:; base-uri 'self'; form-action 'self';`,

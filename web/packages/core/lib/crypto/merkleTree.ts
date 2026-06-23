@@ -606,12 +606,14 @@ export async function processWhitelist(
     const cliffEnd = new Date(schedule.cliffEndDate).getTime() / 1000;
     // For simplicity, we assume 'distributionDuration' is count of periods (e.g. 12 months -> 12 epochs)
     // If durationUnit is months, period is roughly 30 days.
-    // Clamp to >=1: distributionDuration=0 is a valid UI mode ("unlock
-    // instantly", see VestingDurationPicker + isStep1Valid's `duration >= 0`),
-    // and calculateUnlockEvents already returns 1 for it. Without the clamp,
-    // `amount / BigInt(epochs)` below throws RangeError: Division by zero and
-    // dead-ends the user at deploy with an opaque merkleError.
-    const epochs = Math.max(1, schedule.distributionDuration);
+    // Epoch count must be a positive INTEGER: it feeds BigInt(epochs) and the
+    // `epoch < epochs` loop below. Round + clamp to >=1, exactly matching
+    // calculateUnlockEvents (utils/vesting.ts: `Math.max(Math.round(duration), 1)`).
+    // distributionDuration=0 is a valid UI mode ("unlock instantly") and a
+    // fractional value (isStep1Valid only checks `duration >= 0`, the input is
+    // parseFloat'd) would otherwise reach `amount / BigInt(2.5)` and throw
+    // RangeError — the same opaque merkleError the =0 case did.
+    const epochs = Math.max(1, Math.round(schedule.distributionDuration));
 
     // Calculate Period Length in Seconds
     let periodSeconds = 0;

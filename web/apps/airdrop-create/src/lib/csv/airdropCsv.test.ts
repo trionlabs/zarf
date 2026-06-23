@@ -37,10 +37,13 @@ describe('parseAirdropCSV', () => {
         expect(errors.some((e) => e.includes('Duplicate'))).toBe(true);
     });
 
-    it('rejects malformed rows and non-positive amounts', () => {
+    it('rejects malformed rows with the SPECIFIC reason for each (amount / address / columns)', () => {
         const { entries, errors } = parseAirdropCSV(`${UPPER},0\nnotanaddress,10\n${UPPER}`);
         expect(entries).toHaveLength(0);
-        expect(errors.length).toBeGreaterThanOrEqual(3);
+        expect(errors).toHaveLength(3);
+        expect(errors[0]).toMatch(/positive decimal/); // amount=0
+        expect(errors[1]).toMatch(/invalid Stellar address/); // bad strkey (only assertion of this branch)
+        expect(errors[2]).toMatch(/expected "address,amount"/); // single column
     });
 
     it('skips a header row', () => {

@@ -319,3 +319,31 @@ describe('buildCorsHeaders (fail-closed — write worker must never fail open)',
         expect(headers['Access-Control-Allow-Origin']).toBeUndefined();
     });
 });
+
+describe('pin-proxy worker CORS (integration — fail-closed via worker.fetch)', () => {
+    // Guards against a regression that re-adds `|| '*'` at the call site rather
+    // than in the helper — the helper-only tests above would not catch that.
+    it('OPTIONS preflight from an allow-listed origin echoes the origin (204)', async () => {
+        const res = await worker.fetch(
+            new Request('https://proxy.example/pin', {
+                method: 'OPTIONS',
+                headers: { Origin: 'https://app.example' },
+            }),
+            ENV,
+        );
+        expect(res.status).toBe(204);
+        expect(res.headers.get('Access-Control-Allow-Origin')).toBe('https://app.example');
+    });
+
+    it('OPTIONS preflight from an off-list origin gets NO Access-Control-Allow-Origin', async () => {
+        const res = await worker.fetch(
+            new Request('https://proxy.example/pin', {
+                method: 'OPTIONS',
+                headers: { Origin: 'https://evil.example' },
+            }),
+            ENV,
+        );
+        expect(res.status).toBe(204);
+        expect(res.headers.get('Access-Control-Allow-Origin')).toBeNull();
+    });
+});
