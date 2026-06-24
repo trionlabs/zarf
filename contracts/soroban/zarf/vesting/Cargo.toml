@@ -7,11 +7,11 @@ edition = "2021"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-soroban-sdk = { version = "26.0.0-rc.1", default-features = false, features = ["alloc"] }
+soroban-sdk = { version = "26.1.0", default-features = false, features = ["alloc"] }
 
 [dev-dependencies]
 rs-soroban-ultrahonk = { path = "../../verifier" }
-soroban-sdk = { version = "26.0.0-rc.1", default-features = false, features = ["alloc", "testutils"] }
+soroban-sdk = { version = "26.1.0", default-features = false, features = ["alloc", "testutils"] }
 zarf-jwk-registry = { path = "../jwk-registry" }
 
 [profile.release]

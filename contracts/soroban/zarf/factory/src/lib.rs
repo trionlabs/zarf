@@ -1,8 +1,8 @@
 #![no_std]
 
 use soroban_sdk::{
-    contract, contracterror, contractevent, contractimpl, contracttype, crypto::BnScalar, token,
-    xdr::ToXdr, Address, BytesN, Env, String, Val, Vec,
+    contract, contracterror, contractevent, contractimpl, contracttype, crypto::bn254::Bn254Fr,
+    token, xdr::ToXdr, Address, BytesN, Env, String, Val, Vec,
 };
 
 const BN254_SCALAR_MODULUS: [u8; 32] = [
@@ -118,7 +118,7 @@ impl ZarfVestingFactoryContract {
     pub fn recipient_id(env: Env, recipient: Address) -> BytesN<32> {
         let address_xdr = recipient.to_xdr(&env);
         let digest = env.crypto().keccak256(&address_xdr).to_bytes();
-        BnScalar::from_bytes(digest).to_bytes()
+        Bn254Fr::from_bytes(digest).to_bytes()
     }
 
     pub fn predict_vesting_address(env: Env, owner: Address, salt: BytesN<32>) -> Address {

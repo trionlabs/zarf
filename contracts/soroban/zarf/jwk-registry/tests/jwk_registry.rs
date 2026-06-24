@@ -7,7 +7,8 @@ use soroban_sdk::{
 };
 use zarf_jwk_registry::{
     DataKey, Error as RegistryError, JwkRegistryContract, JwkRegistryContractClient,
-    DAY_IN_LEDGERS, MAX_ACTIVATION_DELAY_SECS, MIN_ACTIVATION_DELAY_SECS, TTL_EXTEND_TO,
+    DAY_IN_LEDGERS, MAX_ACTIVATION_DELAY_SECS, MAX_ACTIVE_KEYS, MAX_PENDING_KEYS,
+    MIN_ACTIVATION_DELAY_SECS, TTL_EXTEND_TO,
 };
 
 const DELAY_SECS: u64 = 6 * 3600;
@@ -647,6 +648,50 @@ fn owner_can_cancel_a_pending_key() {
 }
 
 #[test]
+fn revoking_a_key_clears_its_pending_proposal() {
+    // Regression: a revocation must also drop any outstanding proposal for the
+    // same hash, or the permissionless `activate_key` could resurrect the
+    // just-revoked key after the delay — defeating fail-safe revocation.
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let (_owner, _id, client) = setup(&env);
+    let operator = Address::generate(&env);
+    client.set_operator(&operator);
+
+    let kid = String::from_str(&env, "google-key-1");
+    let limbs = limbs(&env);
+
+    // Stage and activate the key so it is live on-chain.
+    let key_hash = client.propose_key(&kid, &limbs);
+    env.ledger().with_mut(|l| l.timestamp += DELAY_SECS + 1);
+    client.activate_key(&key_hash);
+    assert!(client.is_valid_key_hash(&key_hash));
+
+    // The rotation worker re-proposes the same (already-active) hash — a normal
+    // occurrence — so a fresh Pending entry now coexists with the live key.
+    let key_hash_again = client.propose_key(&kid, &limbs);
+    assert_eq!(key_hash_again, key_hash);
+    assert_eq!(client.get_pending_count(), 1);
+
+    // Incident response: the owner revokes the key.
+    client.revoke_key(&key_hash);
+    assert!(!client.is_valid_key_hash(&key_hash));
+
+    // The revocation must have cleared the pending proposal too.
+    assert_eq!(client.get_pending_count(), 0);
+    assert!(client.get_pending(&key_hash).is_none());
+
+    // So a permissionless activate after the delay cannot bring it back.
+    env.ledger().with_mut(|l| l.timestamp += DELAY_SECS + 1);
+    match client.try_activate_key(&key_hash) {
+        Err(Ok(RegistryError::PendingNotFound)) => {}
+        other => panic!("expected PendingNotFound after revoke, got {:?}", other),
+    }
+    assert!(!client.is_valid_key_hash(&key_hash));
+}
+
+#[test]
 fn pending_enumeration_swap_removes() {
     let env = Env::default();
     env.mock_all_auths();
@@ -769,4 +814,278 @@ fn owner_register_overrides_a_pending_proposal() {
     assert!(client.is_valid_key_hash(&key_hash));
     assert_eq!(client.get_pending_count(), 0);
     assert!(client.get_pending(&key_hash).is_none());
+}
+
+#[test]
+fn active_key_cap_blocks_overflow_and_revoke_frees_a_slot() {
+    // The live trust surface is bounded: at most MAX_ACTIVE_KEYS keys may be
+    // valid at once. Filling the set then adding one more distinct key must fail
+    // closed with no state change; re-registering an already-valid key (the
+    // rotation job's steady-state) must NOT consume a slot; revoking frees
+    // exactly one.
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let (_owner, _id, client) = setup(&env);
+
+    // Fill the active set to the ceiling with MAX_ACTIVE_KEYS distinct keys.
+    let first_hash = client.register_key(&String::from_str(&env, "k1"), &limbs_with_seed(&env, 1));
+    for seed in 2..=(MAX_ACTIVE_KEYS as u8) {
+        client.register_key(&String::from_str(&env, "k"), &limbs_with_seed(&env, seed));
+    }
+    assert_eq!(client.get_active_key_count(), MAX_ACTIVE_KEYS);
+    assert_eq!(client.get_registered_key_count(), MAX_ACTIVE_KEYS);
+
+    // One more DISTINCT key exceeds the ceiling: fail closed, no state change.
+    let overflow_seed = (MAX_ACTIVE_KEYS as u8) + 1;
+    match client.try_register_key(
+        &String::from_str(&env, "overflow"),
+        &limbs_with_seed(&env, overflow_seed),
+    ) {
+        Err(Ok(RegistryError::KeyLimitReached)) => {}
+        other => panic!("expected KeyLimitReached at the cap, got {:?}", other),
+    }
+    assert_eq!(client.get_active_key_count(), MAX_ACTIVE_KEYS);
+    assert_eq!(client.get_registered_key_count(), MAX_ACTIVE_KEYS);
+
+    // Re-registering an ALREADY-VALID key does not consume a slot, so it stays
+    // allowed even at the ceiling — the rotation worker must never be bricked.
+    client.register_key(&String::from_str(&env, "k1"), &limbs_with_seed(&env, 1));
+    assert_eq!(client.get_active_key_count(), MAX_ACTIVE_KEYS);
+
+    // Revoking frees exactly one slot...
+    client.revoke_key(&first_hash);
+    assert_eq!(client.get_active_key_count(), MAX_ACTIVE_KEYS - 1);
+
+    // ...and now the previously-rejected key fits.
+    client.register_key(
+        &String::from_str(&env, "overflow"),
+        &limbs_with_seed(&env, overflow_seed),
+    );
+    assert_eq!(client.get_active_key_count(), MAX_ACTIVE_KEYS);
+}
+
+#[test]
+fn active_key_cap_blocks_permissionless_activation_and_preserves_pending() {
+    // The ceiling must hold on the PERMISSIONLESS path too: a compromised
+    // operator that has staged keys cannot push the live set past the cap by
+    // waiting out the delay and calling activate_key. The rejected activation
+    // reverts, leaving the pending entry intact.
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let (_owner, _id, client) = setup(&env);
+    let operator = Address::generate(&env);
+    client.set_operator(&operator);
+
+    // Fill the active set to the ceiling via the owner path.
+    for seed in 1..=(MAX_ACTIVE_KEYS as u8) {
+        client.register_key(&String::from_str(&env, "k"), &limbs_with_seed(&env, seed));
+    }
+    assert_eq!(client.get_active_key_count(), MAX_ACTIVE_KEYS);
+
+    // Stage one more via the operator and wait out the delay. Proposing is NOT
+    // gated by the cap — only making a key valid is — so this succeeds.
+    let overflow_seed = (MAX_ACTIVE_KEYS as u8) + 1;
+    let pending_hash = client.propose_key(
+        &String::from_str(&env, "overflow"),
+        &limbs_with_seed(&env, overflow_seed),
+    );
+    env.ledger().with_mut(|l| l.timestamp += DELAY_SECS + 1);
+
+    // Activation is permissionless AND past the delay, yet the cap rejects it.
+    match client.try_activate_key(&pending_hash) {
+        Err(Ok(RegistryError::KeyLimitReached)) => {}
+        other => panic!(
+            "expected KeyLimitReached on activate at the cap, got {:?}",
+            other
+        ),
+    }
+    assert!(!client.is_valid_key_hash(&pending_hash));
+    assert_eq!(client.get_active_key_count(), MAX_ACTIVE_KEYS);
+
+    // The rejected activation reverted, so the pending entry must survive intact.
+    assert_eq!(client.get_pending_count(), 1);
+    assert!(client.get_pending(&pending_hash).is_some());
+
+    // Once the owner revokes a key to make room, the same activation succeeds.
+    let freed = client.get_registered_key(&0);
+    client.revoke_key(&freed);
+    client.activate_key(&pending_hash);
+    assert!(client.is_valid_key_hash(&pending_hash));
+    assert_eq!(client.get_active_key_count(), MAX_ACTIVE_KEYS);
+}
+
+#[test]
+fn pending_cap_blocks_unbounded_staging_but_not_re_proposals() {
+    // A compromised/buggy operator must not be able to stage an unbounded
+    // pending set (storage griefing). Filling the pending set to the ceiling
+    // then proposing one more DISTINCT hash fails closed with no state change;
+    // re-proposing an ALREADY-pending hash (the worker's steady-state retry)
+    // must stay allowed even at the cap, or routine rotation would brick.
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let (_owner, _id, client) = setup(&env);
+    let operator = Address::generate(&env);
+    client.set_operator(&operator);
+
+    // Fill the pending set to the ceiling with MAX_PENDING_KEYS distinct hashes.
+    let first_hash = client.propose_key(&String::from_str(&env, "k1"), &limbs_with_seed(&env, 1));
+    for seed in 2..=(MAX_PENDING_KEYS as u8) {
+        client.propose_key(&String::from_str(&env, "k"), &limbs_with_seed(&env, seed));
+    }
+    assert_eq!(client.get_pending_count(), MAX_PENDING_KEYS);
+
+    // One more DISTINCT proposal exceeds the ceiling: fail closed, no change.
+    let overflow_seed = (MAX_PENDING_KEYS as u8) + 1;
+    match client.try_propose_key(
+        &String::from_str(&env, "overflow"),
+        &limbs_with_seed(&env, overflow_seed),
+    ) {
+        Err(Ok(RegistryError::PendingLimitReached)) => {}
+        other => panic!("expected PendingLimitReached at the cap, got {:?}", other),
+    }
+    assert_eq!(client.get_pending_count(), MAX_PENDING_KEYS);
+    assert!(client
+        .get_pending(&client.compute_key_hash(&limbs_with_seed(&env, overflow_seed)))
+        .is_none());
+
+    // Re-proposing an already-pending hash does not consume a slot, so it stays
+    // allowed at the ceiling — the rotation worker is never bricked.
+    let re = client.propose_key(&String::from_str(&env, "k1"), &limbs_with_seed(&env, 1));
+    assert_eq!(re, first_hash);
+    assert_eq!(client.get_pending_count(), MAX_PENDING_KEYS);
+
+    // Cancelling one frees exactly one slot, and the overflow proposal then fits.
+    client.cancel_pending(&first_hash);
+    assert_eq!(client.get_pending_count(), MAX_PENDING_KEYS - 1);
+    client.propose_key(
+        &String::from_str(&env, "overflow"),
+        &limbs_with_seed(&env, overflow_seed),
+    );
+    assert_eq!(client.get_pending_count(), MAX_PENDING_KEYS);
+}
+
+#[test]
+fn owner_can_batch_cancel_all_pending() {
+    // Incident response: the owner drains the entire pending set in one call
+    // (O(1)-ish remediation) instead of one cancel_pending per hash. After the
+    // drain the enumeration is empty and no staged key can later activate.
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let (_owner, _id, client) = setup(&env);
+    let operator = Address::generate(&env);
+    client.set_operator(&operator);
+
+    // Stage several distinct proposals.
+    let mut hashes = Vec::new(&env);
+    for seed in 1..=5_u8 {
+        hashes.push_back(
+            client.propose_key(&String::from_str(&env, "k"), &limbs_with_seed(&env, seed)),
+        );
+    }
+    assert_eq!(client.get_pending_count(), 5);
+
+    // One call clears them all.
+    client.cancel_all_pending();
+    assert_eq!(client.get_pending_count(), 0);
+    for h in hashes.iter() {
+        assert!(client.get_pending(&h).is_none());
+        assert!(!client.is_valid_key_hash(&h));
+    }
+    // The enumeration is fully drained: index 0 no longer resolves.
+    assert!(client.try_get_pending_at(&0).is_err());
+
+    // No staged key can be activated after the batch cancel, even past the delay.
+    env.ledger().with_mut(|l| l.timestamp += DELAY_SECS + 1);
+    for h in hashes.iter() {
+        match client.try_activate_key(&h) {
+            Err(Ok(RegistryError::PendingNotFound)) => {}
+            other => panic!(
+                "expected PendingNotFound after batch cancel, got {:?}",
+                other
+            ),
+        }
+    }
+
+    // Idempotent: calling it again on an empty set is a no-op, not an error.
+    client.cancel_all_pending();
+    assert_eq!(client.get_pending_count(), 0);
+
+    // The enumeration is clean enough to keep working: a fresh proposal lands
+    // at index 0, proving PendingCount/PendingAt were reset, not corrupted.
+    let fresh = client.propose_key(&String::from_str(&env, "fresh"), &limbs_with_seed(&env, 9));
+    assert_eq!(client.get_pending_count(), 1);
+    assert_eq!(client.get_pending_at(&0), fresh);
+}
+
+#[test]
+fn batch_cancel_all_pending_requires_owner_auth() {
+    // cancel_all_pending is an owner-only lever: a non-owner signature must not
+    // satisfy it, and the pending set must be left untouched.
+    let env = Env::default();
+
+    let owner = Address::generate(&env);
+    let operator = Address::generate(&env);
+    let stranger = Address::generate(&env);
+    let id = env.register(JwkRegistryContract, (owner.clone(), DELAY_SECS));
+    let client = JwkRegistryContractClient::new(&env, &id);
+
+    client
+        .mock_auths(&[MockAuth {
+            address: &owner,
+            invoke: &MockAuthInvoke {
+                contract: &id,
+                fn_name: "set_operator",
+                args: (&operator,).into_val(&env),
+                sub_invokes: &[],
+            },
+        }])
+        .set_operator(&operator);
+
+    let kid = String::from_str(&env, "google-key-1");
+    let limbs = limbs(&env);
+    client
+        .mock_auths(&[MockAuth {
+            address: &operator,
+            invoke: &MockAuthInvoke {
+                contract: &id,
+                fn_name: "propose_key",
+                args: (&kid, &limbs).into_val(&env),
+                sub_invokes: &[],
+            },
+        }])
+        .propose_key(&kid, &limbs);
+    assert_eq!(client.get_pending_count(), 1);
+
+    // A stranger's signature does not satisfy the owner-only batch cancel.
+    assert!(client
+        .mock_auths(&[MockAuth {
+            address: &stranger,
+            invoke: &MockAuthInvoke {
+                contract: &id,
+                fn_name: "cancel_all_pending",
+                args: ().into_val(&env),
+                sub_invokes: &[],
+            },
+        }])
+        .try_cancel_all_pending()
+        .is_err());
+    assert_eq!(client.get_pending_count(), 1);
+
+    // The owner can.
+    client
+        .mock_auths(&[MockAuth {
+            address: &owner,
+            invoke: &MockAuthInvoke {
+                contract: &id,
+                fn_name: "cancel_all_pending",
+                args: ().into_val(&env),
+                sub_invokes: &[],
+            },
+        }])
+        .cancel_all_pending();
+    assert_eq!(client.get_pending_count(), 0);
 }
