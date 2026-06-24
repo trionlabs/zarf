@@ -1,10 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-    getRegistry,
-    searchRegistry,
-    getRegistryToken,
-    getTokenPresets,
-} from './tokenRegistry';
+import { getRegistry, searchRegistry, getRegistryToken, getTokenPresets } from './tokenRegistry';
 
 const TESTNET_USDC = 'CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA';
 

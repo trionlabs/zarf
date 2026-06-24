@@ -247,8 +247,12 @@
                     {#if list.length === 0}
                         <DistributionEmptyState
                             icon={activeTab === 'active' ? Layers : Archive}
-                            color={activeTab === 'active' ? 'bg-zen-success-muted' : 'bg-zen-fg-faint/10'}
-                            iconColor={activeTab === 'active' ? 'text-zen-success-content' : 'text-zen-fg-subtle'}
+                            color={activeTab === 'active'
+                                ? 'bg-zen-success-muted'
+                                : 'bg-zen-fg-faint/10'}
+                            iconColor={activeTab === 'active'
+                                ? 'text-zen-success-content'
+                                : 'text-zen-fg-subtle'}
                             title={activeTab === 'active'
                                 ? 'No Active Distributions'
                                 : 'No History Found'}

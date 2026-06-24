@@ -9,11 +9,7 @@ const ENV = { ADMIN_TOKEN } as unknown as Parameters<typeof worker.fetch>[1];
 type AuthResult = { error?: string };
 
 /** Each test uses a distinct IP so the per-isolate failure counter is isolated. */
-function req(
-    path: string,
-    method: string,
-    headers: Record<string, string>,
-): Request {
+function req(path: string, method: string, headers: Record<string, string>): Request {
     return new Request(`https://jwt.zarf.to${path}`, { method, headers });
 }
 

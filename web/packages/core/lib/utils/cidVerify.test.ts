@@ -42,12 +42,13 @@ describe('verifyCidAgainstBytes', () => {
     });
 
     it('reports unparseable CIDs as unverifiable', async () => {
-        await expect(verifyCidAgainstBytes('zarf-stellar-factory-e2e', enc.encode(CONTENT)))
-            .resolves.toBe('unverifiable');
-        // Right shape, but not valid base58btc payload semantics.
         await expect(
-            verifyCidAgainstBytes('b'.padEnd(46, '0'), enc.encode(CONTENT)),
+            verifyCidAgainstBytes('zarf-stellar-factory-e2e', enc.encode(CONTENT)),
         ).resolves.toBe('unverifiable');
+        // Right shape, but not valid base58btc payload semantics.
+        await expect(verifyCidAgainstBytes('b'.padEnd(46, '0'), enc.encode(CONTENT))).resolves.toBe(
+            'unverifiable',
+        );
     });
 });
 
