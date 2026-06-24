@@ -12,6 +12,12 @@ const COMMON_CONNECT_ORIGINS = [
     'https://www.googleapis.com',
     'https://horizon-testnet.stellar.org',
     'https://horizon.stellar.org',
+    // UltraHonk SRS: bb.js (UltraHonkBackend, constructed with no crsPath in
+    // proof.worker.ts) fetches g1.dat/g2.dat from crs.aztec.network on a cold
+    // IndexedDB cache (net_crs.js). Without this, the FIRST claim on a fresh
+    // browser is connect-src-blocked at proof time. Returning browsers cache the
+    // SRS in IndexedDB, which is why this stayed latent.
+    'https://crs.aztec.network',
 ];
 
 function originFrom(value: string | boolean | undefined): string | null {
@@ -59,7 +65,20 @@ const connectSrc = dev
 // bootstrap to 'self'). The no-nonce branch only applies to non-HTML responses
 // (assets) that carry no inline scripts; it never reopens 'unsafe-inline'.
 // Mirror any kit.csp script-src change here so both policies stay in agreement.
-const SCRIPT_SRC_BASE = "'self' 'wasm-unsafe-eval' blob: https://static.cloudflareinsights.com";
+//
+// claim-only ASYMMETRY vs create: 'unsafe-eval' is REQUIRED here because
+// @noir-lang/acvm_js@1.0.0-beta.18 ships a wasm-bindgen shim
+//   imports.wbg.__wbg_newnoargs = (a,b) => new Function(getStringFromWasm0(a,b))
+// (web/acvm_js.js:712) that the ACVM can invoke during witness generation;
+// 'new Function' is gated by 'unsafe-eval'. It must appear in BOTH this header
+// AND kit.csp's <meta> script-src (svelte.config.js) — the browser enforces the
+// intersection, so a missing entry on either side re-breaks proofs. The nonce
+// keeps inline scripts locked down (strictly stronger than the old
+// 'unsafe-inline'); 'unsafe-eval' only relaxes eval/new Function, not inline
+// injection. The UltraHonk SRS fetch (crs.aztec.network) is in connect-src, not
+// here. Still pending the P0-1 cold-browser proof certification.
+const SCRIPT_SRC_BASE =
+    "'self' 'wasm-unsafe-eval' 'unsafe-eval' blob: https://static.cloudflareinsights.com";
 
 export const handle: Handle = async ({ event, resolve }) => {
     let nonce = '';

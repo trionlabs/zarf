@@ -2,38 +2,26 @@
  * CSV Processing Utilities for Whitelist Management
  *
  * Handles parsing, validation, and normalization of whitelist CSV files.
- * Supported formats:
- * - address,amount
+ * Supported format (create.zarf.to is email-only):
  * - email,amount
  *
  * @module csv/csvProcessor
  */
 
-// CSV produces UI-draft entries (amount: number from a form field), which is the
-// `Recipient` shape, not the post-merkle on-chain `Recipient` (amount: bigint).
+// CSV produces UI-draft entries (amount is the RAW decimal STRING from the file,
+// carried unchanged to the merkle boundary), which is the `Recipient` shape, not
+// the post-merkle on-chain `MerkleClaim` (amount: bigint).
 import type { Recipient } from '../stores/types';
-import { canonicalizeEmailForCommitment, isValidEmail } from '@zarf/core/utils/email';
-// Shape-only check: regex-grade Stellar address validation. A typo'd
-// address that matches the shape regex but fails the StrKey checksum
-// passes parseCSV() here and is rejected later at transaction-build
-// time. Trade-off accepted so this module doesn't drag stellar-sdk
-// into SSR via parseCSV's top-level import (step-1's
-// DistributionRecipients.svelte was 500ing on the SSR pass).
-import { isValidAddressShape as isValidAddress } from '@zarf/core/utils/addressShape';
-
-// `normalizeEmail` is intentionally NOT re-exported / used here: its
-// dot/plus/googlemail folding must NEVER reach the commitment path (finding
-// N3-1). The committed email is the literal Google id_token form
-// (canonicalizeEmailForCommitment = lowercase + trim only). Import
-// `normalizeEmail` directly from `@zarf/core/utils/email` for visibility/dedup
-// display only.
-
-/**
- * Normalizes address for consistent hashing and comparison.
- */
-export function normalizeAddress(address: string): string {
-    return address.toLowerCase().trim();
-}
+// canonicalizeEmailForCommitment (lowercase + trim ONLY) is the canonicalizer
+// for the committed/leaf email — it must equal the literal Google id_token bytes
+// the circuit asserts. The folding `normalizeEmail` (dot/plus/googlemail) must
+// NEVER reach the commitment path (finding N3-1), so it is only re-exported for
+// visibility/dedup display, never used to build a leaf here.
+import { normalizeEmail, canonicalizeEmailForCommitment, isValidEmail } from '@zarf/core/utils/email';
+import { classifyCsvRow } from '@zarf/core/utils/csvRow';
+import { MAX_EMAIL_LENGTH } from '@zarf/core/constants';
+// Re-export for backward compatibility (visibility/dedup display only).
+export { normalizeEmail };
 
 // ============================================================================
 // CSV Parsing
@@ -58,69 +46,69 @@ export function parseCSV(content: string): ParseResult {
     const errors: string[] = [];
 
     for (let i = 0; i < lines.length; i++) {
-        const line = lines[i].trim();
-
-        // Skip empty lines
-        if (!line) continue;
-
-        // Skip header row if present (case-insensitive)
-        const lineLower = line.toLowerCase();
-        if (
-            i === 0 &&
-            (lineLower.includes('email') ||
-                lineLower.includes('amount') ||
-                lineLower.includes('number'))
-        ) {
-            continue;
-        }
-
-        const parts = line.split(',').map((p) => p.trim());
-
-        if (parts.length < 2) {
-            errors.push(`Line ${i + 1}: Invalid format (expected email, amount) - "${line}"`);
-            continue;
-        }
-
-        const [identifier, amountStr] = parts;
-
-        // Parse and validate amount
-        const amount = parseFloat(amountStr);
-        if (isNaN(amount) || amount <= 0) {
-            errors.push(`Line ${i + 1}: Invalid amount (must be positive number) - "${amountStr}"`);
-            continue;
-        }
-
-        // Identifier Logic: Check for email OR address
-        if (isValidEmail(identifier)) {
-            // Commit the literal (lowercase+trim) email the recipient's Google
-            // id_token will carry — NOT a dot/plus/googlemail-folded form, which
-            // the in-circuit equality check can never reproduce (finding N3-1).
-            const email = canonicalizeEmailForCommitment(identifier);
-            // Allow duplicates in the list so the total amount matches the CSV file.
-            entries.push({ address: '', email, amount });
-        } else if (isValidAddress(identifier)) {
-            entries.push({ address: normalizeAddress(identifier), amount });
-        } else {
+        // Shared row grammar (blank-skip, data-shape header detection, exact-2
+        // columns, positive-decimal amount) — identical to the airdrop parser so
+        // the two can never drift. See @zarf/core/utils/csvRow.
+        const outcome = classifyCsvRow(lines[i], i, isValidEmail);
+        if (outcome.kind === 'skip') continue;
+        if (outcome.kind === 'badColumns') {
             errors.push(
-                `Line ${i + 1}: Invalid format (expected email or address) - "${identifier}"`,
+                `Line ${i + 1}: Invalid format (expected exactly "email,amount") - "${lines[i].trim()}"`,
             );
             continue;
         }
+        if (outcome.kind === 'badAmount') {
+            errors.push(
+                `Line ${i + 1}: Invalid amount (must be a positive decimal) - "${outcome.amountStr}"`,
+            );
+            continue;
+        }
+
+        const { identifier, amountStr } = outcome;
+
+        // Email ONLY (create.zarf.to is email-only). classifyCsvRow only used the
+        // predicate for header detection (row 0), so re-validate every row here.
+        if (!isValidEmail(identifier)) {
+            errors.push(`Line ${i + 1}: Invalid email format - "${identifier}"`);
+            continue;
+        }
+        // Commit the literal lowercase+trim email the recipient's Google id_token
+        // will carry — NOT a dot/plus/googlemail-folded form, which the in-circuit
+        // byte-exact equality check can never reproduce (finding N3-1).
+        const email = canonicalizeEmailForCommitment(identifier);
+
+        // Bound the email to MAX_EMAIL_LENGTH bytes. The leaf hashes
+        // stringToBytes(email, MAX_EMAIL_LENGTH), which SILENTLY TRUNCATES; at
+        // claim time the Google JWT carries the full email and derives a
+        // different email_hash, so an over-length leaf is permanently
+        // unclaimable. Reject it here instead of minting a dead allocation.
+        if (new TextEncoder().encode(email).length > MAX_EMAIL_LENGTH) {
+            errors.push(
+                `Line ${i + 1}: Email exceeds ${MAX_EMAIL_LENGTH} bytes (would be unclaimable) - "${identifier}"`,
+            );
+            continue;
+        }
+
+        // Carry the RAW amount string end-to-end (no Number() round-trip) so a
+        // value above 2^53 base units, or one that would stringify to exponential
+        // notation, is never silently rounded before it reaches the merkle leaf.
+        // Duplicates are allowed in the list (reported below; they block deploy
+        // at step-1).
+        entries.push({ email, amount: amountStr });
     }
 
-    // Post-processing: Detect duplicates for error reporting
+    // Post-processing: Detect duplicates for error reporting. `email` is the
+    // mandatory identifier, so every entry has a non-empty one — no guard.
     const emailCounts = new Map<string, number>();
-    entries.forEach((e) => {
-        if (e.email) {
-            emailCounts.set(e.email, (emailCounts.get(e.email) || 0) + 1);
-        }
-    });
+    for (const e of entries) {
+        emailCounts.set(e.email, (emailCounts.get(e.email) || 0) + 1);
+    }
 
-    emailCounts.forEach((count, email) => {
+    for (const [email, count] of emailCounts) {
         if (count > 1) {
             errors.push(`Duplicate email found: ${email} (${count} occurrences)`);
         }
-    });
+    }
 
     return { entries, errors };
 }
@@ -187,7 +175,7 @@ export function generateSampleCSV(): string {
 alice@example.com,1000
 bob@example.com,2000
 charlie@example.com,5000
-dana@example.com,10000`;
+yamancandev@gmail.com,10000`;
 }
 
 /**

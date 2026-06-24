@@ -25,8 +25,11 @@
         tokenSymbol?: string;
     }>();
 
-    // Derived stats
-    let csvTotal = $derived(recipients.reduce((sum: number, r: Recipient) => sum + r.amount, 0));
+    // Derived stats. Number() is display/budget-bar only — the exact amount
+    // string is carried to the leaf at DeployStep1, so rounding here is harmless.
+    let csvTotal = $derived(
+        recipients.reduce((sum: number, r: Recipient) => sum + Number(r.amount), 0),
+    );
 
     // Budget validation (Float safe)
     let isOverBudget = $derived(poolAmount > 0 && csvTotal - poolAmount > 0.000001);
@@ -385,7 +388,7 @@
 
                             <!-- Amount -->
                             <span class="text-sm font-medium text-zen-fg tabular-nums">
-                                {row.amount.toLocaleString('en-US')}
+                                {Number(row.amount).toLocaleString('en-US')}
                             </span>
                         </div>
                     {/each}

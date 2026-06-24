@@ -18,7 +18,7 @@ jobs:
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
       - name: Setup Rust
-        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable branch
+        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
         with:
           # The SHA pin freezes the action code; the toolchain channel must
           # now be selected explicitly (it normally comes from the ref name).
@@ -34,6 +34,8 @@ jobs:
             contracts/soroban/zarf/jwk-registry
             contracts/soroban/zarf/vesting
             contracts/soroban/zarf/factory
+            contracts/soroban/zarf/airdrop
+            contracts/soroban/zarf/airdrop-factory
 
       - name: Rustfmt check
         run: |
@@ -42,7 +44,9 @@ jobs:
             contracts/soroban/verifier/ultrahonk-soroban-verifier \
             contracts/soroban/zarf/jwk-registry \
             contracts/soroban/zarf/vesting \
-            contracts/soroban/zarf/factory; do
+            contracts/soroban/zarf/factory \
+            contracts/soroban/zarf/airdrop \
+            contracts/soroban/zarf/airdrop-factory; do
             cargo fmt --manifest-path "$crate/Cargo.toml" --check
           done
 
@@ -60,6 +64,13 @@ jobs:
           cargo build --manifest-path contracts/soroban/zarf/vesting/Cargo.toml --target wasm32v1-none --release
           cargo build --manifest-path contracts/soroban/zarf/factory/Cargo.toml --target wasm32v1-none --release
 
+      # airdrop-factory's test embeds the instance wasm (include_bytes!/
+      # contractimport!), so the instance must build --release FIRST.
+      - name: Build airdrop contract WASMs
+        run: |
+          cargo build --manifest-path contracts/soroban/zarf/airdrop/Cargo.toml --target wasm32v1-none --release
+          cargo build --manifest-path contracts/soroban/zarf/airdrop-factory/Cargo.toml --target wasm32v1-none --release
+
       - name: Clippy (deny warnings)
         run: |
           for crate in \
@@ -67,7 +78,9 @@ jobs:
             contracts/soroban/verifier/ultrahonk-soroban-verifier \
             contracts/soroban/zarf/jwk-registry \
             contracts/soroban/zarf/vesting \
-            contracts/soroban/zarf/factory; do
+            contracts/soroban/zarf/factory \
+            contracts/soroban/zarf/airdrop \
+            contracts/soroban/zarf/airdrop-factory; do
             cargo clippy --manifest-path "$crate/Cargo.toml" --all-targets -- -D warnings
           done
 
@@ -89,6 +102,12 @@ jobs:
 
       - name: Test factory
         run: cargo test --manifest-path contracts/soroban/zarf/factory/Cargo.toml
+
+      - name: Test airdrop
+        run: cargo test --manifest-path contracts/soroban/zarf/airdrop/Cargo.toml
+
+      - name: Test airdrop factory
+        run: cargo test --manifest-path contracts/soroban/zarf/airdrop-factory/Cargo.toml
 
   circuits:
     name: Noir Circuit
@@ -125,7 +144,7 @@ jobs:
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
       - name: Setup Rust
-        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable branch
+        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
         with:
           toolchain: stable
 
@@ -141,7 +160,9 @@ jobs:
             contracts/soroban/verifier \
             contracts/soroban/zarf/jwk-registry \
             contracts/soroban/zarf/vesting \
-            contracts/soroban/zarf/factory; do
+            contracts/soroban/zarf/factory \
+            contracts/soroban/zarf/airdrop \
+            contracts/soroban/zarf/airdrop-factory; do
             cargo audit --file "$crate/Cargo.lock" || true
           done
 
@@ -170,6 +191,9 @@ jobs:
       VITE_STELLAR_TESTNET_RPC_URL: https://soroban-testnet.stellar.org
       VITE_STELLAR_TESTNET_HORIZON_URL: https://horizon-testnet.stellar.org
       VITE_STELLAR_TESTNET_FACTORY_ADDRESS: CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB7
+      # airdrop apps' coreInit throws at module-eval without their own factory
+      # address (read by +layout.ts → build/smoke fail). Public testnet dummy.
+      VITE_STELLAR_TESTNET_AIRDROP_FACTORY_ADDRESS: CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB7
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -202,6 +226,21 @@ jobs:
       - name: Run unit tests (core, ui, create)
         run: pnpm --dir web -r --if-present test
 
+      - name: Test core
+        run: pnpm --dir web --filter @zarf/core test
+
+      - name: Test indexer
+        run: pnpm --dir web --filter @zarf/indexer test
+
+      - name: Test airdrop create
+        run: pnpm --dir web --filter @zarf/airdrop-create test
+
+      - name: Test airdrop claim
+        run: pnpm --dir web --filter @zarf/airdrop-claim test
+
+      - name: Test create
+        run: pnpm --dir web --filter @zarf/create test
+
       - name: Check shared types
         run: pnpm --dir web check:type-forks
 
@@ -210,6 +249,8 @@ jobs:
           pnpm --dir web --filter @zarf/landing check
           pnpm --dir web --filter @zarf/create check
           pnpm --dir web --filter @zarf/claim check
+          pnpm --dir web --filter @zarf/airdrop-create check
+          pnpm --dir web --filter @zarf/airdrop-claim check
 
       - name: Check worker apps
         run: |
@@ -224,10 +265,16 @@ jobs:
       - name: Check direct console.* allow-list
         run: pnpm --dir web check:console
 
+      # Airdrop Rust fixture == web byte-copy (sha256). Runs before the builds:
+      # a drift here means the contract and the off-chain builder compute
+      # different Merkle roots, so every claim would silently fail InvalidProof.
+      - name: Check Merkle vectors in sync
+        run: pnpm --dir web check:merkle-vectors
+
       # Build apps so check:budget has manifests + immutable assets to
-      # measure. Builds run sequentially because the three apps share
-      # the same pnpm store and vite worker pool; parallelizing here
-      # has not shown meaningful wall-clock savings in local timing.
+      # measure. Builds run sequentially because the apps share the same
+      # pnpm store and vite worker pool; parallelizing here has not shown
+      # meaningful wall-clock savings in local timing.
       - name: Build landing app
         run: pnpm --dir web build:landing
 
@@ -237,10 +284,16 @@ jobs:
       - name: Build create app
         run: pnpm --dir web build:create
 
+      - name: Build airdrop create app
+        run: pnpm --dir web build:airdrop-create
+
+      - name: Build airdrop claim app
+        run: pnpm --dir web build:airdrop-claim
+
       - name: Check bundle budget (initialGz + totalGz per app)
         run: pnpm --dir web check:budget
 
-      # Boot `vite dev` for all three apps and curl the SSR routes.
+      # Boot `vite dev` for every app and curl the SSR routes.
       # Catches module-evaluation crashes (e.g. a top-level
       # stellar-sdk + buffer import that 500s during SSR but passes
       # both build and svelte-check). Fixed-port script so the CI log

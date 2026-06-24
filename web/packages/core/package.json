@@ -16,6 +16,7 @@
     "./contracts/wallet": "./lib/contracts/wallet.ts",
     "./crypto": "./lib/crypto/index.ts",
     "./crypto/*": "./lib/crypto/*.ts",
+    "./merkle": "./lib/merkle/index.ts",
     "./utils": "./lib/utils/index.ts",
     "./utils/*": "./lib/utils/*.ts",
     "./constants": "./lib/constants.ts",
@@ -35,6 +36,7 @@
     "noir-jwt": "^0.4.5"
   },
   "dependencies": {
+    "@noble/hashes": "^1.8.0",
     "@stellar/freighter-api": "^6.0.1",
     "@stellar/stellar-sdk": "^15.1.0",
     "buffer": "^6.0.3"

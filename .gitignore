@@ -66,6 +66,9 @@ presentation/
 presentation.zip
 tests/
 
+#video
+video/
+
 # local deploy identifiers (never commit)
 .deploy_ids.env
 

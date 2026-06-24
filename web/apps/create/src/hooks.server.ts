@@ -76,6 +76,9 @@ export const handle: Handle = async ({ event, resolve }) => {
         : `script-src ${SCRIPT_SRC_BASE}`;
     response.headers.set(
         'Content-Security-Policy',
+        // create.zarf.to is eval-free by design: it only builds distributions
+        // (Pedersen/bb.js, no Noir ACVM), so NO 'unsafe-eval' here — unlike
+        // claim.zarf.to which runs the prover. Inline scripts are nonce-gated.
         `default-src 'self'; ${scriptSrc}; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; ${connectSrc}; img-src 'self' data: https:; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none';`,
     );
     // Non-CSP defense-in-depth headers. HSTS is two years + includeSubDomains;

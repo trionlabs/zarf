@@ -59,6 +59,12 @@ jobs:
             { app: 'landing', package: '@zarf/landing', kind: 'svelte', url: 'https://zarf.to' },
             { app: 'create', package: '@zarf/create', kind: 'svelte', url: 'https://create.zarf.to' },
             { app: 'claim', package: '@zarf/claim', kind: 'svelte', url: 'https://claim.zarf.to' },
+            // Airdrop apps are wallet/Merkle based (NO Noir prover, NOT VK-bound),
+            // so they ride the normal auto-deploy path. Their custom-domain routes
+            // (airdrop.zarf.to / claim-drop.zarf.to) stay commented in wrangler until
+            // the cutover runbook enables them; until then they deploy to *.workers.dev.
+            { app: 'airdrop-create', package: '@zarf/airdrop-create', kind: 'svelte', url: 'https://airdrop.zarf.to' },
+            { app: 'airdrop-claim', package: '@zarf/airdrop-claim', kind: 'svelte', url: 'https://claim-drop.zarf.to' },
             { app: 'indexer', package: '@zarf/indexer', kind: 'worker', url: 'https://indexer.zarf.to' },
             { app: 'pin-proxy', package: '@zarf/pin-proxy', kind: 'worker', url: 'zarf-pin-proxy' },
             { app: 'jwk-rotation', package: '@zarf/jwk-rotation', kind: 'worker', url: 'https://jwt.zarf.to' },

@@ -57,30 +57,19 @@
         deployStore.startMerkleGeneration();
 
         try {
-            // Recipient emails are redacted before the wizard state touches
-            // localStorage, so a restored session cannot rebuild the tree —
-            // generating with blank emails would silently produce a tree no
-            // recipient could ever claim from.
-            if (
-                distribution.recipients.length === 0 ||
-                distribution.recipients.some((r) => !r.email)
-            ) {
-                deployStore.setMerkleError(
-                    'Recipient emails are not kept on disk for privacy. Re-import the recipient CSV for this distribution, then return here to deploy.',
-                );
-                return;
-            }
-
             const tokenDecimals = wizardStore.tokenDetails.tokenDecimals ?? 7;
 
             // Map recipients to { email, amount } format expected by service
             // CRITICAL: Convert amount to token base units using token decimals.
             // This ensures the Merkle Root matches the on-chain values.
             const entries = distribution.recipients.map((r) => ({
-                // Guard above guarantees non-empty; `?? ''` only narrows the type.
-                email: r.email ?? '',
-                // We pass BigInt directly to avoid precision loss
-                amount: parseTokenAmount(String(r.amount), tokenDecimals),
+                email: r.email || '',
+                // r.amount is the RAW CSV decimal string; feed it to
+                // parseTokenAmount unchanged (no String(Number(...)) round-trip)
+                // so large/exponential values reach the leaf at full precision.
+                // (Legacy number-typed drafts are coerced to strings in
+                // wizardStore.restore(), so a string reaches here in practice.)
+                amount: parseTokenAmount(r.amount, tokenDecimals),
             }));
 
             // ADR-023: Discrete Vesting - Generator needs Schedule
@@ -145,36 +134,6 @@
             tokens.
         </p>
     </div>
-
-    {#if deployStore.priorCreateTxHash || deployStore.priorApproveTxHash}
-        <!-- An earlier attempt submitted on-chain transactions before the
-             session was interrupted. The cryptographic tree is not kept on
-             disk, so the flow restarts — but the user must check whether the
-             previous attempt already completed before deploying again. -->
-        <div
-            class="rounded-lg p-4 mb-8 border border-amber-500/40 bg-amber-500/10 flex gap-3"
-            transition:fly={{ y: 8, duration: 200 }}
-        >
-            <AlertTriangle class="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
-            <div class="text-sm">
-                <p class="font-bold mb-1">A previous deployment attempt was interrupted</p>
-                <p class="text-zen-fg-muted mb-2">
-                    On-chain transactions were submitted before the page was reloaded. Check your
-                    dashboard — if this distribution already launched, do not deploy it again.
-                </p>
-                {#if deployStore.priorCreateTxHash}
-                    <p class="font-mono text-xs break-all text-zen-fg-muted">
-                        create tx: {deployStore.priorCreateTxHash}
-                    </p>
-                {/if}
-                {#if deployStore.priorApproveTxHash}
-                    <p class="font-mono text-xs break-all text-zen-fg-muted">
-                        approve tx: {deployStore.priorApproveTxHash}
-                    </p>
-                {/if}
-            </div>
-        </div>
-    {/if}
 
     {#if distribution}
         <!-- Summary Card -->

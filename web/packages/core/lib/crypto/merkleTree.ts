@@ -633,7 +633,11 @@ export async function processWhitelist(
     const cliffEnd = new Date(schedule.cliffEndDate).getTime() / 1000;
     // For simplicity, we assume 'distributionDuration' is count of periods (e.g. 12 months -> 12 epochs)
     // If durationUnit is months, period is roughly 30 days.
-    const epochs = schedule.distributionDuration;
+    // Clamp to a positive integer, matching the UI's calculateUnlockEvents
+    // (utils/vesting.ts: `Math.max(Math.round(duration), 1)`). distributionDuration=0
+    // ("unlock instantly") and fractional durations otherwise crash at
+    // `amount / BigInt(epochs)` (division-by-zero / non-integer BigInt).
+    const epochs = Math.max(1, Math.round(schedule.distributionDuration));
 
     // Period length in seconds. Single source of truth shared with the deploy
     // planner; exhaustive over DurationUnit, so a newly-added unit throws here
