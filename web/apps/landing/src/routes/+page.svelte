@@ -121,15 +121,11 @@
         </button>
 
         <div class="flex items-center gap-3">
-            <a href="https://docs.zarf.to" aria-label="Zarf documentation" class="inline-block">
-                <ZenButton
-                    variant="ghost"
-                    size="sm"
-                    aria-label="Zarf documentation"
-                    class="rounded-full bg-base-content/5 text-base-content/70 border border-base-content/8 hover:text-base-content hover:bg-base-content/10 !ring-0 px-4 py-1.5"
-                >
-                    Docs
-                </ZenButton>
+            <a
+                href="https://docs.zarf.to"
+                class="text-xs font-medium tracking-wide text-base-content/60 hover:text-base-content transition-colors duration-300 px-1.5"
+            >
+                Docs
             </a>
 
             <a
