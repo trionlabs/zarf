@@ -58,8 +58,8 @@ importers:
         specifier: ^2.1.11
         version: 2.1.11
       '@noir-lang/acvm_js':
-        specifier: 1.0.0-beta.18
-        version: 1.0.0-beta.18
+        specifier: 1.0.0-beta.22
+        version: 1.0.0-beta.22
       '@noir-lang/noir_js':
         specifier: 1.0.0-beta.18
         version: 1.0.0-beta.18
@@ -259,7 +259,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^4.1.7
-        version: 4.1.7(@types/node@25.9.1)(happy-dom@20.9.0)(vite@7.3.3(@types/node@25.9.1)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.22.4))
+        version: 4.1.7(@types/node@25.9.1)(happy-dom@20.9.0)(vite@8.1.3(@types/node@25.9.1)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4))
       wrangler:
         specifier: ^4.95.0
         version: 4.95.0(@cloudflare/workers-types@4.20260527.1)
@@ -333,7 +333,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^4.1.7
-        version: 4.1.7(@types/node@25.9.1)(happy-dom@20.9.0)(vite@7.3.3(@types/node@25.9.1)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.22.4))
+        version: 4.1.7(@types/node@25.9.1)(happy-dom@20.9.0)(vite@8.1.3(@types/node@25.9.1)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.4))
       wrangler:
         specifier: ^4.95.0
         version: 4.95.0(@cloudflare/workers-types@4.20260527.1)
@@ -354,8 +354,8 @@ importers:
         specifier: ^2.1.11
         version: 2.1.11
       '@noir-lang/acvm_js':
-        specifier: 1.0.0-beta.18
-        version: 1.0.0-beta.18
+        specifier: 1.0.0-beta.22
+        version: 1.0.0-beta.22
       '@noir-lang/noir_js':
         specifier: 1.0.0-beta.18
         version: 1.0.0-beta.18
@@ -1403,6 +1403,9 @@ packages:
   '@noir-lang/acvm_js@1.0.0-beta.18':
     resolution: {integrity: sha512-QQXAaowxSzGKk+Ua7ofc2jcpvUTYSxmDuF5SzwwOFMue9+ccp9QcqOkjyyIZWjtapcenV7YCXrzcBjvEt7N8Nw==}
 
+  '@noir-lang/acvm_js@1.0.0-beta.22':
+    resolution: {integrity: sha512-2xXfSKrnskUNmPiG/Kj6yvWi1E6wJBl/1ZsmzVaHEEyJsUBf15xaSRBZR7X1361whUR2vqyG80ck2huLZPb5bA==}
+
   '@noir-lang/noir_js@1.0.0-beta.18':
     resolution: {integrity: sha512-J0VSw13U9SQpejh1sWNEjuKxjl/uJblOmWJMdlpYqCetth9oBAnKv8+IMk0bZlkrjDp22Yf8vMDkf+Qb8KBZ2Q==}
 
@@ -1637,6 +1640,7 @@ packages:
   '@stellar/stellar-base@15.0.0':
     resolution: {integrity: sha512-XQhxUr9BYiEcFcgc4oWcCMR9QJCny/GmmGsuwPKf/ieIcOeb5149KLHYx9mJCA0ea8QbucR2/GzV58QbXOTxQA==}
     engines: {node: '>=20.0.0'}
+    deprecated: This package is now rolled into @stellar/stellar-sdk. Please use @stellar/stellar-sdk to continue receiving updates and support.
 
   '@stellar/stellar-sdk@15.1.0':
     resolution: {integrity: sha512-GsJUcWx2yboVzYdhTe/LHS3V1wVLSHkUkglC5bBoYWGJt31vzIhbSGno60NP9CdCTNkLJdnrsLJ63oA58Zvh5A==}
@@ -5112,6 +5116,8 @@ snapshots:
   '@noble/hashes@1.8.0': {}
 
   '@noir-lang/acvm_js@1.0.0-beta.18': {}
+
+  '@noir-lang/acvm_js@1.0.0-beta.22': {}
 
   '@noir-lang/noir_js@1.0.0-beta.18':
     dependencies:
