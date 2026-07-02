@@ -332,27 +332,29 @@
                 : 'opacity-0 translate-y-5'}"
             style="transition-delay: 1200ms;"
         >
-            <a href="https://claim.zarf.to" class="inline-block">
+            <a href="https://early.zarf.to" class="inline-block">
                 <ZenButton
                     variant="primary"
                     size="lg"
                     class="rounded-full !bg-zen-fg/90 backdrop-blur-sm !text-zen-bg hover:shadow-lg hover:shadow-zen-fg/10 w-full sm:w-auto"
                 >
-                    Claim your tokens
+                    Get early access
                     {#snippet iconRight()}
                         <ArrowRight class="w-3.5 h-3.5" />
                     {/snippet}
                 </ZenButton>
             </a>
-            <a href="https://create.zarf.to" class="inline-block">
+            <span class="inline-block">
                 <ZenButton
                     variant="secondary"
                     size="lg"
-                    class="rounded-full !bg-zen-fg/5 backdrop-blur-md !text-zen-fg/60 !border-zen-fg/10 hover:!text-zen-fg w-full sm:w-auto"
+                    disabled
+                    title="Claiming opens at launch"
+                    class="rounded-full !bg-zen-fg/5 backdrop-blur-md !text-zen-fg/60 !border-zen-fg/10 w-full sm:w-auto"
                 >
-                    Create a distribution
+                    Claim tokens
                 </ZenButton>
-            </a>
+            </span>
         </div>
 
         <!-- Honest status line — the Stellar mark sits in a glyph+wordmark lockup. -->
