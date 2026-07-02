@@ -63,3 +63,6 @@ tests/
 
 # local deploy identifiers (never commit)
 .deploy_ids.env
+
+# internal security audit notes (local only, never commit)
+issues/
