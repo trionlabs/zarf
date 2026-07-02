@@ -20,16 +20,16 @@
     "lucide-svelte": "^0.563.0"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20260527.1",
-    "@sveltejs/adapter-cloudflare": "^7.2.8",
-    "@sveltejs/kit": "^2.61.1",
+    "@cloudflare/workers-types": "^4.20260702.1",
+    "@sveltejs/adapter-cloudflare": "^7.2.9",
+    "@sveltejs/kit": "^2.69.0",
     "@sveltejs/vite-plugin-svelte": "^6.2.4",
-    "@tailwindcss/vite": "^4.3.0",
-    "svelte": "^5.55.9",
-    "svelte-check": "^4.4.8",
-    "tailwindcss": "^4.3.0",
+    "@tailwindcss/vite": "^4.3.2",
+    "svelte": "^5.56.4",
+    "svelte-check": "^4.7.1",
+    "tailwindcss": "^4.3.2",
     "typescript": "^5.9.3",
     "vite": "^7.3.3",
-    "wrangler": "^4.95.0"
+    "wrangler": "^4.106.0"
   }
 }
