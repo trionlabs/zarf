@@ -3,7 +3,6 @@
     import { ArrowRight, Banknote, ChevronDown, Gift, Hourglass, Lock } from 'lucide-svelte';
     import { browser } from '@zarf/core/utils/ssr';
     import { themeStore } from '../../stores/themeStore.svelte';
-    import Tooltip from '../../components/ui/Tooltip.svelte';
     import ZenButton from '../../components/ui/ZenButton.svelte';
 
     // --- State & Config ---
@@ -21,12 +20,13 @@
     // Two reveal words as requested
     const HIDDEN_DATA = ['Private Claim'];
 
-    // Rotating headline objects — each pairs a real Zarf use case with its mark.
-    // Labels are kept near-equal length so the fixed-width pill never looks empty.
+    // Rotating headline objects, recipient-voiced — each pairs a real Zarf
+    // use case with its mark. Labels are kept near-equal length so the
+    // fixed-width slot never looks empty.
     const ROTATING = [
         { label: 'private tokens', icon: Lock },
         { label: 'token airdrops', icon: Gift },
-        { label: 'team payroll', icon: Banknote },
+        { label: 'your payroll', icon: Banknote },
         { label: 'vesting grants', icon: Hourglass },
     ];
     let rotateIdx = $state(0);
@@ -283,16 +283,16 @@
 
     <!-- Content Block -->
     <div class="relative z-30 text-center max-w-4xl px-6 flex flex-col items-center gap-5 md:gap-6">
-        <!-- Headline: static verb line + sealed pill whose contents "declassify" -->
+        <!-- Headline: one recipient-voiced sentence; the object slot "declassifies".
+             The slot carries the page's single color accent (zen-primary). -->
         <h1
-            class="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tighter text-zen-fg leading-[1.12] transition-opacity duration-1000 ease-out {mounted
+            class="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tighter text-zen-fg leading-[1.12] [text-wrap:balance] transition-opacity duration-1000 ease-out {mounted
                 ? 'opacity-100'
                 : 'opacity-0'}"
             style="transition-delay: 400ms;"
         >
-            Distribute &amp; claim
-            <br />
-            <span class="relative inline-grid items-center align-middle mx-0.5" aria-hidden="true">
+            Receive
+            <span class="relative inline-grid items-center align-middle mx-1" aria-hidden="true">
                 {#each ROTATING as item, i (item.label)}
                     <span
                         class="col-start-1 row-start-1 inline-flex items-center justify-center gap-2 sm:gap-2.5 whitespace-nowrap transition-all duration-500 ease-out motion-reduce:transition-none {i ===
@@ -300,15 +300,18 @@
                             ? 'opacity-100 blur-none translate-y-0'
                             : 'opacity-0 blur-sm translate-y-1'}"
                     >
-                        <item.icon class="w-[0.42em] h-[0.42em] opacity-45" strokeWidth={2} />
+                        <item.icon
+                            class="w-[0.42em] h-[0.42em] text-zen-primary opacity-80"
+                            strokeWidth={2}
+                        />
                         {item.label}
                     </span>
                 {/each}
                 <span
-                    class="absolute -bottom-1 sm:-bottom-1.5 left-0 right-0 h-px bg-gradient-to-r from-transparent via-zen-fg/40 to-transparent"
+                    class="absolute -bottom-1 sm:-bottom-1.5 left-0 right-0 h-px bg-gradient-to-r from-transparent via-zen-primary/60 to-transparent"
                 ></span>
             </span>
-            <span class="sr-only">private tokens, airdrops, payroll, and vesting grants</span>
+            <span class="sr-only">private tokens, token airdrops, your payroll, and vesting grants</span>
             on Stellar.
         </h1>
 
@@ -319,8 +322,8 @@
                 : 'opacity-0 translate-y-5'}"
             style="transition-delay: 600ms;"
         >
-            Distribute tokens to emails with ZK proofs.<br class="hidden sm:block" />
-            No wallet exposure. No identity leaks.
+            Tokens arrive in your inbox, sealed with ZK proofs.<br class="hidden sm:block" />
+            Claim with a Google sign-in. No wallet to start. No identity leaks.
         </p>
 
         <!-- CTA Group -->
@@ -330,46 +333,38 @@
                 : 'opacity-0 translate-y-5'}"
             style="transition-delay: 1200ms;"
         >
-            <a
-                href="https://x.com/zarfto"
-                target="_blank"
-                rel="noopener noreferrer"
-                class="inline-block"
-            >
+            <a href="https://claim.zarf.to" class="inline-block">
                 <ZenButton
                     variant="primary"
                     size="lg"
                     class="rounded-full !bg-zen-fg/90 backdrop-blur-sm !text-zen-bg hover:shadow-lg hover:shadow-zen-fg/10 w-full sm:w-auto"
                 >
-                    {#snippet iconLeft()}
-                        <svg
-                            class="w-4 h-4"
-                            fill="currentColor"
-                            viewBox="0 0 24 24"
-                            aria-hidden="true"
-                        >
-                            <path
-                                d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"
-                            ></path>
-                        </svg>
-                    {/snippet}
-                    Follow on X
-                </ZenButton>
-            </a>
-            <Tooltip text="Coming Soon" position="bottom">
-                <ZenButton
-                    variant="secondary"
-                    size="lg"
-                    disabled
-                    class="rounded-full !bg-zen-fg/5 backdrop-blur-md !text-zen-fg/40 !border-zen-fg/10 cursor-not-allowed"
-                >
-                    Claim Tokens
+                    Claim your tokens
                     {#snippet iconRight()}
                         <ArrowRight class="w-3.5 h-3.5" />
                     {/snippet}
                 </ZenButton>
-            </Tooltip>
+            </a>
+            <a href="https://create.zarf.to" class="inline-block">
+                <ZenButton
+                    variant="secondary"
+                    size="lg"
+                    class="rounded-full !bg-zen-fg/5 backdrop-blur-md !text-zen-fg/60 !border-zen-fg/10 hover:!text-zen-fg w-full sm:w-auto"
+                >
+                    Create a distribution
+                </ZenButton>
+            </a>
         </div>
+
+        <!-- Honest status line -->
+        <p
+            class="text-[11px] font-medium tracking-[0.15em] uppercase text-zen-fg/35 transition-opacity duration-700 ease-out {mounted
+                ? 'opacity-100'
+                : 'opacity-0'}"
+            style="transition-delay: 1500ms;"
+        >
+            Live on Stellar testnet
+        </p>
     </div>
 
     <!-- Scroll Indicator -->
