@@ -1,0 +1,7 @@
+<!-- Neutral placeholder mark. TODO: replace with your brand mark / app icon.
+     Loaded via <img> (Mark.svelte + favicon) so CSS vars do NOT apply here —
+     uses neutral hardcoded hex. setup.mjs may rewrite the hex literals. -->
+<svg preserveAspectRatio="none" width="100%" height="100%" overflow="visible" style="display: block;" viewBox="0 0 587 587" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="587" height="587" rx="96" fill="#888888"/>
+  <circle cx="293.5" cy="293.5" r="150" fill="none" stroke="#ffffff" stroke-width="44"/>
+</svg>

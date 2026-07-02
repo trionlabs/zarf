@@ -1,0 +1,10 @@
+node_modules/
+/.svelte-kit/
+/.wrangler/
+/build/
+/dist/
+.dev.vars
+.env
+.env.*
+!.env.example
+stats.html
