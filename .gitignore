@@ -57,3 +57,9 @@ test/*.dev
 
 #plans
 plans/
+presentation/
+presentation.zip
+tests/
+
+# local deploy identifiers (never commit)
+.deploy_ids.env
