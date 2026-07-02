@@ -64,10 +64,10 @@
 </script>
 
 <svelte:head>
-    <title>zarf.to - Privacy-Preserving Token Distribution</title>
+    <title>zarf.to - Privacy-Preserving Token Distribution on Stellar</title>
     <meta
         name="description"
-        content="Create private token distributions and payroll with built-in vesting and privacy-preserving claims using Zero-Knowledge proofs."
+        content="Create private token distributions and payroll on Stellar with built-in vesting and privacy-preserving claims using Zero-Knowledge proofs."
     />
 
     <!-- Open Graph -->
@@ -77,7 +77,7 @@
     <meta property="og:title" content="Zarf — Privacy-Preserving Token Distribution" />
     <meta
         property="og:description"
-        content="Create private token distributions and payroll with built-in vesting and privacy-preserving claims using Zero-Knowledge proofs."
+        content="Create private token distributions and payroll on Stellar with built-in vesting and privacy-preserving claims using Zero-Knowledge proofs."
     />
     <meta property="og:image" content="https://zarf.to/og.png" />
     <meta property="og:image:width" content="1200" />
@@ -90,7 +90,7 @@
     <meta name="twitter:title" content="Zarf — Privacy-Preserving Token Distribution" />
     <meta
         name="twitter:description"
-        content="Create private token distributions and payroll with built-in vesting and privacy-preserving claims using Zero-Knowledge proofs."
+        content="Create private token distributions and payroll on Stellar with built-in vesting and privacy-preserving claims using Zero-Knowledge proofs."
     />
     <meta name="twitter:image" content="https://zarf.to/og.png" />
 </svelte:head>
@@ -284,7 +284,15 @@
                 <div class="text-xs text-zen-fg-muted flex items-center gap-1.5">
                     <span>© 2026</span>
                     <span class="text-base-content/20">·</span>
-                    <span>Built by</span>
+                    <span>Built on</span>
+                    <a
+                        href="https://stellar.org"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="text-zen-fg-muted hover:text-base-content/60 transition-colors duration-300"
+                        >Stellar</a
+                    >
+                    <span>by</span>
                     <a
                         href="https://trionlabs.dev"
                         target="_blank"

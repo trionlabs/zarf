@@ -271,7 +271,7 @@
             style="transition-delay: 200ms;"
         >
             <span class="w-1.5 h-1.5 rounded-full bg-zen-fg/40"></span>
-            Confidential Vesting | Private Payroll
+            Confidential Vesting | Private Payroll | On Stellar
         </div>
 
         <!-- Headline -->
