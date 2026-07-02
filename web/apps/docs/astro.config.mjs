@@ -18,7 +18,7 @@ export default defineConfig({
 				},
 			],
 			social: [
-				{ icon: 'x.com', label: 'X', href: 'https://x.com/trionlabs' },
+				{ icon: 'x.com', label: 'X', href: 'https://x.com/zarfto' },
 				{ icon: 'email', label: 'Contact', href: 'mailto:contact@trionlabs.dev' },
 			],
 			sidebar: [

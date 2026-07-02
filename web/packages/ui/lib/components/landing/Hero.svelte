@@ -292,21 +292,21 @@
         >
             Distribute &amp; claim
             <br />
-            <span
-                class="inline-grid items-center align-middle my-1 px-4 sm:px-5 py-0.5 sm:py-1 rounded-2xl border border-zen-fg/15 bg-zen-fg/5 backdrop-blur-md"
-                aria-hidden="true"
-            >
+            <span class="relative inline-grid items-center align-middle mx-0.5" aria-hidden="true">
                 {#each ROTATING as item, i (item.label)}
                     <span
-                        class="col-start-1 row-start-1 inline-flex items-center justify-center gap-2 sm:gap-3 whitespace-nowrap transition-all duration-500 ease-out motion-reduce:transition-none {i ===
+                        class="col-start-1 row-start-1 inline-flex items-center justify-center gap-2 sm:gap-2.5 whitespace-nowrap transition-all duration-500 ease-out motion-reduce:transition-none {i ===
                         rotateIdx
                             ? 'opacity-100 blur-none translate-y-0'
                             : 'opacity-0 blur-sm translate-y-1'}"
                     >
-                        <item.icon class="w-[0.6em] h-[0.6em] opacity-70" strokeWidth={2.5} />
+                        <item.icon class="w-[0.42em] h-[0.42em] opacity-45" strokeWidth={2} />
                         {item.label}
                     </span>
                 {/each}
+                <span
+                    class="absolute -bottom-1 sm:-bottom-1.5 left-0 right-0 h-px bg-gradient-to-r from-transparent via-zen-fg/40 to-transparent"
+                ></span>
             </span>
             <span class="sr-only">private tokens, airdrops, payroll, and vesting grants</span>
             on Stellar.
@@ -331,7 +331,7 @@
             style="transition-delay: 1200ms;"
         >
             <a
-                href="https://x.com/trionlabs"
+                href="https://x.com/zarfto"
                 target="_blank"
                 rel="noopener noreferrer"
                 class="inline-block"
