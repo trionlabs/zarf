@@ -184,7 +184,7 @@
         <section class="py-24 relative overflow-hidden">
             <div class="container mx-auto px-6 max-w-2xl text-center">
                 <p class="text-xs font-medium tracking-[0.2em] uppercase text-zen-fg-muted mb-4">
-                    Stay Updated
+                    Early Access
                 </p>
                 <h2
                     class="text-3xl md:text-4xl font-semibold mb-5 tracking-tight text-base-content"
@@ -192,20 +192,29 @@
                     Join the Waitlist
                 </h2>
                 <p class="text-base text-zen-fg-muted mb-10 max-w-md mx-auto leading-relaxed">
-                    Be the first to know when zarf.to launches. Follow us for exclusive updates and
-                    early access.
+                    Land on Zarf before launch. Follow, share, and claim your beta tester spot —
+                    early access delivered to your email.
                 </p>
                 <div class="flex flex-col sm:flex-row items-center justify-center gap-4">
+                    <a href="https://early.zarf.to" class="inline-block">
+                        <ZenButton
+                            variant="primary"
+                            size="lg"
+                            class="rounded-full !bg-base-content !text-base-100 hover:shadow-lg hover:shadow-base-content/10 w-full sm:w-auto"
+                        >
+                            Get Early Access
+                        </ZenButton>
+                    </a>
                     <a
-                        href="https://x.com/trionlabs"
+                        href="https://x.com/zarfto"
                         target="_blank"
                         rel="noopener noreferrer"
                         class="inline-block"
                     >
                         <ZenButton
-                            variant="primary"
+                            variant="secondary"
                             size="lg"
-                            class="rounded-full !bg-base-content !text-base-100 hover:shadow-lg hover:shadow-base-content/10 w-full sm:w-auto"
+                            class="rounded-full !bg-transparent !text-base-content/70 !border-base-content/15 hover:!text-base-content w-full sm:w-auto"
                         >
                             {#snippet iconLeft()}
                                 <svg
@@ -219,7 +228,7 @@
                                     ></path>
                                 </svg>
                             {/snippet}
-                            Follow on X
+                            Follow @zarfto
                         </ZenButton>
                     </a>
                     <Tooltip text="Coming Soon" position="top">
