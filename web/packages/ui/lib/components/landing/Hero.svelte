@@ -43,8 +43,12 @@
 
     // --- Helpers ---
     function generateHash(): string {
-        const hex = Math.random().toString(16).substring(2, 10);
-        return '0x' + hex.substring(0, 2) + '....' + hex.substring(hex.length - 2);
+        // Stellar strkey fragments: accounts are G[A-D]..., contracts C[A-D]...
+        const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+        const pick = () => alphabet[Math.floor(Math.random() * alphabet.length)];
+        const prefix =
+            (Math.random() > 0.5 ? 'C' : 'G') + 'ABCD'[Math.floor(Math.random() * 4)];
+        return prefix + pick() + pick() + '....' + pick() + pick() + pick() + pick();
     }
 
     function initPoints() {
