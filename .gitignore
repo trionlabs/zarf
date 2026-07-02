@@ -6,6 +6,9 @@
 *.key
 *.secret
 .dev.vars*
+# local Stellar CLI keystore / identities (aliases live in the global config;
+# this blocks a stray repo-local keystore from ever entering the public tree)
+.stellar/
 # block new witness files anywhere; committed contract test fixtures stay tracked
 **/Prover.toml
 
@@ -13,6 +16,8 @@
 circuits/target/
 target/
 node_modules/
+# package-manager store / caches (never commit)
+.pnpm-store/
 
 # poc
 poc/node_modules
