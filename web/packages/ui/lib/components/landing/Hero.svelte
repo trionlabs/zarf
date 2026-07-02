@@ -284,7 +284,8 @@
     <!-- Content Block -->
     <div class="relative z-30 text-center max-w-4xl px-6 flex flex-col items-center gap-5 md:gap-6">
         <!-- Headline: one recipient-voiced sentence; the object slot "declassifies".
-             The slot carries the page's single color accent (zen-primary). -->
+             Monochrome system (zen-primary ~= zen-fg), so the changing word is
+             marked by motion + a quiet leading glyph, not color or an underline. -->
         <h1
             class="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tighter text-zen-fg leading-[1.12] [text-wrap:balance] transition-opacity duration-1000 ease-out {mounted
                 ? 'opacity-100'
@@ -292,25 +293,20 @@
             style="transition-delay: 400ms;"
         >
             Receive
-            <!-- Slot sits on the text baseline (no flex, no vertical-align tricks):
-                 each word is normal inline flow inside a stacked grid cell, so its
-                 baseline is the grid's baseline and matches the sentence exactly.
-                 The hairline lives inside each word, so it always spans that word. -->
+            <!-- Slot sits on the text baseline: each word is normal inline flow in
+                 a stacked grid cell, so its baseline matches the sentence exactly. -->
             <span class="inline-grid justify-items-center align-baseline mx-1" aria-hidden="true">
                 {#each ROTATING as item, i (item.label)}
                     <span
-                        class="col-start-1 row-start-1 relative whitespace-nowrap transition-all duration-500 ease-out motion-reduce:transition-none {i ===
+                        class="col-start-1 row-start-1 whitespace-nowrap transition-all duration-500 ease-out motion-reduce:transition-none {i ===
                         rotateIdx
                             ? 'opacity-100 blur-none'
                             : 'opacity-0 blur-sm'}"
                     >
                         <item.icon
-                            class="inline-block align-middle w-[0.42em] h-[0.42em] mr-2 sm:mr-2.5 text-zen-primary opacity-80"
+                            class="inline-block align-[-0.06em] w-[0.5em] h-[0.5em] mr-2 sm:mr-2.5 opacity-40"
                             strokeWidth={2}
                         />{item.label}
-                        <span
-                            class="absolute -bottom-1 sm:-bottom-1.5 left-0 right-0 h-px bg-gradient-to-r from-transparent via-zen-primary/60 to-transparent"
-                        ></span>
                     </span>
                 {/each}
             </span>
@@ -359,14 +355,27 @@
             </a>
         </div>
 
-        <!-- Honest status line -->
+        <!-- Honest status line — the Stellar mark sits in a glyph+wordmark lockup. -->
         <p
-            class="text-[11px] font-medium tracking-[0.15em] uppercase text-zen-fg/35 transition-opacity duration-700 ease-out {mounted
+            class="inline-flex items-center gap-1.5 text-[11px] font-medium tracking-[0.15em] uppercase text-zen-fg/35 transition-opacity duration-700 ease-out {mounted
                 ? 'opacity-100'
                 : 'opacity-0'}"
             style="transition-delay: 1500ms;"
         >
-            Live on Stellar testnet
+            Live on
+            <span class="inline-flex items-center gap-1 text-zen-fg/55">
+                <svg
+                    class="w-3 h-3 fill-current"
+                    viewBox="0 0 24 24"
+                    aria-hidden="true"
+                >
+                    <path
+                        d="M12.003 1.716c-1.37 0-2.7.27-3.948.78A10.18 10.18 0 0 0 2.66 7.901a10.136 10.136 0 0 0-.797 3.954c0 .258.01.516.027.775a1.942 1.942 0 0 1-1.055 1.88L0 14.934v1.902l2.463-1.26.072-.032v.005l.77-.39.758-.385.066-.039 14.807-7.56 1.666-.847 3.392-1.732V2.694L17.792 5.86 3.744 13.025l-.104.055-.017-.115a8.286 8.286 0 0 1-.071-1.105c0-2.255.88-4.377 2.474-5.977a8.462 8.462 0 0 1 2.71-1.82 8.513 8.513 0 0 1 3.2-.654h.067a8.41 8.41 0 0 1 4.09 1.055l1.628-.83.126-.066a10.11 10.11 0 0 0-5.845-1.853zM24 7.143 5.047 16.808l-1.666.847L0 19.382v1.902l3.282-1.671 2.91-1.485 14.058-7.153.105-.055.016.115c.05.369.072.743.072 1.11 0 2.255-.88 4.383-2.475 5.978a8.461 8.461 0 0 1-2.71 1.82 8.305 8.305 0 0 1-3.2.654h-.06c-1.441 0-2.86-.369-4.102-1.061l-.066.033-1.683.857c.594.418 1.232.776 1.903 1.062a10.11 10.11 0 0 0 3.947.797 10.09 10.09 0 0 0 7.17-2.975 10.136 10.136 0 0 0 2.969-7.18c0-.259-.005-.523-.027-.781a1.942 1.942 0 0 1 1.055-1.88L24 9.044z"
+                    ></path>
+                </svg>
+                Stellar
+            </span>
+            testnet
         </p>
     </div>
 
