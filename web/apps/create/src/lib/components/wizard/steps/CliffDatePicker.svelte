@@ -73,7 +73,7 @@
 
     <!-- Date Input (Month · Day, Year) -->
     <div
-        class="flex items-center gap-2 text-4xl font-medium tracking-tighter leading-none text-zen-fg"
+        class="flex flex-wrap items-center gap-2 text-4xl font-medium tracking-tighter leading-none text-zen-fg"
     >
         <ZenSelect
             bind:value={selectedMonth}
@@ -108,7 +108,7 @@
     </div>
 
     <!-- Quick Date Presets + Time Selector -->
-    <div class="flex items-center gap-2 text-xs text-zen-fg-subtle">
+    <div class="flex flex-wrap items-center gap-2 text-xs text-zen-fg-subtle">
         {#each CLIFF_PRESETS as preset, i (i)}
             {@const presetDate = addMonthsToToday(preset.months)}
             <ZenButton

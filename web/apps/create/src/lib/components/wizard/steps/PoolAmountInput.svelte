@@ -81,8 +81,10 @@
 <div class="space-y-3">
     <h3 class="zen-section-label">Distribution Pool</h3>
 
-    <!-- Amount Input -->
-    <div class="flex items-baseline gap-3">
+    <!-- Amount Input: content-sized so the token symbol hugs the number and the
+         value shares the section's left edge. field-sizing-content does the
+         sizing where supported; the reactive size attr is the fallback. -->
+    <div class="flex items-baseline gap-3 min-w-0">
         <input
             type="text"
             value={poolInputValue}
@@ -91,20 +93,19 @@
             aria-label="Distribution Pool Amount"
             inputmode="decimal"
             autocomplete="off"
-            class="w-80 bg-transparent border-none !text-5xl font-medium tracking-tighter leading-none text-right placeholder:text-zen-fg/10 text-zen-fg focus:outline-none focus:ring-0 transition-all"
+            size={Math.max(poolInputValue.length, 1)}
+            class="field-sizing-content min-w-0 max-w-full bg-transparent border-none !text-4xl sm:!text-5xl font-medium tracking-tighter leading-none text-left placeholder:text-zen-fg/10 text-zen-fg focus:outline-none focus:ring-0 transition-all"
         />
-        <span class="text-zen-fg/50 text-lg font-medium">
+        <span class="text-zen-fg/50 text-lg font-medium shrink-0">
             {tokenSymbol}
         </span>
     </div>
 
     <!-- Quick Presets (% Supply) -->
     {#if hasSupply}
-        <div class="flex items-center gap-3">
-            <span class="text-xs text-zen-fg-muted uppercase tracking-widest w-16 shrink-0"
-                >Quick</span
-            >
-            <div class="flex items-center gap-1">
+        <div class="flex flex-wrap items-center gap-x-3 gap-y-2">
+            <span class="text-xs text-zen-fg-muted uppercase tracking-widest shrink-0">Quick</span>
+            <div class="flex flex-wrap items-center gap-1">
                 {#each PERCENTAGE_PRESETS as pct (pct)}
                     <button
                         type="button"
@@ -137,7 +138,7 @@
                 </div>
             </div>
         </div>
-        <p class="text-xs text-zen-fg-muted pl-20">
+        <p class="text-xs text-zen-fg-muted">
             Total Supply: {totalSupply.toLocaleString('en-US')}
             {tokenSymbol}
         </p>

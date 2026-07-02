@@ -44,7 +44,7 @@
 {#if !isDonePage}
     <!-- Minimal Progress Bar -->
     <div class="w-full border-b border-zen-border-subtle bg-zen-bg">
-        <div class="max-w-7xl mx-auto px-6 py-2 flex items-center gap-4">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2 flex items-center gap-4">
             <!-- Progress Bar -->
             <div
                 class="flex-1 h-1 bg-zen-fg/10 rounded-full overflow-hidden"
