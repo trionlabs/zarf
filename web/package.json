@@ -49,13 +49,13 @@
     "@eslint/js": "^10.0.1",
     "@types/node": "^25.9.1",
     "@zarf/core": "workspace:*",
-    "eslint": "^10.4.0",
+    "eslint": "^10.6.0",
     "eslint-config-prettier": "^10.1.8",
-    "eslint-plugin-svelte": "^3.18.0",
-    "globals": "^17.6.0",
-    "prettier": "^3.8.3",
-    "prettier-plugin-svelte": "^4.0.1",
+    "eslint-plugin-svelte": "^3.20.0",
+    "globals": "^17.7.0",
+    "prettier": "^3.9.4",
+    "prettier-plugin-svelte": "^4.1.1",
     "tsx": "^4.22.4",
-    "typescript-eslint": "^8.60.0"
+    "typescript-eslint": "^8.62.1"
   }
 }
