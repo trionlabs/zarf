@@ -42,8 +42,10 @@
         "BRAND_NAME": "Zarf",
         "BRAND_HANDLE": "zarfto",
         "SITE_DOMAIN": "early.zarf.to",
-        // Comma-separated numeric X user ids allowed into /admin.
-        "ADMIN_X_USER_IDS": "2072627068370583552",
+        // ADMIN_X_USER_IDS (comma-separated numeric X ids allowed into /admin)
+        // is a SECRET, not a var — this repo is public and the admin identity
+        // shouldn't be advertised. Set via `wrangler secret put ADMIN_X_USER_IDS`.
+        // ADMIN_KEY is the break-glass fallback.
         "ADMIN_EMAILS": "yamancandev@gmail.com",
         "TWITTER_REDIRECT_URI": "https://early.zarf.to/api/auth/twitter/callback",
         "BRAND_X_USERNAME": "zarfto",
@@ -52,6 +54,6 @@
     },
     // Secrets live on the worker (set via `wrangler secret put`, persist across
     // deploys by worker name): TWITTER_CLIENT_ID, TWITTER_CLIENT_SECRET,
-    // ADMIN_KEY. Still pending: TWITTER_BEARER_TOKEN (follower sweep only).
-    // NEVER set ALLOW_MOCK_OAUTH in prod.
+    // ADMIN_KEY, ADMIN_X_USER_IDS. Still pending: TWITTER_BEARER_TOKEN (follower
+    // sweep only). NEVER set ALLOW_MOCK_OAUTH in prod.
 }
