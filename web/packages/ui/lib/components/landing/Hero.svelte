@@ -1,6 +1,6 @@
 <script lang="ts">
     import { onMount } from 'svelte';
-    import { ArrowRight, ChevronDown } from 'lucide-svelte';
+    import { ArrowRight, Banknote, ChevronDown, Gift, Hourglass, Lock } from 'lucide-svelte';
     import { browser } from '@zarf/core/utils/ssr';
     import { themeStore } from '../../stores/themeStore.svelte';
     import Tooltip from '../../components/ui/Tooltip.svelte';
@@ -20,6 +20,16 @@
     const REVEAL_RADIUS = 200;
     // Two reveal words as requested
     const HIDDEN_DATA = ['Private Claim'];
+
+    // Rotating headline objects — each pairs a real Zarf use case with its mark.
+    // Labels are kept near-equal length so the fixed-width pill never looks empty.
+    const ROTATING = [
+        { label: 'private tokens', icon: Lock },
+        { label: 'token airdrops', icon: Gift },
+        { label: 'team payroll', icon: Banknote },
+        { label: 'vesting grants', icon: Hourglass },
+    ];
+    let rotateIdx = $state(0);
 
     let mouse = { x: -999, y: -999 };
 
@@ -224,9 +234,16 @@
         });
         resizeObserver.observe(container);
 
+        // Cycle the headline object. Under reduced motion the swap still
+        // happens but transitions are disabled, so it reads as a plain change.
+        const rotateTimer = setInterval(() => {
+            rotateIdx = (rotateIdx + 1) % ROTATING.length;
+        }, 2600);
+
         return () => {
             if (animationId) cancelAnimationFrame(animationId);
             resizeObserver.disconnect();
+            clearInterval(rotateTimer);
         };
     });
 </script>
@@ -266,33 +283,33 @@
 
     <!-- Content Block -->
     <div class="relative z-30 text-center max-w-4xl px-6 flex flex-col items-center gap-5 md:gap-6">
-        <!-- Network Badge -->
-        <a
-            href="https://stellar.org"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-zen-fg/10 bg-zen-fg/5 backdrop-blur-md text-[11px] font-medium tracking-[0.15em] uppercase text-zen-fg/60 hover:text-zen-fg/90
-                   transition-all duration-700 ease-out {mounted
-                ? 'opacity-100 translate-y-0'
-                : 'opacity-0 translate-y-5'}"
-            style="transition-delay: 200ms;"
-        >
-            <svg class="w-3 h-3 fill-current" viewBox="0 0 24 24" aria-hidden="true">
-                <path
-                    d="M12.003 1.716c-1.37 0-2.7.27-3.948.78A10.18 10.18 0 0 0 2.66 7.901a10.136 10.136 0 0 0-.797 3.954c0 .258.01.516.027.775a1.942 1.942 0 0 1-1.055 1.88L0 14.934v1.902l2.463-1.26.072-.032v.005l.77-.39.758-.385.066-.039 14.807-7.56 1.666-.847 3.392-1.732V2.694L17.792 5.86 3.744 13.025l-.104.055-.017-.115a8.286 8.286 0 0 1-.071-1.105c0-2.255.88-4.377 2.474-5.977a8.462 8.462 0 0 1 2.71-1.82 8.513 8.513 0 0 1 3.2-.654h.067a8.41 8.41 0 0 1 4.09 1.055l1.628-.83.126-.066a10.11 10.11 0 0 0-5.845-1.853zM24 7.143 5.047 16.808l-1.666.847L0 19.382v1.902l3.282-1.671 2.91-1.485 14.058-7.153.105-.055.016.115c.05.369.072.743.072 1.11 0 2.255-.88 4.383-2.475 5.978a8.461 8.461 0 0 1-2.71 1.82 8.305 8.305 0 0 1-3.2.654h-.06c-1.441 0-2.86-.369-4.102-1.061l-.066.033-1.683.857c.594.418 1.232.776 1.903 1.062a10.11 10.11 0 0 0 3.947.797 10.09 10.09 0 0 0 7.17-2.975 10.136 10.136 0 0 0 2.969-7.18c0-.259-.005-.523-.027-.781a1.942 1.942 0 0 1 1.055-1.88L24 9.044z"
-                ></path>
-            </svg>
-            Built on Stellar
-        </a>
-
-        <!-- Headline -->
+        <!-- Headline: static verb line + sealed pill whose contents "declassify" -->
         <h1
-            class="text-4xl sm:text-5xl md:text-7xl font-bold tracking-tighter text-zen-fg leading-[1.05] transition-opacity duration-1000 ease-out {mounted
+            class="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tighter text-zen-fg leading-[1.12] transition-opacity duration-1000 ease-out {mounted
                 ? 'opacity-100'
                 : 'opacity-0'}"
             style="transition-delay: 400ms;"
         >
-            Confidential Token<br class="hidden sm:block" /> Distributions & Payroll
+            Distribute &amp; claim
+            <br />
+            <span
+                class="inline-grid items-center align-middle my-1 px-4 sm:px-5 py-0.5 sm:py-1 rounded-2xl border border-zen-fg/15 bg-zen-fg/5 backdrop-blur-md"
+                aria-hidden="true"
+            >
+                {#each ROTATING as item, i (item.label)}
+                    <span
+                        class="col-start-1 row-start-1 inline-flex items-center justify-center gap-2 sm:gap-3 whitespace-nowrap transition-all duration-500 ease-out motion-reduce:transition-none {i ===
+                        rotateIdx
+                            ? 'opacity-100 blur-none translate-y-0'
+                            : 'opacity-0 blur-sm translate-y-1'}"
+                    >
+                        <item.icon class="w-[0.6em] h-[0.6em] opacity-70" strokeWidth={2.5} />
+                        {item.label}
+                    </span>
+                {/each}
+            </span>
+            <span class="sr-only">private tokens, airdrops, payroll, and vesting grants</span>
+            on Stellar.
         </h1>
 
         <!-- Subtitle -->
