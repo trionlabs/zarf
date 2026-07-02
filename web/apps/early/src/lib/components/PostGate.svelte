@@ -9,14 +9,21 @@
         // The user's own referral code — used to build their personal share link
         // so the post they verify carries their /r/ URL (the campaign-link rule).
         referralCode: string;
+        // Share is OPTIONAL — skipping advances to the wallet step without posting.
+        onSkip?: () => void;
     }
 
-    let { referralCode }: Props = $props();
+    let { referralCode, onSkip }: Props = $props();
 
-    // Suggested post copy. The t.co-wrapped URL counts as 23 chars; this body is
-    // ~102 chars, so the full post lands well under 280.
+    // Suggested post copy (approved). The t.co-wrapped URL counts as 23 chars;
+    // this body is ~127 chars, so the full post lands well under 280.
+    // Verification passes on the appended early.zarf.to link (host-substring
+    // rule); #LandedOnZarf is also accepted by verify-post as a fallback if a
+    // user strips the link before posting.
     const SHARE_TEXT =
-        'Just landed on @zarfto — private ZK airdrops on Stellar. Claiming my beta tester spot 🛬 #LandedOnZarf';
+        'Airdrops, but with privacy built in.\n\n' +
+        'I just joined the @zarfto beta for private ZK airdrops on Stellar.\n\n' +
+        'Claim an early spot 🛬';
 
     const referralLink = $derived(`https://early.zarf.to/r/${referralCode}`);
     const intentHref = $derived(
@@ -85,8 +92,8 @@
                 Share your landing
             </h2>
             <p class="text-sm leading-relaxed text-base-content/60">
-                Post about Zarf on X with your personal link, then paste the post URL below so we can
-                verify it.
+                Optional — post about Zarf with your personal invite link to bring friends into the
+                beta, then paste the URL to verify. Or skip and secure your spot now.
             </p>
         </div>
 
@@ -126,6 +133,17 @@
 
         {#if errorMsg}
             <ZenAlert variant="error">{errorMsg}</ZenAlert>
+        {/if}
+
+        {#if onSkip}
+            <button
+                type="button"
+                onclick={onSkip}
+                disabled={loading || success}
+                class="mx-auto text-xs font-medium text-base-content/45 underline-offset-4 transition-colors hover:text-base-content/70 hover:underline disabled:opacity-50"
+            >
+                Skip for now →
+            </button>
         {/if}
     </div>
 </ZenCard>

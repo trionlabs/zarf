@@ -1,12 +1,15 @@
 <script lang="ts">
     // 4-dot funnel progress. `current` is the active step (1..4). Steps before it
-    // are "done", the active one is "current", later ones are "upcoming". Purely
+    // are "done", the active one is "current", later ones are "upcoming". The
+    // Share step (3) is OPTIONAL: when advanced-past without a verified post it
+    // renders "skipped" (muted, dashed) instead of a completed check. Purely
     // presentational — step derivation lives in the page.
     interface Props {
         current: 1 | 2 | 3 | 4;
+        shareVerified?: boolean;
     }
 
-    let { current }: Props = $props();
+    let { current, shareVerified = true }: Props = $props();
 
     const steps = [
         { n: 1, label: 'Login' },
@@ -15,7 +18,9 @@
         { n: 4, label: 'Wallet' },
     ] as const;
 
-    function stateOf(n: number): 'done' | 'current' | 'upcoming' {
+    function stateOf(n: number): 'done' | 'current' | 'upcoming' | 'skipped' {
+        // Share advanced-past without a verified post → skipped, not done.
+        if (n === 3 && !shareVerified && current > 3) return 'skipped';
         if (n < current) return 'done';
         if (n === current) return 'current';
         return 'upcoming';
@@ -26,6 +31,8 @@
         if (s === 'done') return 'bg-primary border-primary text-primary-content';
         if (s === 'current')
             return 'bg-base-100 border-primary text-base-content ring-4 ring-primary/10';
+        if (s === 'skipped')
+            return 'bg-base-100 border-dashed border-base-content/25 text-base-content/40';
         return 'bg-base-100 border-base-content/15 text-base-content/40';
     }
 </script>

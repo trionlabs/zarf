@@ -61,10 +61,13 @@ export const POST: RequestHandler = async (event) => {
     return buildOk(user, position, total);
   }
 
-  // (b) Precondition: step 4 is locked until the post-verify step (step 3) is
-  // done. (A completed user is handled above, so this only guards fresh runs.)
-  if (user.post_verified_at === null) {
-    return apiError(ERROR_CODES.STEP_LOCKED, 409, 'verify your post before completing');
+  // (b) Precondition: completing requires a FOLLOWED account. The share/post
+  // step (step 3) is OPTIONAL — a user may skip it and complete follow → wallet.
+  // Airdrop eligibility is completed+consent, not post, so skippers stay
+  // eligible. This guard keeps the "must follow" invariant against a direct API
+  // caller that never attested. (A completed user is handled above.)
+  if (user.follow_attested_at === null) {
+    return apiError(ERROR_CODES.STEP_LOCKED, 409, 'follow before completing');
   }
 
   const now = Date.now();

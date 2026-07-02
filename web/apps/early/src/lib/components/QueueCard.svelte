@@ -11,6 +11,8 @@
         referralCount: number;
         username: string;
         profileImageUrl?: string | null;
+        // Whether the user verified a share post (vs skipped the optional step).
+        posted?: boolean;
         onLogout?: () => void;
     }
 
@@ -21,11 +23,12 @@
         referralCount,
         username,
         profileImageUrl = null,
+        posted = false,
         onLogout,
     }: Props = $props();
 
     // Same suggested copy as PostGate — the re-share intent lets members keep
-    // moving their cohort up after they're on the list.
+    // spreading Zarf with their invite link after they're on the list.
     const SHARE_TEXT =
         'Just landed on @zarfto — private ZK airdrops on Stellar. Claiming my beta tester spot 🛬 #LandedOnZarf';
 
@@ -34,10 +37,14 @@
             `&url=${encodeURIComponent(referralLink)}`,
     );
 
+    // Honest referral tally — referral_count is real (credited when a referred
+    // signup completes). We make no unbacked queue-position claim.
     const friendsLine = $derived(
-        (referralCount ?? 0) === 1
-            ? '1 friend joined so far — sharing moves your cohort up'
-            : `${referralCount ?? 0} friends joined so far — sharing moves your cohort up`,
+        (referralCount ?? 0) === 0
+            ? 'Invite friends to the beta with your link'
+            : (referralCount ?? 0) === 1
+              ? '1 friend has joined through your invite'
+              : `${referralCount} friends have joined through your invite`,
     );
 
     let copied = $state(false);
@@ -101,7 +108,13 @@
                     <span class="font-medium text-base-content/50">of {total}</span>
                 </h1>
                 <p class="text-sm leading-relaxed text-base-content/60">
-                    You're on the list. We'll deliver your beta airdrop to your email when we launch.
+                    {#if posted}
+                        Thanks for sharing — you're on the list. We'll deliver your beta airdrop to
+                        your email when we launch.
+                    {:else}
+                        You're on the list. We'll deliver your beta airdrop to your email when we
+                        launch — share your invite link below to bring friends along.
+                    {/if}
                 </p>
             </div>
         </div>
@@ -126,7 +139,9 @@
         </div>
 
         <a href={intentHref} target="_blank" rel="noopener noreferrer" class="block w-full">
-            <ZenButton variant="primary" size="lg" class="w-full">Share again ↗</ZenButton>
+            <ZenButton variant="primary" size="lg" class="w-full">
+                {posted ? 'Share again ↗' : 'Share your invite ↗'}
+            </ZenButton>
         </a>
     </div>
 </ZenCard>

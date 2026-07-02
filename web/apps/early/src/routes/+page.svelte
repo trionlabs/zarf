@@ -20,16 +20,22 @@
     // X subject narrowed once for reuse in the derived step + card props.
     const x = $derived(data.subject?.kind === 'x' ? data.subject : null);
 
+    // Share (step 3) is OPTIONAL — skipping it locally advances to the wallet
+    // step. The server mirrors this: /api/waitlist/complete requires follow, not
+    // post (see complete/+server.ts). Skip is session-local; a reload before
+    // completing the wallet simply re-offers the share step.
+    let skippedPost = $state(false);
+
     // Server-enforced step derivation, mirrored for the UI:
     //   1 Login  (not X-authed)      → XLoginButton card
     //   2 Follow (!follow_attested_at)
-    //   3 Share  (!post_verified_at)
+    //   3 Share  (!post_verified_at, skippable)
     //   4 Wallet (!completed_at)
     //   5        → QueueCard (Stepper hides at this stage)
     const step = $derived.by(() => {
         if (!x) return 1;
         if (x.follow_attested_at == null) return 2;
-        if (x.post_verified_at == null) return 3;
+        if (x.post_verified_at == null && !skippedPost) return 3;
         if (x.completed_at == null) return 4;
         return 5;
     });
@@ -112,7 +118,7 @@
 
     <!-- Progress indicator (hidden once queued) -->
     {#if step <= 4}
-        <Stepper current={step as 1 | 2 | 3 | 4} />
+        <Stepper current={step as 1 | 2 | 3 | 4} shareVerified={x?.post_verified_at != null} />
     {/if}
 
     <!-- Authenticated identity chip for the mid-funnel steps -->
@@ -176,7 +182,7 @@
         {:else if step === 2}
             <FollowGate brand={data.brand} />
         {:else if step === 3}
-            <PostGate referralCode={x?.referral_code ?? ''} />
+            <PostGate referralCode={x?.referral_code ?? ''} onSkip={() => (skippedPost = true)} />
         {:else if step === 4}
             <WalletGate />
         {:else}
@@ -187,6 +193,7 @@
                 referralCount={x?.referral_count ?? 0}
                 username={x?.username ?? ''}
                 profileImageUrl={x?.profile_image_url ?? null}
+                posted={x?.post_verified_at != null}
                 onLogout={handleLogout}
             />
         {/if}
