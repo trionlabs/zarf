@@ -91,7 +91,7 @@ Configure cliff periods, linear release schedules, and complex vesting terms dir
 
 ## Continuous Deployment
 
-GitHub Actions deploys the five web apps after `CI` succeeds on `main`.
+GitHub Actions deploys the web apps after `CI` succeeds on `main`.
 The deploy workflow can also be started manually from Actions.
 
 Required GitHub repository secrets:
@@ -133,6 +133,8 @@ The workflow deploys:
 - `@zarf/landing` -> `zarf-landing` / `https://zarf.to`
 - `@zarf/create` -> `zarf-create` / `https://create.zarf.to`
 - `@zarf/claim` -> `zarf-claim` / `https://claim.zarf.to`
+- `@zarf/indexer` -> `zarf-indexer` / `https://indexer.zarf.to`
+- `@zarf/docs` -> `zarf-docs` / `https://docs.zarf.to`
 - `@zarf/pin-proxy` -> `zarf-pin-proxy`
 - `@zarf/jwk-rotation` -> `zarf-jwk-rotation`
 
