@@ -292,24 +292,27 @@
             style="transition-delay: 400ms;"
         >
             Receive
-            <span class="relative inline-grid items-center align-middle mx-1" aria-hidden="true">
+            <!-- Slot sits on the text baseline (no flex, no vertical-align tricks):
+                 each word is normal inline flow inside a stacked grid cell, so its
+                 baseline is the grid's baseline and matches the sentence exactly.
+                 The hairline lives inside each word, so it always spans that word. -->
+            <span class="inline-grid justify-items-center align-baseline mx-1" aria-hidden="true">
                 {#each ROTATING as item, i (item.label)}
                     <span
-                        class="col-start-1 row-start-1 inline-flex items-center justify-center gap-2 sm:gap-2.5 whitespace-nowrap transition-all duration-500 ease-out motion-reduce:transition-none {i ===
+                        class="col-start-1 row-start-1 relative whitespace-nowrap transition-all duration-500 ease-out motion-reduce:transition-none {i ===
                         rotateIdx
-                            ? 'opacity-100 blur-none translate-y-0'
-                            : 'opacity-0 blur-sm translate-y-1'}"
+                            ? 'opacity-100 blur-none'
+                            : 'opacity-0 blur-sm'}"
                     >
                         <item.icon
-                            class="w-[0.42em] h-[0.42em] text-zen-primary opacity-80"
+                            class="inline-block align-middle w-[0.42em] h-[0.42em] mr-2 sm:mr-2.5 text-zen-primary opacity-80"
                             strokeWidth={2}
-                        />
-                        {item.label}
+                        />{item.label}
+                        <span
+                            class="absolute -bottom-1 sm:-bottom-1.5 left-0 right-0 h-px bg-gradient-to-r from-transparent via-zen-primary/60 to-transparent"
+                        ></span>
                     </span>
                 {/each}
-                <span
-                    class="absolute -bottom-1 sm:-bottom-1.5 left-0 right-0 h-px bg-gradient-to-r from-transparent via-zen-primary/60 to-transparent"
-                ></span>
             </span>
             <span class="sr-only">private tokens, token airdrops, your payroll, and vesting grants</span>
             on Stellar.
@@ -317,13 +320,13 @@
 
         <!-- Subtitle -->
         <p
-            class="text-base md:text-lg text-zen-fg/60 max-w-lg text-center leading-normal transition-all duration-700 ease-out {mounted
+            class="text-base md:text-lg text-zen-fg/60 max-w-xl text-center leading-normal transition-all duration-700 ease-out {mounted
                 ? 'opacity-100 translate-y-0'
                 : 'opacity-0 translate-y-5'}"
             style="transition-delay: 600ms;"
         >
             Tokens arrive in your inbox, sealed with ZK proofs.<br class="hidden sm:block" />
-            Claim with a Google sign-in. No wallet to start. No identity leaks.
+            Claim with a Google sign-in &mdash; no wallet to start, no identity leaks.
         </p>
 
         <!-- CTA Group -->
