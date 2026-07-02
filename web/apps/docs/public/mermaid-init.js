@@ -7,10 +7,30 @@ if (blocks.length > 0) {
 		'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs'
 	);
 	const dark = document.documentElement.dataset.theme === 'dark';
-	mermaid.initialize({ startOnLoad: false, theme: dark ? 'dark' : 'neutral' });
+	mermaid.initialize({
+		startOnLoad: false,
+		theme: dark ? 'dark' : 'neutral',
+		fontFamily: "'Saira', ui-sans-serif, system-ui, sans-serif",
+		themeVariables: {
+			fontFamily: "'Saira', ui-sans-serif, system-ui, sans-serif",
+			fontSize: '14px',
+		},
+	});
+	// Expressive Code wraps every line in its own <div class="ec-line">, so
+	// `pre.textContent` concatenates the lines with no newlines and mermaid
+	// fails to parse. Rebuild the source line-by-line (falling back to
+	// innerText / textContent for un-wrapped blocks).
+	const extractSource = (pre) => {
+		const lines = pre.querySelectorAll('.ec-line');
+		if (lines.length > 0) {
+			return [...lines].map((line) => line.textContent).join('\n');
+		}
+		return pre.innerText ?? pre.textContent ?? '';
+	};
+
 	let i = 0;
 	for (const pre of blocks) {
-		const source = pre.textContent ?? '';
+		const source = extractSource(pre);
 		const target = pre.closest('.expressive-code') ?? pre;
 		const container = document.createElement('div');
 		container.className = 'mermaid-diagram';
