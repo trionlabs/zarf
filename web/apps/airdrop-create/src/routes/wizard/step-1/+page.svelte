@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { onMount } from 'svelte';
+    import { onMount, untrack } from 'svelte';
     import { goto } from '$app/navigation';
     import {
         ArrowLeft,
@@ -54,9 +54,13 @@
         }
     });
 
-    // Persist the draft list as it changes (recovers on reload).
+    // Persist the draft list as it changes (recovers on reload). The store
+    // write must be untracked: setRecipients() → persist() spreads `state`
+    // back, and reading state this effect just wrote invalidates its own
+    // dependencies on every run (effect_update_depth_exceeded on first edit).
     $effect(() => {
-        campaignStore.setRecipients(recipients.map((r) => ({ ...r })));
+        const rows = recipients.map((r) => ({ ...r }));
+        untrack(() => campaignStore.setRecipients(rows));
     });
 
     // ---- Validation ----------------------------------------------------------

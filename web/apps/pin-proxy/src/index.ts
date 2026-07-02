@@ -38,6 +38,11 @@ interface Env {
     // to no limiting (deploys never break on absent bindings).
     PIN_IP_LIMITER?: RateLimiter;
     PIN_OWNER_LIMITER?: RateLimiter;
+    // Optional: per-IP limit on /ipfs/:cid reads. This route is unauthenticated
+    // and fans out up to 3 upstream gateway fetches (each up to
+    // MAX_GATEWAY_RESPONSE_BYTES), so without a cap it is a 3x amplification /
+    // subrequest-quota burn surface. Missing binding degrades to no limiting.
+    IPFS_READ_LIMITER?: RateLimiter;
 }
 
 interface ClaimList {
@@ -109,7 +114,7 @@ export default {
         }
 
         if (url.pathname.startsWith('/ipfs/') && request.method === 'GET') {
-            return handleIpfsRead(url, corsHeaders);
+            return handleIpfsRead(request, url, env, corsHeaders);
         }
 
         return json({ error: 'not_found' }, 404, corsHeaders);
@@ -314,7 +319,27 @@ async function handlePinAirdrop(
     return json({ cid: data.IpfsHash, size: data.PinSize }, 200, corsHeaders);
 }
 
-async function handleIpfsRead(url: URL, corsHeaders: Record<string, string>): Promise<Response> {
+async function handleIpfsRead(
+    request: Request,
+    url: URL,
+    env: Env,
+    corsHeaders: Record<string, string>,
+): Promise<Response> {
+    // Per-IP limit first: this unauthenticated route fans out up to 3 upstream
+    // gateway fetches (each up to MAX_GATEWAY_RESPONSE_BYTES), so an unthrottled
+    // /ipfs/:cid is a 3x amplification / subrequest-quota burn surface (the
+    // indexer's equivalent read path is already covered by its REQUEST_LIMITER).
+    // CF-Connecting-IP is Cloudflare-set and cannot be spoofed. The limit is more
+    // generous than /pin (reads are legitimate and frequent) but still bounds the
+    // amplification. Missing binding degrades to no limiting.
+    if (env.IPFS_READ_LIMITER) {
+        const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
+        const { success } = await env.IPFS_READ_LIMITER.limit({ key: ip });
+        if (!success) {
+            return json({ error: 'rate_limited' }, 429, corsHeaders);
+        }
+    }
+
     const cid = validateCid(url.pathname.slice('/ipfs/'.length));
     if (!cid) {
         return json({ error: 'invalid_cid' }, 400, corsHeaders);

@@ -63,16 +63,18 @@
     // UNLOCK EVENTS
     const unlockEvents = $derived(calculateUnlockEvents(cliffDate, endDate, duration));
 
-    // Token amounts
+    // Token amounts. Fractional per-unlock slices are real (e.g. 100 tokens
+    // over 366 daily unlocks) — flooring them displays a misleading 0.
     const tokensPerUnlock = $derived(
-        unlockEvents > 0 && totalTokens > 0 ? Math.floor(totalTokens / unlockEvents) : 0,
+        unlockEvents > 0 && totalTokens > 0 ? totalTokens / unlockEvents : 0,
     );
 
     // Format helpers
     const formatNumber = (n: number) => {
         if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M`;
         if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
-        return n.toLocaleString('en-US');
+        if (Number.isInteger(n)) return n.toLocaleString('en-US');
+        return n.toLocaleString('en-US', { maximumFractionDigits: n < 0.01 ? 6 : 2 });
     };
 
     const formatDateLong = (date: Date | null) => {
@@ -113,10 +115,15 @@
     // Chart calculations
     const hasValidDates = $derived(cliffDate !== null && !isNaN(cliffDate.getTime()));
 
+    // A cliff date in the past means unlocking has already begun — render
+    // "immediate" instead of a negative countdown.
+    const cliffInPast = $derived(hasValidDates && daysToCliff <= 0);
+
     // Smart lock period sizing (min 10%, max 35%)
     const lockPeriodPercent = $derived.by(() => {
         if (!hasValidDates || totalDaysFromNow <= 0) return 0;
         if (isInstant) return 100;
+        if (cliffInPast) return 0;
         const natural = (daysToCliff / totalDaysFromNow) * 100;
         return Math.min(Math.max(natural, 10), 35);
     });
@@ -198,12 +205,19 @@
                     <p class="text-[10px] text-zen-fg-muted uppercase tracking-widest mb-1">
                         Lock Period
                     </p>
-                    <p class="text-2xl font-light tabular-nums">
-                        {daysToCliff}<span class="text-sm text-zen-fg-subtle ml-1">days</span>
-                    </p>
-                    <p class="text-xs text-zen-fg-subtle mt-0.5">
-                        until {formatDateShort(cliffDate)}
-                    </p>
+                    {#if cliffInPast}
+                        <p class="text-2xl font-light text-zen-warning">None</p>
+                        <p class="text-xs text-zen-fg-subtle mt-0.5">
+                            Start date has passed — unlocks begin immediately
+                        </p>
+                    {:else}
+                        <p class="text-2xl font-light tabular-nums">
+                            {daysToCliff}<span class="text-sm text-zen-fg-subtle ml-1">days</span>
+                        </p>
+                        <p class="text-xs text-zen-fg-subtle mt-0.5">
+                            until {formatDateShort(cliffDate)}
+                        </p>
+                    {/if}
                 </div>
                 <div>
                     <p class="text-[10px] text-zen-fg-muted uppercase tracking-widest mb-1">

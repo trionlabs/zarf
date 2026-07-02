@@ -61,11 +61,31 @@ const connectSrc = dev
     ? `connect-src ${connectSources()} http://localhost:* ws://localhost:*`
     : `connect-src ${connectSources()}`;
 
+// script-src is nonce-gated (no 'unsafe-inline'). kit.csp (svelte.config.js)
+// stamps a per-request nonce on SvelteKit's bootstrap and the app.html
+// %sveltekit.nonce% script and emits it as a <meta> CSP; we capture that nonce
+// from the rendered HTML and reuse it in the header script-src so both policies
+// agree. Eval-free: this app ships NO Noir/bb.js prover, so no
+// 'unsafe-eval'/'wasm-unsafe-eval'.
+const SCRIPT_SRC_BASE = "'self' https://static.cloudflareinsights.com";
+
 export const handle: Handle = async ({ event, resolve }) => {
-    const response = await resolve(event);
+    let nonce = '';
+    const response = await resolve(event, {
+        transformPageChunk: ({ html }) => {
+            if (!nonce) {
+                const match = html.match(/\bnonce="([^"]+)"/);
+                if (match) nonce = match[1];
+            }
+            return html;
+        },
+    });
+    const scriptSrc = nonce
+        ? `script-src ${SCRIPT_SRC_BASE} 'nonce-${nonce}'`
+        : `script-src ${SCRIPT_SRC_BASE}`;
     response.headers.set(
         'Content-Security-Policy',
-        `default-src 'self'; script-src 'self' 'unsafe-inline' https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; ${connectSrc}; img-src 'self' data: https:; worker-src 'self' blob:; base-uri 'self'; form-action 'self';`,
+        `default-src 'self'; ${scriptSrc}; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; ${connectSrc}; img-src 'self' data: https:; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none';`,
     );
     response.headers.set('X-Content-Type-Options', 'nosniff');
     response.headers.set('X-Frame-Options', 'DENY');

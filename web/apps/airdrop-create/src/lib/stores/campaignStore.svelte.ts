@@ -11,6 +11,7 @@
  *
  * @module stores/campaignStore
  */
+import { untrack } from 'svelte';
 import { browser } from '$app/environment';
 import { getActiveStellarNetworkId } from '@zarf/core/config/runtime';
 import { warn } from '@zarf/core/utils/log';
@@ -66,8 +67,11 @@ const totalAmountUi = $derived(
 function persist() {
     if (!browser) return;
     try {
-        const blob = { version: SCHEMA_VERSION, ...state };
-        localStorage.setItem(storageKey(), JSON.stringify(blob));
+        // Untracked: persist() runs from callers' $effects, and a tracked
+        // read of the fields that effect just wrote would invalidate the
+        // effect's own dependencies (infinite loop).
+        const blob = untrack(() => JSON.stringify({ version: SCHEMA_VERSION, ...state }));
+        localStorage.setItem(storageKey(), blob);
     } catch (error) {
         warn('[campaignStore] Failed to persist:', error);
     }
@@ -120,9 +124,13 @@ function setTokenDetails(details: Partial<TokenDetails>) {
 // (finding airdrop-B1). A non-null merkleRoot is the signal that Prepare ran;
 // clearing the WAL forces a re-Prepare against the edited inputs.
 function invalidatePreparedDeploy() {
-    if (state.activeDeploy && state.activeDeploy.merkleRoot !== null) {
-        state.activeDeploy = null;
-    }
+    // Untracked read for the same reason as persist(): setters run inside
+    // callers' $effects and must not register store state as a dependency.
+    untrack(() => {
+        if (state.activeDeploy && state.activeDeploy.merkleRoot !== null) {
+            state.activeDeploy = null;
+        }
+    });
 }
 
 function setRecipients(rows: RecipientRow[]) {

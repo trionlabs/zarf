@@ -448,3 +448,40 @@ describe('pin-proxy worker CORS (integration — fail-closed via worker.fetch)',
         expect(res.headers.get('Access-Control-Allow-Origin')).toBeNull();
     });
 });
+
+describe('pin-proxy /ipfs read rate limit (IPFS_READ_LIMITER)', () => {
+    const get = (path: string) =>
+        new Request(`https://proxy.example${path}`, {
+            method: 'GET',
+            headers: { 'CF-Connecting-IP': '203.0.113.7' },
+        });
+
+    afterEach(() => {
+        vi.unstubAllGlobals();
+        vi.clearAllMocks();
+    });
+
+    it('returns 429 when the per-IP read limiter denies — BEFORE any gateway fetch', async () => {
+        const fetchSpy = vi.fn();
+        vi.stubGlobal('fetch', fetchSpy);
+        const env = { ...ENV, IPFS_READ_LIMITER: { limit: async () => ({ success: false }) } };
+        const res = await worker.fetch(get('/ipfs/anything'), env);
+        expect(res.status).toBe(429);
+        expect(((await res.json()) as { error: string }).error).toBe('rate_limited');
+        // The limit gate must short-circuit the 3x gateway amplification.
+        expect(fetchSpy).not.toHaveBeenCalled();
+    });
+
+    it('passes the limiter through to CID validation when allowed', async () => {
+        const env = { ...ENV, IPFS_READ_LIMITER: { limit: async () => ({ success: true }) } };
+        const res = await worker.fetch(get('/ipfs/not-a-valid-cid!'), env);
+        expect(res.status).toBe(400);
+        expect(((await res.json()) as { error: string }).error).toBe('invalid_cid');
+    });
+
+    it('degrades to no limiting when the binding is absent (route still serves)', async () => {
+        const res = await worker.fetch(get('/ipfs/not-a-valid-cid!'), ENV);
+        expect(res.status).toBe(400);
+        expect(((await res.json()) as { error: string }).error).toBe('invalid_cid');
+    });
+});

@@ -16,9 +16,17 @@
 
     // Wallet-only: NO authStore / Google / PIN — an airdrop campaign needs a
     // wallet, never an email identity.
+
+    // Restore the draft during layout INIT, not onMount: children mount before
+    // their parent, so on a step-1 reload the page's persist $effect would run
+    // first and overwrite the saved draft with the empty initial state before
+    // an onMount restore ever read it.
+    if (browser) {
+        campaignStore.restore();
+    }
+
     onMount(() => {
         if (browser) {
-            campaignStore.restore();
             themeStore.restore();
             networkStore.restore();
             walletStore.init();

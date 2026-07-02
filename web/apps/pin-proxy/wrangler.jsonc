@@ -13,6 +13,9 @@
     },
     // Burst control on /pin: pin auth proves possession of *some* keypair,
     // not authorization, so unlimited pinning = Pinata quota/cost abuse.
+    // IPFS_READ_LIMITER caps the unauthenticated /ipfs/:cid read route, which
+    // fans out up to 3 upstream gateway fetches per call (3x amplification);
+    // higher ceiling than /pin since reads are legitimate and frequent.
     "unsafe": {
         "bindings": [
             {
@@ -26,6 +29,12 @@
                 "name": "PIN_OWNER_LIMITER",
                 "namespace_id": "2002",
                 "simple": { "limit": 5, "period": 60 },
+            },
+            {
+                "type": "ratelimit",
+                "name": "IPFS_READ_LIMITER",
+                "namespace_id": "2004",
+                "simple": { "limit": 30, "period": 60 },
             },
         ],
     },
