@@ -1,0 +1,44 @@
+---
+title: Zarf Documentation
+description: Confidential token distributions and payroll on Stellar. Guides for recipients, distribution creators, and developers.
+template: splash
+hero:
+  tagline: Distribute tokens to emails with zero-knowledge proofs. No wallet exposure. No identity leaks.
+  actions:
+    - text: What is Zarf?
+      link: /learn/what-is-zarf/
+      icon: right-arrow
+    - text: I received a claim email
+      link: /recipients/claim-your-tokens/
+      icon: email
+      variant: secondary
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+## Find your path
+
+<CardGrid stagger>
+	<Card title="I received tokens" icon="email">
+		Someone sent you tokens via Zarf. Learn how to [claim them with your
+		email](/recipients/claim-your-tokens/) or [with your
+		wallet](/recipients/claim-with-wallet/) — no crypto experience needed.
+	</Card>
+	<Card title="I want to distribute tokens" icon="rocket">
+		Run an airdrop, payroll, or grant program. Start with the [creator
+		quickstart](/creators/quickstart/) and the
+		[playbooks](/creators/playbooks/airdrop/).
+	</Card>
+	<Card title="I'm building on Zarf" icon="seti:rust">
+		Contracts, ZK circuits, indexer API, and self-hosting. Start with the
+		[architecture overview](/developers/architecture/).
+	</Card>
+	<Card title="How does the privacy work?" icon="approve-check">
+		Understand [what's on-chain and what never leaves your
+		browser](/learn/privacy-model/), and [what you do and don't have to
+		trust](/learn/trust-assumptions/).
+	</Card>
+</CardGrid>
+
+> **Status:** Zarf runs on Stellar **testnet** today. Mainnet launch is gated on
+> a third-party security audit. See [project status](/resources/project-status/).

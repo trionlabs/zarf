@@ -1,0 +1,11 @@
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "zarf-docs",
+	"compatibility_date": "2026-06-01",
+	"assets": {
+		"directory": "./dist",
+		"not_found_handling": "404-page"
+	}
+	// Custom domain docs.zarf.to is attached in the Cloudflare dashboard,
+	// same as the other zarf-* workers.
+}
