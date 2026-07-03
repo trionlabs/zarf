@@ -118,7 +118,7 @@
             description="Manage your drafts, active vesting contracts, and history."
         />
         <div class="flex items-center gap-3">
-            <ZenButton variant="primary" onclick={handleCreateNew}>
+            <ZenButton variant="primary" size="lg" onclick={handleCreateNew}>
                 <Plus class="w-4 h-4 mr-2" />
                 New Distribution
             </ZenButton>
@@ -174,11 +174,13 @@
 
     <!-- Snippets -->
     {#snippet createAction()}
-        <ZenButton variant="primary" onclick={handleCreateNew}>Create First Distribution</ZenButton>
+        <ZenButton variant="primary" size="lg" onclick={handleCreateNew}
+            >Create First Distribution</ZenButton
+        >
     {/snippet}
 
     {#snippet deployAction()}
-        <ZenButton variant="primary" onclick={handleCreateNew}>Deploy New</ZenButton>
+        <ZenButton variant="primary" size="lg" onclick={handleCreateNew}>Deploy New</ZenButton>
     {/snippet}
 
     {#snippet connectAction()}
@@ -247,8 +249,12 @@
                     {#if list.length === 0}
                         <DistributionEmptyState
                             icon={activeTab === 'active' ? Layers : Archive}
-                            color={activeTab === 'active' ? 'bg-zen-success-muted' : 'bg-zen-fg-faint/10'}
-                            iconColor={activeTab === 'active' ? 'text-zen-success-content' : 'text-zen-fg-subtle'}
+                            color={activeTab === 'active'
+                                ? 'bg-zen-success-muted'
+                                : 'bg-zen-fg-faint/10'}
+                            iconColor={activeTab === 'active'
+                                ? 'text-zen-success-content'
+                                : 'text-zen-fg-subtle'}
                             title={activeTab === 'active'
                                 ? 'No Active Distributions'
                                 : 'No History Found'}

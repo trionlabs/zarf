@@ -227,7 +227,7 @@
 
             <!-- Token Amounts (if provided) -->
             {#if totalTokens > 0}
-                <div class="flex items-center gap-8 py-3 px-4 bg-zen-fg/[0.02] rounded-lg">
+                <div class="flex items-center gap-4 sm:gap-8 py-3 px-4 bg-zen-fg/[0.02] rounded-lg">
                     <div>
                         <p class="text-[10px] text-zen-fg-muted uppercase tracking-widest">Total</p>
                         <p class="text-lg font-medium tabular-nums">

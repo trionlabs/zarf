@@ -19,7 +19,7 @@
         {
             title: 'Programmable Privacy',
             subtitle: 'Vesting & Compliance',
-            desc: 'Enforce smart contract rules like 4-year vesting schedules or regulatory geofencing entirely within the privacy circuit. Control without compromise.',
+            desc: 'Enforce Soroban smart contract rules like 4-year vesting schedules or regulatory geofencing entirely within the privacy circuit. Control without compromise.',
         },
     ];
 

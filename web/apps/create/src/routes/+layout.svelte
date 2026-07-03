@@ -47,7 +47,14 @@
 
 <WalletSelectionModal />
 
-<AppShell showWallet rootClass="selection:bg-zen-primary-muted selection:text-zen-fg">
+<!-- containerClass: pages own their horizontal gutters (wizard layout / distributions
+     each provide max-w + px), so the shell only reserves clearance for the fixed
+     mobile bottom nav (h-14 + safe area). -->
+<AppShell
+    showWallet
+    rootClass="selection:bg-zen-primary-muted selection:text-zen-fg"
+    containerClass="w-full pb-24 lg:pb-0"
+>
     {#snippet nav()}
         <a
             href="/wizard/step-0"

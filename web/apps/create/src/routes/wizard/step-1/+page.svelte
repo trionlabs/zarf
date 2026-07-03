@@ -246,50 +246,48 @@
 
 <h1 class="sr-only">Create Distribution — Step 2 of 3: {microSteps[creationStep]}</h1>
 
-<div class="flex flex-col lg:flex-row gap-8 items-start p-2">
-    <!-- LEFT COLUMN: Form Wizard -->
-    <div class="flex-1 w-full lg:max-w-xl flex flex-col min-h-[400px]">
-        <!-- Header: selected-token chip + named sub-progress -->
-        <div class="flex items-center justify-between gap-3 mb-4">
-            <!-- Token chip: persistent token context + change affordance, all steps/breakpoints -->
-            <div
-                class="inline-flex items-center gap-2 bg-zen-fg/5 rounded-full pl-1.5 pr-1 py-1 border border-zen-border-subtle"
-            >
-                {#if wizardStore.tokenDetails.iconUrl}
-                    <img
-                        src={wizardStore.tokenDetails.iconUrl}
-                        alt=""
-                        class="w-4 h-4 rounded-full"
-                    />
-                {:else}
-                    <div
-                        class="w-4 h-4 rounded-full bg-zen-primary flex items-center justify-center text-[8px] text-zen-primary-content font-bold"
-                    >
-                        {wizardStore.tokenDetails.tokenSymbol?.charAt(0)}
-                    </div>
-                {/if}
-                <span class="text-xs font-semibold">{wizardStore.tokenDetails.tokenSymbol}</span>
-                <button
-                    class="text-[10px] font-medium text-zen-fg-subtle hover:text-zen-fg px-1.5 py-0.5 rounded-full hover:bg-zen-fg/5 transition-colors"
-                    onclick={() => goto('/wizard/step-0')}
+<!-- Page Header: mirrors the Distributions page anatomy (PageHeader typography
+     left, contextual controls right) so the two pages read as one system. -->
+<header class="mb-8 flex flex-wrap items-start justify-between gap-x-6 gap-y-4">
+    <div class="space-y-2">
+        <h2 class="text-2xl md:text-3xl font-light tracking-tight text-zen-fg" in:fade>
+            {creationSteps[creationStep].label}
+        </h2>
+        <p class="text-sm md:text-base text-zen-fg-muted font-light leading-relaxed">
+            {stepSubtitles[creationStep]}
+        </p>
+    </div>
+
+    <div class="flex flex-wrap items-center gap-3">
+        <!-- Token chip: persistent token context + change affordance, all steps/breakpoints -->
+        <div
+            class="inline-flex items-center gap-2 bg-zen-fg/5 rounded-full pl-1.5 pr-1 py-1 border border-zen-border-subtle"
+        >
+            {#if wizardStore.tokenDetails.iconUrl}
+                <img src={wizardStore.tokenDetails.iconUrl} alt="" class="w-4 h-4 rounded-full" />
+            {:else}
+                <div
+                    class="w-4 h-4 rounded-full bg-zen-primary flex items-center justify-center text-[8px] text-zen-primary-content font-bold"
                 >
-                    Change
-                </button>
-            </div>
-
-            <MicroStepProgress segments={microSegments} current={creationStep} />
+                    {wizardStore.tokenDetails.tokenSymbol?.charAt(0)}
+                </div>
+            {/if}
+            <span class="text-xs font-semibold">{wizardStore.tokenDetails.tokenSymbol}</span>
+            <button
+                class="text-[10px] font-medium text-zen-fg-subtle hover:text-zen-fg px-1.5 py-0.5 rounded-full hover:bg-zen-fg/5 transition-colors"
+                onclick={() => goto('/wizard/step-0')}
+            >
+                Change
+            </button>
         </div>
 
-        <!-- Dynamic Title -->
-        <div class="mb-4">
-            <h2 class="text-xl font-semibold mb-1" in:fade>
-                {creationSteps[creationStep].label}
-            </h2>
-            <p class="text-zen-fg-muted text-sm">
-                {stepSubtitles[creationStep]}
-            </p>
-        </div>
+        <MicroStepProgress segments={microSegments} current={creationStep} />
+    </div>
+</header>
 
+<div class="flex flex-col lg:flex-row lg:items-start gap-10 lg:gap-8 xl:gap-12">
+    <!-- LEFT COLUMN: Form Wizard -->
+    <div class="w-full lg:max-w-xl lg:shrink-0 flex flex-col min-h-[400px]">
         <!-- Form Content -->
         <div class="flex-1 relative">
             {#if creationStep === 0}
@@ -369,8 +367,10 @@
         </div>
     </div>
 
-    <!-- RIGHT COLUMN: Live Preview (Sticky) -->
-    <div class="hidden lg:block w-full max-w-sm sticky top-24">
+    <!-- RIGHT COLUMN: Live Preview (fills the remaining container width on
+         desktop and sticks; stacks below the form on mobile so small screens
+         still get the vesting chart before deploy) -->
+    <div class="w-full min-w-0 lg:flex-1 lg:max-w-2xl lg:sticky lg:top-24">
         <!-- Preview Label -->
         <div
             class="flex items-center gap-2 mb-4 text-xs font-semibold uppercase tracking-wider text-zen-fg-subtle ml-1"

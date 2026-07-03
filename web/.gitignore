@@ -36,4 +36,6 @@ reports/
 *.md
 **/*.md
 !**/README.md
+# docs site content is real committed documentation, not notes
+!apps/docs/src/content/docs/**
 **/_backlogs/

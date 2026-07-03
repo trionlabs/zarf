@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { ArrowRight, Loader2, Inbox } from 'lucide-svelte';
+    import { ArrowRight, Loader2, Inbox, RefreshCw } from 'lucide-svelte';
     import type { StellarContractId } from '@zarf/core/types';
     import { isValidContractAddressShape } from '@zarf/core/utils/addressShape';
     import {
@@ -13,10 +13,12 @@
 
     let {
         onImport,
+        onRefresh,
         vaultAddresses = [],
         isFiltering = false,
     } = $props<{
         onImport: (addr: string) => void;
+        onRefresh?: () => void;
         vaultAddresses: StellarContractId[];
         isFiltering?: boolean;
     }>();
@@ -119,7 +121,20 @@
                     >{isFiltering ? 'Finding Your Distributions' : 'Your Distributions'}</span
                 >
             </div>
-            {#if isFetchingVault || isFiltering}
+            {#if onRefresh}
+                <button
+                    type="button"
+                    class="p-1.5 -m-1.5 rounded-lg text-zen-fg-muted hover:text-zen-fg hover:bg-zen-fg/5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    onclick={() => onRefresh()}
+                    disabled={isFetchingVault || isFiltering}
+                    aria-label="Refresh distributions"
+                    title="Refresh distributions"
+                >
+                    <RefreshCw
+                        class="w-4 h-4 {isFetchingVault || isFiltering ? 'animate-spin' : ''}"
+                    />
+                </button>
+            {:else if isFetchingVault || isFiltering}
                 <Loader2 class="w-4 h-4 animate-spin text-zen-fg-muted" />
             {/if}
         </div>
@@ -141,7 +156,7 @@
                             No distributions found for your email
                         </p>
                         <p class="text-xs text-zen-fg-faint">
-                            If you have a contract address, you can import it manually below
+                            Just added? Refresh above — or import a contract address manually below
                         </p>
                     </div>
                 </div>

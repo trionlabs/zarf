@@ -35,7 +35,16 @@ import {
 
 afterEach(() => {
     vi.clearAllMocks();
+    vi.useRealTimers();
 });
+
+/** Run an emailFilter call whose retry backoff sleeps under fake timers. */
+async function withFakeTimers<T>(run: () => Promise<T>): Promise<T> {
+    vi.useFakeTimers();
+    const pending = run();
+    await vi.runAllTimersAsync();
+    return pending;
+}
 
 const VESTING = { address: 'CABC', metadataCid: 'cid-1' } as never;
 
@@ -62,16 +71,38 @@ describe('isEmailInDistribution', () => {
         expect(await isEmailInDistribution(VESTING, '0xhash_x')).toBe(true);
     });
 
-    it('fails CLOSED (hidden) on an IPFS fetch error', async () => {
+    it('fails CLOSED (hidden) after retries when IPFS stays unreadable', async () => {
         fetchIpfsEmailHashes.mockRejectedValue(new IpfsFetchError('gateway down'));
         fetchIpfsJson.mockRejectedValue(new IpfsFetchError('gateway down'));
-        expect(await isEmailInDistribution(VESTING, '0xhash_x')).toBe(false);
+        expect(await withFakeTimers(() => isEmailInDistribution(VESTING, '0xhash_x'))).toBe(false);
+        // Full retry budget was spent before hiding the distribution.
+        expect(fetchIpfsJson).toHaveBeenCalledTimes(3);
     });
 
     it('fails OPEN on a non-IPFS error (UX fallback)', async () => {
         fetchIpfsEmailHashes.mockRejectedValue(new TypeError('unexpected'));
         fetchIpfsJson.mockRejectedValue(new TypeError('unexpected'));
-        expect(await isEmailInDistribution(VESTING, '0xhash_x')).toBe(true);
+        expect(await withFakeTimers(() => isEmailInDistribution(VESTING, '0xhash_x'))).toBe(true);
+    });
+
+    it('recovers (visible) when a fresh CID becomes readable on retry', async () => {
+        // First round: both routes fail (gateway propagation lag on a fresh
+        // pin). Second round: the extraction route serves the hashes.
+        fetchIpfsEmailHashes
+            .mockRejectedValueOnce(new IpfsFetchError('not yet propagated'))
+            .mockResolvedValue(['0xhash_alice@example.com']);
+        fetchIpfsJson.mockRejectedValue(new IpfsFetchError('not yet propagated'));
+        expect(
+            await withFakeTimers(() => isEmailInDistribution(VESTING, '0xhash_alice@example.com')),
+        ).toBe(true);
+        expect(fetchIpfsEmailHashes).toHaveBeenCalledTimes(2);
+    });
+
+    it('does not retry an invalid CID (permanent failure)', async () => {
+        fetchIpfsEmailHashes.mockRejectedValue(new IpfsFetchError('bad cid', 'INVALID_CID'));
+        fetchIpfsJson.mockRejectedValue(new IpfsFetchError('bad cid', 'INVALID_CID'));
+        expect(await withFakeTimers(() => isEmailInDistribution(VESTING, '0xhash_x'))).toBe(false);
+        expect(fetchIpfsJson).toHaveBeenCalledTimes(1);
     });
 
     it('falls back to the full document when the extraction route is unavailable', async () => {
