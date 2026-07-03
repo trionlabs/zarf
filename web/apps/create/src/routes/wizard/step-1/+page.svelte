@@ -72,7 +72,7 @@
     let validationErrors = $state<string[]>([]);
 
     const totalAmount = $derived(
-        recipients.reduce((sum: number, r: Recipient) => sum + r.amount, 0),
+        recipients.reduce((sum: number, r: Recipient) => sum + Number(r.amount), 0),
     );
 
     // Compare allocations at the token's base-unit granularity so float summation

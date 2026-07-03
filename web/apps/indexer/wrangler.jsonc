@@ -7,7 +7,7 @@
     "vars": {
         // localhost origins are a dev convenience; override in production via
         // the dashboard or `wrangler deploy --var ALLOWED_ORIGINS:...`.
-        "ALLOWED_ORIGINS": "http://localhost:5173,http://localhost:5174,http://localhost:5175,https://create.zarf.to,https://claim.zarf.to",
+        "ALLOWED_ORIGINS": "http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost:5176,http://localhost:5177,https://create.zarf.to,https://claim.zarf.to,https://airdrop.zarf.to,https://claim-drop.zarf.to",
     },
     // Per-IP burst control: one uncached GET can fan out to ~200 RPC
     // simulations, so unauthenticated callers can otherwise amplify traffic

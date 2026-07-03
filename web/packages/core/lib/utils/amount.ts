@@ -20,6 +20,36 @@ export function parseTokenAmount(value: string | number, decimals: number): bigi
     return BigInt(whole) * 10n ** BigInt(decimals) + BigInt(paddedFraction || '0');
 }
 
+/** Soroban i128 ceiling (2^127 - 1) — the maximum representable amount. */
+const I128_MAX = (1n << 127n) - 1n;
+
+/**
+ * True if `value` is a positive decimal-string amount — the grammar
+ * `parseTokenAmount` accepts (no exponent, no IEEE-754 rounding), excluding
+ * zero. Decimals-agnostic; use for early grid/CSV validation before the token's
+ * decimals are known. Amounts MUST be carried as strings end-to-end so a value
+ * above 2^53 base units is not silently rounded before it reaches the leaf.
+ */
+export function isPositiveAmountString(value: string): boolean {
+    const v = value.trim();
+    return /^\d+(\.\d+)?$/.test(v) && !/^0*(\.0*)?$/.test(v);
+}
+
+/**
+ * True if `value` is a valid positive token amount for `decimals`: a positive
+ * decimal string within the token's decimal places whose base-unit value fits a
+ * Soroban i128. Non-throwing wrapper over `parseTokenAmount` for UI validation
+ * before any transaction.
+ */
+export function isValidTokenAmount(value: string, decimals: number): boolean {
+    try {
+        const base = parseTokenAmount(value, decimals);
+        return base > 0n && base <= I128_MAX;
+    } catch {
+        return false;
+    }
+}
+
 export function formatTokenAmount(value: bigint, decimals: number, maxFractionDigits = 4): string {
     validateTokenDecimals(decimals);
     const divisor = 10n ** BigInt(decimals);

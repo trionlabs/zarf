@@ -13,12 +13,18 @@ below are executed on testnet and the live OAuth round-trip is validated.**
 
 - `circuits/src/main.nr`: reads the `nonce` claim and asserts it equals the
   lowercase 64-hex of the `recipient` field. `MAX_DATA_LENGTH` 1024 -> 1536.
-  `nargo test` green (12 tests incl. 3 nonce cases).
+  `nargo test` green. The defense-in-depth batch (Items 1-4, see
+  [`circuit-defense-in-depth-batch.md`](circuit-defense-in-depth-batch.md)) is
+  now folded into this same circuit/VK: Item 1 made the nonce decode injective
+  (`recipient.to_be_bytes::<32>`), Item 2 pinned merkle path indices to boolean;
+  `nargo test` is 15 green.
 - VK + fixtures regenerated with `poc/scripts/generateZarfProofForStellar.js`
-  (nonce = hex(recipient)); committed at
+  (nonce = hex(recipient), bb.js 2.1.9); committed at
   `contracts/soroban/zarf/vesting/tests/fixtures/zarf-stellar-recipient/*`
-  and `contracts/soroban/verifier/tests/zarf/*`. New `vk_hash` =
-  `0x27aeb147db74e998681b88e1605c8dfcddcbd43b160574436191bd9ccb4a4640`.
+  and `contracts/soroban/verifier/tests/zarf/*`. Current `vk_hash` =
+  `0x120d37a4a2a7c13da4369006e00bc4fcd0ce82cdfcca87ce60c5fd1fb03dfefc`
+  (the pre-batch M1 VK was `0x27aeb147db74e998681b88e1605c8dfcddcbd43b160574436191bd9ccb4a4640`;
+  it is superseded — deploy the new hash).
 - Compiled circuit copied to `web/packages/core/static/circuits/zarf.json`
   (the claim app static dir is a symlink to it).
 - `web/packages/core/lib/constants.ts` `MAX_SIGNED_DATA_LENGTH` -> 1536
@@ -72,7 +78,7 @@ asserts `expected_email == jwt.email` byte-exact:
 ### 2. Deploy order (testnet, needs the deployer secret)
 
 ```
-verifier   (new vk_bytes + vk_hash 0x27aeb147...)   # M4/M5/L6 hardening rides here
+verifier   (new vk_bytes + vk_hash 0x120d37a4...)   # M4/M5/L6 + defense-in-depth batch ride here
 *** GATE ***  verify_proof(known-good fixture) vs the fresh verifier — MUST pass
 registry   (v2: owner multisig + operator timelock)  # --activation_delay_secs >= MIN (6h); then set_operator to the rotation worker key
 vesting    (upload new wasm hash)

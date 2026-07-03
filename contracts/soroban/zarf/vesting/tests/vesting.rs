@@ -2,7 +2,7 @@ use soroban_sdk::{
     contract, contracterror, contractimpl, contracttype,
     testutils::{
         storage::{Instance, Persistent},
-        Address as _, Ledger,
+        Address as _, Ledger, MockAuth, MockAuthInvoke,
     },
     token, Address, Bytes, BytesN, ConversionError, Env, IntoVal, InvokeError, String, Symbol, Val,
     Vec,
@@ -1214,7 +1214,251 @@ fn owner_methods_require_auth_without_mock_all_auths() {
     let vesting = ZarfVestingContractClient::new(&env, &vesting_id);
 
     assert!(vesting.try_set_merkle_root(&root).is_err());
-    assert!(vesting.try_transfer_ownership(&new_owner).is_err());
+    assert!(vesting.try_propose_owner(&new_owner).is_err());
     assert_eq!(vesting.merkle_root(), zero_root);
     assert_eq!(vesting.owner(), owner);
+    assert_eq!(vesting.pending_owner(), None);
+}
+
+/// Deploys a vesting campaign owned by `owner` with a zero (unset) merkle root,
+/// used by the two-step ownership tests below where the proof machinery is
+/// irrelevant.
+fn deploy_owned_vesting<'a>(
+    env: &'a Env,
+    owner: &Address,
+) -> (Address, ZarfVestingContractClient<'a>) {
+    let zero_root = BytesN::from_array(env, &[0_u8; 32]);
+    let token_asset = env.register_stellar_asset_contract_v2(owner.clone());
+    let token_id = token_asset.address();
+    let verifier_id = env.register(MockVerifier, ());
+    let registry_id = env.register(
+        JwkRegistryContract,
+        (owner.clone(), MIN_ACTIVATION_DELAY_SECS),
+    );
+    let vesting_id = env.register(
+        ZarfVestingContract,
+        (
+            owner.clone(),
+            token_id,
+            verifier_id,
+            registry_id,
+            String::from_str(env, "Zarf"),
+            String::from_str(env, "Private vesting"),
+            zero_root,
+            audience_hash(env),
+            String::from_str(env, "ipfs://claim-list"),
+        ),
+    );
+    let client = ZarfVestingContractClient::new(env, &vesting_id);
+    (vesting_id, client)
+}
+
+#[test]
+fn two_step_ownership_moves_owner_controls() {
+    let env = Env::default();
+
+    let owner = Address::generate(&env);
+    let new_owner = Address::generate(&env);
+    let stranger = Address::generate(&env);
+    let (id, vesting) = deploy_owned_vesting(&env, &owner);
+    let root = BytesN::from_array(&env, &[5_u8; 32]);
+
+    // A non-owner cannot propose a successor.
+    assert!(vesting
+        .mock_auths(&[MockAuth {
+            address: &new_owner,
+            invoke: &MockAuthInvoke {
+                contract: &id,
+                fn_name: "propose_owner",
+                args: (&new_owner,).into_val(&env),
+                sub_invokes: &[],
+            },
+        }])
+        .try_propose_owner(&new_owner)
+        .is_err());
+
+    // Owner proposes the successor; ownership has NOT moved yet.
+    vesting
+        .mock_auths(&[MockAuth {
+            address: &owner,
+            invoke: &MockAuthInvoke {
+                contract: &id,
+                fn_name: "propose_owner",
+                args: (&new_owner,).into_val(&env),
+                sub_invokes: &[],
+            },
+        }])
+        .propose_owner(&new_owner);
+    assert_eq!(vesting.owner(), owner);
+    assert_eq!(vesting.pending_owner(), Some(new_owner.clone()));
+
+    // A third party cannot accept; only the nominee can.
+    assert!(vesting
+        .mock_auths(&[MockAuth {
+            address: &stranger,
+            invoke: &MockAuthInvoke {
+                contract: &id,
+                fn_name: "accept_ownership",
+                args: ().into_val(&env),
+                sub_invokes: &[],
+            },
+        }])
+        .try_accept_ownership()
+        .is_err());
+    assert_eq!(vesting.owner(), owner);
+
+    // The nominee accepts — only now does ownership move.
+    vesting
+        .mock_auths(&[MockAuth {
+            address: &new_owner,
+            invoke: &MockAuthInvoke {
+                contract: &id,
+                fn_name: "accept_ownership",
+                args: ().into_val(&env),
+                sub_invokes: &[],
+            },
+        }])
+        .accept_ownership();
+    assert_eq!(vesting.owner(), new_owner);
+    assert_eq!(vesting.pending_owner(), None);
+
+    // The old owner can no longer drive owner-only controls.
+    assert!(vesting
+        .mock_auths(&[MockAuth {
+            address: &owner,
+            invoke: &MockAuthInvoke {
+                contract: &id,
+                fn_name: "set_merkle_root",
+                args: (&root,).into_val(&env),
+                sub_invokes: &[],
+            },
+        }])
+        .try_set_merkle_root(&root)
+        .is_err());
+    assert_eq!(vesting.merkle_root(), BytesN::from_array(&env, &[0_u8; 32]));
+
+    // The new owner can.
+    vesting
+        .mock_auths(&[MockAuth {
+            address: &new_owner,
+            invoke: &MockAuthInvoke {
+                contract: &id,
+                fn_name: "set_merkle_root",
+                args: (&root,).into_val(&env),
+                sub_invokes: &[],
+            },
+        }])
+        .set_merkle_root(&root);
+    assert_eq!(vesting.merkle_root(), root);
+}
+
+#[test]
+fn cancel_ownership_transfer_aborts_handover() {
+    let env = Env::default();
+
+    let owner = Address::generate(&env);
+    let nominee = Address::generate(&env);
+    let stranger = Address::generate(&env);
+    let (id, vesting) = deploy_owned_vesting(&env, &owner);
+
+    // Owner proposes a successor.
+    vesting
+        .mock_auths(&[MockAuth {
+            address: &owner,
+            invoke: &MockAuthInvoke {
+                contract: &id,
+                fn_name: "propose_owner",
+                args: (&nominee,).into_val(&env),
+                sub_invokes: &[],
+            },
+        }])
+        .propose_owner(&nominee);
+    assert_eq!(vesting.pending_owner(), Some(nominee.clone()));
+
+    // A non-owner cannot abort the handover.
+    assert!(vesting
+        .mock_auths(&[MockAuth {
+            address: &stranger,
+            invoke: &MockAuthInvoke {
+                contract: &id,
+                fn_name: "cancel_ownership_transfer",
+                args: ().into_val(&env),
+                sub_invokes: &[],
+            },
+        }])
+        .try_cancel_ownership_transfer()
+        .is_err());
+    assert_eq!(vesting.pending_owner(), Some(nominee.clone()));
+
+    // The owner aborts it: the nomination clears and ownership is unchanged.
+    vesting
+        .mock_auths(&[MockAuth {
+            address: &owner,
+            invoke: &MockAuthInvoke {
+                contract: &id,
+                fn_name: "cancel_ownership_transfer",
+                args: ().into_val(&env),
+                sub_invokes: &[],
+            },
+        }])
+        .cancel_ownership_transfer();
+    assert_eq!(vesting.pending_owner(), None);
+    assert_eq!(vesting.owner(), owner);
+
+    // The cancelled nominee can no longer accept — the handover is gone.
+    match vesting
+        .mock_auths(&[MockAuth {
+            address: &nominee,
+            invoke: &MockAuthInvoke {
+                contract: &id,
+                fn_name: "accept_ownership",
+                args: ().into_val(&env),
+                sub_invokes: &[],
+            },
+        }])
+        .try_accept_ownership()
+    {
+        Err(Ok(VestingError::PendingOwnerNotSet)) => {}
+        other => panic!("expected PendingOwnerNotSet after cancel, got {:?}", other),
+    }
+}
+
+#[test]
+fn accept_or_cancel_without_pending_nominee_errs() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let owner = Address::generate(&env);
+    let (_id, vesting) = deploy_owned_vesting(&env, &owner);
+    assert_eq!(vesting.pending_owner(), None);
+
+    match vesting.try_accept_ownership() {
+        Err(Ok(VestingError::PendingOwnerNotSet)) => {}
+        other => panic!("expected PendingOwnerNotSet on accept, got {:?}", other),
+    }
+    match vesting.try_cancel_ownership_transfer() {
+        Err(Ok(VestingError::PendingOwnerNotSet)) => {}
+        other => panic!("expected PendingOwnerNotSet on cancel, got {:?}", other),
+    }
+}
+
+#[test]
+fn re_propose_overwrites_pending_nominee() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let owner = Address::generate(&env);
+    let first = Address::generate(&env);
+    let second = Address::generate(&env);
+    let (_id, vesting) = deploy_owned_vesting(&env, &owner);
+
+    vesting.propose_owner(&first);
+    assert_eq!(vesting.pending_owner(), Some(first.clone()));
+
+    // Re-proposing replaces the nominee; the first nominee can no longer accept.
+    vesting.propose_owner(&second);
+    assert_eq!(vesting.pending_owner(), Some(second.clone()));
+
+    vesting.accept_ownership();
+    assert_eq!(vesting.owner(), second);
 }

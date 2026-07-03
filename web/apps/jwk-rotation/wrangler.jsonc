@@ -18,7 +18,15 @@
         "STELLAR_RPC_URL": "https://soroban-testnet.stellar.org",
         "STELLAR_NETWORK_PASSPHRASE": "Test SDF Network ; September 2015",
         "JWK_REGISTRY_ADDRESS": "CCTN3XSQM2P7CSXY4UOBGE67DA2Q7IZSRICP3ELKGUQDL5666VDCLXXW",
-        "REVOKE_REMOVED_KEYS": "true",
+        // Fail-safe default: OFF until the ROTATION_STATE KV (grace rail) below is
+        // provisioned. With REVOKE_REMOVED_KEYS=true AND no ROTATION_STATE binding,
+        // checkGraceWindow returns 'elapsed' immediately, so a key transiently
+        // missing from a single JWKS fetch would be revoked on its FIRST absence —
+        // bricking every claim minted against it (P0-5). The worker still monitors
+        // and ALERTS (registry_keys_not_in_google_jwks) while this is false. Flip to
+        // "true" ONLY after creating + binding ROTATION_STATE so the grace window
+        // and MIN_ACTIVE_KEYS / MAX_REVOCATIONS_PER_RUN rails actually apply.
+        "REVOKE_REMOVED_KEYS": "false",
         "TX_POLL_ATTEMPTS": "20",
         // Revocation safety rails (see executeRevocations in src/index.ts).
         "MIN_ACTIVE_KEYS": "2",

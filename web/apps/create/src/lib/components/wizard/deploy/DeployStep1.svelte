@@ -58,9 +58,11 @@
 
         try {
             // Recipient emails are redacted before the wizard state touches
-            // localStorage, so a restored session cannot rebuild the tree —
-            // generating with blank emails would silently produce a tree no
-            // recipient could ever claim from.
+            // localStorage (wizardStore.redactForStorage), so a restored session
+            // cannot rebuild the tree — generating with blank emails would
+            // silently produce a tree no recipient could ever claim from. Fail
+            // closed and prompt a CSV re-import instead of minting a dead,
+            // fund-committed distribution.
             if (
                 distribution.recipients.length === 0 ||
                 distribution.recipients.some((r) => !r.email)
@@ -77,10 +79,13 @@
             // CRITICAL: Convert amount to token base units using token decimals.
             // This ensures the Merkle Root matches the on-chain values.
             const entries = distribution.recipients.map((r) => ({
-                // Guard above guarantees non-empty; `?? ''` only narrows the type.
-                email: r.email ?? '',
-                // We pass BigInt directly to avoid precision loss
-                amount: parseTokenAmount(String(r.amount), tokenDecimals),
+                email: r.email || '',
+                // r.amount is the RAW CSV decimal string; feed it to
+                // parseTokenAmount unchanged (no String(Number(...)) round-trip)
+                // so large/exponential values reach the leaf at full precision.
+                // (Legacy number-typed drafts are coerced to strings in
+                // wizardStore.restore(), so a string reaches here in practice.)
+                amount: parseTokenAmount(r.amount, tokenDecimals),
             }));
 
             // ADR-023: Discrete Vesting - Generator needs Schedule

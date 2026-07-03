@@ -11,6 +11,7 @@
  *   GET /v1/:network/vestings/:address/claimed?commitments=<hex32>,...
  *   GET /v1/:network/vestings/:address/claimed/:commitment
  *   GET /v1/:network/owners/:owner/vestings
+ *   GET /v1/:network/airdrop/:address/progress?recipients=N
  *   GET /v1/ipfs/:cid
  *   GET /v1/ipfs/:cid/email-hashes
  *
@@ -42,6 +43,7 @@ interface RateLimiter {
 interface Env {
     ALLOWED_ORIGINS?: string;
     MAX_CONTRACTS?: string;
+    MAX_AIRDROP_RECIPIENTS?: string;
     // Optional per-IP limiter: a single uncached GET can fan out to ~200
     // upstream RPC simulations, so an unauthenticated caller can otherwise
     // amplify traffic into the configured RPC at will. A missing binding
@@ -147,6 +149,21 @@ const CACHE_TTL_UNVERIFIED = 300; // gateway bytes that could not be authenticat
 // non-sha2-256). withEdgeCache caps the TTL for such responses and the header
 // is never forwarded to clients (cache/browser headers are rebuilt from scratch).
 const UNVERIFIED_HEADER = 'X-Zarf-Cid-Unverified';
+
+// --- airdrop progress route (additive; standalone Merkle-claim tool, 17-m7 §T4) ---
+const CACHE_TTL_AIRDROP_TERMINAL = 3_600; // fully claimed → the response won't change
+const CACHE_TTL_AIRDROP_LIVE = 10; // partial → must reflect new claims quickly
+const AIRDROP_PAGE_LIMIT = 80; // matches the instance MAX_PAGE_LIMIT (no wider window)
+const MAX_AIRDROP_RECIPIENTS = 10_000; // hard cap bounding claimed_statuses fan-out (≤125 simulates)
+
+// Best-effort per-isolate rate limit for the airdrop route — SECONDARY to the
+// hard recipients clamp (the primary DoS control, which bounds per-request RPC
+// fan-out). Workers run many short-lived isolates, so this caps a single hot
+// isolate, not the fleet. Keyed by CF client IP; fixed window.
+const AIRDROP_RL_MAX = 60; // requests per window per IP per isolate
+const AIRDROP_RL_WINDOW_MS = 10_000;
+const AIRDROP_RL_MAX_KEYS = 5_000; // prune trigger to bound isolate memory
+const airdropRateState = new Map<string, { count: number; resetAt: number }>();
 
 export default {
     async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
@@ -289,6 +306,23 @@ export default {
                 const cfg = getNetworkConfig(env, network);
                 return await cached(CACHE_TTL_LIST, () =>
                     handleOwnerVestings(owner, url, env, cfg, corsHeaders),
+                );
+            }
+
+            if (parts.length === 5 && parts[2] === 'airdrop' && parts[4] === 'progress') {
+                const network = decodeSegment(parts[1]);
+                const addr = decodeSegment(parts[3]);
+                // Resolve config INSIDE the try (its 500 gets CORS-wrapped by the
+                // catch below) and via the airdrop-specific reader, so a missing
+                // vesting factory doesn't 500 the standalone tool (17-m7 §T4).
+                const cfg = getAirdropNetworkConfig(env, network);
+                rateLimitAirdrop(request);
+                const recipients = parseRecipients(
+                    url.searchParams.get('recipients'),
+                    airdropRecipientCap(env),
+                );
+                return await cached(airdropProgressTtl, () =>
+                    handleAirdropProgress(addr, recipients, cfg, corsHeaders),
                 );
             }
 
@@ -932,6 +966,186 @@ async function simulate(
     return result.result.retval;
 }
 
+// ===== Airdrop progress route (additive; 17-m7 §T4) =====================
+// GET /v1/:net/airdrop/:addr/progress?recipients=N → IndexerAirdropProgress
+// (consumed by @zarf/core getAirdropProgress, contracts.ts). Reads the instance
+// directly at :addr — no vesting factory needed; the client fails open to
+// RPC-direct on any error.
+
+export interface AirdropProgressBody {
+    claimedCount: number;
+    recipientCount: number;
+    totalAmount: string;
+    contractBalance: string;
+    deadline: number;
+    locked: boolean;
+}
+
+interface AirdropConfigView {
+    token: string;
+    total: bigint;
+    deadline: number;
+    locked: boolean;
+}
+
+// rpcUrl + passphrase only — NOT the vesting factoryAddress that getNetworkConfig
+// requires (and 500s without). factoryAddress is left empty: the progress path
+// never reads it. Called inside the request try so its 500 is CORS-wrapped.
+function getAirdropNetworkConfig(env: Env, network: string): NetworkConfig {
+    const envMap = env as Record<string, string | undefined>;
+    const id = network.toLowerCase();
+    const prefix = `STELLAR_${id.toUpperCase().replace(/[^A-Z0-9]/g, '_')}_`;
+    const rpcUrl =
+        envMap[`${prefix}RPC_URL`] ?? (id === 'testnet' ? env.STELLAR_RPC_URL : undefined);
+    const networkPassphrase =
+        envMap[`${prefix}NETWORK_PASSPHRASE`] ??
+        (id === 'testnet' ? env.STELLAR_NETWORK_PASSPHRASE : undefined) ??
+        defaultPassphrase(id);
+    if (!rpcUrl || !networkPassphrase) {
+        throw new HttpError(500, 'network_not_configured', `Network is not configured: ${network}`);
+    }
+    return { id, rpcUrl, networkPassphrase, factoryAddress: '' };
+}
+
+function airdropRecipientCap(env: Env): number {
+    const configured = Number(env.MAX_AIRDROP_RECIPIENTS);
+    return Number.isInteger(configured) && configured > 0 ? configured : MAX_AIRDROP_RECIPIENTS;
+}
+
+// PRIMARY DoS control: the client-supplied recipient count bounds the
+// claimed_statuses fan-out (ceil(N/80) simulations), so it is validated + hard-
+// capped server-side. Over the cap → 400 (the client then falls back to
+// RPC-direct), never a silent unbounded scan.
+export function parseRecipients(raw: string | null, cap: number): number {
+    if (raw === null || raw === '') {
+        throw new HttpError(400, 'invalid_recipients', 'Provide ?recipients=<positive integer>');
+    }
+    const n = Number(raw);
+    if (!Number.isInteger(n) || n < 1) {
+        throw new HttpError(400, 'invalid_recipients', '?recipients must be a positive integer');
+    }
+    if (n > cap) {
+        throw new HttpError(400, 'recipients_too_large', `?recipients exceeds the ${cap} cap`);
+    }
+    return n;
+}
+
+function rateLimitAirdrop(request: Request): void {
+    const now = Date.now();
+    const ip = request.headers.get('CF-Connecting-IP') ?? 'unknown';
+    if (airdropRateState.size > AIRDROP_RL_MAX_KEYS) {
+        for (const [key, value] of airdropRateState) {
+            if (now >= value.resetAt) airdropRateState.delete(key);
+        }
+    }
+    const entry = airdropRateState.get(ip);
+    if (!entry || now >= entry.resetAt) {
+        airdropRateState.set(ip, { count: 1, resetAt: now + AIRDROP_RL_WINDOW_MS });
+        return;
+    }
+    if (entry.count >= AIRDROP_RL_MAX) {
+        throw new HttpError(429, 'rate_limited', 'Too many requests; please retry shortly.');
+    }
+    entry.count += 1;
+}
+
+export function popcountStatuses(statuses: unknown[]): number {
+    let claimed = 0;
+    for (const status of statuses) if (status) claimed += 1;
+    return claimed;
+}
+
+export function decodeAirdropConfig(value: xdr.ScVal): AirdropConfigView {
+    const fields = scMap(value, 'airdrop config');
+    return {
+        token: StellarSdkAddress.fromScVal(scMapField(fields, 'token')).toString(),
+        total: scValToBigInt(scMapField(fields, 'total')),
+        deadline: Number(scValToBigInt(scMapField(fields, 'deadline'))),
+        locked: Boolean(scValToNative(scMapField(fields, 'locked'))),
+    };
+}
+
+export function buildAirdropProgressBody(args: {
+    claimedCount: number;
+    recipientCount: number;
+    totalAmount: bigint;
+    contractBalance: bigint;
+    deadline: number;
+    locked: boolean;
+}): AirdropProgressBody {
+    return {
+        claimedCount: args.claimedCount,
+        recipientCount: args.recipientCount,
+        totalAmount: args.totalAmount.toString(),
+        contractBalance: args.contractBalance.toString(),
+        deadline: args.deadline,
+        locked: args.locked,
+    };
+}
+
+// Fully claimed → terminal, safe to cache long; otherwise short so a fresh claim
+// shows up quickly. Mirrors `claimedResponseTtl` for the vesting bitmap.
+export function airdropProgressTtl(bodyText: string): number {
+    try {
+        const parsed = JSON.parse(bodyText) as { claimedCount?: number; recipientCount?: number };
+        const terminal =
+            typeof parsed.recipientCount === 'number' &&
+            parsed.recipientCount > 0 &&
+            typeof parsed.claimedCount === 'number' &&
+            parsed.claimedCount >= parsed.recipientCount;
+        return terminal ? CACHE_TTL_AIRDROP_TERMINAL : CACHE_TTL_AIRDROP_LIVE;
+    } catch {
+        return 0;
+    }
+}
+
+async function readAirdropConfig(cfg: NetworkConfig, address: string): Promise<AirdropConfigView> {
+    return decodeAirdropConfig(await simulate(cfg, address, 'config'));
+}
+
+async function countClaimedStatuses(
+    cfg: NetworkConfig,
+    address: string,
+    recipientCount: number,
+): Promise<number> {
+    let claimed = 0;
+    for (let start = 0; start < recipientCount; start += AIRDROP_PAGE_LIMIT) {
+        const limit = Math.min(AIRDROP_PAGE_LIMIT, recipientCount - start);
+        const result = await simulate(cfg, address, 'claimed_statuses', [
+            scU32(start),
+            scU32(limit),
+        ]);
+        claimed += popcountStatuses((scValToNative(result) as unknown[]) ?? []);
+    }
+    return claimed;
+}
+
+async function handleAirdropProgress(
+    address: string,
+    recipientCount: number,
+    cfg: NetworkConfig,
+    corsHeaders: Record<string, string>,
+): Promise<Response> {
+    assertAddress(address, 'airdrop address');
+    const config = await readAirdropConfig(cfg, address);
+    const [claimedCount, contractBalance] = await Promise.all([
+        countClaimedStatuses(cfg, address, recipientCount),
+        getTokenBalance(cfg, config.token, address),
+    ]);
+    return json(
+        buildAirdropProgressBody({
+            claimedCount,
+            recipientCount,
+            totalAmount: config.total,
+            contractBalance,
+            deadline: config.deadline,
+            locked: config.locked,
+        }),
+        200,
+        corsHeaders,
+    );
+}
+
 function parseVestingSummary(value: xdr.ScVal): VestingSummary {
     const fields = scMap(value, 'vesting summary');
     const metadataCid = scString(scMapField(fields, 'metadata_cid'));
@@ -1167,23 +1381,34 @@ function readMaxContracts(url: URL, env: Env): number {
     return Math.min(Math.floor(requested), configuredMax);
 }
 
-function buildCorsHeaders(origin: string | null, env: Env): Record<string, string> {
+// Fail-closed CORS: advertise Access-Control-Allow-Origin ONLY when the request
+// Origin is explicitly allow-listed. An unmatched or absent Origin gets NO ACAO
+// header (the browser blocks the cross-origin read) instead of the old
+// `allowed[0] || '*'` fallback, which echoed an allowed origin — or `*` when
+// ALLOWED_ORIGINS was unset — to every caller. Shared helper: this intentionally
+// tightens the vesting/token/ipfs routes too (17-m7 §6; covered by index.test.ts).
+// Same-origin + non-browser callers (no Origin header) are unaffected, and the
+// standalone airdrop client fails open to RPC-direct when a read is blocked.
+export function buildCorsHeaders(origin: string | null, env: Env): Record<string, string> {
     const allowed = (env.ALLOWED_ORIGINS || '')
         .split(',')
         .map((o) => o.trim())
         .filter(Boolean);
 
-    // Unmatched origins get the first allow-listed origin (a deny for the
-    // requesting page) — never '*', even when the var is misconfigured/empty.
-    const allowOrigin = origin && allowed.includes(origin) ? origin : (allowed[0] ?? 'null');
-
-    return {
-        'Access-Control-Allow-Origin': allowOrigin,
+    // Fail-closed: advertise Access-Control-Allow-Origin ONLY for an explicitly
+    // allow-listed Origin (set below). An unmatched or absent Origin gets NO
+    // ACAO header at all — never an echoed allow-listed origin and never '*',
+    // even when ALLOWED_ORIGINS is misconfigured or empty.
+    const headers: Record<string, string> = {
         'Access-Control-Allow-Methods': 'GET, OPTIONS',
         'Access-Control-Allow-Headers': 'Content-Type, Authorization',
         'Access-Control-Max-Age': '86400',
         Vary: 'Origin',
     };
+    if (origin && allowed.includes(origin)) {
+        headers['Access-Control-Allow-Origin'] = origin;
+    }
+    return headers;
 }
 
 function json(body: unknown, status: number, extraHeaders: Record<string, string> = {}): Response {

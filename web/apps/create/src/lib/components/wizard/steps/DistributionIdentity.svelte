@@ -2,10 +2,7 @@
     import { Shield, Lock } from 'lucide-svelte';
     import ZenInput from '@zarf/ui/components/ui/ZenInput.svelte';
 
-    let {
-        name = $bindable(),
-        description = $bindable(),
-    } = $props<{
+    let { name = $bindable(), description = $bindable() } = $props<{
         name: string;
         description: string;
     }>();

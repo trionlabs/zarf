@@ -421,6 +421,16 @@ export async function buildMerkleTree(leaves: bigint[]): Promise<{
         throw new Error('Cannot build Merkle tree with no leaves');
     }
 
+    // The circuit verifies a fixed-depth (TREE_DEPTH) Merkle path. More than
+    // 2**TREE_DEPTH leaves would build a deeper tree whose root no proof can
+    // ever satisfy — silently producing a funded-but-unclaimable distribution.
+    // Fail loudly at build time instead.
+    if (leaves.length > 2 ** TREE_DEPTH) {
+        throw new Error(
+            `Too many leaves: ${leaves.length} exceeds the maximum of ${2 ** TREE_DEPTH} (2**${TREE_DEPTH})`,
+        );
+    }
+
     const empty = await getEmptyHashes();
 
     // Calculate minimal tree depth (next power of 2)
@@ -623,7 +633,11 @@ export async function processWhitelist(
     const cliffEnd = new Date(schedule.cliffEndDate).getTime() / 1000;
     // For simplicity, we assume 'distributionDuration' is count of periods (e.g. 12 months -> 12 epochs)
     // If durationUnit is months, period is roughly 30 days.
-    const epochs = schedule.distributionDuration;
+    // Clamp to a positive integer, matching the UI's calculateUnlockEvents
+    // (utils/vesting.ts: `Math.max(Math.round(duration), 1)`). distributionDuration=0
+    // ("unlock instantly") and fractional durations otherwise crash at
+    // `amount / BigInt(epochs)` (division-by-zero / non-integer BigInt).
+    const epochs = Math.max(1, Math.round(schedule.distributionDuration));
 
     // Period length in seconds. Single source of truth shared with the deploy
     // planner; exhaustive over DurationUnit, so a newly-added unit throws here

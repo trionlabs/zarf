@@ -187,8 +187,11 @@ export function redirectToGoogle(contractAddress?: string): void {
         throw new Error('VITE_GOOGLE_CLIENT_ID is not defined in environment variables');
     }
 
-    // Use Root Origin WITH trailing slash (http://localhost:5173/) to match Google Console config.
-    // The Landing Page (+page.svelte) will handle the callback and forward to /claim with state.
+    // Use the INITIATING origin WITH a trailing slash (e.g. https://claim.zarf.to/)
+    // to match the Google Console config. The callback returns to that same origin,
+    // which handles its own #id_token (claim's +page.svelte → extractTokenFromUrl).
+    // It is deliberately NOT zarf.to: the shell must never receive the JWT (the
+    // legacy landing-page relay that forwarded it was removed).
     const redirectUri = `${window.location.origin}/`;
 
     // Build state with optional contract address
