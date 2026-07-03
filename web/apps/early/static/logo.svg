@@ -1,0 +1,8 @@
+<!-- Neutral placeholder logo (generic mark + neutral wordmark slab).
+     TODO: replace with your own logo. Loaded via <img> in some surfaces, so
+     uses neutral hardcoded hex rather than CSS vars. -->
+<svg preserveAspectRatio="none" width="100%" height="100%" overflow="visible" style="display: block;" viewBox="0 0 415.235 65.9074" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect x="0" y="0.9" width="64" height="64" rx="12" fill="#888888"/>
+  <circle cx="32" cy="32.9" r="18" fill="none" stroke="#ffffff" stroke-width="6"/>
+  <rect x="96" y="20.9" width="300" height="24" rx="6" fill="#888888"/>
+</svg>
