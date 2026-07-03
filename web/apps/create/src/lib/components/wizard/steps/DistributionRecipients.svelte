@@ -108,7 +108,7 @@
 <!-- Stats Summary Bar (Brutalist) -->
 {#if recipients.length > 0}
     <div class="mb-8 p-6 bg-zen-fg/[0.02] border border-zen-border-subtle rounded-2xl">
-        <div class="grid grid-cols-4 gap-8 items-center">
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-8 items-center">
             <!-- Recipients -->
             <div>
                 <span class="text-xs font-medium text-zen-fg-muted block mb-1">Recipients</span>

@@ -16,6 +16,7 @@
     "build:claim": "pnpm --filter @zarf/claim build",
     "build:all": "pnpm -r build",
     "deploy:landing": "pnpm --filter @zarf/landing run deploy",
+    "deploy:early": "pnpm --filter @zarf/early run deploy",
     "deploy:create": "pnpm --filter @zarf/create run deploy",
     "deploy:claim": "pnpm --filter @zarf/claim run deploy",
     "deploy:pin-proxy": "pnpm --filter @zarf/pin-proxy run deploy",

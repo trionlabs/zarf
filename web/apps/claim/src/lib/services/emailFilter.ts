@@ -87,19 +87,46 @@ async function resolveDistributionCid(
         : (distribution.metadataCid ?? (await getCidForVesting(distribution.address)));
 }
 
+// A freshly pinned CID can lag behind on public gateways for a few seconds,
+// and `isEmailInDistribution` fails CLOSED on IPFS errors — without retries a
+// just-deployed distribution would stay hidden until a full page reload.
+const EMAIL_HASH_FETCH_ATTEMPTS = 3;
+const EMAIL_HASH_RETRY_DELAYS_MS = [1_000, 2_500];
+
+function sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 /**
  * Eligibility filtering only needs `emailHashes`, so prefer the indexer's
  * tiny extraction route over downloading the full distribution document
  * (which grows with recipients × epochs). Older indexer deployments lack
  * the route; fall back to the full document then.
+ *
+ * Transient failures (gateway propagation lag, indexer hiccup) are retried
+ * with backoff before the caller's fail-closed policy hides the distribution.
+ * Invalid CIDs are permanent and never retried. Throws the last error once
+ * attempts are exhausted so the caller's open/closed classification holds.
  */
 async function fetchEmailHashes(cid: string): Promise<string[] | null | undefined> {
-    try {
-        return await fetchIpfsEmailHashes(cid);
-    } catch {
-        const data = await fetchIpfsJson<DistributionWithHashes>(cid);
-        return data?.emailHashes;
+    let lastError: unknown;
+    for (let attempt = 0; attempt < EMAIL_HASH_FETCH_ATTEMPTS; attempt++) {
+        if (attempt > 0) {
+            await sleep(EMAIL_HASH_RETRY_DELAYS_MS[attempt - 1] ?? 2_500);
+        }
+        try {
+            return await fetchIpfsEmailHashes(cid);
+        } catch {
+            try {
+                const data = await fetchIpfsJson<DistributionWithHashes>(cid);
+                return data?.emailHashes;
+            } catch (error) {
+                lastError = error;
+                if (error instanceof IpfsFetchError && error.code === 'INVALID_CID') break;
+            }
+        }
     }
+    throw lastError;
 }
 
 /**

@@ -632,6 +632,7 @@
 
                     <ZenButton
                         variant="primary"
+                        size="lg"
                         class="w-full"
                         disabled={imported && !acknowledged}
                         aria-describedby={imported && !acknowledged

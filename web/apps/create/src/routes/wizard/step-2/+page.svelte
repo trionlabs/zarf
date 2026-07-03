@@ -83,16 +83,16 @@
     />
 </svelte:head>
 
-<div
-    class="h-full flex flex-col relative max-w-5xl w-full px-4 md:px-0 transition-all duration-300 ml-0"
->
+<div class="h-full flex flex-col relative max-w-5xl w-full mx-auto">
     <!-- Header + Stepper - Only show when not deployed -->
     {#if !deployStore.isDeployed}
         <!-- Compact Header Row -->
-        <div class="flex items-center justify-between mb-4">
-            <div>
-                <h1 class="text-xl font-bold text-zen-fg">Deploy Distribution</h1>
-                <p class="text-sm text-zen-fg-muted">
+        <div class="flex flex-wrap items-center justify-between gap-3 mb-6">
+            <div class="space-y-2">
+                <h1 class="text-2xl md:text-3xl font-light tracking-tight text-zen-fg">
+                    Deploy Distribution
+                </h1>
+                <p class="text-sm md:text-base text-zen-fg-muted font-light leading-relaxed">
                     {distribution?.name || 'Finalize and launch'}
                 </p>
             </div>
@@ -102,7 +102,7 @@
         </div>
 
         <!-- Stepper (Minimal) -->
-        <div class="flex items-center gap-2 mb-6">
+        <div class="flex flex-wrap items-center gap-2 gap-y-3 mb-6">
             {#each [{ id: 1, label: 'Prepare' }, { id: 2, label: 'Backup' }, { id: 3, label: 'Approvals' }, { id: 4, label: 'Deploy' }] as step, i (step.id)}
                 {@const isActive = currentStep === step.id}
                 {@const isPast = currentStep > step.id}

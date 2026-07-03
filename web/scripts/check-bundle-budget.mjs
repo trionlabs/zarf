@@ -11,7 +11,9 @@
 //     surface a user can possibly hit while navigating the app.
 //
 // Budgets (claim ratchet 2026-05-20 from post phase-1.1.B step-4
-// floor of 117.3 KB; landing/create still on the 2026-05-19 baseline):
+// floor of 117.3 KB; create still on the 2026-05-19 baseline; landing
+// re-baselined 2026-07-02 from the 79.5 KB floor after the docs-link +
+// "Built on Stellar" header/footer additions):
 //   initialGz: floor * 1.05, nearest 1 KB. Per-route perception gate.
 //   totalGz:   floor * 1.15, nearest 50 KB. Patological bloat tripwire.
 //
@@ -26,7 +28,7 @@ import { resolve, basename, join } from 'node:path';
 const KB = 1024;
 
 const BUDGETS = {
-    landing: { initialGz: 79 * KB, totalGz: 100 * KB },
+    landing: { initialGz: 83 * KB, totalGz: 100 * KB },
     claim: { initialGz: 123 * KB, totalGz: 13250 * KB },
     create: { initialGz: 456 * KB, totalGz: 6350 * KB },
 };

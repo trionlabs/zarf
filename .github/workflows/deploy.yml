@@ -62,6 +62,7 @@ jobs:
             { app: 'indexer', package: '@zarf/indexer', kind: 'worker', url: 'https://indexer.zarf.to' },
             { app: 'pin-proxy', package: '@zarf/pin-proxy', kind: 'worker', url: 'zarf-pin-proxy' },
             { app: 'jwk-rotation', package: '@zarf/jwk-rotation', kind: 'worker', url: 'https://jwt.zarf.to' },
+            { app: 'docs', package: '@zarf/docs', kind: 'worker', url: 'https://docs.zarf.to' },
           ];
           const VK = new Set(['create', 'claim']); // VK-bound: never auto/blanket deploy
           const event = process.env.EVENT_NAME;

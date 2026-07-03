@@ -24,16 +24,20 @@ interface IndexerVestingContract {
     metadataCid: string | null;
 }
 
-export async function discoverAllVestings(): Promise<DiscoveredVesting[]> {
-    try {
-        const indexed = await fetchIndexerJson<IndexerVestingsResult>(
-            indexerNetworkPath('/vestings'),
-        );
-        return indexed.vestings;
-    } catch (error) {
-        warn('[VestingDiscovery] Indexer discovery failed:', error);
-        return [];
-    }
+/**
+ * List every registered distribution. Throws on indexer failure — the caller
+ * decides the staleness policy (e.g. keep showing a previously fetched list
+ * instead of downgrading to empty). `forceRefresh` bypasses the indexer's
+ * edge-cache read so a just-deployed distribution shows up immediately.
+ */
+export async function discoverAllVestings(
+    options: { forceRefresh?: boolean } = {},
+): Promise<DiscoveredVesting[]> {
+    const indexed = await fetchIndexerJson<IndexerVestingsResult>(
+        indexerNetworkPath('/vestings'),
+        options.forceRefresh ? { refresh: 1 } : {},
+    );
+    return indexed.vestings;
 }
 
 export async function getCidForVesting(address: StellarContractId): Promise<string | null> {

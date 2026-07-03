@@ -34,10 +34,15 @@
     let isAuthenticated = $derived(authStore.isAuthenticated);
     let userEmail = $derived(authStore.gmail.email);
 
+    // Version counter so a slow in-flight filter can never overwrite the
+    // results of a newer one (mirrors the pattern in ImportContractInput).
+    let filterVersion = 0;
+
     // Filter distributions when user authenticates
     $effect(() => {
         // Reset filter state when auth changes
         if (!isAuthenticated || !userEmail) {
+            filterVersion++; // discard any in-flight filter results
             hasFiltered = false;
             filteredAddresses = [];
             return;
@@ -54,29 +59,80 @@
     });
 
     async function filterDistributions(email: string, vestings: DiscoveredVesting[]) {
+        const version = ++filterVersion;
+        // Keep the previously filtered cards visible while re-filtering
+        // (hasFiltered stays true after the first pass) — a background refresh
+        // must not flash the vault back to skeletons.
         isFiltering = true;
-        hasFiltered = false;
 
         try {
             const eligible = await filterDistributionsByEmail(vestings, email);
+            if (version !== filterVersion) return;
             filteredAddresses = eligible;
         } catch (error) {
+            if (version !== filterVersion) return;
             err('[Claim] Failed to filter distributions:', error);
             // Fall back to showing all on error
             filteredAddresses = vestings.map((vesting) => vesting.address);
         } finally {
-            isFiltering = false;
-            hasFiltered = true;
+            if (version === filterVersion) {
+                isFiltering = false;
+                hasFiltered = true;
+            }
         }
     }
 
-    onMount(async () => {
+    // Discovery used to be a one-shot onMount read, so a tab opened before a
+    // deployment never saw it without a full reload. It now re-runs on window
+    // focus / tab visibility (throttled) and on the manual Refresh action.
+    const AUTO_REFRESH_MIN_MS = 30_000;
+    let isDiscovering = false;
+    let lastDiscoveryAt = 0;
+
+    async function refreshVestings(opts: { manual?: boolean } = {}) {
+        const manual = opts.manual ?? false;
+        if (isDiscovering) return;
+        if (!manual && Date.now() - lastDiscoveryAt < AUTO_REFRESH_MIN_MS) return;
+
+        isDiscovering = true;
         try {
-            const vestings = await discoverAllVestings();
-            discoveredVestings = Array.from(new Map(vestings.map((v) => [v.address, v])).values());
+            // Manual refresh bypasses the indexer edge cache: it is the
+            // user's "I just got added, where is it?" escape hatch.
+            const vestings = await discoverAllVestings({ forceRefresh: manual });
+            lastDiscoveryAt = Date.now();
+            const unique = Array.from(new Map(vestings.map((v) => [v.address, v])).values());
+
+            // The factory registry is append-only: an empty result over a
+            // populated list means the read failed upstream, not that the
+            // registry emptied. Never downgrade to an empty vault.
+            if (unique.length === 0 && discoveredVestings.length > 0) {
+                warn('[Claim] Discovery returned empty over a populated list; keeping previous');
+                return;
+            }
+
+            // Manual refresh always reassigns so the email filter re-runs
+            // (rescuing distributions hidden by a transient IPFS failure);
+            // auto refresh skips no-op updates to avoid re-filter churn on
+            // every window focus.
+            if (manual || vestingsChanged(discoveredVestings, unique)) {
+                discoveredVestings = unique;
+            }
         } catch (e) {
             warn('[Claim] Chain discovery failed', e);
+        } finally {
+            isDiscovering = false;
         }
+    }
+
+    function vestingsChanged(prev: DiscoveredVesting[], next: DiscoveredVesting[]): boolean {
+        if (prev.length !== next.length) return true;
+        const key = (v: DiscoveredVesting) => `${v.address}:${v.metadataCid ?? ''}`;
+        const seen = new Set(prev.map(key));
+        return next.some((v) => !seen.has(key(v)));
+    }
+
+    onMount(() => {
+        void refreshVestings();
     });
 
     onMount(async () => {
@@ -176,6 +232,13 @@
     });
 </script>
 
+<svelte:window onfocus={() => void refreshVestings()} />
+<svelte:document
+    onvisibilitychange={() => {
+        if (document.visibilityState === 'visible') void refreshVestings();
+    }}
+/>
+
 <svelte:head>
     <title>Claim Tokens — Zarf</title>
     <meta
@@ -212,6 +275,7 @@
             <section class="w-full">
                 <ImportContractInput
                     onImport={handleImport}
+                    onRefresh={() => void refreshVestings({ manual: true })}
                     vaultAddresses={hasFiltered ? filteredAddresses : []}
                     isFiltering={isFiltering || !hasFiltered}
                 />
