@@ -1,0 +1,561 @@
+/*
+  ============================================================================
+  ZARF DOCS — Zen Design System theme for Starlight
+  ----------------------------------------------------------------------------
+  "Porcelain & Precision": a smoky, monochrome charcoal + porcelain palette,
+  Saira for text, JetBrains Mono for code, film-grain texture, glass chrome.
+
+  Mirrors the tokens defined in @zarf/ui (packages/ui/lib/styles) so the docs
+  read as the same product as zarf.to, create.zarf.to and claim.zarf.to.
+
+  Everything here is intentionally UNLAYERED: unlayered rules beat every
+  `@layer starlight.*` rule regardless of specificity, so these overrides win
+  cleanly without `!important`.
+  ============================================================================
+*/
+
+/* ============================================================
+   1. TYPOGRAPHY
+   ============================================================ */
+:root {
+	--sl-font: 'Saira', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI',
+		sans-serif;
+	--sl-font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+		'Liberation Mono', 'Courier New', monospace;
+}
+
+/* ============================================================
+   2. COLOR — DARK (default). Smoky fume + porcelain.
+   Base canvas #121212, soft-white text, porcelain accents.
+   ============================================================ */
+:root,
+::backdrop {
+	/* Neutral ramp: gray-1 (brightest) → gray-6 (darkest surface) */
+	--sl-color-white: oklch(97% 0.006 260); /* headings / highest contrast */
+	--sl-color-gray-1: oklch(90% 0.008 260); /* strong text */
+	--sl-color-gray-2: oklch(78% 0.007 262); /* body text (default text token) */
+	--sl-color-gray-3: oklch(62% 0.006 265); /* muted / secondary */
+	--sl-color-gray-4: oklch(47% 0.006 270); /* subtle / captions */
+	--sl-color-gray-5: oklch(30% 0.006 275); /* borders / inline-code bg */
+	--sl-color-gray-6: oklch(20% 0.006 280); /* elevated fume surface */
+	--sl-color-black: #121212; /* base canvas */
+
+	/* Accent — monochrome porcelain (no chroma brand color, by design) */
+	--sl-color-accent-low: oklch(28% 0.02 280);
+	--sl-color-accent: oklch(74% 0.018 280);
+	--sl-color-accent-high: oklch(93% 0.012 280); /* link / interactive text */
+
+	/* Semantic (asides) — muted, broken tones matching zen dark theme */
+	--sl-hue-blue: 250;
+	--sl-color-blue: oklch(70% 0.09 250);
+	--sl-color-blue-high: oklch(84% 0.08 250);
+	--sl-color-blue-low: oklch(28% 0.045 250);
+	--sl-hue-green: 155;
+	--sl-color-green: oklch(70% 0.1 155);
+	--sl-color-green-high: oklch(84% 0.1 155);
+	--sl-color-green-low: oklch(27% 0.05 155);
+	--sl-hue-orange: 75;
+	--sl-color-orange: oklch(75% 0.11 75);
+	--sl-color-orange-high: oklch(88% 0.1 80);
+	--sl-color-orange-low: oklch(28% 0.05 70);
+	--sl-hue-red: 25;
+	--sl-color-red: oklch(68% 0.13 25);
+	--sl-color-red-high: oklch(84% 0.1 25);
+	--sl-color-red-low: oklch(28% 0.06 25);
+	--sl-hue-purple: 285;
+	--sl-color-purple: oklch(70% 0.07 285);
+	--sl-color-purple-high: oklch(86% 0.05 285);
+	--sl-color-purple-low: oklch(28% 0.035 285);
+
+	/* Semantic surfaces */
+	--sl-color-bg: #121212;
+	--sl-color-bg-nav: color-mix(in oklch, #121212 68%, transparent);
+	--sl-color-bg-sidebar: var(--sl-color-bg);
+	--sl-color-bg-inline-code: oklch(26% 0.006 275);
+	--sl-color-text: var(--sl-color-gray-2);
+	--sl-color-text-accent: var(--sl-color-accent-high);
+
+	/* Hairlines — translucent porcelain, ~0.5px feel */
+	--sl-color-hairline: oklch(90% 0.01 260 / 0.08);
+	--sl-color-hairline-light: oklch(90% 0.01 260 / 0.14);
+	--sl-color-hairline-shade: oklch(90% 0.01 260 / 0.05);
+
+	--sl-color-backdrop-overlay: color-mix(in oklch, #050505 78%, transparent);
+
+	/* Layout — slightly airier reading column (GitBook feel) */
+	--sl-content-width: 47rem;
+
+	/* Zarf brand ambience */
+	--zarf-glow: radial-gradient(
+		120% 55% at 50% -8%,
+		oklch(92% 0.02 280 / 0.06),
+		transparent 60%
+	);
+	--zarf-grain-blend: soft-light;
+	--zarf-grain-opacity: 0.4;
+}
+
+/* ============================================================
+   3. COLOR — LIGHT (Paper Porcelain). Cool silver + charcoal.
+   ============================================================ */
+:root[data-theme='light'],
+[data-theme='light'] ::backdrop {
+	--sl-color-white: oklch(18% 0.012 290); /* headings — deep charcoal */
+	--sl-color-gray-1: oklch(24% 0.012 290);
+	--sl-color-gray-2: oklch(30% 0.01 292); /* body text (~#211e23) */
+	--sl-color-gray-3: oklch(45% 0.009 292); /* muted */
+	--sl-color-gray-4: oklch(58% 0.008 292); /* subtle */
+	--sl-color-gray-5: oklch(80% 0.005 292); /* borders */
+	--sl-color-gray-6: oklch(92% 0.004 292); /* silver surface */
+	--sl-color-gray-7: oklch(96% 0.003 292);
+	--sl-color-black: #f8f8fa; /* base canvas */
+
+	/* Accent — deep cool charcoal */
+	--sl-color-accent-low: oklch(90% 0.01 292);
+	--sl-color-accent: oklch(28% 0.02 292);
+	--sl-color-accent-high: oklch(16% 0.02 292);
+
+	/* Semantic (asides) — refined, cool, readable on silver */
+	--sl-color-blue: oklch(55% 0.13 250);
+	--sl-color-blue-high: oklch(38% 0.13 250);
+	--sl-color-blue-low: oklch(94% 0.03 250);
+	--sl-color-green: oklch(58% 0.14 155);
+	--sl-color-green-high: oklch(36% 0.13 155);
+	--sl-color-green-low: oklch(94% 0.035 155);
+	--sl-color-orange: oklch(66% 0.14 75);
+	--sl-color-orange-high: oklch(40% 0.12 70);
+	--sl-color-orange-low: oklch(95% 0.04 80);
+	--sl-color-red: oklch(56% 0.17 25);
+	--sl-color-red-high: oklch(42% 0.16 25);
+	--sl-color-red-low: oklch(95% 0.035 25);
+	--sl-color-purple: oklch(52% 0.1 292);
+	--sl-color-purple-high: oklch(34% 0.09 292);
+	--sl-color-purple-low: oklch(94% 0.02 292);
+
+	--sl-color-bg: #f8f8fa;
+	--sl-color-bg-nav: color-mix(in oklch, #f8f8fa 72%, transparent);
+	--sl-color-bg-sidebar: var(--sl-color-bg);
+	--sl-color-bg-inline-code: oklch(93% 0.004 292);
+	--sl-color-text: var(--sl-color-gray-2);
+	--sl-color-text-accent: var(--sl-color-accent);
+
+	--sl-color-hairline: oklch(24% 0.01 292 / 0.1);
+	--sl-color-hairline-light: oklch(24% 0.01 292 / 0.14);
+	--sl-color-hairline-shade: oklch(24% 0.01 292 / 0.06);
+
+	--sl-color-backdrop-overlay: color-mix(in oklch, #211e23 45%, transparent);
+
+	--zarf-glow: radial-gradient(120% 55% at 50% -8%, oklch(20% 0.02 292 / 0.04), transparent 60%);
+	--zarf-grain-blend: multiply;
+	--zarf-grain-opacity: 0.16;
+}
+
+/* ============================================================
+   4. CANVAS + BRAND TEXTURE
+   Glow + film grain live in the body background, so they never
+   sit above text (surfaces float clean over a textured void).
+   ============================================================ */
+body {
+	background-color: var(--sl-color-bg);
+	background-image: var(--zarf-glow),
+		url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.42'/%3E%3C/svg%3E");
+	background-attachment: fixed, fixed;
+	background-repeat: no-repeat, repeat;
+	background-size: 100% max(680px, 60vh), 140px 140px;
+	background-position: top center, top left;
+	background-blend-mode: normal, var(--zarf-grain-blend);
+}
+
+/* Tighten the grain strength via an extra opacity gate on the noise layer */
+:root {
+	color-scheme: dark;
+}
+
+/* Selection + text rendering */
+::selection {
+	background-color: color-mix(in oklch, var(--sl-color-accent) 26%, transparent);
+	color: var(--sl-color-white);
+}
+body {
+	-webkit-font-smoothing: antialiased;
+	text-rendering: optimizeLegibility;
+	font-feature-settings: 'cv11', 'ss01';
+	letter-spacing: -0.003em;
+}
+
+/* ============================================================
+   5. TOP NAV — glass chrome (matches landing header)
+   ============================================================ */
+.header {
+	backdrop-filter: blur(14px) saturate(140%);
+	-webkit-backdrop-filter: blur(14px) saturate(140%);
+	border-bottom: 1px solid var(--sl-color-hairline);
+}
+
+/* Divider before the theme/social group */
+.social-icons::after {
+	border-inline-end-color: var(--sl-color-hairline-light) !important;
+}
+
+/* Site title: keep the wordmark in the standard text color (not accent),
+   letting the logo mark carry the brand color. */
+.site-title {
+	color: var(--sl-color-white);
+	font-weight: 600;
+	letter-spacing: -0.01em;
+	gap: 0.625rem;
+}
+.site-title img {
+	border-radius: 0.5rem;
+}
+
+/* ============================================================
+   6. SIDEBAR — editorial / GitBook nav
+   ============================================================ */
+.sidebar-content {
+	font-size: var(--sl-text-sm);
+}
+
+/* Section labels → uppercase micro-labels (landing's tracked caps) */
+.sidebar-content .group-label .large {
+	font-size: 0.6875rem;
+	font-weight: 600;
+	letter-spacing: 0.12em;
+	text-transform: uppercase;
+	color: var(--sl-color-gray-4);
+}
+
+/* Breathing room between top-level groups */
+.sidebar-content .top-level > li + li {
+	margin-top: 1.35rem;
+}
+
+/* Nested tree guide line */
+.sidebar-content ul ul li {
+	border-inline-start-color: var(--sl-color-hairline);
+}
+
+/* Links: muted at rest, rounded hover chip, refined active state */
+.sidebar-content a {
+	color: var(--sl-color-gray-3);
+	border-radius: 0.5rem;
+	padding: 0.34em 0.55rem;
+	transition:
+		color 0.15s ease,
+		background-color 0.15s ease;
+}
+.sidebar-content a:hover,
+.sidebar-content a:focus-visible {
+	color: var(--sl-color-white);
+	background-color: color-mix(in oklch, var(--sl-color-white) 6%, transparent);
+}
+
+/* Active page: soft highlight + accent text (not the loud solid pill) */
+.sidebar-content a[aria-current='page'],
+.sidebar-content a[aria-current='page']:hover,
+.sidebar-content a[aria-current='page']:focus {
+	font-weight: 600;
+	color: var(--sl-color-white);
+	background-color: color-mix(in oklch, var(--sl-color-white) 9%, transparent);
+}
+
+/* Caret alignment */
+.sidebar-content summary {
+	border-radius: 0.5rem;
+}
+
+/* ============================================================
+   7. RIGHT SIDEBAR — table of contents
+   ============================================================ */
+starlight-toc a {
+	border-radius: 0.5rem;
+	transition:
+		color 0.15s ease,
+		background-color 0.15s ease;
+}
+starlight-toc a[aria-current='true'],
+starlight-toc a[aria-current='true']:hover,
+starlight-toc a[aria-current='true']:focus {
+	color: var(--sl-color-white);
+	border-inline-start-color: var(--sl-color-accent);
+	font-weight: 600;
+}
+
+/* Mobile ToC dropdown surface */
+mobile-starlight-toc nav {
+	border-radius: 0 0 0.75rem 0.75rem;
+}
+
+/* ============================================================
+   8. CONTENT TYPOGRAPHY
+   ============================================================ */
+.sl-markdown-content {
+	line-height: 1.72;
+}
+
+.sl-markdown-content :is(h1, h2, h3, h4, h5, h6) {
+	letter-spacing: -0.018em;
+	font-weight: 600;
+}
+.sl-markdown-content h1 {
+	letter-spacing: -0.024em;
+}
+
+/* Section headings get a hairline lead-in for scannability */
+.sl-markdown-content h2:not(:where(.not-content *)) {
+	padding-bottom: 0.4rem;
+	border-bottom: 1px solid var(--sl-color-hairline);
+}
+
+/* Links — clearly interactive, editorial underline */
+.sl-markdown-content a:not(:where(.not-content *)) {
+	text-decoration: underline;
+	text-decoration-color: color-mix(in oklch, var(--sl-color-text-accent) 35%, transparent);
+	text-decoration-thickness: 1px;
+	text-underline-offset: 0.2em;
+	transition:
+		color 0.15s ease,
+		text-decoration-color 0.15s ease;
+}
+.sl-markdown-content a:hover:not(:where(.not-content *)) {
+	text-decoration-color: currentColor;
+}
+
+/* Inline code — subtle chip with a hairline */
+.sl-markdown-content code:not(:where(.not-content *)) {
+	border: 1px solid var(--sl-color-hairline);
+	border-radius: 0.375rem;
+	font-size: 0.8125em;
+	color: var(--sl-color-gray-1);
+}
+
+/* Fenced blocks that aren't Expressive Code (rare) */
+.sl-markdown-content pre:not(:where(.not-content *)) {
+	border: 1px solid var(--sl-color-hairline);
+	border-radius: 0.75rem;
+}
+
+/* Blockquote — brand accent bar */
+.sl-markdown-content blockquote:not(:where(.not-content *)) {
+	border-inline-start: 2px solid var(--sl-color-accent);
+	padding-block: 0.2rem;
+	color: var(--sl-color-gray-2);
+	font-style: normal;
+}
+
+/* Horizontal rule → hairline */
+.sl-markdown-content hr:not(:where(.not-content *)) {
+	border: none;
+	border-top: 1px solid var(--sl-color-hairline);
+	margin-block: 2.5rem;
+}
+
+/* Tables — clean, GitBook-like */
+.sl-markdown-content table:not(:where(.not-content *)) {
+	border: 1px solid var(--sl-color-hairline);
+	border-radius: 0.75rem;
+	border-spacing: 0;
+	overflow: hidden;
+	width: 100%;
+	display: table;
+}
+.sl-markdown-content :is(th, td):not(:where(.not-content *)) {
+	border: none;
+	border-bottom: 1px solid var(--sl-color-hairline);
+	padding: 0.6rem 0.9rem;
+}
+.sl-markdown-content thead th:not(:where(.not-content *)) {
+	background-color: color-mix(in oklch, var(--sl-color-gray-6) 55%, transparent);
+	color: var(--sl-color-white);
+	font-weight: 600;
+	font-size: var(--sl-text-sm);
+	letter-spacing: 0.01em;
+}
+.sl-markdown-content tbody tr:last-child :is(th, td):not(:where(.not-content *)) {
+	border-bottom: none;
+}
+.sl-markdown-content tbody tr:hover :is(th, td):not(:where(.not-content *)) {
+	background-color: color-mix(in oklch, var(--sl-color-white) 3%, transparent);
+}
+
+/* Keyboard keys */
+.sl-markdown-content kbd:not(:where(.not-content *)) {
+	background-color: var(--sl-color-gray-6);
+	border: 1px solid var(--sl-color-hairline-light);
+	border-bottom-width: 2px;
+	border-radius: 0.375rem;
+	padding: 0.1rem 0.4rem;
+	font-size: 0.8125em;
+	font-family: var(--sl-font-mono);
+}
+
+/* Page title (non-splash) */
+.content-panel h1[data-page-title] {
+	letter-spacing: -0.024em;
+}
+
+/* ============================================================
+   9. CARDS — neutralize rainbow icons, glass surface
+   ============================================================ */
+.card {
+	border: 1px solid var(--sl-color-hairline) !important;
+	border-radius: 1rem;
+	background-color: color-mix(in oklch, var(--sl-color-gray-6) 45%, transparent) !important;
+	backdrop-filter: blur(8px);
+	-webkit-backdrop-filter: blur(8px);
+	transition:
+		border-color 0.2s ease,
+		background-color 0.2s ease,
+		transform 0.2s ease;
+}
+.card:hover {
+	border-color: var(--sl-color-hairline-light) !important;
+	background-color: color-mix(in oklch, var(--sl-color-gray-6) 70%, transparent) !important;
+}
+/* Force every card icon chip to the monochrome porcelain, not the 4n rainbow */
+.card,
+.card:nth-child(4n + 1),
+.card:nth-child(4n + 3),
+.card:nth-child(4n + 4),
+.card:nth-child(4n + 5) {
+	--sl-card-border: var(--sl-color-hairline-light);
+	--sl-card-bg: color-mix(in oklch, var(--sl-color-white) 6%, transparent);
+}
+.card .icon {
+	color: var(--sl-color-accent-high);
+	border-radius: 0.5rem;
+}
+.card .title {
+	letter-spacing: -0.015em;
+}
+
+/* Link cards */
+.sl-link-card {
+	border-radius: 0.75rem;
+	border-color: var(--sl-color-hairline);
+}
+.sl-link-card:hover {
+	border-color: var(--sl-color-hairline-light);
+	background-color: color-mix(in oklch, var(--sl-color-white) 3%, transparent);
+}
+
+/* ============================================================
+   10. ASIDES — softer, brand-tuned callouts
+   ============================================================ */
+.starlight-aside {
+	border-radius: 0 0.75rem 0.75rem 0;
+	border-inline-start-width: 2px;
+	padding: 1rem 1.15rem;
+	background-color: color-mix(in oklch, var(--sl-color-asides-border) 8%, transparent);
+}
+
+/* ============================================================
+   11. SPLASH HERO — buttons echo ZenButton pills
+   ============================================================ */
+.hero h1 {
+	letter-spacing: -0.03em;
+}
+.hero .tagline {
+	color: var(--sl-color-gray-3);
+	line-height: 1.5;
+}
+
+.sl-link-button {
+	font-weight: 500;
+	letter-spacing: -0.005em;
+	transition:
+		background-color 0.2s ease,
+		border-color 0.2s ease,
+		color 0.2s ease,
+		box-shadow 0.2s ease;
+}
+.sl-link-button.primary {
+	background: var(--sl-color-white);
+	border-color: var(--sl-color-white);
+	color: var(--sl-color-bg);
+	box-shadow: 0 8px 24px -10px color-mix(in oklch, black 60%, transparent);
+}
+.sl-link-button.primary:hover {
+	background: color-mix(in oklch, var(--sl-color-white) 90%, var(--sl-color-accent));
+	border-color: var(--sl-color-white);
+	color: var(--sl-color-bg);
+	box-shadow: 0 10px 30px -8px color-mix(in oklch, var(--sl-color-white) 30%, transparent);
+}
+.sl-link-button.secondary {
+	border-color: var(--sl-color-hairline-light);
+	color: var(--sl-color-gray-1);
+	background: color-mix(in oklch, var(--sl-color-white) 3%, transparent);
+}
+.sl-link-button.secondary:hover {
+	border-color: var(--sl-color-gray-3);
+	color: var(--sl-color-white);
+	background: color-mix(in oklch, var(--sl-color-white) 7%, transparent);
+}
+
+/* ============================================================
+   12. PAGINATION + FOOTER
+   ============================================================ */
+.pagination-links a {
+	border-radius: 0.75rem;
+	border-color: var(--sl-color-hairline);
+	box-shadow: none;
+	transition:
+		border-color 0.2s ease,
+		background-color 0.2s ease;
+}
+.pagination-links a:hover {
+	border-color: var(--sl-color-hairline-light);
+	background-color: color-mix(in oklch, var(--sl-color-white) 3%, transparent);
+}
+.pagination-links a .link-title {
+	color: var(--sl-color-white);
+}
+
+/* ============================================================
+   13. SEARCH
+   ============================================================ */
+.sl-flex button[data-open-modal] {
+	border-radius: 0.75rem;
+	border-color: var(--sl-color-hairline);
+	background-color: color-mix(in oklch, var(--sl-color-white) 3%, transparent);
+}
+site-search dialog {
+	border-radius: 1rem;
+	border: 1px solid var(--sl-color-hairline-light);
+}
+
+/* ============================================================
+   14. EXPRESSIVE CODE — blend the frame chrome with our surfaces
+   (syntax colors come from the ec themes set in astro.config)
+   ============================================================ */
+.expressive-code .frame {
+	border-radius: 0.75rem;
+}
+.expressive-code .frame pre {
+	border-color: var(--sl-color-hairline);
+}
+
+/* Rendered mermaid diagrams sit on a clean panel */
+.mermaid-diagram {
+	margin-block: 1.5rem;
+	padding: 1.25rem;
+	border: 1px solid var(--sl-color-hairline);
+	border-radius: 1rem;
+	background-color: color-mix(in oklch, var(--sl-color-gray-6) 35%, transparent);
+	overflow-x: auto;
+}
+.mermaid-diagram svg {
+	display: block;
+	margin-inline: auto;
+	height: auto;
+	max-width: 100%;
+}
+
+/* ============================================================
+   15. MOTION — respect reduced-motion
+   ============================================================ */
+@media (prefers-reduced-motion: reduce) {
+	* {
+		transition-duration: 0.01ms !important;
+	}
+}
