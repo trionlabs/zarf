@@ -28,9 +28,9 @@ verifies that proof before releasing funds.
 ```mermaid
 flowchart LR
   CR["Creator"] -->|"CSV emails + token"| CA["create.zarf.to"]
-  CA -->|"create_and_fund_vesting"| F["Factory"]
+  CA -->|"create_campaign"| F["Factory"]
   F -->|"deploy + fund"| VEST[("Vesting contract")]
-  F -. "vesting_created" .-> IDX["Indexer<br/>indexer.zarf.to"]
+  F -. "campaign_created" .-> IDX["Indexer<br/>indexer.zarf.to"]
   CA -->|"claim link + PIN (email)"| REM["Recipient"]
   REM --> CL["claim.zarf.to"]
   CL -->|"Google sign-in (JWT)"| CL
@@ -166,9 +166,10 @@ For the threat-model consequences of this split, see the
 2. **Pin metadata.** Distribution metadata is pinned to IPFS through pin-proxy,
    which returns a `metadata_cid`. pin-proxy re-hashes the gateway bytes to confirm
    the CID (see [IPFS & metadata](/developers/ipfs-and-metadata/)).
-3. **Deploy + fund.** The creator signs `create_and_fund_vesting(...)` on the
-   Factory, which deterministically deploys a Vesting contract and transfers the
-   token funding into it in one call, emitting `vesting_created`. (Funding here is
+3. **Deploy + fund.** The creator signs `create_campaign(...)` on the Factory
+   with email/ZK + epoch modes, which deterministically deploys a Vesting
+   contract and transfers the
+   token funding into it in one call, emitting `campaign_created`. (Funding here is
    a direct `transfer_from`; the `deposited` event belongs to the Vesting
    contract's separate owner-only `deposit` top-up entrypoint.)
 4. **Email.** The creator downloads `secrets.csv` (email + PIN per recipient) and

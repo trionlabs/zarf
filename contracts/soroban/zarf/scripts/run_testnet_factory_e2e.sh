@@ -209,17 +209,22 @@ VESTING_ID=$(
     --id "$FACTORY_ID" \
     --source "$SOURCE" \
     --network "$NETWORK" \
-    -- create_and_fund_vesting \
+    -- create_campaign \
     --owner "$SOURCE" \
     --token "$TOKEN_ID" \
     --salt "$SALT" \
+    --claim_authorization 0 \
+    --claim_schedule 0 \
+    --reclaim_policy 0 \
     --name '"Zarf"' \
     --description '"Zarf Stellar factory e2e"' \
     --merkle_root "$ROOT_BYTES" \
     --audience_hash "$AUDIENCE_HASH_BYTES" \
     --recipient_count "$RECIPIENT_COUNT" \
     --total_amount "$AMOUNT" \
-    --metadata_cid "\"$METADATA_CID\"" | last_nonempty_line | tr -d '"'
+    --claim_deadline 0 \
+    --metadata_cid "\"$METADATA_CID\"" \
+    --funding_mode 1 | last_nonempty_line | tr -d '"'
 )
 
 echo "Claiming..."

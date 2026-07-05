@@ -58,7 +58,7 @@ flowchart LR
     P -->|Pinata JWT server-side| PIN[Pinata pinJSONToIPFS]
     PIN -->|CIDv0| P
     P -->|cid| B
-    B -->|metadata_cid| F[Factory create_and_fund_vesting]
+    B -->|metadata_cid| F[Factory create_campaign]
     class B offchain
     class P offchain
     class PIN offchain
@@ -103,10 +103,10 @@ verifies the signature against the owner key. Any failure returns
 ## From CID to chain
 
 The CID returned by the pin proxy becomes the `metadata_cid` argument to the
-factory's `create_vesting` / `create_and_fund_vesting`
-(`contracts.ts` → `createAndFundVesting`). The factory stores it
+factory's `create_campaign` call (`contracts.ts` → `createAndFundVesting`). The
+factory stores it
 (`MetadataCid(vesting)`), the vesting contract stores it (`MetadataCid`), and it
-is emitted in the `VestingCreated` event — so a claim app can discover the CID
+is emitted in the `CampaignCreated` event — so a claim app can discover the CID
 purely from on-chain data (or via the [indexer](/developers/indexer-api/)).
 
 ## CID verification

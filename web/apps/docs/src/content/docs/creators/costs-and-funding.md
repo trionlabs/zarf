@@ -13,9 +13,9 @@ rule: **deposited tokens can only leave through a valid claim.**
 ## What you deposit
 
 At creation you deposit the **entire pool amount** into the vesting contract. In
-the email flow this happens in a single `create_and_fund_vesting` call — the
-factory deploys your contract and transfers the full total into it atomically,
-after you approve the token allowance. The create wizard requires your recipient
+the email flow this happens in a single `create_campaign` call using email/ZK +
+epoch modes — the factory deploys your contract and transfers the full total
+into it atomically, after you approve the token allowance. The create wizard requires your recipient
 allocations to sum to exactly the pool, so you deposit precisely what you
 intend to hand out.
 

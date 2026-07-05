@@ -6,8 +6,8 @@
  *      Merkle claim-list (`leafBinding:'none'`), and pin it to IPFS → CID.
  *      (Address-into-list ordering is load-bearing: the predicted address is
  *      embedded in the published list *before* deploy.)
- *   2. `deployCampaign` — approve the factory for `total`, then `create_airdrop`
- *      (atomic deploy + fund). Added in T7.
+ *   2. `deployCampaign` — approve the factory for `total`, then wallet-mode
+ *      `create_campaign` (atomic deploy + fund). Added in T7.
  *
  * @module services/airdropDeploy
  */
@@ -148,7 +148,7 @@ export async function approveCampaign(
 
 /**
  * Phase 3: deploy + atomically fund the airdrop instance via the factory. A
- * short settle delay lets the approval propagate before `create_airdrop`
+ * short settle delay lets the approval propagate before `create_campaign`
  * simulates against it.
  */
 export async function createCampaign(

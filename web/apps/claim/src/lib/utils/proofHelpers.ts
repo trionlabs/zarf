@@ -6,7 +6,7 @@ import { fetchIpfsJson } from '@zarf/core/utils/ipfsFetch';
 /**
  * Fetch Merkle leaves for a vesting from IPFS.
  *
- * The CID is resolved from the factory's VestingCreated event log.
+ * The CID is resolved from the factory's CampaignCreated event log.
  *
  * @param contractAddress - Vesting contract address
  */
