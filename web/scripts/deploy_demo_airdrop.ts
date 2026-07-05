@@ -3,7 +3,7 @@
  *
  * Sibling of deploy_demo_distribution.ts (ZK vesting). Builds the keccak Merkle
  * claim-list via @zarf/core/merkle, pins it to the pin-proxy /pin-airdrop route,
- * deploys + funds the instance through the airdrop factory, and prints the
+ * deploys + funds the instance through the unified factory, and prints the
  * airdrop-claim link (?a=<airdrop>&cid=<cid>).
  *
  *   cd web && ./node_modules/.bin/tsx scripts/deploy_demo_airdrop.ts \
@@ -171,7 +171,7 @@ async function main() {
     const factory = argString(
         args,
         'factory',
-        requireEnv(env, 'VITE_STELLAR_TESTNET_AIRDROP_FACTORY_ADDRESS'),
+        requireEnv(env, 'VITE_STELLAR_TESTNET_FACTORY_ADDRESS'),
     );
     // Prod pin.zarf.to is pre-integration and lacks /pin-airdrop; override with a
     // local pin-proxy (wrangler dev + PINATA_JWT) until integration is deployed:

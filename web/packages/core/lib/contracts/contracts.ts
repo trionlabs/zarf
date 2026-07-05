@@ -501,7 +501,7 @@ export function buildCreateAirdropArgs(params: CreateAirdropParams): xdr.ScVal[]
 }
 
 /**
- * Deploy + atomically fund an airdrop instance via the airdrop factory. The
+ * Deploy + atomically fund an airdrop instance via the configured factory. The
  * caller already holds the predicted address (from `predictAirdropAddress`) to
  * build/pin the claim-list, so this returns only the tx hash; the deployed
  * address equals the predicted one (proven by the factory's M2 tests).

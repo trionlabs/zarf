@@ -20,6 +20,7 @@ SALT=${SALT:-$(node -e "console.log(require('crypto').randomBytes(32).toString('
 VERIFIER_WASM="$VERIFIER_DIR/target/wasm32v1-none/release/rs_soroban_ultrahonk.wasm"
 REGISTRY_WASM="$ZARF_DIR/jwk-registry/target/wasm32v1-none/release/zarf_jwk_registry.wasm"
 VESTING_WASM="$ZARF_DIR/vesting/target/wasm32v1-none/release/zarf_vesting_soroban.wasm"
+AIRDROP_WASM="$ZARF_DIR/airdrop/target/wasm32v1-none/release/zarf_airdrop_soroban.wasm"
 FACTORY_WASM="$ZARF_DIR/factory/target/wasm32v1-none/release/zarf_vesting_factory_soroban.wasm"
 PROOF_SCRIPT="$ROOT_DIR/poc/scripts/generateZarfProofForStellar.js"
 VK_PATH=${VK_PATH:-$VERIFIER_DIR/tests/zarf/target/vk}
@@ -51,6 +52,7 @@ echo "Building Soroban contracts..."
 cargo build --manifest-path "$VERIFIER_DIR/Cargo.toml" --target wasm32v1-none --release
 cargo build --manifest-path "$ZARF_DIR/jwk-registry/Cargo.toml" --target wasm32v1-none --release
 cargo build --manifest-path "$ZARF_DIR/vesting/Cargo.toml" --target wasm32v1-none --release
+cargo build --manifest-path "$ZARF_DIR/airdrop/Cargo.toml" --target wasm32v1-none --release
 cargo build --manifest-path "$ZARF_DIR/factory/Cargo.toml" --target wasm32v1-none --release
 
 TOKEN_ID=$(stellar contract id asset --asset native --network "$NETWORK")
@@ -126,6 +128,14 @@ VESTING_WASM_HASH=$(
     --network "$NETWORK" | last_nonempty_line
 )
 
+echo "Uploading airdrop Wasm..."
+AIRDROP_WASM_HASH=$(
+  stellar contract upload \
+    --wasm "$AIRDROP_WASM" \
+    --source "$SOURCE" \
+    --network "$NETWORK" | last_nonempty_line
+)
+
 echo "Deploying vesting factory..."
 FACTORY_ID=$(
   stellar contract deploy \
@@ -135,7 +145,8 @@ FACTORY_ID=$(
     -- \
     --verifier "$VERIFIER_ID" \
     --jwk_registry "$REGISTRY_ID" \
-    --vesting_wasm_hash "$VESTING_WASM_HASH" | last_nonempty_line
+    --vesting_wasm_hash "$VESTING_WASM_HASH" \
+    --airdrop_wasm_hash "$AIRDROP_WASM_HASH" | last_nonempty_line
 )
 
 echo "Computing Soroban recipient field..."

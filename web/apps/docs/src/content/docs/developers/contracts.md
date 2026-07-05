@@ -51,8 +51,10 @@ deliberately gated on a third-party audit — see
 
 ## Factory — `ZarfVestingFactoryContract`
 
-Deploys vesting contracts at deterministic addresses and maintains a global and
-per-owner registry of deployments.
+Deploys vesting and wallet-airdrop contracts at deterministic addresses. Vesting
+deployments keep the existing global/per-owner registry; airdrops use a separate
+flat registry so vesting discovery does not treat airdrops as ZK/email
+campaigns.
 
 ### Constructor
 
@@ -62,17 +64,19 @@ fn __constructor(
     verifier: Address,
     jwk_registry: Address,
     vesting_wasm_hash: BytesN<32>,
+    airdrop_wasm_hash: BytesN<32>,
 )
 ```
 
 The factory is initialized once with the addresses it will inject into every
 vesting contract it deploys, plus the WASM hash of the vesting contract to
-deploy.
+deploy. It also records the airdrop WASM hash used by `create_airdrop`.
 
 ### Deterministic addresses
 
 ```rust
 fn predict_vesting_address(env: Env, owner: Address, salt: BytesN<32>) -> Address
+fn predict_airdrop_address(env: Env, owner: Address, salt: BytesN<32>) -> Address
 ```
 
 The deployment salt is owner-bound: `keccak256(owner.to_xdr() || salt)`. The
@@ -81,6 +85,9 @@ so `predict_vesting_address` returns exactly the address a subsequent
 `create_vesting`/`create_and_fund_vesting` with the same `(owner, salt)` will
 produce. This lets callers compute the vesting address before the transaction
 lands.
+
+Airdrops use the same owner-bound pattern with an airdrop domain separator, so
+the same `(owner, salt)` cannot collide with a vesting address.
 
 ### Creating a distribution
 
@@ -110,12 +117,29 @@ later with the vesting contract's `deposit`).
 `metadata_cid` is the IPFS CID of the pinned claim list; see
 [IPFS & metadata](/developers/ipfs-and-metadata/).
 
+### Creating a wallet airdrop
+
+```rust
+fn create_airdrop(
+    env: Env, owner: Address, token: Address,
+    merkle_root: BytesN<32>, total: i128, deadline: u64, locked: bool,
+    recipient_count: u32, salt: BytesN<32>, metadata_cid: String,
+) -> Result<Address, Error>
+```
+
+`create_airdrop` requires `owner.require_auth()`, rejects a zero root, validates
+`recipient_count > 0`, `total > 0`, `total >= recipient_count`, and rejects a
+past non-zero deadline. It deploys the airdrop instance with `deploy_v2`, pulls
+`total` from the owner via `transfer_from`, verifies the credited balance, and
+emits `AirdropCreated`.
+
 ### Read functions
 
 ```rust
 fn verifier(env: Env) -> Result<Address, Error>
 fn jwk_registry(env: Env) -> Result<Address, Error>
 fn vesting_wasm_hash(env: Env) -> Result<BytesN<32>, Error>
+fn airdrop_wasm_hash(env: Env) -> Result<BytesN<32>, Error>
 fn recipient_id(env: Env, recipient: Address) -> BytesN<32>
 fn vesting_metadata_cid(env: Env, vesting: Address) -> Result<String, Error>
 
@@ -130,6 +154,9 @@ fn get_owner_deployment(env: Env, owner: Address, index: u32) -> Result<Address,
 fn get_owner_deployments(env: Env, owner: Address, start: u32, limit: u32) -> Result<Vec<Address>, Error>
 fn get_owner_deployment_info(env: Env, owner: Address, index: u32) -> Result<DeploymentInfo, Error>
 fn get_owner_deployment_infos(env: Env, owner: Address, start: u32, limit: u32) -> Result<Vec<DeploymentInfo>, Error>
+
+fn get_airdrop_deployment_count(env: Env) -> u32
+fn get_airdrop_deployment(env: Env, index: u32) -> Result<Address, Error>
 ```
 
 `DeploymentInfo { address: Address, metadata_cid: String }`. Range reads are

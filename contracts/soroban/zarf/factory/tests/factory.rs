@@ -12,6 +12,8 @@ use zarf_vesting_factory_soroban::{
 
 const VESTING_WASM: &[u8] =
     include_bytes!("../../vesting/target/wasm32v1-none/release/zarf_vesting_soroban.wasm");
+const AIRDROP_WASM: &[u8] =
+    include_bytes!("../../airdrop/target/wasm32v1-none/release/zarf_airdrop_soroban.wasm");
 
 const BN254_SCALAR_MODULUS_TEST: [u8; 32] = [
     0x30, 0x64, 0x4e, 0x72, 0xe1, 0x31, 0xa0, 0x29, 0xb8, 0x50, 0x45, 0xb6, 0x81, 0x81, 0x58, 0x5d,
@@ -21,6 +23,12 @@ const BN254_SCALAR_MODULUS_TEST: [u8; 32] = [
 mod vesting {
     soroban_sdk::contractimport!(
         file = "../vesting/target/wasm32v1-none/release/zarf_vesting_soroban.wasm"
+    );
+}
+
+mod airdrop {
+    soroban_sdk::contractimport!(
+        file = "../airdrop/target/wasm32v1-none/release/zarf_airdrop_soroban.wasm"
     );
 }
 
@@ -53,9 +61,15 @@ fn setup(
     let token_asset = env.register_stellar_asset_contract_v2(owner.clone());
     let token = token_asset.address();
     let vesting_wasm_hash = env.deployer().upload_contract_wasm(VESTING_WASM);
+    let airdrop_wasm_hash = env.deployer().upload_contract_wasm(AIRDROP_WASM);
     let factory_id = env.register(
         ZarfVestingFactoryContract,
-        (verifier.clone(), registry.clone(), vesting_wasm_hash),
+        (
+            verifier.clone(),
+            registry.clone(),
+            vesting_wasm_hash,
+            airdrop_wasm_hash,
+        ),
     );
     let factory = ZarfVestingFactoryContractClient::new(env, &factory_id);
 
@@ -267,6 +281,102 @@ fn create_and_fund_vesting_consumes_factory_allowance() {
     assert_eq!(token_client.balance(&vesting), amount);
     assert_eq!(factory.get_deployment_count(), 1);
     assert_eq!(factory.get_deployment(&0), vesting);
+}
+
+#[test]
+fn creates_airdrop_and_keeps_vesting_registry_separate() {
+    let env = Env::default();
+    let (factory, factory_id, _verifier, _registry, token_id) = setup(&env);
+
+    let owner = Address::generate(&env);
+    let amount = 500_i128;
+    let recipient_count = 3_u32;
+    let token_admin = token::StellarAssetClient::new(&env, &token_id);
+    let token_client = token::TokenClient::new(&env, &token_id);
+    token_admin.mint(&owner, &amount);
+    token_client.approve(&owner, &factory_id, &amount, &1000);
+
+    let salt = test_salt(&env, 41);
+    let root = BytesN::from_array(&env, &[42_u8; 32]);
+    let deadline = env.ledger().timestamp() + 3600;
+    let predicted = factory.predict_airdrop_address(&owner, &salt);
+    let airdrop = factory.create_airdrop(
+        &owner,
+        &token_id,
+        &root,
+        &amount,
+        &deadline,
+        &true,
+        &recipient_count,
+        &salt,
+        &String::from_str(&env, "ipfs://airdrop"),
+    );
+
+    assert_eq!(airdrop, predicted);
+    assert_eq!(token_client.balance(&airdrop), amount);
+
+    let airdrop_client = airdrop::Client::new(&env, &airdrop);
+    let cfg = airdrop_client.config();
+    assert_eq!(cfg.admin, owner);
+    assert_eq!(cfg.token, token_id);
+    assert_eq!(cfg.merkle_root, root);
+    assert_eq!(cfg.total, amount);
+    assert_eq!(cfg.deadline, deadline);
+    assert!(cfg.locked);
+
+    assert_eq!(factory.get_airdrop_deployment_count(), 1);
+    assert_eq!(factory.get_airdrop_deployment(&0), airdrop);
+    assert_eq!(factory.get_deployment_count(), 0);
+    assert!(factory.try_get_deployment(&0).is_err());
+}
+
+#[test]
+fn airdrop_and_vesting_salts_are_separate_namespaces() {
+    let env = Env::default();
+    let (factory, _factory_id, _verifier, _registry, _token_id) = setup(&env);
+
+    let owner = Address::generate(&env);
+    let salt = test_salt(&env, 51);
+
+    assert_ne!(
+        factory.predict_airdrop_address(&owner, &salt),
+        factory.predict_vesting_address(&owner, &salt)
+    );
+}
+
+#[test]
+fn failed_airdrop_funding_does_not_track_deployment() {
+    let env = Env::default();
+    let (factory, _factory_id, _verifier, _registry, token_id) = setup(&env);
+
+    let owner = Address::generate(&env);
+    let amount = 500_i128;
+    let token_admin = token::StellarAssetClient::new(&env, &token_id);
+    let token_client = token::TokenClient::new(&env, &token_id);
+    token_admin.mint(&owner, &amount);
+
+    let salt = test_salt(&env, 42);
+    let predicted = factory.predict_airdrop_address(&owner, &salt);
+    let result = factory.try_create_airdrop(
+        &owner,
+        &token_id,
+        &BytesN::from_array(&env, &[43_u8; 32]),
+        &amount,
+        &0,
+        &false,
+        &1,
+        &salt,
+        &String::from_str(&env, "ipfs://airdrop"),
+    );
+
+    assert!(
+        result.is_err(),
+        "funding without allowance unexpectedly succeeded"
+    );
+    assert_eq!(token_client.balance(&owner), amount);
+    assert_eq!(token_client.balance(&predicted), 0);
+    assert_eq!(factory.get_airdrop_deployment_count(), 0);
+    assert!(factory.try_get_airdrop_deployment(&0).is_err());
 }
 
 #[test]
@@ -661,9 +771,10 @@ fn create_vesting_requires_owner_auth_without_mock_all_auths() {
     let token_asset = env.register_stellar_asset_contract_v2(owner.clone());
     let token_id = token_asset.address();
     let vesting_wasm_hash = env.deployer().upload_contract_wasm(VESTING_WASM);
+    let airdrop_wasm_hash = env.deployer().upload_contract_wasm(AIRDROP_WASM);
     let factory_id = env.register(
         ZarfVestingFactoryContract,
-        (verifier, registry, vesting_wasm_hash),
+        (verifier, registry, vesting_wasm_hash, airdrop_wasm_hash),
     );
     let factory = ZarfVestingFactoryContractClient::new(&env, &factory_id);
 

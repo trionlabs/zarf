@@ -82,7 +82,8 @@ verifier   (new vk_bytes + vk_hash 0x120d37a4...)   # M4/M5/L6 + defense-in-dept
 *** GATE ***  verify_proof(known-good fixture) vs the fresh verifier — MUST pass
 registry   (v2: owner multisig + operator timelock)  # --activation_delay_secs >= MIN (6h); then set_operator to the rotation worker key
 vesting    (upload new wasm hash)
-factory v2 (constructor: verifier, registry, vesting_wasm_hash)
+airdrop    (upload wasm hash)
+factory v2 (constructor: verifier, registry, vesting_wasm_hash, airdrop_wasm_hash)
 ```
 
 **Hard gate — before constructing the factory** (the factory constructor

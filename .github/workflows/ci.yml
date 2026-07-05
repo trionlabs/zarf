@@ -35,7 +35,6 @@ jobs:
             contracts/soroban/zarf/vesting
             contracts/soroban/zarf/factory
             contracts/soroban/zarf/airdrop
-            contracts/soroban/zarf/airdrop-factory
 
       - name: Rustfmt check
         run: |
@@ -45,8 +44,7 @@ jobs:
             contracts/soroban/zarf/jwk-registry \
             contracts/soroban/zarf/vesting \
             contracts/soroban/zarf/factory \
-            contracts/soroban/zarf/airdrop \
-            contracts/soroban/zarf/airdrop-factory; do
+            contracts/soroban/zarf/airdrop; do
             cargo fmt --manifest-path "$crate/Cargo.toml" --check
           done
 
@@ -64,12 +62,8 @@ jobs:
           cargo build --manifest-path contracts/soroban/zarf/vesting/Cargo.toml --target wasm32v1-none --release
           cargo build --manifest-path contracts/soroban/zarf/factory/Cargo.toml --target wasm32v1-none --release
 
-      # airdrop-factory's test embeds the instance wasm (include_bytes!/
-      # contractimport!), so the instance must build --release FIRST.
-      - name: Build airdrop contract WASMs
-        run: |
-          cargo build --manifest-path contracts/soroban/zarf/airdrop/Cargo.toml --target wasm32v1-none --release
-          cargo build --manifest-path contracts/soroban/zarf/airdrop-factory/Cargo.toml --target wasm32v1-none --release
+      - name: Build airdrop contract WASM
+        run: cargo build --manifest-path contracts/soroban/zarf/airdrop/Cargo.toml --target wasm32v1-none --release
 
       - name: Clippy (deny warnings)
         run: |
@@ -79,8 +73,7 @@ jobs:
             contracts/soroban/zarf/jwk-registry \
             contracts/soroban/zarf/vesting \
             contracts/soroban/zarf/factory \
-            contracts/soroban/zarf/airdrop \
-            contracts/soroban/zarf/airdrop-factory; do
+            contracts/soroban/zarf/airdrop; do
             cargo clippy --manifest-path "$crate/Cargo.toml" --all-targets -- -D warnings
           done
 
@@ -105,9 +98,6 @@ jobs:
 
       - name: Test airdrop
         run: cargo test --manifest-path contracts/soroban/zarf/airdrop/Cargo.toml
-
-      - name: Test airdrop factory
-        run: cargo test --manifest-path contracts/soroban/zarf/airdrop-factory/Cargo.toml
 
   circuits:
     name: Noir Circuit
@@ -161,8 +151,7 @@ jobs:
             contracts/soroban/zarf/jwk-registry \
             contracts/soroban/zarf/vesting \
             contracts/soroban/zarf/factory \
-            contracts/soroban/zarf/airdrop \
-            contracts/soroban/zarf/airdrop-factory; do
+            contracts/soroban/zarf/airdrop; do
             cargo audit --file "$crate/Cargo.lock" || true
           done
 
@@ -191,9 +180,6 @@ jobs:
       VITE_STELLAR_TESTNET_RPC_URL: https://soroban-testnet.stellar.org
       VITE_STELLAR_TESTNET_HORIZON_URL: https://horizon-testnet.stellar.org
       VITE_STELLAR_TESTNET_FACTORY_ADDRESS: CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB7
-      # airdrop apps' coreInit throws at module-eval without their own factory
-      # address (read by +layout.ts → build/smoke fail). Public testnet dummy.
-      VITE_STELLAR_TESTNET_AIRDROP_FACTORY_ADDRESS: CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB7
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4

@@ -41,6 +41,7 @@ pub enum Error {
     InvalidAudience = 6,
     TokenTransferMismatch = 7,
     MerkleRootAlreadyUsed = 8,
+    InvalidDeadline = 9,
 }
 
 #[contracttype]
@@ -49,6 +50,7 @@ pub enum DataKey {
     Verifier,
     JwkRegistry,
     VestingWasmHash,
+    AirdropWasmHash,
     DeploymentCount,
     /// Holds a full `DeploymentInfo` so range reads cost one ledger entry
     /// per item. Factories deployed from earlier builds stored a bare
@@ -64,6 +66,10 @@ pub enum DataKey {
     /// audience_hash) but NOT to a vesting contract address, so identically
     /// rooted siblings would each accept the same proof.
     UsedRoot(BytesN<32>),
+    /// Airdrop deployments use their own registry so vesting discovery never
+    /// treats a wallet-airdrop instance as an email/ZK vesting contract.
+    AirdropDeploymentCount,
+    AirdropDeploymentAt(u32),
 }
 
 #[contractevent(topics = ["vesting_created"])]
@@ -77,6 +83,23 @@ pub struct VestingCreated {
     pub token: Address,
     pub total_amount: i128,
     pub recipient_count: u32,
+    pub metadata_cid: String,
+}
+
+#[contractevent(topics = ["airdrop_created"])]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AirdropCreated {
+    #[topic]
+    pub airdrop: Address,
+    #[topic]
+    pub owner: Address,
+    #[topic]
+    pub token: Address,
+    pub total_amount: i128,
+    pub recipient_count: u32,
+    pub merkle_root: BytesN<32>,
+    pub deadline: u64,
+    pub locked: bool,
     pub metadata_cid: String,
 }
 
@@ -94,12 +117,15 @@ impl ZarfVestingFactoryContract {
         verifier: Address,
         jwk_registry: Address,
         vesting_wasm_hash: BytesN<32>,
+        airdrop_wasm_hash: BytesN<32>,
     ) {
         let store = env.storage().instance();
         store.set(&DataKey::Verifier, &verifier);
         store.set(&DataKey::JwkRegistry, &jwk_registry);
         store.set(&DataKey::VestingWasmHash, &vesting_wasm_hash);
+        store.set(&DataKey::AirdropWasmHash, &airdrop_wasm_hash);
         store.set(&DataKey::DeploymentCount, &0_u32);
+        store.set(&DataKey::AirdropDeploymentCount, &0_u32);
         Self::extend_contract_ttl(&env);
     }
 
@@ -115,6 +141,10 @@ impl ZarfVestingFactoryContract {
         Self::get_instance(&env, DataKey::VestingWasmHash)
     }
 
+    pub fn airdrop_wasm_hash(env: Env) -> Result<BytesN<32>, Error> {
+        Self::get_instance(&env, DataKey::AirdropWasmHash)
+    }
+
     pub fn recipient_id(env: Env, recipient: Address) -> BytesN<32> {
         let address_xdr = recipient.to_xdr(&env);
         let digest = env.crypto().keccak256(&address_xdr).to_bytes();
@@ -123,6 +153,13 @@ impl ZarfVestingFactoryContract {
 
     pub fn predict_vesting_address(env: Env, owner: Address, salt: BytesN<32>) -> Address {
         let deployment_salt = Self::owner_bound_salt(&env, &owner, &salt);
+        env.deployer()
+            .with_current_contract(deployment_salt)
+            .deployed_address()
+    }
+
+    pub fn predict_airdrop_address(env: Env, owner: Address, salt: BytesN<32>) -> Address {
+        let deployment_salt = Self::airdrop_bound_salt(&env, &owner, &salt);
         env.deployer()
             .with_current_contract(deployment_salt)
             .deployed_address()
@@ -237,6 +274,63 @@ impl ZarfVestingFactoryContract {
         Ok(vesting)
     }
 
+    #[allow(clippy::too_many_arguments)]
+    pub fn create_airdrop(
+        env: Env,
+        owner: Address,
+        token: Address,
+        merkle_root: BytesN<32>,
+        total: i128,
+        deadline: u64,
+        locked: bool,
+        recipient_count: u32,
+        salt: BytesN<32>,
+        metadata_cid: String,
+    ) -> Result<Address, Error> {
+        owner.require_auth();
+        Self::validate_airdrop_metadata(recipient_count, total, deadline, &env)?;
+        if Self::is_zero_root(&merkle_root) {
+            return Err(Error::InvalidMerkleRoot);
+        }
+
+        let airdrop = Self::deploy_airdrop(
+            &env,
+            owner.clone(),
+            token.clone(),
+            merkle_root.clone(),
+            total,
+            deadline,
+            locked,
+            salt,
+        )?;
+
+        let token_client = token::TokenClient::new(&env, &token);
+        let before_balance = token_client.balance(&airdrop);
+        token_client.transfer_from(&env.current_contract_address(), &owner, &airdrop, &total);
+        let after_balance = token_client.balance(&airdrop);
+        if after_balance
+            != before_balance
+                .checked_add(total)
+                .ok_or(Error::TokenTransferMismatch)?
+        {
+            return Err(Error::TokenTransferMismatch);
+        }
+
+        Self::track_airdrop_deployment(
+            &env,
+            airdrop.clone(),
+            owner,
+            token,
+            total,
+            recipient_count,
+            merkle_root,
+            deadline,
+            locked,
+            metadata_cid,
+        );
+        Ok(airdrop)
+    }
+
     pub fn get_deployment_count(env: Env) -> u32 {
         Self::deployment_count(&env)
     }
@@ -302,6 +396,17 @@ impl ZarfVestingFactoryContract {
             .ok_or(Error::NotInitialized)
     }
 
+    pub fn get_airdrop_deployment_count(env: Env) -> u32 {
+        Self::airdrop_deployment_count(&env)
+    }
+
+    pub fn get_airdrop_deployment(env: Env, index: u32) -> Result<Address, Error> {
+        env.storage()
+            .persistent()
+            .get(&DataKey::AirdropDeploymentAt(index))
+            .ok_or(Error::NotInitialized)
+    }
+
     #[allow(clippy::too_many_arguments)]
     fn deploy_vesting(
         env: &Env,
@@ -334,6 +439,28 @@ impl ZarfVestingFactoryContract {
                     audience_hash,
                     metadata_cid,
                 ),
+            ))
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn deploy_airdrop(
+        env: &Env,
+        owner: Address,
+        token: Address,
+        merkle_root: BytesN<32>,
+        total: i128,
+        deadline: u64,
+        locked: bool,
+        salt: BytesN<32>,
+    ) -> Result<Address, Error> {
+        let wasm_hash = Self::get_instance::<BytesN<32>>(env, DataKey::AirdropWasmHash)?;
+        let deployment_salt = Self::airdrop_bound_salt(env, &owner, &salt);
+        Ok(env
+            .deployer()
+            .with_current_contract(deployment_salt)
+            .deploy_v2(
+                wasm_hash,
+                (owner, token, merkle_root, total, deadline, locked),
             ))
     }
 
@@ -384,6 +511,45 @@ impl ZarfVestingFactoryContract {
         .publish(env);
     }
 
+    #[allow(clippy::too_many_arguments)]
+    fn track_airdrop_deployment(
+        env: &Env,
+        airdrop: Address,
+        owner: Address,
+        token: Address,
+        total_amount: i128,
+        recipient_count: u32,
+        merkle_root: BytesN<32>,
+        deadline: u64,
+        locked: bool,
+        metadata_cid: String,
+    ) {
+        let persistent = env.storage().persistent();
+
+        let count = Self::airdrop_deployment_count(env);
+        let key = DataKey::AirdropDeploymentAt(count);
+        persistent.set(&key, &airdrop);
+        persistent.extend_ttl(&key, TTL_THRESHOLD, TTL_EXTEND_TO);
+        env.storage()
+            .instance()
+            .set(&DataKey::AirdropDeploymentCount, &(count + 1));
+
+        Self::extend_contract_ttl(env);
+
+        AirdropCreated {
+            airdrop,
+            owner,
+            token,
+            total_amount,
+            recipient_count,
+            merkle_root,
+            deadline,
+            locked,
+            metadata_cid,
+        }
+        .publish(env);
+    }
+
     /// Reserve a merkle root so no two factory campaigns can share one.
     ///
     /// A proof is bound to (merkle_root, audience_hash) but NOT to a specific
@@ -424,6 +590,24 @@ impl ZarfVestingFactoryContract {
         }
         if total_amount < 0 || (require_funding && total_amount == 0) {
             return Err(Error::InvalidAmount);
+        }
+        Ok(())
+    }
+
+    fn validate_airdrop_metadata(
+        recipient_count: u32,
+        total: i128,
+        deadline: u64,
+        env: &Env,
+    ) -> Result<(), Error> {
+        if recipient_count == 0 {
+            return Err(Error::InvalidRecipientCount);
+        }
+        if total <= 0 || total < i128::from(recipient_count) {
+            return Err(Error::InvalidAmount);
+        }
+        if deadline != 0 && deadline <= env.ledger().timestamp() {
+            return Err(Error::InvalidDeadline);
         }
         Ok(())
     }
@@ -471,6 +655,13 @@ impl ZarfVestingFactoryContract {
         env.crypto().keccak256(&preimage).to_bytes()
     }
 
+    fn airdrop_bound_salt(env: &Env, owner: &Address, salt: &BytesN<32>) -> BytesN<32> {
+        let mut preimage = owner.clone().to_xdr(env);
+        preimage.extend_from_array(b":airdrop:");
+        preimage.extend_from_array(&salt.to_array());
+        env.crypto().keccak256(&preimage).to_bytes()
+    }
+
     fn get_instance<T>(env: &Env, key: DataKey) -> Result<T, Error>
     where
         T: soroban_sdk::TryFromVal<Env, Val>,
@@ -485,6 +676,13 @@ impl ZarfVestingFactoryContract {
         env.storage()
             .instance()
             .get(&DataKey::DeploymentCount)
+            .unwrap_or(0)
+    }
+
+    fn airdrop_deployment_count(env: &Env) -> u32 {
+        env.storage()
+            .instance()
+            .get(&DataKey::AirdropDeploymentCount)
             .unwrap_or(0)
     }
 
