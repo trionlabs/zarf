@@ -28,7 +28,7 @@ playbooks instead.
   create.zarf.to. Recipients claim by signing in with Google; no email ever
   touches the chain, and recipients do not need a wallet before they start.
 - **You already have on-chain wallet addresses** → use the **wallet airdrop**
-  at airdrop.zarf.to. Classic address whitelist, no Google, no PIN.
+  at create.zarf.to/airdrop. Classic address whitelist, no Google, no PIN.
 
 Not sure? The [email vs wallet](/creators/email-vs-wallet/) comparison walks
 through the trade-offs.

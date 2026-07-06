@@ -9,12 +9,12 @@ const { PREDICTED } = vi.hoisted(() => ({
 vi.mock('@zarf/core/contracts', () => ({
     predictAirdropAddress: vi.fn(async () => PREDICTED),
 }));
-vi.mock('./pinService', () => ({
+vi.mock('$lib/services/pinService', () => ({
     pinAirdropClaimList: vi.fn(async () => ({ cid: 'bafyTEST' })),
 }));
 
 import { prepareCampaign, buildMerkleRows, sumBaseUnits } from './airdropDeploy';
-import { pinAirdropClaimList } from './pinService';
+import { pinAirdropClaimList } from '$lib/services/pinService';
 
 // Real, checksum-valid strkeys — these go through Address.fromString in leafHash.
 const REC_G = 'GC6TCMKAV55B5M3ESAJZLEJXSD2KF6UGWXCIFZDB7VURMTLYW724ITS4' as StellarAddress;

@@ -25,11 +25,15 @@
     } from '@zarf/core/utils/amount';
     import { getTokenBalanceRpc } from '@zarf/core/contracts';
     import { warn } from '@zarf/core/utils/log';
-    import { campaignStore } from '$lib/stores/campaignStore.svelte';
-    import { normalizeAirdropAddress } from '$lib/csv/airdropCsv';
-    import { findDuplicateAddresses } from '$lib/recipients';
-    import RecipientGrid from '$lib/components/RecipientGrid.svelte';
-    import type { RecipientRow, StellarAddress, StellarContractId } from '$lib/stores/types';
+    import { campaignStore } from '$lib/airdrop/stores/campaignStore.svelte';
+    import { normalizeAirdropAddress } from '$lib/airdrop/csv/airdropCsv';
+    import { findDuplicateAddresses } from '$lib/airdrop/recipients';
+    import RecipientGrid from '$lib/airdrop/components/RecipientGrid.svelte';
+    import type {
+        RecipientRow,
+        StellarAddress,
+        StellarContractId,
+    } from '$lib/airdrop/stores/types';
 
     let recipients = $state<RecipientRow[]>(campaignStore.recipients.map((r) => ({ ...r })));
     let noDeadline = $state(campaignStore.deadline === 0);
@@ -140,7 +144,7 @@
 
     function handleBack() {
         campaignStore.previousStep();
-        goto('/wizard/step-0');
+        goto('/airdrop/wizard/step-0');
     }
     function handleNext() {
         if (!canContinue) return;
@@ -148,7 +152,7 @@
         campaignStore.setDeadline(deadlineSeconds);
         campaignStore.setLocked(locked);
         campaignStore.nextStep();
-        goto('/wizard/step-2');
+        goto('/airdrop/wizard/step-2');
     }
 </script>
 

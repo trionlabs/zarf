@@ -18,8 +18,9 @@ Both product families run on **Stellar testnet**:
   prove email ownership with a zero-knowledge proof (Noir / UltraHonk) verified
   **on-chain** by the verifier contract using Soroban's native BN254 host
   functions. A measured ZK claim costs roughly **0.0225 XLM** on testnet.
-- **Wallet airdrops** — created and claimed at `airdrop.zarf.to`. Classic
-  address-whitelist distributions with the same vesting engine and no ZK.
+- **Wallet airdrops** — created at `create.zarf.to/airdrop` and claimed at
+  `airdrop.zarf.to`. Classic address-whitelist distributions with the same
+  vesting engine and no ZK.
 
 The supporting services are live too: the [indexer](/developers/indexer-api/)
 (`indexer.zarf.to`), the [pin-proxy](/developers/ipfs-and-metadata/)

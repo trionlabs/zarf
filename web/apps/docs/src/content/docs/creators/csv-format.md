@@ -39,8 +39,8 @@ The identifier can be either:
 
 For an **email (ZK) distribution** at create.zarf.to, use **emails** — that's
 what the zero-knowledge proof is built around. The parser also recognizes
-**Stellar-address** rows at the shape level, but the wallet-airdrop path is
-currently script-driven rather than run through this uploader; see
+**Stellar-address** rows at the shape level for the wallet-airdrop creator under
+`/airdrop`; see
 [Email vs wallet](/creators/email-vs-wallet/) for which flow you're running.
 
 ### Column 2 — the amount

@@ -11,8 +11,8 @@
     import { isChecksumValidContract } from '@zarf/core/utils/tokenAsset';
     import { readTokenMetaRpc } from '@zarf/core/contracts';
     import { warn } from '@zarf/core/utils/log';
-    import { campaignStore } from '$lib/stores/campaignStore.svelte';
-    import type { StellarAddress, StellarContractId } from '$lib/stores/types';
+    import { campaignStore } from '$lib/airdrop/stores/campaignStore.svelte';
+    import type { StellarAddress, StellarContractId } from '$lib/airdrop/stores/types';
 
     let tokenAddress = $state('');
     let checking = $state(false);
@@ -119,7 +119,7 @@
             acknowledged: true,
         });
         campaignStore.nextStep();
-        goto('/wizard/step-1');
+        goto('/airdrop/wizard/step-1');
     }
 </script>
 

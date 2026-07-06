@@ -1,24 +1,32 @@
 <script lang="ts">
     import { onMount } from 'svelte';
-    import { page } from '$app/stores';
+    import { page } from '$app/state';
     import { wizardStore } from '../../stores/wizardStore.svelte';
 
-    const steps = [
+    type Step = { label: string; path: string };
+
+    const defaultSteps: Step[] = [
         { label: 'Token', path: '/wizard/step-0' },
         { label: 'Create', path: '/wizard/step-1' },
         { label: 'Deploy', path: '/wizard/step-2' },
     ];
+
+    let { steps = defaultSteps, currentStep = null } = $props<{
+        steps?: Step[];
+        currentStep?: number | null;
+    }>();
 
     let mounted = $state(false);
     let currentStepIndex = $state(0);
 
     // The "done" view is a post-launch terminal state and intentionally
     // outside the 3-step progress bar; the bar self-hides while it's shown.
-    const isDonePage = $derived($page.url.pathname.includes('/wizard/done'));
+    const isDonePage = $derived(page.url.pathname.includes('/wizard/done'));
 
     // Determine effective step index based on URL
     const effectiveStepIndex = $derived.by(() => {
-        const path = $page.url.pathname;
+        if (typeof currentStep === 'number') return currentStep;
+        const path = page.url.pathname;
         if (path.includes('/step-0')) return 0;
         if (path.includes('/step-1')) return 1;
         if (path.includes('/step-2')) return 2;
@@ -27,11 +35,13 @@
 
     onMount(() => {
         mounted = true;
-        currentStepIndex = wizardStore.currentStep;
+        if (currentStep === null) {
+            currentStepIndex = wizardStore.currentStep;
+        }
     });
 
     $effect(() => {
-        if (mounted) {
+        if (mounted && currentStep === null) {
             currentStepIndex = wizardStore.currentStep;
         }
     });

@@ -85,11 +85,11 @@ core cryptography, ZK proving, and Stellar wiring live in `@zarf/core`
 | Origin | App(s) | Role | CSP posture | Source |
 |---|---|---|---|---|
 | `zarf.to` | `@zarf/landing` | Chooser / redirect shell; never touches JWT, PIN, or claim link | strict | `web/apps/landing` |
-| `create.zarf.to` | `@zarf/create` | ZK email distributions — create only, **email-only** | `wasm-unsafe-eval`, no `unsafe-eval` | `web/apps/create/src` |
+| `create.zarf.to` | `@zarf/create` | Email/ZK distribution creator plus wallet-airdrop creator under `/airdrop` | `wasm-unsafe-eval`, no `unsafe-eval` | `web/apps/create/src` |
 | `claim.zarf.to` | `@zarf/claim` | ZK email claim (UltraHonk prover + Google JWT) — most isolated | `wasm-unsafe-eval`, no `unsafe-eval`; + Google JWT | `web/apps/claim/src` |
-| `airdrop.zarf.to` | `@zarf/airdrop-create`, `@zarf/airdrop-claim` | Wallet address-whitelist airdrops (create + claim), no ZK | strict, no eval | `web/apps/airdrop-create`, `web/apps/airdrop-claim` |
+| `airdrop.zarf.to` | `@zarf/airdrop-claim` | Wallet address-whitelist claim, no ZK | strict, no eval | `web/apps/airdrop-claim` |
 
-<!-- TODO(verify): airdrop.zarf.to is the ratified target origin (plans/origin-split-impl.md). That plan is "PLAN ONLY — not yet executed": today the wallet flow is two separate apps (airdrop-create / airdrop-claim); the plan merges them into one worker (zarf-airdrop) at airdrop.zarf.to. README's live deploy list currently ships only landing/create/claim/pin-proxy/jwk-rotation. -->
+<!-- TODO(verify): airdrop.zarf.to is the ratified target claim origin (plans/origin-split-impl.md). The wallet create flow now lives under create.zarf.to/airdrop; the wallet claim app remains a separate worker until claim surfaces are merged. -->
 
 <!-- TODO(verify): CSP posture column — at HEAD 3be14ec (PR #9) create.zarf.to and claim.zarf.to ship the SAME eval-free script-src ('self' 'wasm-unsafe-eval' 'blob:' https://static.cloudflareinsights.com); there is no 'unsafe-eval' anywhere in web/ source (commit: "strict nonces, no unsafe-inline/eval"). The two airdrop apps currently ship no custom CSP at all, so "strict, no eval" is the plan's target, not current source. See the origin-split note below. -->
 

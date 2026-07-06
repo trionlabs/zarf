@@ -14,7 +14,6 @@
     "build:landing": "pnpm --filter @zarf/landing build",
     "build:create": "pnpm --filter @zarf/create build",
     "build:claim": "pnpm --filter @zarf/claim build",
-    "build:airdrop-create": "pnpm --filter @zarf/airdrop-create build",
     "build:airdrop-claim": "pnpm --filter @zarf/airdrop-claim build",
     "build:all": "pnpm -r build",
     "deploy:landing": "pnpm --filter @zarf/landing run deploy",

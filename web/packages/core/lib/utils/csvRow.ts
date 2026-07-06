@@ -1,8 +1,8 @@
 /**
  * Shared `identifier,amount` CSV row grammar.
  *
- * BOTH distribution CSV parsers — the ZK/email one (apps/create) and the
- * wallet/airdrop one (apps/airdrop-create) — are forks that historically drifted
+ * BOTH distribution CSV parsers — the ZK/email one and the wallet/airdrop one
+ * in apps/create — are forks that historically drifted
  * apart (one got `parts.length !== 2` + data-shape header detection, the other
  * was left on `< 2` + substring header matching, which silently under-allocated
  * and dropped recipients). This is the single source of truth for the row

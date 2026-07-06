@@ -22,9 +22,9 @@ import {
 import type { CreateAirdropParams } from '@zarf/core/contracts';
 import { parseTokenAmount } from '@zarf/core/utils/amount';
 import type { StellarAddress, StellarContractId, TransactionHash } from '@zarf/core/types';
-import { normalizeAirdropAddress } from '$lib/csv/airdropCsv';
-import { pinAirdropClaimList } from './pinService';
-import type { RecipientRow } from '$lib/stores/types';
+import { normalizeAirdropAddress } from '$lib/airdrop/csv/airdropCsv';
+import { pinAirdropClaimList } from '$lib/services/pinService';
+import type { RecipientRow } from '$lib/airdrop/stores/types';
 
 /** A fresh 32-byte salt as `0x`-hex. Fixing it makes predict/pin/deploy stable. */
 export function generateSalt(): `0x${string}` {

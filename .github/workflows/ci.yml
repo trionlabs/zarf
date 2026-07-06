@@ -218,9 +218,6 @@ jobs:
       - name: Test indexer
         run: pnpm --dir web --filter @zarf/indexer test
 
-      - name: Test airdrop create
-        run: pnpm --dir web --filter @zarf/airdrop-create test
-
       - name: Test airdrop claim
         run: pnpm --dir web --filter @zarf/airdrop-claim test
 
@@ -235,7 +232,6 @@ jobs:
           pnpm --dir web --filter @zarf/landing check
           pnpm --dir web --filter @zarf/create check
           pnpm --dir web --filter @zarf/claim check
-          pnpm --dir web --filter @zarf/airdrop-create check
           pnpm --dir web --filter @zarf/airdrop-claim check
 
       - name: Check worker apps
@@ -269,9 +265,6 @@ jobs:
 
       - name: Build create app
         run: pnpm --dir web build:create
-
-      - name: Build airdrop create app
-        run: pnpm --dir web build:airdrop-create
 
       - name: Build airdrop claim app
         run: pnpm --dir web build:airdrop-claim

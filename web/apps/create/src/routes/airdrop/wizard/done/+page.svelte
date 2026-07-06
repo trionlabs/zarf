@@ -8,7 +8,7 @@
     import ZenButton from '@zarf/ui/components/ui/ZenButton.svelte';
     import { getContractExplorerUrl } from '@zarf/core/contracts/explorer';
     import { warn } from '@zarf/core/utils/log';
-    import { campaignStore } from '$lib/stores/campaignStore.svelte';
+    import { campaignStore } from '$lib/airdrop/stores/campaignStore.svelte';
 
     let airdrop = $state('');
     let cid = $state('');
@@ -29,7 +29,7 @@
         const recent = campaignStore.campaigns[0];
         airdrop = page.url.searchParams.get('a') || recent?.airdropAddress || '';
         cid = page.url.searchParams.get('cid') || recent?.metadataCid || '';
-        if (!airdrop || !cid) goto('/distributions');
+        if (!airdrop || !cid) goto('/airdrop/distributions');
     });
 
     // Render the QR client-side only; the link works regardless of QR success.
@@ -127,10 +127,10 @@
         class="flex flex-wrap items-center justify-center gap-3"
         in:fly={{ y: 16, duration: 500, delay: 320 }}
     >
-        <ZenButton variant="primary" onclick={() => goto('/distributions')}>
+        <ZenButton variant="primary" onclick={() => goto('/airdrop/distributions')}>
             <LayoutGrid class="mr-1 h-4 w-4" /> My distributions
         </ZenButton>
-        <ZenButton variant="ghost" onclick={() => goto('/wizard/step-0')}>
+        <ZenButton variant="ghost" onclick={() => goto('/airdrop/wizard/step-0')}>
             <Plus class="mr-1 h-4 w-4" /> Create another
         </ZenButton>
     </div>

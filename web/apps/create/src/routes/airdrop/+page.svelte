@@ -2,7 +2,7 @@
     import { goto } from '$app/navigation';
     import { ArrowRight, LayoutGrid, Coins } from 'lucide-svelte';
     import ZenButton from '@zarf/ui/components/ui/ZenButton.svelte';
-    import { campaignStore } from '$lib/stores/campaignStore.svelte';
+    import { campaignStore } from '$lib/airdrop/stores/campaignStore.svelte';
 
     const campaignCount = $derived(campaignStore.campaigns.length);
 </script>
@@ -23,11 +23,11 @@
         </p>
     </div>
     <div class="flex flex-wrap items-center justify-center gap-3">
-        <ZenButton variant="primary" onclick={() => goto('/wizard/step-0')}>
+        <ZenButton variant="primary" onclick={() => goto('/airdrop/wizard/step-0')}>
             Create a distribution <ArrowRight class="ml-1 h-4 w-4" />
         </ZenButton>
         {#if campaignCount > 0}
-            <ZenButton variant="ghost" onclick={() => goto('/distributions')}>
+            <ZenButton variant="ghost" onclick={() => goto('/airdrop/distributions')}>
                 <LayoutGrid class="mr-1 h-4 w-4" /> My distributions ({campaignCount})
             </ZenButton>
         {/if}
