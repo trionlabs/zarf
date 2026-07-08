@@ -1,13 +1,15 @@
 use soroban_sdk::{
+    contract, contractimpl, contracttype,
     testutils::{
         storage::{Instance, Persistent},
-        Address as _,
+        Address as _, Ledger,
     },
     token, Address, BytesN, Env, String,
 };
 use zarf_vesting_factory_soroban::{
-    DataKey, DeploymentInfo, Error as FactoryError, ZarfVestingFactoryContract,
-    ZarfVestingFactoryContractClient, MAX_PAGE_LIMIT, TTL_EXTEND_TO,
+    DataKey, DeploymentInfo, Error as FactoryError, PendingVerifierUpdate,
+    ZarfVestingFactoryContract, ZarfVestingFactoryContractClient, MAX_PAGE_LIMIT,
+    MIN_VERIFIER_UPDATE_DELAY_SECS, TTL_EXTEND_TO,
 };
 
 const VESTING_WASM: &[u8] =
@@ -24,6 +26,31 @@ mod vesting {
     );
 }
 
+#[contract]
+pub struct MockVerifier;
+
+#[contracttype]
+#[derive(Clone)]
+pub enum MockVerifierKey {
+    VkHash,
+}
+
+#[contractimpl]
+impl MockVerifier {
+    pub fn __constructor(env: Env, vk_hash: BytesN<32>) {
+        env.storage()
+            .instance()
+            .set(&MockVerifierKey::VkHash, &vk_hash);
+    }
+
+    pub fn vk_hash(env: Env) -> BytesN<32> {
+        env.storage()
+            .instance()
+            .get(&MockVerifierKey::VkHash)
+            .expect("mock verifier initialized")
+    }
+}
+
 fn test_salt(env: &Env, n: u8) -> BytesN<32> {
     BytesN::from_array(env, &[n; 32])
 }
@@ -34,6 +61,12 @@ fn audience_hash(env: &Env) -> BytesN<32> {
 
 fn non_canonical_field(env: &Env) -> BytesN<32> {
     BytesN::from_array(env, &BN254_SCALAR_MODULUS_TEST)
+}
+
+fn mock_verifier(env: &Env, n: u8) -> (Address, BytesN<32>) {
+    let vk_hash = BytesN::from_array(env, &[n; 32]);
+    let verifier = env.register(MockVerifier, (vk_hash.clone(),));
+    (verifier, vk_hash)
 }
 
 fn setup(
@@ -50,12 +83,18 @@ fn setup(
     let verifier = Address::generate(env);
     let registry = Address::generate(env);
     let owner = Address::generate(env);
+    let upgrade_admin = Address::generate(env);
     let token_asset = env.register_stellar_asset_contract_v2(owner.clone());
     let token = token_asset.address();
     let vesting_wasm_hash = env.deployer().upload_contract_wasm(VESTING_WASM);
     let factory_id = env.register(
         ZarfVestingFactoryContract,
-        (verifier.clone(), registry.clone(), vesting_wasm_hash),
+        (
+            verifier.clone(),
+            registry.clone(),
+            vesting_wasm_hash,
+            upgrade_admin,
+        ),
     );
     let factory = ZarfVestingFactoryContractClient::new(env, &factory_id);
 
@@ -132,6 +171,264 @@ fn creates_vesting_and_tracks_metadata() {
     assert_eq!(owner_infos.len(), 1);
     assert_eq!(owner_infos.get_unchecked(0).address, vesting);
     assert_eq!(owner_infos.get_unchecked(0).metadata_cid, cid);
+}
+
+#[test]
+fn factory_verifier_update_is_timelocked_and_future_deployments_only() {
+    let env = Env::default();
+    let (factory, _factory_id, old_verifier, _registry, token) = setup(&env);
+    let owner = Address::generate(&env);
+    let (new_verifier, new_vk_hash) = mock_verifier(&env, 44);
+    let circuit_hash = BytesN::from_array(&env, &[45_u8; 32]);
+    let manifest_hash = BytesN::from_array(&env, &[46_u8; 32]);
+
+    match factory.try_propose_verifier_update(
+        &old_verifier,
+        &new_vk_hash,
+        &circuit_hash,
+        &manifest_hash,
+    ) {
+        Err(Ok(FactoryError::InvalidVerifierUpdate)) => {}
+        other => panic!("unexpected same-verifier proposal result: {:?}", other),
+    }
+    match factory.try_propose_verifier_update(
+        &new_verifier,
+        &BytesN::from_array(&env, &[99_u8; 32]),
+        &circuit_hash,
+        &manifest_hash,
+    ) {
+        Err(Ok(FactoryError::InvalidVerifierUpdate)) => {}
+        other => panic!("unexpected wrong-vk proposal result: {:?}", other),
+    }
+    match factory.try_propose_verifier_update(
+        &new_verifier,
+        &new_vk_hash,
+        &circuit_hash,
+        &BytesN::from_array(&env, &[0_u8; 32]),
+    ) {
+        Err(Ok(FactoryError::InvalidVerifierUpdate)) => {}
+        other => panic!("unexpected zero-manifest proposal result: {:?}", other),
+    }
+    match factory.try_propose_verifier_update(
+        &Address::generate(&env),
+        &new_vk_hash,
+        &circuit_hash,
+        &manifest_hash,
+    ) {
+        Err(Ok(FactoryError::VerifierUpdateCallFailed)) => {}
+        other => panic!("unexpected missing-vk proposal result: {:?}", other),
+    }
+
+    factory.propose_verifier_update(&new_verifier, &new_vk_hash, &circuit_hash, &manifest_hash);
+    factory.cancel_verifier_update();
+    assert!(factory.pending_verifier_update().is_none());
+    match factory.try_execute_verifier_update() {
+        Err(Ok(FactoryError::PendingVerifierUpdateNotFound)) => {}
+        other => panic!("unexpected cancelled verifier execute result: {:?}", other),
+    }
+
+    factory.propose_verifier_update(&new_verifier, &new_vk_hash, &circuit_hash, &manifest_hash);
+    let pending = factory
+        .pending_verifier_update()
+        .expect("pending verifier update");
+    assert_eq!(pending.verifier, new_verifier);
+    assert_eq!(pending.vk_hash, new_vk_hash);
+    assert_eq!(pending.circuit_hash, circuit_hash);
+    assert_eq!(pending.manifest_hash, manifest_hash);
+    assert_eq!(
+        pending.execute_after - pending.proposed_at,
+        MIN_VERIFIER_UPDATE_DELAY_SECS
+    );
+
+    let old_child = factory.create_vesting(
+        &owner,
+        &token,
+        &test_salt(&env, 71),
+        &String::from_str(&env, "Zarf"),
+        &String::from_str(&env, "Old verifier child"),
+        &BytesN::from_array(&env, &[7_u8; 32]),
+        &audience_hash(&env),
+        &1,
+        &100,
+        &String::from_str(&env, "ipfs://old-verifier-child"),
+    );
+    let old_child_client = vesting::Client::new(&env, &old_child);
+    assert_eq!(old_child_client.verifier(), old_verifier);
+
+    match factory.try_execute_verifier_update() {
+        Err(Ok(FactoryError::VerifierUpdateDelayNotElapsed)) => {}
+        other => panic!("unexpected early verifier execute result: {:?}", other),
+    }
+
+    env.ledger().set_timestamp(pending.execute_after);
+    factory.execute_verifier_update();
+    assert!(factory.pending_verifier_update().is_none());
+    assert_eq!(factory.verifier(), new_verifier);
+    let current_metadata = factory
+        .current_verifier_metadata()
+        .expect("current verifier metadata");
+    assert_eq!(current_metadata.verifier, new_verifier);
+    assert_eq!(current_metadata.vk_hash, new_vk_hash);
+    assert_eq!(current_metadata.circuit_hash, circuit_hash);
+    assert_eq!(current_metadata.manifest_hash, manifest_hash);
+    assert_eq!(current_metadata.activated_at, pending.execute_after);
+    assert_eq!(old_child_client.verifier(), old_verifier);
+
+    let new_child = factory.create_vesting(
+        &owner,
+        &token,
+        &test_salt(&env, 72),
+        &String::from_str(&env, "Zarf"),
+        &String::from_str(&env, "New verifier child"),
+        &BytesN::from_array(&env, &[8_u8; 32]),
+        &audience_hash(&env),
+        &1,
+        &100,
+        &String::from_str(&env, "ipfs://new-verifier-child"),
+    );
+    let new_child_client = vesting::Client::new(&env, &new_child);
+    assert_eq!(new_child_client.verifier(), new_verifier);
+}
+
+#[test]
+fn factory_verifier_update_requires_upgrade_admin_auth() {
+    let env = Env::default();
+    let verifier = Address::generate(&env);
+    let registry = Address::generate(&env);
+    let upgrade_admin = Address::generate(&env);
+    let vesting_wasm_hash = env.deployer().upload_contract_wasm(VESTING_WASM);
+    let factory_id = env.register(
+        ZarfVestingFactoryContract,
+        (verifier, registry, vesting_wasm_hash, upgrade_admin),
+    );
+    let factory = ZarfVestingFactoryContractClient::new(&env, &factory_id);
+    let (new_verifier, new_vk_hash) = mock_verifier(&env, 47);
+    let circuit_hash = BytesN::from_array(&env, &[48_u8; 32]);
+    let manifest_hash = BytesN::from_array(&env, &[49_u8; 32]);
+
+    assert!(factory
+        .try_propose_verifier_update(&new_verifier, &new_vk_hash, &circuit_hash, &manifest_hash)
+        .is_err());
+    env.as_contract(&factory_id, || {
+        env.storage().instance().set(
+            &DataKey::PendingVerifierUpdate,
+            &PendingVerifierUpdate {
+                verifier: new_verifier,
+                vk_hash: new_vk_hash,
+                circuit_hash,
+                manifest_hash,
+                proposed_at: 0,
+                execute_after: 0,
+            },
+        );
+    });
+    assert!(factory.try_cancel_verifier_update().is_err());
+    assert!(factory.try_execute_verifier_update().is_err());
+}
+
+#[test]
+fn factory_upgrade_admin_controls_pause_and_child_vesting_admin() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let verifier = Address::generate(&env);
+    let registry = Address::generate(&env);
+    let owner = Address::generate(&env);
+    let upgrade_admin = Address::generate(&env);
+    let token_asset = env.register_stellar_asset_contract_v2(owner.clone());
+    let token = token_asset.address();
+    let vesting_wasm_hash = env.deployer().upload_contract_wasm(VESTING_WASM);
+    let factory_id = env.register(
+        ZarfVestingFactoryContract,
+        (verifier, registry, vesting_wasm_hash, upgrade_admin.clone()),
+    );
+    let factory = ZarfVestingFactoryContractClient::new(&env, &factory_id);
+
+    assert_eq!(factory.version(), 2);
+    assert_eq!(factory.schema_version(), 1);
+    assert_eq!(factory.upgrade_admin(), upgrade_admin);
+
+    let vesting = factory.create_vesting(
+        &owner,
+        &token,
+        &test_salt(&env, 31),
+        &String::from_str(&env, "Zarf"),
+        &String::from_str(&env, "Factory deployed"),
+        &BytesN::from_array(&env, &[8_u8; 32]),
+        &audience_hash(&env),
+        &1,
+        &100,
+        &String::from_str(&env, "ipfs://admin"),
+    );
+    let vesting_client = vesting::Client::new(&env, &vesting);
+    assert_eq!(vesting_client.upgrade_admin(), factory_id);
+
+    let child_wasm_hash = BytesN::from_array(&env, &[4_u8; 32]);
+    let child_manifest_hash = BytesN::from_array(&env, &[5_u8; 32]);
+    match factory.try_propose_upgrade(&child_wasm_hash, &child_manifest_hash, &1) {
+        Err(Ok(FactoryError::InvalidUpgrade)) => {}
+        other => panic!(
+            "unexpected non-incrementing factory upgrade result: {:?}",
+            other
+        ),
+    }
+    match factory.try_propose_vesting_upgrade(
+        &vesting,
+        &BytesN::from_array(&env, &[0_u8; 32]),
+        &child_manifest_hash,
+        &2,
+    ) {
+        Err(Ok(FactoryError::InvalidUpgrade)) => {}
+        other => panic!("unexpected zero child wasm hash result: {:?}", other),
+    }
+    match factory.try_propose_vesting_upgrade(
+        &vesting,
+        &child_wasm_hash,
+        &BytesN::from_array(&env, &[0_u8; 32]),
+        &2,
+    ) {
+        Err(Ok(FactoryError::InvalidUpgrade)) => {}
+        other => panic!("unexpected zero child manifest hash result: {:?}", other),
+    }
+
+    factory.propose_vesting_upgrade(&vesting, &child_wasm_hash, &child_manifest_hash, &2);
+    let pending = vesting_client
+        .pending_upgrade()
+        .expect("child pending upgrade");
+    assert_eq!(pending.wasm_hash, child_wasm_hash);
+    assert_eq!(pending.manifest_hash, child_manifest_hash);
+
+    factory.pause();
+    assert!(factory.is_paused());
+    let result = factory.try_create_vesting(
+        &owner,
+        &token,
+        &test_salt(&env, 32),
+        &String::from_str(&env, "Zarf"),
+        &String::from_str(&env, "Factory deployed"),
+        &BytesN::from_array(&env, &[9_u8; 32]),
+        &audience_hash(&env),
+        &1,
+        &100,
+        &String::from_str(&env, "ipfs://paused"),
+    );
+    match result {
+        Err(Ok(FactoryError::Paused)) => {}
+        other => panic!("unexpected paused create result: {:?}", other),
+    }
+}
+
+#[test]
+fn factory_upgrade_admin_transfer_is_two_step() {
+    let env = Env::default();
+    let (factory, _factory_id, _verifier, _registry, _token) = setup(&env);
+    let original_admin = factory.upgrade_admin();
+    let new_admin = Address::generate(&env);
+
+    factory.propose_upgrade_admin(&new_admin);
+    assert_eq!(factory.upgrade_admin(), original_admin);
+    factory.accept_upgrade_admin();
+    assert_eq!(factory.upgrade_admin(), new_admin);
 }
 
 #[test]
@@ -658,12 +955,13 @@ fn create_vesting_requires_owner_auth_without_mock_all_auths() {
     let verifier = Address::generate(&env);
     let registry = Address::generate(&env);
     let owner = Address::generate(&env);
+    let upgrade_admin = Address::generate(&env);
     let token_asset = env.register_stellar_asset_contract_v2(owner.clone());
     let token_id = token_asset.address();
     let vesting_wasm_hash = env.deployer().upload_contract_wasm(VESTING_WASM);
     let factory_id = env.register(
         ZarfVestingFactoryContract,
-        (verifier, registry, vesting_wasm_hash),
+        (verifier, registry, vesting_wasm_hash, upgrade_admin),
     );
     let factory = ZarfVestingFactoryContractClient::new(&env, &factory_id);
 

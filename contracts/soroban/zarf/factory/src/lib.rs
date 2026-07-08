@@ -2,7 +2,7 @@
 
 use soroban_sdk::{
     contract, contracterror, contractevent, contractimpl, contracttype, crypto::BnScalar, token,
-    xdr::ToXdr, Address, BytesN, Env, String, Val, Vec,
+    xdr::ToXdr, Address, BytesN, Env, IntoVal, InvokeError, String, Symbol, Val, Vec,
 };
 
 const BN254_SCALAR_MODULUS: [u8; 32] = [
@@ -25,6 +25,12 @@ pub const TTL_THRESHOLD: u32 = TTL_EXTEND_TO - DAY_IN_LEDGERS;
 /// footprint entries per transaction (~100), so 80 leaves headroom for the
 /// instance and code entries.
 pub const MAX_PAGE_LIMIT: u32 = 80;
+pub const CONTRACT_VERSION: u32 = 2;
+pub const SCHEMA_VERSION: u32 = 1;
+pub const MIN_VERIFIER_UPDATE_DELAY_SECS: u64 = 7 * 24 * 3600;
+/// Factory Wasm upgrades can change future verifier wiring, so they must not be
+/// a shorter path around the verifier-rotation timelock.
+pub const MIN_UPGRADE_DELAY_SECS: u64 = MIN_VERIFIER_UPDATE_DELAY_SECS;
 
 #[contract]
 pub struct ZarfVestingFactoryContract;
@@ -41,6 +47,20 @@ pub enum Error {
     InvalidAudience = 6,
     TokenTransferMismatch = 7,
     MerkleRootAlreadyUsed = 8,
+    UpgradeAdminNotSet = 9,
+    PendingUpgradeNotFound = 10,
+    UpgradeDelayNotElapsed = 11,
+    InvalidSchemaVersion = 12,
+    AlreadyMigrated = 13,
+    Paused = 14,
+    Deprecated = 15,
+    PendingUpgradeAdminNotSet = 16,
+    VestingUpgradeCallFailed = 17,
+    InvalidUpgrade = 18,
+    PendingVerifierUpdateNotFound = 19,
+    VerifierUpdateDelayNotElapsed = 20,
+    InvalidVerifierUpdate = 21,
+    VerifierUpdateCallFailed = 22,
 }
 
 #[contracttype]
@@ -64,6 +84,14 @@ pub enum DataKey {
     /// audience_hash) but NOT to a vesting contract address, so identically
     /// rooted siblings would each accept the same proof.
     UsedRoot(BytesN<32>),
+    UpgradeAdmin,
+    PendingUpgradeAdmin,
+    PendingUpgrade,
+    SchemaVersion,
+    Paused,
+    Deprecated,
+    PendingVerifierUpdate,
+    VerifierMetadata,
 }
 
 #[contractevent(topics = ["vesting_created"])]
@@ -87,6 +115,133 @@ pub struct DeploymentInfo {
     pub metadata_cid: String,
 }
 
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PendingUpgrade {
+    pub wasm_hash: BytesN<32>,
+    pub manifest_hash: BytesN<32>,
+    pub proposed_at: u64,
+    pub execute_after: u64,
+    pub from_version: u32,
+    pub to_version: u32,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PendingVerifierUpdate {
+    pub verifier: Address,
+    pub vk_hash: BytesN<32>,
+    pub circuit_hash: BytesN<32>,
+    pub manifest_hash: BytesN<32>,
+    pub proposed_at: u64,
+    pub execute_after: u64,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct VerifierMetadata {
+    pub verifier: Address,
+    pub vk_hash: BytesN<32>,
+    pub circuit_hash: BytesN<32>,
+    pub manifest_hash: BytesN<32>,
+    pub activated_at: u64,
+}
+
+#[contractevent(topics = ["upgrade_proposed"])]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct UpgradeProposed {
+    #[topic]
+    pub wasm_hash: BytesN<32>,
+    #[topic]
+    pub manifest_hash: BytesN<32>,
+    pub execute_after: u64,
+    pub from_version: u32,
+    pub to_version: u32,
+}
+
+#[contractevent(topics = ["upgrade_cancelled"])]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct UpgradeCancelled {
+    #[topic]
+    pub wasm_hash: BytesN<32>,
+    #[topic]
+    pub manifest_hash: BytesN<32>,
+}
+
+#[contractevent(topics = ["upgrade_executed"])]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct UpgradeExecuted {
+    #[topic]
+    pub wasm_hash: BytesN<32>,
+    #[topic]
+    pub manifest_hash: BytesN<32>,
+    pub from_version: u32,
+    pub to_version: u32,
+}
+
+#[contractevent(topics = ["factory_paused"], data_format = "single-value")]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct FactoryPaused {
+    pub paused: bool,
+}
+
+#[contractevent(topics = ["factory_deprecated"], data_format = "single-value")]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct FactoryDeprecated {
+    pub deprecated: bool,
+}
+
+#[contractevent(topics = ["upgrade_admin_proposed"], data_format = "single-value")]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct UpgradeAdminProposed {
+    #[topic]
+    pub new_admin: Address,
+}
+
+#[contractevent(topics = ["upgrade_admin_set"])]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct UpgradeAdminTransferred {
+    #[topic]
+    pub previous_admin: Address,
+    #[topic]
+    pub new_admin: Address,
+}
+
+#[contractevent(topics = ["verifier_update_proposed"])]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct VerifierUpdateProposed {
+    #[topic]
+    pub verifier: Address,
+    #[topic]
+    pub vk_hash: BytesN<32>,
+    pub circuit_hash: BytesN<32>,
+    pub manifest_hash: BytesN<32>,
+    pub execute_after: u64,
+}
+
+#[contractevent(topics = ["verifier_update_cancelled"])]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct VerifierUpdateCancelled {
+    #[topic]
+    pub verifier: Address,
+    #[topic]
+    pub vk_hash: BytesN<32>,
+    pub circuit_hash: BytesN<32>,
+    pub manifest_hash: BytesN<32>,
+}
+
+#[contractevent(topics = ["verifier_update_executed"])]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct VerifierUpdateExecuted {
+    #[topic]
+    pub previous_verifier: Address,
+    #[topic]
+    pub verifier: Address,
+    pub vk_hash: BytesN<32>,
+    pub circuit_hash: BytesN<32>,
+    pub manifest_hash: BytesN<32>,
+}
+
 #[contractimpl]
 impl ZarfVestingFactoryContract {
     pub fn __constructor(
@@ -94,13 +249,335 @@ impl ZarfVestingFactoryContract {
         verifier: Address,
         jwk_registry: Address,
         vesting_wasm_hash: BytesN<32>,
+        upgrade_admin: Address,
     ) {
         let store = env.storage().instance();
         store.set(&DataKey::Verifier, &verifier);
         store.set(&DataKey::JwkRegistry, &jwk_registry);
         store.set(&DataKey::VestingWasmHash, &vesting_wasm_hash);
         store.set(&DataKey::DeploymentCount, &0_u32);
+        store.set(&DataKey::UpgradeAdmin, &upgrade_admin);
+        store.set(&DataKey::SchemaVersion, &SCHEMA_VERSION);
+        store.set(&DataKey::Paused, &false);
+        store.set(&DataKey::Deprecated, &false);
         Self::extend_contract_ttl(&env);
+    }
+
+    pub fn version() -> u32 {
+        CONTRACT_VERSION
+    }
+
+    pub fn schema_version(env: Env) -> u32 {
+        env.storage()
+            .instance()
+            .get(&DataKey::SchemaVersion)
+            .unwrap_or(0_u32)
+    }
+
+    pub fn upgrade_admin(env: Env) -> Result<Address, Error> {
+        Self::get_instance(&env, DataKey::UpgradeAdmin)
+    }
+
+    pub fn pending_upgrade(env: Env) -> Option<PendingUpgrade> {
+        env.storage().instance().get(&DataKey::PendingUpgrade)
+    }
+
+    pub fn pending_verifier_update(env: Env) -> Option<PendingVerifierUpdate> {
+        env.storage()
+            .instance()
+            .get(&DataKey::PendingVerifierUpdate)
+    }
+
+    pub fn current_verifier_metadata(env: Env) -> Option<VerifierMetadata> {
+        env.storage().instance().get(&DataKey::VerifierMetadata)
+    }
+
+    pub fn propose_upgrade_admin(env: Env, new_admin: Address) -> Result<(), Error> {
+        Self::require_upgrade_admin(&env)?;
+        env.storage()
+            .instance()
+            .set(&DataKey::PendingUpgradeAdmin, &new_admin);
+        Self::extend_contract_ttl(&env);
+        UpgradeAdminProposed { new_admin }.publish(&env);
+        Ok(())
+    }
+
+    pub fn accept_upgrade_admin(env: Env) -> Result<(), Error> {
+        let pending: Address = env
+            .storage()
+            .instance()
+            .get(&DataKey::PendingUpgradeAdmin)
+            .ok_or(Error::PendingUpgradeAdminNotSet)?;
+        pending.require_auth();
+        let previous_admin = Self::upgrade_admin(env.clone())?;
+        env.storage()
+            .instance()
+            .set(&DataKey::UpgradeAdmin, &pending);
+        env.storage()
+            .instance()
+            .remove(&DataKey::PendingUpgradeAdmin);
+        Self::extend_contract_ttl(&env);
+        UpgradeAdminTransferred {
+            previous_admin,
+            new_admin: pending,
+        }
+        .publish(&env);
+        Ok(())
+    }
+
+    pub fn cancel_upgrade_admin_transfer(env: Env) -> Result<(), Error> {
+        Self::require_upgrade_admin(&env)?;
+        if !env.storage().instance().has(&DataKey::PendingUpgradeAdmin) {
+            return Err(Error::PendingUpgradeAdminNotSet);
+        }
+        env.storage()
+            .instance()
+            .remove(&DataKey::PendingUpgradeAdmin);
+        Self::extend_contract_ttl(&env);
+        Ok(())
+    }
+
+    pub fn is_paused(env: Env) -> bool {
+        env.storage()
+            .instance()
+            .get(&DataKey::Paused)
+            .unwrap_or(false)
+    }
+
+    pub fn is_deprecated(env: Env) -> bool {
+        env.storage()
+            .instance()
+            .get(&DataKey::Deprecated)
+            .unwrap_or(false)
+    }
+
+    pub fn pause(env: Env) -> Result<(), Error> {
+        Self::require_upgrade_admin(&env)?;
+        env.storage().instance().set(&DataKey::Paused, &true);
+        Self::extend_contract_ttl(&env);
+        FactoryPaused { paused: true }.publish(&env);
+        Ok(())
+    }
+
+    pub fn unpause(env: Env) -> Result<(), Error> {
+        Self::require_upgrade_admin(&env)?;
+        env.storage().instance().set(&DataKey::Paused, &false);
+        Self::extend_contract_ttl(&env);
+        FactoryPaused { paused: false }.publish(&env);
+        Ok(())
+    }
+
+    pub fn deprecate(env: Env) -> Result<(), Error> {
+        Self::require_upgrade_admin(&env)?;
+        env.storage().instance().set(&DataKey::Deprecated, &true);
+        Self::extend_contract_ttl(&env);
+        FactoryDeprecated { deprecated: true }.publish(&env);
+        Ok(())
+    }
+
+    pub fn propose_upgrade(
+        env: Env,
+        wasm_hash: BytesN<32>,
+        manifest_hash: BytesN<32>,
+        to_version: u32,
+    ) -> Result<(), Error> {
+        Self::require_upgrade_admin(&env)?;
+        Self::validate_factory_upgrade_proposal(&wasm_hash, &manifest_hash, to_version)?;
+        let proposed_at = env.ledger().timestamp();
+        let pending = PendingUpgrade {
+            wasm_hash: wasm_hash.clone(),
+            manifest_hash: manifest_hash.clone(),
+            proposed_at,
+            execute_after: proposed_at.saturating_add(MIN_UPGRADE_DELAY_SECS),
+            from_version: CONTRACT_VERSION,
+            to_version,
+        };
+        env.storage()
+            .instance()
+            .set(&DataKey::PendingUpgrade, &pending);
+        Self::extend_contract_ttl(&env);
+        UpgradeProposed {
+            wasm_hash,
+            manifest_hash,
+            execute_after: pending.execute_after,
+            from_version: pending.from_version,
+            to_version,
+        }
+        .publish(&env);
+        Ok(())
+    }
+
+    pub fn cancel_upgrade(env: Env) -> Result<(), Error> {
+        Self::require_upgrade_admin(&env)?;
+        let pending: PendingUpgrade = env
+            .storage()
+            .instance()
+            .get(&DataKey::PendingUpgrade)
+            .ok_or(Error::PendingUpgradeNotFound)?;
+        env.storage().instance().remove(&DataKey::PendingUpgrade);
+        Self::extend_contract_ttl(&env);
+        UpgradeCancelled {
+            wasm_hash: pending.wasm_hash,
+            manifest_hash: pending.manifest_hash,
+        }
+        .publish(&env);
+        Ok(())
+    }
+
+    pub fn execute_upgrade(env: Env) -> Result<(), Error> {
+        Self::require_upgrade_admin(&env)?;
+        let pending: PendingUpgrade = env
+            .storage()
+            .instance()
+            .get(&DataKey::PendingUpgrade)
+            .ok_or(Error::PendingUpgradeNotFound)?;
+        if env.ledger().timestamp() < pending.execute_after {
+            return Err(Error::UpgradeDelayNotElapsed);
+        }
+        env.storage().instance().remove(&DataKey::PendingUpgrade);
+        Self::extend_contract_ttl(&env);
+        UpgradeExecuted {
+            wasm_hash: pending.wasm_hash.clone(),
+            manifest_hash: pending.manifest_hash,
+            from_version: pending.from_version,
+            to_version: pending.to_version,
+        }
+        .publish(&env);
+        env.deployer()
+            .update_current_contract_wasm(pending.wasm_hash);
+        Ok(())
+    }
+
+    pub fn propose_verifier_update(
+        env: Env,
+        verifier: Address,
+        vk_hash: BytesN<32>,
+        circuit_hash: BytesN<32>,
+        manifest_hash: BytesN<32>,
+    ) -> Result<(), Error> {
+        Self::require_upgrade_admin(&env)?;
+        Self::validate_factory_verifier_update(
+            &env,
+            &verifier,
+            &vk_hash,
+            &circuit_hash,
+            &manifest_hash,
+        )?;
+        let proposed_at = env.ledger().timestamp();
+        let pending = PendingVerifierUpdate {
+            verifier: verifier.clone(),
+            vk_hash: vk_hash.clone(),
+            circuit_hash: circuit_hash.clone(),
+            manifest_hash: manifest_hash.clone(),
+            proposed_at,
+            execute_after: proposed_at.saturating_add(MIN_VERIFIER_UPDATE_DELAY_SECS),
+        };
+        env.storage()
+            .instance()
+            .set(&DataKey::PendingVerifierUpdate, &pending);
+        Self::extend_contract_ttl(&env);
+        VerifierUpdateProposed {
+            verifier,
+            vk_hash,
+            circuit_hash,
+            manifest_hash,
+            execute_after: pending.execute_after,
+        }
+        .publish(&env);
+        Ok(())
+    }
+
+    pub fn cancel_verifier_update(env: Env) -> Result<(), Error> {
+        Self::require_upgrade_admin(&env)?;
+        let pending: PendingVerifierUpdate = env
+            .storage()
+            .instance()
+            .get(&DataKey::PendingVerifierUpdate)
+            .ok_or(Error::PendingVerifierUpdateNotFound)?;
+        env.storage()
+            .instance()
+            .remove(&DataKey::PendingVerifierUpdate);
+        Self::extend_contract_ttl(&env);
+        VerifierUpdateCancelled {
+            verifier: pending.verifier,
+            vk_hash: pending.vk_hash,
+            circuit_hash: pending.circuit_hash,
+            manifest_hash: pending.manifest_hash,
+        }
+        .publish(&env);
+        Ok(())
+    }
+
+    pub fn execute_verifier_update(env: Env) -> Result<(), Error> {
+        Self::require_upgrade_admin(&env)?;
+        let pending: PendingVerifierUpdate = env
+            .storage()
+            .instance()
+            .get(&DataKey::PendingVerifierUpdate)
+            .ok_or(Error::PendingVerifierUpdateNotFound)?;
+        if env.ledger().timestamp() < pending.execute_after {
+            return Err(Error::VerifierUpdateDelayNotElapsed);
+        }
+        Self::validate_factory_verifier_update(
+            &env,
+            &pending.verifier,
+            &pending.vk_hash,
+            &pending.circuit_hash,
+            &pending.manifest_hash,
+        )?;
+        let previous_verifier = Self::get_instance::<Address>(&env, DataKey::Verifier)?;
+        env.storage()
+            .instance()
+            .set(&DataKey::Verifier, &pending.verifier);
+        env.storage().instance().set(
+            &DataKey::VerifierMetadata,
+            &VerifierMetadata {
+                verifier: pending.verifier.clone(),
+                vk_hash: pending.vk_hash.clone(),
+                circuit_hash: pending.circuit_hash.clone(),
+                manifest_hash: pending.manifest_hash.clone(),
+                activated_at: env.ledger().timestamp(),
+            },
+        );
+        env.storage()
+            .instance()
+            .remove(&DataKey::PendingVerifierUpdate);
+        Self::extend_contract_ttl(&env);
+        VerifierUpdateExecuted {
+            previous_verifier,
+            verifier: pending.verifier,
+            vk_hash: pending.vk_hash,
+            circuit_hash: pending.circuit_hash,
+            manifest_hash: pending.manifest_hash,
+        }
+        .publish(&env);
+        Ok(())
+    }
+
+    pub fn propose_vesting_upgrade(
+        env: Env,
+        vesting: Address,
+        wasm_hash: BytesN<32>,
+        manifest_hash: BytesN<32>,
+        to_version: u32,
+    ) -> Result<(), Error> {
+        Self::require_upgrade_admin(&env)?;
+        Self::validate_child_upgrade_proposal(&wasm_hash, &manifest_hash, to_version)?;
+        let mut args: Vec<Val> = Vec::new(&env);
+        args.push_back(wasm_hash.into_val(&env));
+        args.push_back(manifest_hash.into_val(&env));
+        args.push_back(to_version.into_val(&env));
+        Self::invoke_vesting(&env, &vesting, "propose_upgrade", args)
+    }
+
+    pub fn cancel_vesting_upgrade(env: Env, vesting: Address) -> Result<(), Error> {
+        Self::require_upgrade_admin(&env)?;
+        Self::invoke_vesting(&env, &vesting, "cancel_upgrade", Vec::new(&env))
+    }
+
+    pub fn execute_vesting_upgrade(env: Env, vesting: Address) -> Result<(), Error> {
+        Self::require_upgrade_admin(&env)?;
+        Self::invoke_vesting(&env, &vesting, "execute_upgrade", Vec::new(&env))
     }
 
     pub fn verifier(env: Env) -> Result<Address, Error> {
@@ -142,6 +619,7 @@ impl ZarfVestingFactoryContract {
         total_amount: i128,
         metadata_cid: String,
     ) -> Result<Address, Error> {
+        Self::require_active(&env)?;
         owner.require_auth();
         Self::validate_metadata(recipient_count, total_amount, false)?;
         // Require a canonical, non-zero root even on the unfunded path: a
@@ -190,6 +668,7 @@ impl ZarfVestingFactoryContract {
         total_amount: i128,
         metadata_cid: String,
     ) -> Result<Address, Error> {
+        Self::require_active(&env)?;
         owner.require_auth();
         Self::validate_metadata(recipient_count, total_amount, true)?;
         Self::validate_initial_root(&merkle_root, true)?;
@@ -317,6 +796,7 @@ impl ZarfVestingFactoryContract {
         let wasm_hash = Self::get_instance::<BytesN<32>>(env, DataKey::VestingWasmHash)?;
         let verifier = Self::get_instance::<Address>(env, DataKey::Verifier)?;
         let jwk_registry = Self::get_instance::<Address>(env, DataKey::JwkRegistry)?;
+        let upgrade_admin = env.current_contract_address();
         let deployment_salt = Self::owner_bound_salt(env, &owner, &salt);
         Ok(env
             .deployer()
@@ -333,6 +813,7 @@ impl ZarfVestingFactoryContract {
                     merkle_root,
                     audience_hash,
                     metadata_cid,
+                    upgrade_admin,
                 ),
             ))
     }
@@ -479,6 +960,123 @@ impl ZarfVestingFactoryContract {
             .instance()
             .get(&key)
             .ok_or(Error::NotInitialized)
+    }
+
+    fn require_upgrade_admin(env: &Env) -> Result<Address, Error> {
+        let admin = Self::get_instance::<Address>(env, DataKey::UpgradeAdmin)
+            .map_err(|_| Error::UpgradeAdminNotSet)?;
+        admin.require_auth();
+        Ok(admin)
+    }
+
+    fn require_active(env: &Env) -> Result<(), Error> {
+        if env
+            .storage()
+            .instance()
+            .get(&DataKey::Deprecated)
+            .unwrap_or(false)
+        {
+            return Err(Error::Deprecated);
+        }
+        if env
+            .storage()
+            .instance()
+            .get(&DataKey::Paused)
+            .unwrap_or(false)
+        {
+            return Err(Error::Paused);
+        }
+        Ok(())
+    }
+
+    fn validate_factory_upgrade_proposal(
+        wasm_hash: &BytesN<32>,
+        manifest_hash: &BytesN<32>,
+        to_version: u32,
+    ) -> Result<(), Error> {
+        Self::validate_upgrade_artifacts(wasm_hash, manifest_hash, to_version)?;
+        if to_version <= CONTRACT_VERSION {
+            return Err(Error::InvalidUpgrade);
+        }
+        Ok(())
+    }
+
+    fn validate_child_upgrade_proposal(
+        wasm_hash: &BytesN<32>,
+        manifest_hash: &BytesN<32>,
+        to_version: u32,
+    ) -> Result<(), Error> {
+        Self::validate_upgrade_artifacts(wasm_hash, manifest_hash, to_version)
+    }
+
+    fn validate_upgrade_artifacts(
+        wasm_hash: &BytesN<32>,
+        manifest_hash: &BytesN<32>,
+        to_version: u32,
+    ) -> Result<(), Error> {
+        if to_version == 0 || Self::is_zero_hash(wasm_hash) || Self::is_zero_hash(manifest_hash) {
+            return Err(Error::InvalidUpgrade);
+        }
+        Ok(())
+    }
+
+    fn is_zero_hash(hash: &BytesN<32>) -> bool {
+        hash.to_array().iter().all(|byte| *byte == 0)
+    }
+
+    fn validate_factory_verifier_update(
+        env: &Env,
+        verifier: &Address,
+        vk_hash: &BytesN<32>,
+        circuit_hash: &BytesN<32>,
+        manifest_hash: &BytesN<32>,
+    ) -> Result<(), Error> {
+        let current = Self::get_instance::<Address>(env, DataKey::Verifier)?;
+        if *verifier == current {
+            return Err(Error::InvalidVerifierUpdate);
+        }
+        Self::validate_verifier_metadata(env, verifier, vk_hash, circuit_hash, manifest_hash)
+    }
+
+    fn validate_verifier_metadata(
+        env: &Env,
+        verifier: &Address,
+        vk_hash: &BytesN<32>,
+        circuit_hash: &BytesN<32>,
+        manifest_hash: &BytesN<32>,
+    ) -> Result<(), Error> {
+        if Self::is_zero_hash(vk_hash)
+            || Self::is_zero_hash(circuit_hash)
+            || Self::is_zero_hash(manifest_hash)
+        {
+            return Err(Error::InvalidVerifierUpdate);
+        }
+        let observed_vk_hash = Self::verifier_vk_hash(env, verifier)?;
+        if observed_vk_hash != *vk_hash {
+            return Err(Error::InvalidVerifierUpdate);
+        }
+        Ok(())
+    }
+
+    fn verifier_vk_hash(env: &Env, verifier: &Address) -> Result<BytesN<32>, Error> {
+        env.try_invoke_contract::<BytesN<32>, InvokeError>(
+            verifier,
+            &Symbol::new(env, "vk_hash"),
+            Vec::new(env),
+        )
+        .map_err(|_| Error::VerifierUpdateCallFailed)?
+        .map_err(|_| Error::VerifierUpdateCallFailed)
+    }
+
+    fn invoke_vesting(
+        env: &Env,
+        vesting: &Address,
+        function: &str,
+        args: Vec<Val>,
+    ) -> Result<(), Error> {
+        env.try_invoke_contract::<(), InvokeError>(vesting, &Symbol::new(env, function), args)
+            .map_err(|_| Error::VestingUpgradeCallFailed)?
+            .map_err(|_| Error::VestingUpgradeCallFailed)
     }
 
     fn deployment_count(env: &Env) -> u32 {

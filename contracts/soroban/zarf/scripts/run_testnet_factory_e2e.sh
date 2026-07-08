@@ -15,6 +15,7 @@ UNLOCK_TIME=${UNLOCK_TIME:-0}
 SECRET=${SECRET:-0x586b396d5032714c}
 AUDIENCE=${AUDIENCE:-test-client-id}
 METADATA_CID=${METADATA_CID:-ipfs://zarf-stellar-factory-e2e}
+UPGRADE_ADMIN=${UPGRADE_ADMIN:-$SOURCE}
 SALT=${SALT:-$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")}
 
 VERIFIER_WASM="$VERIFIER_DIR/target/wasm32v1-none/release/rs_soroban_ultrahonk.wasm"
@@ -135,7 +136,8 @@ FACTORY_ID=$(
     -- \
     --verifier "$VERIFIER_ID" \
     --jwk_registry "$REGISTRY_ID" \
-    --vesting_wasm_hash "$VESTING_WASM_HASH" | last_nonempty_line
+    --vesting_wasm_hash "$VESTING_WASM_HASH" \
+    --upgrade_admin "$UPGRADE_ADMIN" | last_nonempty_line
 )
 
 echo "Computing Soroban recipient field..."

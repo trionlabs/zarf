@@ -13,6 +13,7 @@ AMOUNT=${AMOUNT:-1000}
 UNLOCK_TIME=${UNLOCK_TIME:-0}
 SECRET=${SECRET:-0x586b396d5032714c}
 AUDIENCE=${AUDIENCE:-test-client-id}
+UPGRADE_ADMIN=${UPGRADE_ADMIN:-$SOURCE}
 
 REGISTRY_WASM="$ZARF_DIR/jwk-registry/target/wasm32v1-none/release/zarf_jwk_registry.wasm"
 VESTING_WASM="$ZARF_DIR/vesting/target/wasm32v1-none/release/zarf_vesting_soroban.wasm"
@@ -72,7 +73,8 @@ if [[ -z "${VESTING_ID:-}" ]]; then
       --description '"Zarf Stellar claim e2e"' \
       --merkle_root "$ZERO_ROOT" \
       --audience_hash "$AUDIENCE_HASH" \
-      --metadata_cid '"ipfs://zarf-testnet-e2e"' | last_nonempty_line
+      --metadata_cid '"ipfs://zarf-testnet-e2e"' \
+      --upgrade_admin "$UPGRADE_ADMIN" | last_nonempty_line
   )
 fi
 

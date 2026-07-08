@@ -79,17 +79,29 @@ vesting    (upload new wasm hash)
 factory v2 (constructor: verifier, registry, vesting_wasm_hash)
 ```
 
-**Hard gate — before constructing the factory** (the factory constructor
-embeds the verifier address, so that is the real wiring point, not the UI):
-verify a known-good fixture proof against the fresh verifier instance. The
-`vk_hash` is bb's internal VK hash, not keccak(vk_bytes), so the constructor
-cannot self-check the (vk_bytes, vk_hash) pair — a *consistent but
-wrong-circuit* pair would deploy clean and silently verify a different
-circuit. This gate is automated in
+If the existing factory governance is already live, you may keep the factory
+address for future campaigns instead of deploying a new factory: deploy and
+fixture-gate the new immutable verifier, then call
+`propose_verifier_update(new_verifier, vk_hash, circuit_hash, manifest_hash)`
+on the factory and execute it only after the seven-day verifier timelock. This
+changes the verifier injected into newly-created vestings only; the
+verifier-rotation flow does not mutate existing vesting verifier addresses, and
+existing vestings must not be silently migrated as part of a circuit cutover.
+
+**Hard gate — before constructing a new factory or proposing/executing a factory
+verifier update** (the factory verifier config is the real wiring point, not the
+UI): verify known-good and known-bad fixture proofs against the fresh verifier
+instance. The `vk_hash` is bb's internal VK hash, not keccak(vk_bytes), so the
+constructor cannot self-check the (vk_bytes, vk_hash) pair — a *consistent but
+wrong-circuit* pair would deploy clean and silently verify a different circuit.
+The factory's `circuit_hash` and `manifest_hash` fields are durable audit
+metadata after execution, not on-chain proof that the manifest matches the
+verifier. This gate is automated in
 `contracts/soroban/zarf/scripts/run_testnet_factory_e2e.sh` (the `F-4 GATE`
 block runs `verify_proof` on the committed fixture and aborts before the
 factory is deployed); mirror that step in any mainnet/manual deploy and do
-NOT construct the factory until it passes. See `verifier/src/lib.rs`.
+NOT construct a new factory or propose/execute a verifier update until it
+passes. See `verifier/src/lib.rs`.
 
 ### 3. Update config + rotate the registry
 

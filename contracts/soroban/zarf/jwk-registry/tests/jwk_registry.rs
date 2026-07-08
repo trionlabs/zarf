@@ -84,6 +84,65 @@ fn setup(env: &Env) -> (Address, Address, JwkRegistryContractClient<'_>) {
 }
 
 #[test]
+fn upgrade_governance_requires_admin_and_timelock() {
+    let env = Env::default();
+    let (owner, _id, client) = setup(&env);
+    let wasm_hash = BytesN::from_array(&env, &[4_u8; 32]);
+    let manifest_hash = BytesN::from_array(&env, &[5_u8; 32]);
+
+    assert_eq!(client.version(), 1);
+    assert_eq!(client.schema_version(), 1);
+    assert_eq!(client.upgrade_admin(), owner);
+    assert!(client
+        .try_propose_upgrade(&wasm_hash, &manifest_hash, &2)
+        .is_err());
+
+    env.mock_all_auths();
+    match client.try_propose_upgrade(&wasm_hash, &manifest_hash, &1) {
+        Err(Ok(RegistryError::InvalidUpgrade)) => {}
+        other => panic!("unexpected non-incrementing upgrade result: {:?}", other),
+    }
+    match client.try_propose_upgrade(&BytesN::from_array(&env, &[0_u8; 32]), &manifest_hash, &2) {
+        Err(Ok(RegistryError::InvalidUpgrade)) => {}
+        other => panic!("unexpected zero wasm hash result: {:?}", other),
+    }
+    match client.try_propose_upgrade(&wasm_hash, &BytesN::from_array(&env, &[0_u8; 32]), &2) {
+        Err(Ok(RegistryError::InvalidUpgrade)) => {}
+        other => panic!("unexpected zero manifest hash result: {:?}", other),
+    }
+
+    client.propose_upgrade(&wasm_hash, &manifest_hash, &2);
+    let pending = client.pending_upgrade().expect("pending upgrade");
+    assert_eq!(pending.wasm_hash, wasm_hash);
+    assert_eq!(pending.manifest_hash, manifest_hash);
+
+    match client.try_execute_upgrade() {
+        Err(Ok(RegistryError::UpgradeDelayNotElapsed)) => {}
+        other => panic!("unexpected early execute result: {:?}", other),
+    }
+
+    client.cancel_upgrade();
+    assert!(client.pending_upgrade().is_none());
+    match client.try_execute_upgrade() {
+        Err(Ok(RegistryError::PendingUpgradeNotFound)) => {}
+        other => panic!("unexpected cancelled execute result: {:?}", other),
+    }
+}
+
+#[test]
+fn upgrade_admin_transfer_is_two_step() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (_owner, _id, client) = setup(&env);
+    let new_admin = Address::generate(&env);
+
+    client.propose_upgrade_admin(&new_admin);
+    assert_ne!(client.upgrade_admin(), new_admin);
+    client.accept_upgrade_admin();
+    assert_eq!(client.upgrade_admin(), new_admin);
+}
+
+#[test]
 fn owner_can_register_and_revoke_key() {
     let env = Env::default();
     env.mock_all_auths();
@@ -348,6 +407,7 @@ fn two_step_ownership_moves_registration_rights() {
         }])
         .accept_ownership();
     assert_eq!(client.owner(), new_owner);
+    assert_eq!(client.upgrade_admin(), new_owner);
     assert_eq!(client.pending_owner(), None);
 
     // The old owner can no longer register keys.

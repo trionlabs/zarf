@@ -60,6 +60,10 @@ const ALLOWLIST = {
         entries: WHOLE_FILE,
         reason: 'esbuild.pure string-literal references, not real calls',
     },
+    'apps/early/vite.config.ts': {
+        entries: WHOLE_FILE,
+        reason: 'esbuild.pure string-literal references, not real calls',
+    },
 
     // Cloudflare Worker — no Vite, no esbuild.pure, dev() helper does
     // not apply (import.meta.env.DEV is undefined in workerd). Stays on
@@ -81,6 +85,14 @@ const ALLOWLIST = {
                 content:
                     'console.warn(`[PinProxy] Unverifiable gateway response accepted for ${cid}`);',
                 reason: 'backend Cloudflare Worker — no Vite DEV gate available',
+            },
+        ],
+    },
+    'apps/early/src/lib/server/errors.ts': {
+        entries: [
+            {
+                content: 'console.error(',
+                reason: 'SvelteKit server-side structured error log; frontend log helper is Vite/browser-oriented',
             },
         ],
     },

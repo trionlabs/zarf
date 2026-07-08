@@ -7,6 +7,7 @@
     import ZenBadge from '@zarf/ui/components/ui/ZenBadge.svelte';
     import ZenAlert from '@zarf/ui/components/ui/ZenAlert.svelte';
     import ZenSpinner from '@zarf/ui/components/ui/ZenSpinner.svelte';
+    import { err as logErr } from '@zarf/core/utils/log';
 
     let { data }: { data: PageData } = $props();
 
@@ -29,10 +30,15 @@
     let exportingEmails = $state(false);
     let exportingUsers = $state(false);
     let error = $state('');
-    let sweepResult = $state<
-        { verified: number; unverified: number; pending: number; followers_fetched?: number } | null
-    >(null);
-    let reverifyResult = $state<{ checked: number; cleared: number; transient: number } | null>(null);
+    let sweepResult = $state<{
+        verified: number;
+        unverified: number;
+        pending: number;
+        followers_fetched?: number;
+    } | null>(null);
+    let reverifyResult = $state<{ checked: number; cleared: number; transient: number } | null>(
+        null,
+    );
 
     // Pending attesters awaiting a follower sweep (drives the cost hint).
     const pending = $derived(Math.max(0, data.stats.attested - data.stats.verified));
@@ -51,10 +57,7 @@
 
     // Optimistic local copy so manual verify / delete re-render immediately;
     // invalidateAll() re-syncs the authoritative list + stats on completion.
-    let rows = $state<UserRow[]>(data.users);
-    $effect(() => {
-        rows = data.users;
-    });
+    let rows = $derived(data.users);
 
     const FILTERS: ReadonlyArray<[Filter, string]> = [
         ['all', ''],
@@ -130,7 +133,7 @@
         try {
             await fetch('/api/auth/logout', { method: 'POST' });
         } catch (err) {
-            console.error('Logout failed:', err);
+            logErr('Logout failed:', err);
         } finally {
             // Hard nav: layout guard re-runs with cleared cookie → bounced to /
             await goto('/', { invalidateAll: true });
@@ -313,7 +316,11 @@
         </div>
         <div class="flex flex-wrap items-center gap-4 text-xs text-base-content/60">
             {#if data.admin && 'username' in data.admin && data.admin.username}
-                <span>Logged in as <strong class="text-base-content/80">@{data.admin.username}</strong></span>
+                <span
+                    >Logged in as <strong class="text-base-content/80"
+                        >@{data.admin.username}</strong
+                    ></span
+                >
             {:else}
                 <span>Logged in</span>
             {/if}
@@ -344,18 +351,31 @@
 
             <div class="mt-4 grid grid-cols-2 gap-4">
                 <ZenCard variant="glass" padding="md" radius="xl">
-                    <span class="block text-[11px] font-medium uppercase tracking-[0.15em] text-base-content/50">
+                    <span
+                        class="block text-[11px] font-medium uppercase tracking-[0.15em] text-base-content/50"
+                    >
                         Total
                     </span>
-                    <span class="mt-2 block text-3xl font-bold tabular-nums tracking-tight text-base-content">
+                    <span
+                        class="mt-2 block text-3xl font-bold tabular-nums tracking-tight text-base-content"
+                    >
                         {data.emailStats.total}
                     </span>
                 </ZenCard>
-                <ZenCard variant="glass" padding="md" radius="xl" class="ring-1 ring-inset ring-primary/20">
-                    <span class="block text-[11px] font-medium uppercase tracking-[0.15em] text-base-content/50">
+                <ZenCard
+                    variant="glass"
+                    padding="md"
+                    radius="xl"
+                    class="ring-1 ring-inset ring-primary/20"
+                >
+                    <span
+                        class="block text-[11px] font-medium uppercase tracking-[0.15em] text-base-content/50"
+                    >
                         Confirmed
                     </span>
-                    <span class="mt-2 block text-3xl font-bold tabular-nums tracking-tight text-primary">
+                    <span
+                        class="mt-2 block text-3xl font-bold tabular-nums tracking-tight text-primary"
+                    >
                         {data.emailStats.confirmed}
                     </span>
                 </ZenCard>
@@ -379,23 +399,53 @@
                     <table class="w-full text-sm">
                         <thead>
                             <tr class="bg-base-content/[0.03] text-left">
-                                <th class="px-4 py-3 text-[11px] font-medium uppercase tracking-wider text-base-content/50">Email</th>
-                                <th class="px-4 py-3 text-[11px] font-medium uppercase tracking-wider text-base-content/50">Created</th>
-                                <th class="px-4 py-3 text-[11px] font-medium uppercase tracking-wider text-base-content/50">Confirmed</th>
-                                <th class="px-4 py-3 text-[11px] font-medium uppercase tracking-wider text-base-content/50">Source</th>
+                                <th
+                                    class="px-4 py-3 text-[11px] font-medium uppercase tracking-wider text-base-content/50"
+                                    >Email</th
+                                >
+                                <th
+                                    class="px-4 py-3 text-[11px] font-medium uppercase tracking-wider text-base-content/50"
+                                    >Created</th
+                                >
+                                <th
+                                    class="px-4 py-3 text-[11px] font-medium uppercase tracking-wider text-base-content/50"
+                                    >Confirmed</th
+                                >
+                                <th
+                                    class="px-4 py-3 text-[11px] font-medium uppercase tracking-wider text-base-content/50"
+                                    >Source</th
+                                >
                             </tr>
                         </thead>
                         <tbody>
                             {#each data.emailSignups as s (s.id)}
-                                <tr class="border-t border-base-content/5 transition-colors hover:bg-base-content/[0.03]">
-                                    <td class="px-4 py-3 font-mono text-xs text-base-content">{s.email}</td>
-                                    <td class="whitespace-nowrap px-4 py-3 text-xs tabular-nums text-base-content/60">{fmtDate(s.created_at)}</td>
-                                    <td class="whitespace-nowrap px-4 py-3 text-xs tabular-nums text-base-content/60">{fmtDate(s.confirmed_at)}</td>
-                                    <td class="px-4 py-3 text-xs text-base-content/60">{s.source ?? '—'}</td>
+                                <tr
+                                    class="border-t border-base-content/5 transition-colors hover:bg-base-content/[0.03]"
+                                >
+                                    <td class="px-4 py-3 font-mono text-xs text-base-content"
+                                        >{s.email}</td
+                                    >
+                                    <td
+                                        class="whitespace-nowrap px-4 py-3 text-xs tabular-nums text-base-content/60"
+                                        >{fmtDate(s.created_at)}</td
+                                    >
+                                    <td
+                                        class="whitespace-nowrap px-4 py-3 text-xs tabular-nums text-base-content/60"
+                                        >{fmtDate(s.confirmed_at)}</td
+                                    >
+                                    <td class="px-4 py-3 text-xs text-base-content/60"
+                                        >{s.source ?? '—'}</td
+                                    >
                                 </tr>
                             {/each}
                             {#if data.emailSignups.length === 0}
-                                <tr><td colspan="4" class="px-4 py-10 text-center text-sm text-base-content/50">No email signups yet.</td></tr>
+                                <tr
+                                    ><td
+                                        colspan="4"
+                                        class="px-4 py-10 text-center text-sm text-base-content/50"
+                                        >No email signups yet.</td
+                                    ></tr
+                                >
                             {/if}
                         </tbody>
                     </table>
@@ -409,13 +459,29 @@
         <div class="mt-10 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
             {#each funnelTiles as [label, value] (label)}
                 <ZenCard variant="glass" padding="md" radius="xl">
-                    <span class="block text-[11px] font-medium uppercase tracking-[0.15em] text-base-content/50">{label}</span>
-                    <span class="mt-2 block text-3xl font-bold tabular-nums tracking-tight text-base-content">{value}</span>
+                    <span
+                        class="block text-[11px] font-medium uppercase tracking-[0.15em] text-base-content/50"
+                        >{label}</span
+                    >
+                    <span
+                        class="mt-2 block text-3xl font-bold tabular-nums tracking-tight text-base-content"
+                        >{value}</span
+                    >
                 </ZenCard>
             {/each}
-            <ZenCard variant="glass" padding="md" radius="xl" class="ring-1 ring-inset ring-primary/20">
-                <span class="block text-[11px] font-medium uppercase tracking-[0.15em] text-base-content/50">Eligible</span>
-                <span class="mt-2 block text-3xl font-bold tabular-nums tracking-tight text-primary">{data.stats.eligible}</span>
+            <ZenCard
+                variant="glass"
+                padding="md"
+                radius="xl"
+                class="ring-1 ring-inset ring-primary/20"
+            >
+                <span
+                    class="block text-[11px] font-medium uppercase tracking-[0.15em] text-base-content/50"
+                    >Eligible</span
+                >
+                <span class="mt-2 block text-3xl font-bold tabular-nums tracking-tight text-primary"
+                    >{data.stats.eligible}</span
+                >
             </ZenCard>
         </div>
 
@@ -483,14 +549,17 @@
             {#if sweeping || reverifying}
                 <ZenSpinner size="xs" />
             {/if}
-            <span>{pending} pending · sweep fetches ALL followers of @{data.brand.handle} (~$0.001/follower)</span>
+            <span
+                >{pending} pending · sweep fetches ALL followers of @{data.brand.handle} (~$0.001/follower)</span
+            >
         </div>
 
         {#if sweepResult}
             <div class="mt-4">
                 <ZenAlert variant="success">
-                    Sweep complete — pending {sweepResult.pending}, verified {sweepResult.verified}, still
-                    unverified {sweepResult.unverified}{#if sweepResult.followers_fetched != null}, fetched {sweepResult.followers_fetched}
+                    Sweep complete — pending {sweepResult.pending}, verified {sweepResult.verified},
+                    still unverified {sweepResult.unverified}{#if sweepResult.followers_fetched != null},
+                        fetched {sweepResult.followers_fetched}
                         followers from X{/if}.
                 </ZenAlert>
             </div>
@@ -512,7 +581,10 @@
                     <thead>
                         <tr class="bg-base-content/[0.03] text-left">
                             {#each ['User', 'State', 'Created', 'Attested', 'Verified', 'Post', 'Wallet', 'Email', 'Refs', 'Eligible', 'Attempts'] as h (h)}
-                                <th class="whitespace-nowrap px-4 py-3 text-[11px] font-medium uppercase tracking-wider text-base-content/50">{h}</th>
+                                <th
+                                    class="whitespace-nowrap px-4 py-3 text-[11px] font-medium uppercase tracking-wider text-base-content/50"
+                                    >{h}</th
+                                >
                             {/each}
                             <th class="px-4 py-3" aria-label="actions"></th>
                         </tr>
@@ -520,7 +592,9 @@
                     <tbody>
                         {#each visible as u (u.id)}
                             {@const state = userState(u)}
-                            <tr class="border-t border-base-content/5 transition-colors hover:bg-base-content/[0.03]">
+                            <tr
+                                class="border-t border-base-content/5 transition-colors hover:bg-base-content/[0.03]"
+                            >
                                 <td class="px-4 py-3">
                                     <a
                                         href={`https://x.com/${u.username}`}
@@ -529,22 +603,45 @@
                                         class="group inline-flex items-center gap-2"
                                     >
                                         {#if u.profile_image_url}
-                                            <img src={u.profile_image_url} alt="" class="h-7 w-7 rounded-full" />
+                                            <img
+                                                src={u.profile_image_url}
+                                                alt=""
+                                                class="h-7 w-7 rounded-full"
+                                            />
                                         {:else}
-                                            <span class="h-7 w-7 rounded-full bg-base-content/10" aria-hidden="true"></span>
+                                            <span
+                                                class="h-7 w-7 rounded-full bg-base-content/10"
+                                                aria-hidden="true"
+                                            ></span>
                                         {/if}
                                         <span class="flex flex-col leading-tight">
-                                            <span class="font-semibold text-base-content group-hover:underline">@{u.username}</span>
-                                            {#if u.name}<span class="text-xs text-base-content/50">{u.name}</span>{/if}
+                                            <span
+                                                class="font-semibold text-base-content group-hover:underline"
+                                                >@{u.username}</span
+                                            >
+                                            {#if u.name}<span class="text-xs text-base-content/50"
+                                                    >{u.name}</span
+                                                >{/if}
                                         </span>
                                     </a>
                                 </td>
                                 <td class="px-4 py-3">
-                                    <ZenBadge variant={stateVariant[state]} size="sm">{state}</ZenBadge>
+                                    <ZenBadge variant={stateVariant[state]} size="sm"
+                                        >{state}</ZenBadge
+                                    >
                                 </td>
-                                <td class="whitespace-nowrap px-4 py-3 text-xs tabular-nums text-base-content/60">{fmtDate(u.created_at)}</td>
-                                <td class="whitespace-nowrap px-4 py-3 text-xs tabular-nums text-base-content/60">{fmtDate(u.follow_attested_at)}</td>
-                                <td class="whitespace-nowrap px-4 py-3 text-xs tabular-nums text-base-content/60">{fmtDate(u.follow_verified_at)}</td>
+                                <td
+                                    class="whitespace-nowrap px-4 py-3 text-xs tabular-nums text-base-content/60"
+                                    >{fmtDate(u.created_at)}</td
+                                >
+                                <td
+                                    class="whitespace-nowrap px-4 py-3 text-xs tabular-nums text-base-content/60"
+                                    >{fmtDate(u.follow_attested_at)}</td
+                                >
+                                <td
+                                    class="whitespace-nowrap px-4 py-3 text-xs tabular-nums text-base-content/60"
+                                    >{fmtDate(u.follow_verified_at)}</td
+                                >
                                 <td class="px-4 py-3">
                                     {#if u.post_verified_at && u.post_url}
                                         <a
@@ -552,22 +649,36 @@
                                             target="_blank"
                                             rel="noopener noreferrer"
                                             class="font-bold text-zen-success hover:underline"
-                                            title={`View post — verified ${fmtDate(u.post_verified_at)}`}>✓</a
+                                            title={`View post — verified ${fmtDate(u.post_verified_at)}`}
+                                            >✓</a
                                         >
                                     {:else if u.post_verified_at}
-                                        <span class="font-bold text-zen-success" title={fmtDate(u.post_verified_at)}>✓</span>
+                                        <span
+                                            class="font-bold text-zen-success"
+                                            title={fmtDate(u.post_verified_at)}>✓</span
+                                        >
                                     {:else}
                                         <span class="text-base-content/40">—</span>
                                     {/if}
                                 </td>
-                                <td class="whitespace-nowrap px-4 py-3 font-mono text-xs text-base-content/60" title={u.stellar_address ?? ''}>
+                                <td
+                                    class="whitespace-nowrap px-4 py-3 font-mono text-xs text-base-content/60"
+                                    title={u.stellar_address ?? ''}
+                                >
                                     {#if walletState(u) === 'verified'}
                                         <span class="inline-flex items-center gap-1">
-                                            <span class="text-zen-success" title={`Signature-verified ${fmtDate(u.wallet_sig_verified_at)}`} aria-label="signature-verified">✦</span>
+                                            <span
+                                                class="text-zen-success"
+                                                title={`Signature-verified ${fmtDate(u.wallet_sig_verified_at)}`}
+                                                aria-label="signature-verified">✦</span
+                                            >
                                             <span>{truncWallet(u.stellar_address)}</span>
                                         </span>
                                     {:else if walletState(u) === 'pasted'}
-                                        <span class="inline-flex items-center gap-1 text-base-content/40" title="Pasted address — ownership NOT proven">
+                                        <span
+                                            class="inline-flex items-center gap-1 text-base-content/40"
+                                            title="Pasted address — ownership NOT proven"
+                                        >
                                             <span aria-label="pasted, unverified">•</span>
                                             <span>{truncWallet(u.stellar_address)}</span>
                                         </span>
@@ -575,8 +686,13 @@
                                         <span class="text-base-content/40">—</span>
                                     {/if}
                                 </td>
-                                <td class="max-w-[22ch] overflow-hidden text-ellipsis whitespace-nowrap px-4 py-3 font-mono text-xs text-base-content/60">{u.email ?? '—'}</td>
-                                <td class="px-4 py-3 text-right tabular-nums text-base-content">{u.referral_count}</td>
+                                <td
+                                    class="max-w-[22ch] overflow-hidden text-ellipsis whitespace-nowrap px-4 py-3 font-mono text-xs text-base-content/60"
+                                    >{u.email ?? '—'}</td
+                                >
+                                <td class="px-4 py-3 text-right tabular-nums text-base-content"
+                                    >{u.referral_count}</td
+                                >
                                 <td class="px-4 py-3">
                                     {#if isLiveEligible(u)}
                                         <span
@@ -586,10 +702,16 @@
                                                 : 'Live-eligible (consent + ≥1 identity)'}>✓</span
                                         >
                                     {:else}
-                                        <span class="text-base-content/40" title="Not eligible — needs consent + email or wallet">—</span>
+                                        <span
+                                            class="text-base-content/40"
+                                            title="Not eligible — needs consent + email or wallet"
+                                            >—</span
+                                        >
                                     {/if}
                                 </td>
-                                <td class="px-4 py-3 text-right tabular-nums text-base-content/60">{u.follow_attempt_count}</td>
+                                <td class="px-4 py-3 text-right tabular-nums text-base-content/60"
+                                    >{u.follow_attempt_count}</td
+                                >
                                 <td class="whitespace-nowrap px-4 py-3 text-right">
                                     <div class="inline-flex items-center gap-2">
                                         {#if state !== 'verified'}
@@ -619,7 +741,13 @@
                             </tr>
                         {/each}
                         {#if visible.length === 0}
-                            <tr><td colspan="12" class="px-4 py-10 text-center text-sm text-base-content/50">No users match the current filter.</td></tr>
+                            <tr
+                                ><td
+                                    colspan="12"
+                                    class="px-4 py-10 text-center text-sm text-base-content/50"
+                                    >No users match the current filter.</td
+                                ></tr
+                            >
                         {/if}
                     </tbody>
                 </table>

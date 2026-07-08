@@ -62,12 +62,48 @@ fn __constructor(
     verifier: Address,
     jwk_registry: Address,
     vesting_wasm_hash: BytesN<32>,
+    upgrade_admin: Address,
 )
 ```
 
 The factory is initialized once with the addresses it will inject into every
 vesting contract it deploys, plus the WASM hash of the vesting contract to
-deploy.
+deploy. `upgrade_admin` controls factory upgrades, pause/deprecate actions, and
+factory-mediated upgrades of vestings deployed by this factory.
+
+### Governed verifier rotation
+
+Verifier contracts are immutable. When a circuit or verification key changes,
+deploy a new verifier contract and rotate the factory's stored verifier for
+future campaigns:
+
+```rust
+fn pending_verifier_update(env: Env) -> Option<PendingVerifierUpdate>
+fn current_verifier_metadata(env: Env) -> Option<VerifierMetadata>
+
+fn propose_verifier_update(
+    env: Env,
+    verifier: Address,
+    vk_hash: BytesN<32>,
+    circuit_hash: BytesN<32>,
+    manifest_hash: BytesN<32>,
+) -> Result<(), Error>
+
+fn cancel_verifier_update(env: Env) -> Result<(), Error>
+fn execute_verifier_update(env: Env) -> Result<(), Error>
+```
+
+`propose_verifier_update` requires `upgrade_admin`, rejects zero hashes, rejects
+the current verifier address, and calls `verifier.vk_hash()` to confirm the
+address matches the proposed `vk_hash`. `circuit_hash` and `manifest_hash` are
+auditable release metadata; governance and release tooling must still verify the
+target address is the intended immutable verifier Wasm and passes known-good /
+known-bad fixtures. Execution is timelocked for seven days, and executed metadata
+remains readable through `current_verifier_metadata`. Factory Wasm upgrades use
+the same seven-day minimum because they can change future verifier wiring. After
+execution, only newly deployed vestings use the new verifier. The verifier
+rotation entrypoint does not mutate existing vesting verifier addresses; any
+vesting Wasm upgrade that changes claim behavior is a separate governed change.
 
 ### Deterministic addresses
 
@@ -187,11 +223,14 @@ fn __constructor(
     verifier: Address, jwk_registry: Address,
     name: String, description: String,
     merkle_root: BytesN<32>, audience_hash: BytesN<32>, metadata_cid: String,
+    upgrade_admin: Address,
 ) -> Result<(), Error>
 ```
 
 Deployed by the factory (never called directly). Validates the initial root and
-a non-zero canonical `audience_hash`.
+a non-zero canonical `audience_hash`. Factory-created vestings use the factory
+contract address as `upgrade_admin`, so factory governance remains the control
+point after factory admin rotation.
 
 ### `claim`
 

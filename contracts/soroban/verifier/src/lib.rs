@@ -12,6 +12,7 @@ pub const DAY_IN_LEDGERS: u32 = 17_280;
 /// claim fail until an external restore.
 pub const TTL_EXTEND_TO: u32 = 120 * DAY_IN_LEDGERS;
 pub const TTL_THRESHOLD: u32 = TTL_EXTEND_TO - DAY_IN_LEDGERS;
+pub const CONTRACT_VERSION: u32 = 1;
 
 /// Contract
 #[contract]
@@ -57,6 +58,10 @@ impl UltraHonkVerifierContract {
         env.storage().instance().set(&Self::key_vk_hash(), &vk_hash);
         Self::extend_contract_ttl(&env);
         Ok(())
+    }
+
+    pub fn version() -> u32 {
+        CONTRACT_VERSION
     }
 
     /// Return the hash of the parsed verification key.

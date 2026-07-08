@@ -110,7 +110,8 @@ VESTING_WASM_HASH=$(stellar contract upload --wasm <zarf_vesting_soroban.wasm> \
 stellar contract deploy --wasm <zarf_vesting_factory_soroban.wasm> \
   --source <SOURCE> --network testnet \
   -- --verifier <VERIFIER_ID> --jwk_registry <REGISTRY_ID> \
-     --vesting_wasm_hash "$VESTING_WASM_HASH"
+     --vesting_wasm_hash "$VESTING_WASM_HASH" \
+     --upgrade_admin <COLD_MULTISIG_OR_SOURCE>
 ```
 
 Release WASM artifacts are written to each contract's
@@ -121,6 +122,14 @@ Release WASM artifacts are written to each contract's
 After deploying, register at least one Google signing key in the JWK registry so
 claims can validate JWTs. In production this is kept fresh automatically by the
 [JWK rotation worker](/developers/jwk-rotation/).
+
+To ship a new circuit or verification key, deploy a new immutable verifier
+contract first, verify it against known-good and known-bad fixtures off-chain,
+then use the factory's governed `propose_verifier_update` /
+`execute_verifier_update` flow with the new verifier address, VK hash, circuit
+hash, and release manifest hash. The verifier update timelock is seven days and
+only affects future vestings deployed after execution; the rotation entrypoint
+does not mutate existing vesting verifier addresses.
 
 <!-- TODO(verify): there is no single canonical "deploy to a fresh network" script beyond the e2e harness (run_testnet_factory_e2e.sh) and the demo scripts under web/scripts/. Confirm whether an operator-facing deploy script/runbook exists and link it here if so. -->
 

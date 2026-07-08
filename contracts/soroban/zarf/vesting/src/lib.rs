@@ -39,6 +39,11 @@ pub const TTL_THRESHOLD: u32 = TTL_EXTEND_TO - DAY_IN_LEDGERS;
 /// more conservative than the factory's 80-item page cap — claim tooling
 /// tends to stack extra reads on top of this call.
 pub const MAX_CLAIMED_BATCH: u32 = 64;
+pub const CONTRACT_VERSION: u32 = 1;
+pub const SCHEMA_VERSION: u32 = 1;
+/// Vesting upgrades affect recipient funds, so the minimum delay is longer
+/// than registry key activation.
+pub const MIN_UPGRADE_DELAY_SECS: u64 = 48 * 3600;
 
 #[contract]
 pub struct ZarfVestingContract;
@@ -63,6 +68,13 @@ pub enum Error {
     JwtExpired = 14,
     TokenTransferMismatch = 15,
     TooManyCommitments = 16,
+    UpgradeAdminNotSet = 17,
+    PendingUpgradeNotFound = 18,
+    UpgradeDelayNotElapsed = 19,
+    InvalidSchemaVersion = 20,
+    AlreadyMigrated = 21,
+    PendingUpgradeAdminNotSet = 22,
+    InvalidUpgrade = 23,
 }
 
 #[contracttype]
@@ -78,6 +90,10 @@ pub enum DataKey {
     AudienceHash,
     MetadataCid,
     Claimed(BytesN<32>),
+    UpgradeAdmin,
+    PendingUpgradeAdmin,
+    PendingUpgrade,
+    SchemaVersion,
 }
 
 #[contracttype]
@@ -92,6 +108,17 @@ pub struct VestingSummary {
     pub merkle_root: BytesN<32>,
     pub audience_hash: BytesN<32>,
     pub metadata_cid: String,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PendingUpgrade {
+    pub wasm_hash: BytesN<32>,
+    pub manifest_hash: BytesN<32>,
+    pub proposed_at: u64,
+    pub execute_after: u64,
+    pub from_version: u32,
+    pub to_version: u32,
 }
 
 #[contractevent(topics = ["owner_set"])]
@@ -126,6 +153,54 @@ pub struct Claimed {
     pub amount: i128,
 }
 
+#[contractevent(topics = ["upgrade_proposed"])]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct UpgradeProposed {
+    #[topic]
+    pub wasm_hash: BytesN<32>,
+    #[topic]
+    pub manifest_hash: BytesN<32>,
+    pub execute_after: u64,
+    pub from_version: u32,
+    pub to_version: u32,
+}
+
+#[contractevent(topics = ["upgrade_cancelled"])]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct UpgradeCancelled {
+    #[topic]
+    pub wasm_hash: BytesN<32>,
+    #[topic]
+    pub manifest_hash: BytesN<32>,
+}
+
+#[contractevent(topics = ["upgrade_executed"])]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct UpgradeExecuted {
+    #[topic]
+    pub wasm_hash: BytesN<32>,
+    #[topic]
+    pub manifest_hash: BytesN<32>,
+    pub from_version: u32,
+    pub to_version: u32,
+}
+
+#[contractevent(topics = ["upgrade_admin_proposed"], data_format = "single-value")]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct UpgradeAdminProposed {
+    #[topic]
+    pub new_admin: Address,
+}
+
+#[contractevent(topics = ["upgrade_admin_set"])]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct UpgradeAdminTransferred {
+    #[topic]
+    pub previous_admin: Address,
+    #[topic]
+    pub new_admin: Address,
+}
+
 #[contractimpl]
 impl ZarfVestingContract {
     pub fn __constructor(
@@ -139,6 +214,7 @@ impl ZarfVestingContract {
         merkle_root: BytesN<32>,
         audience_hash: BytesN<32>,
         metadata_cid: String,
+        upgrade_admin: Address,
     ) -> Result<(), Error> {
         Self::validate_initial_root(&merkle_root)?;
         Self::validate_nonzero_field(&audience_hash)?;
@@ -153,10 +229,148 @@ impl ZarfVestingContract {
         store.set(&DataKey::MerkleRoot, &merkle_root);
         store.set(&DataKey::AudienceHash, &audience_hash);
         store.set(&DataKey::MetadataCid, &metadata_cid);
+        store.set(&DataKey::UpgradeAdmin, &upgrade_admin);
+        store.set(&DataKey::SchemaVersion, &SCHEMA_VERSION);
         Self::extend_contract_ttl(&env);
         Ok(())
     }
 
+    pub fn version() -> u32 {
+        CONTRACT_VERSION
+    }
+
+    pub fn schema_version(env: Env) -> u32 {
+        env.storage()
+            .instance()
+            .get(&DataKey::SchemaVersion)
+            .unwrap_or(0_u32)
+    }
+
+    pub fn upgrade_admin(env: Env) -> Result<Address, Error> {
+        Self::get_instance(&env, DataKey::UpgradeAdmin)
+    }
+
+    pub fn pending_upgrade(env: Env) -> Option<PendingUpgrade> {
+        env.storage().instance().get(&DataKey::PendingUpgrade)
+    }
+
+    pub fn propose_upgrade_admin(env: Env, new_admin: Address) -> Result<(), Error> {
+        Self::require_upgrade_admin(&env)?;
+        env.storage()
+            .instance()
+            .set(&DataKey::PendingUpgradeAdmin, &new_admin);
+        Self::extend_contract_ttl(&env);
+        UpgradeAdminProposed { new_admin }.publish(&env);
+        Ok(())
+    }
+
+    pub fn accept_upgrade_admin(env: Env) -> Result<(), Error> {
+        let pending: Address = env
+            .storage()
+            .instance()
+            .get(&DataKey::PendingUpgradeAdmin)
+            .ok_or(Error::PendingUpgradeAdminNotSet)?;
+        pending.require_auth();
+        let previous_admin = Self::upgrade_admin(env.clone())?;
+        env.storage()
+            .instance()
+            .set(&DataKey::UpgradeAdmin, &pending);
+        env.storage()
+            .instance()
+            .remove(&DataKey::PendingUpgradeAdmin);
+        Self::extend_contract_ttl(&env);
+        UpgradeAdminTransferred {
+            previous_admin,
+            new_admin: pending,
+        }
+        .publish(&env);
+        Ok(())
+    }
+
+    pub fn cancel_upgrade_admin_transfer(env: Env) -> Result<(), Error> {
+        Self::require_upgrade_admin(&env)?;
+        if !env.storage().instance().has(&DataKey::PendingUpgradeAdmin) {
+            return Err(Error::PendingUpgradeAdminNotSet);
+        }
+        env.storage()
+            .instance()
+            .remove(&DataKey::PendingUpgradeAdmin);
+        Self::extend_contract_ttl(&env);
+        Ok(())
+    }
+
+    pub fn propose_upgrade(
+        env: Env,
+        wasm_hash: BytesN<32>,
+        manifest_hash: BytesN<32>,
+        to_version: u32,
+    ) -> Result<(), Error> {
+        Self::require_upgrade_admin(&env)?;
+        Self::validate_upgrade_proposal(&wasm_hash, &manifest_hash, to_version)?;
+        let proposed_at = env.ledger().timestamp();
+        let pending = PendingUpgrade {
+            wasm_hash: wasm_hash.clone(),
+            manifest_hash: manifest_hash.clone(),
+            proposed_at,
+            execute_after: proposed_at.saturating_add(MIN_UPGRADE_DELAY_SECS),
+            from_version: CONTRACT_VERSION,
+            to_version,
+        };
+        env.storage()
+            .instance()
+            .set(&DataKey::PendingUpgrade, &pending);
+        Self::extend_contract_ttl(&env);
+        UpgradeProposed {
+            wasm_hash,
+            manifest_hash,
+            execute_after: pending.execute_after,
+            from_version: pending.from_version,
+            to_version,
+        }
+        .publish(&env);
+        Ok(())
+    }
+
+    pub fn cancel_upgrade(env: Env) -> Result<(), Error> {
+        Self::require_upgrade_admin(&env)?;
+        let pending: PendingUpgrade = env
+            .storage()
+            .instance()
+            .get(&DataKey::PendingUpgrade)
+            .ok_or(Error::PendingUpgradeNotFound)?;
+        env.storage().instance().remove(&DataKey::PendingUpgrade);
+        Self::extend_contract_ttl(&env);
+        UpgradeCancelled {
+            wasm_hash: pending.wasm_hash,
+            manifest_hash: pending.manifest_hash,
+        }
+        .publish(&env);
+        Ok(())
+    }
+
+    pub fn execute_upgrade(env: Env) -> Result<(), Error> {
+        Self::require_upgrade_admin(&env)?;
+        let pending: PendingUpgrade = env
+            .storage()
+            .instance()
+            .get(&DataKey::PendingUpgrade)
+            .ok_or(Error::PendingUpgradeNotFound)?;
+        if env.ledger().timestamp() < pending.execute_after {
+            return Err(Error::UpgradeDelayNotElapsed);
+        }
+        env.storage().instance().remove(&DataKey::PendingUpgrade);
+        Self::extend_contract_ttl(&env);
+        UpgradeExecuted {
+            wasm_hash: pending.wasm_hash.clone(),
+            manifest_hash: pending.manifest_hash,
+            from_version: pending.from_version,
+            to_version: pending.to_version,
+        }
+        .publish(&env);
+        env.deployer()
+            .update_current_contract_wasm(pending.wasm_hash);
+        Ok(())
+    }
     pub fn owner(env: Env) -> Result<Address, Error> {
         Self::get_instance(&env, DataKey::Owner)
     }
@@ -431,6 +645,31 @@ impl ZarfVestingContract {
         let owner = Self::get_instance::<Address>(env, DataKey::Owner)?;
         owner.require_auth();
         Ok(owner)
+    }
+
+    fn require_upgrade_admin(env: &Env) -> Result<Address, Error> {
+        let admin = Self::get_instance::<Address>(env, DataKey::UpgradeAdmin)
+            .map_err(|_| Error::UpgradeAdminNotSet)?;
+        admin.require_auth();
+        Ok(admin)
+    }
+
+    fn validate_upgrade_proposal(
+        wasm_hash: &BytesN<32>,
+        manifest_hash: &BytesN<32>,
+        to_version: u32,
+    ) -> Result<(), Error> {
+        if to_version <= CONTRACT_VERSION
+            || Self::is_zero_hash(wasm_hash)
+            || Self::is_zero_hash(manifest_hash)
+        {
+            return Err(Error::InvalidUpgrade);
+        }
+        Ok(())
+    }
+
+    fn is_zero_hash(hash: &BytesN<32>) -> bool {
+        hash.to_array().iter().all(|byte| *byte == 0)
     }
 
     fn is_zero_root(root: &BytesN<32>) -> bool {
