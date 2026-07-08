@@ -60,8 +60,11 @@ Four Rust/Soroban contracts. Full signatures, events, and storage keys are on th
 - **Factory** — deploys vesting contracts deterministically
   (`env.deployer().with_current_contract(salt).deploy_v2(...)`) and funds them in
   one call. Stores the verifier address, JWK registry address, and vesting Wasm
-  hash. Exposes `recipient_id(recipient)` so a Stellar-bound proof can be
-  generated before the vesting instance exists.
+  hash. Factory governance can timelock a verifier-address rotation for future
+  vestings after a new immutable verifier is deployed and fixture-gated; the
+  rotation entrypoint does not mutate existing vesting verifier addresses.
+  Exposes `recipient_id(recipient)` so a Stellar-bound proof can be generated
+  before the vesting instance exists.
   (`contracts/soroban/zarf/factory`)
 - **Vesting** — holds funds, records the Merkle root and audience hash (the
   per-recipient unlock times are baked into the Merkle leaves, not stored as a

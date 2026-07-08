@@ -123,6 +123,14 @@ After deploying, register at least one Google signing key in the JWK registry so
 claims can validate JWTs. In production this is kept fresh automatically by the
 [JWK rotation worker](/developers/jwk-rotation/).
 
+To ship a new circuit or verification key, deploy a new immutable verifier
+contract first, verify it against known-good and known-bad fixtures off-chain,
+then use the factory's governed `propose_verifier_update` /
+`execute_verifier_update` flow with the new verifier address, VK hash, circuit
+hash, and release manifest hash. The verifier update timelock is seven days and
+only affects future vestings deployed after execution; the rotation entrypoint
+does not mutate existing vesting verifier addresses.
+
 <!-- TODO(verify): there is no single canonical "deploy to a fresh network" script beyond the e2e harness (run_testnet_factory_e2e.sh) and the demo scripts under web/scripts/. Confirm whether an operator-facing deploy script/runbook exists and link it here if so. -->
 
 ## 4. Configure and run the apps locally

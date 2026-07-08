@@ -89,7 +89,7 @@ Minimum proposal delay:
 
 - Registry: at least `MIN_ACTIVATION_DELAY_SECS` and preferably longer than the JWK key activation delay.
 - Vesting: at least 48 hours because recipient funds are at risk.
-- Factory: at least 48 hours because it controls new deployments and can consume user token approvals.
+- Factory: at least 7 days because factory Wasm can change future verifier wiring and must not bypass the verifier-rotation delay.
 - Verifier: at least 7 days unless an emergency response policy is separately approved, because this changes proof acceptance.
 
 Add two-step `UpgradeAdmin` rotation:
@@ -149,13 +149,21 @@ Migration requirements:
 
 ### Factory
 
-Factory needs an admin before upgradeability can be safe. Today it has no owner and cannot pause or rotate `VestingWasmHash`.
+Factory now has an explicit `UpgradeAdmin`, pause/deprecate controls, governed
+Wasm upgrades, and governed verifier rotation for future vesting deployments.
+Verifier rotation uses the same seven-day minimum as factory Wasm upgrades: the
+new immutable verifier must expose the proposed `vk_hash`, proposals include
+`circuit_hash` and `manifest_hash`, and executed metadata remains readable from
+factory state. Existing vesting verifier addresses are not mutated by verifier
+rotation; separate vesting Wasm upgrades remain a distinct governed change to
+claim behavior.
 
 Implementation requirements:
 
-- Add `Owner` or `UpgradeAdmin` at construction in the next factory deployment.
-- Add `pause`, `unpause`, and `deprecate` with events. `create_vesting` and `create_and_fund_vesting` must reject while paused or deprecated.
-- Add governed `propose_config_update` for future `VestingWasmHash`, verifier, and registry changes. It should use the same timelock and manifest hash as Wasm upgrades.
+- Keep `UpgradeAdmin` separate from campaign owners and hot operator keys.
+- Keep `pause`, `unpause`, and `deprecate` limited to new factory deployments; recipient claims in existing vestings must not depend on factory pause state.
+- Use factory `propose_verifier_update` / `execute_verifier_update` only for future deployments. Do not mutate existing vesting verifier addresses in routine circuit releases.
+- If future `VestingWasmHash` or registry config rotation is added, give it the same proposal/cancel/execute shape and manifest discipline.
 - Expand `VestingCreated` or add a second event containing verifier, registry, vesting Wasm hash, Merkle root, audience hash, and release manifest hash/CID.
 - Keep deterministic address derivation unchanged unless a versioned factory explicitly documents a new salt scheme.
 

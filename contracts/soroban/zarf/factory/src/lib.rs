@@ -25,9 +25,12 @@ pub const TTL_THRESHOLD: u32 = TTL_EXTEND_TO - DAY_IN_LEDGERS;
 /// footprint entries per transaction (~100), so 80 leaves headroom for the
 /// instance and code entries.
 pub const MAX_PAGE_LIMIT: u32 = 80;
-pub const CONTRACT_VERSION: u32 = 1;
+pub const CONTRACT_VERSION: u32 = 2;
 pub const SCHEMA_VERSION: u32 = 1;
-pub const MIN_UPGRADE_DELAY_SECS: u64 = 48 * 3600;
+pub const MIN_VERIFIER_UPDATE_DELAY_SECS: u64 = 7 * 24 * 3600;
+/// Factory Wasm upgrades can change future verifier wiring, so they must not be
+/// a shorter path around the verifier-rotation timelock.
+pub const MIN_UPGRADE_DELAY_SECS: u64 = MIN_VERIFIER_UPDATE_DELAY_SECS;
 
 #[contract]
 pub struct ZarfVestingFactoryContract;
@@ -54,6 +57,10 @@ pub enum Error {
     PendingUpgradeAdminNotSet = 16,
     VestingUpgradeCallFailed = 17,
     InvalidUpgrade = 18,
+    PendingVerifierUpdateNotFound = 19,
+    VerifierUpdateDelayNotElapsed = 20,
+    InvalidVerifierUpdate = 21,
+    VerifierUpdateCallFailed = 22,
 }
 
 #[contracttype]
@@ -83,6 +90,8 @@ pub enum DataKey {
     SchemaVersion,
     Paused,
     Deprecated,
+    PendingVerifierUpdate,
+    VerifierMetadata,
 }
 
 #[contractevent(topics = ["vesting_created"])]
@@ -115,6 +124,27 @@ pub struct PendingUpgrade {
     pub execute_after: u64,
     pub from_version: u32,
     pub to_version: u32,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PendingVerifierUpdate {
+    pub verifier: Address,
+    pub vk_hash: BytesN<32>,
+    pub circuit_hash: BytesN<32>,
+    pub manifest_hash: BytesN<32>,
+    pub proposed_at: u64,
+    pub execute_after: u64,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct VerifierMetadata {
+    pub verifier: Address,
+    pub vk_hash: BytesN<32>,
+    pub circuit_hash: BytesN<32>,
+    pub manifest_hash: BytesN<32>,
+    pub activated_at: u64,
 }
 
 #[contractevent(topics = ["upgrade_proposed"])]
@@ -177,6 +207,41 @@ pub struct UpgradeAdminTransferred {
     pub new_admin: Address,
 }
 
+#[contractevent(topics = ["verifier_update_proposed"])]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct VerifierUpdateProposed {
+    #[topic]
+    pub verifier: Address,
+    #[topic]
+    pub vk_hash: BytesN<32>,
+    pub circuit_hash: BytesN<32>,
+    pub manifest_hash: BytesN<32>,
+    pub execute_after: u64,
+}
+
+#[contractevent(topics = ["verifier_update_cancelled"])]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct VerifierUpdateCancelled {
+    #[topic]
+    pub verifier: Address,
+    #[topic]
+    pub vk_hash: BytesN<32>,
+    pub circuit_hash: BytesN<32>,
+    pub manifest_hash: BytesN<32>,
+}
+
+#[contractevent(topics = ["verifier_update_executed"])]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct VerifierUpdateExecuted {
+    #[topic]
+    pub previous_verifier: Address,
+    #[topic]
+    pub verifier: Address,
+    pub vk_hash: BytesN<32>,
+    pub circuit_hash: BytesN<32>,
+    pub manifest_hash: BytesN<32>,
+}
+
 #[contractimpl]
 impl ZarfVestingFactoryContract {
     pub fn __constructor(
@@ -215,6 +280,16 @@ impl ZarfVestingFactoryContract {
 
     pub fn pending_upgrade(env: Env) -> Option<PendingUpgrade> {
         env.storage().instance().get(&DataKey::PendingUpgrade)
+    }
+
+    pub fn pending_verifier_update(env: Env) -> Option<PendingVerifierUpdate> {
+        env.storage()
+            .instance()
+            .get(&DataKey::PendingVerifierUpdate)
+    }
+
+    pub fn current_verifier_metadata(env: Env) -> Option<VerifierMetadata> {
+        env.storage().instance().get(&DataKey::VerifierMetadata)
     }
 
     pub fn propose_upgrade_admin(env: Env, new_admin: Address) -> Result<(), Error> {
@@ -307,7 +382,7 @@ impl ZarfVestingFactoryContract {
         to_version: u32,
     ) -> Result<(), Error> {
         Self::require_upgrade_admin(&env)?;
-        Self::validate_upgrade_proposal(&wasm_hash, &manifest_hash, to_version)?;
+        Self::validate_factory_upgrade_proposal(&wasm_hash, &manifest_hash, to_version)?;
         let proposed_at = env.ledger().timestamp();
         let pending = PendingUpgrade {
             wasm_hash: wasm_hash.clone(),
@@ -372,6 +447,113 @@ impl ZarfVestingFactoryContract {
             .update_current_contract_wasm(pending.wasm_hash);
         Ok(())
     }
+
+    pub fn propose_verifier_update(
+        env: Env,
+        verifier: Address,
+        vk_hash: BytesN<32>,
+        circuit_hash: BytesN<32>,
+        manifest_hash: BytesN<32>,
+    ) -> Result<(), Error> {
+        Self::require_upgrade_admin(&env)?;
+        Self::validate_factory_verifier_update(
+            &env,
+            &verifier,
+            &vk_hash,
+            &circuit_hash,
+            &manifest_hash,
+        )?;
+        let proposed_at = env.ledger().timestamp();
+        let pending = PendingVerifierUpdate {
+            verifier: verifier.clone(),
+            vk_hash: vk_hash.clone(),
+            circuit_hash: circuit_hash.clone(),
+            manifest_hash: manifest_hash.clone(),
+            proposed_at,
+            execute_after: proposed_at.saturating_add(MIN_VERIFIER_UPDATE_DELAY_SECS),
+        };
+        env.storage()
+            .instance()
+            .set(&DataKey::PendingVerifierUpdate, &pending);
+        Self::extend_contract_ttl(&env);
+        VerifierUpdateProposed {
+            verifier,
+            vk_hash,
+            circuit_hash,
+            manifest_hash,
+            execute_after: pending.execute_after,
+        }
+        .publish(&env);
+        Ok(())
+    }
+
+    pub fn cancel_verifier_update(env: Env) -> Result<(), Error> {
+        Self::require_upgrade_admin(&env)?;
+        let pending: PendingVerifierUpdate = env
+            .storage()
+            .instance()
+            .get(&DataKey::PendingVerifierUpdate)
+            .ok_or(Error::PendingVerifierUpdateNotFound)?;
+        env.storage()
+            .instance()
+            .remove(&DataKey::PendingVerifierUpdate);
+        Self::extend_contract_ttl(&env);
+        VerifierUpdateCancelled {
+            verifier: pending.verifier,
+            vk_hash: pending.vk_hash,
+            circuit_hash: pending.circuit_hash,
+            manifest_hash: pending.manifest_hash,
+        }
+        .publish(&env);
+        Ok(())
+    }
+
+    pub fn execute_verifier_update(env: Env) -> Result<(), Error> {
+        Self::require_upgrade_admin(&env)?;
+        let pending: PendingVerifierUpdate = env
+            .storage()
+            .instance()
+            .get(&DataKey::PendingVerifierUpdate)
+            .ok_or(Error::PendingVerifierUpdateNotFound)?;
+        if env.ledger().timestamp() < pending.execute_after {
+            return Err(Error::VerifierUpdateDelayNotElapsed);
+        }
+        Self::validate_factory_verifier_update(
+            &env,
+            &pending.verifier,
+            &pending.vk_hash,
+            &pending.circuit_hash,
+            &pending.manifest_hash,
+        )?;
+        let previous_verifier = Self::get_instance::<Address>(&env, DataKey::Verifier)?;
+        env.storage()
+            .instance()
+            .set(&DataKey::Verifier, &pending.verifier);
+        env.storage().instance().set(
+            &DataKey::VerifierMetadata,
+            &VerifierMetadata {
+                verifier: pending.verifier.clone(),
+                vk_hash: pending.vk_hash.clone(),
+                circuit_hash: pending.circuit_hash.clone(),
+                manifest_hash: pending.manifest_hash.clone(),
+                activated_at: env.ledger().timestamp(),
+            },
+        );
+        env.storage()
+            .instance()
+            .remove(&DataKey::PendingVerifierUpdate);
+        Self::extend_contract_ttl(&env);
+        VerifierUpdateExecuted {
+            previous_verifier,
+            verifier: pending.verifier,
+            vk_hash: pending.vk_hash,
+            circuit_hash: pending.circuit_hash,
+            manifest_hash: pending.manifest_hash,
+        }
+        .publish(&env);
+        Ok(())
+    }
+
     pub fn propose_vesting_upgrade(
         env: Env,
         vesting: Address,
@@ -380,7 +562,7 @@ impl ZarfVestingFactoryContract {
         to_version: u32,
     ) -> Result<(), Error> {
         Self::require_upgrade_admin(&env)?;
-        Self::validate_upgrade_proposal(&wasm_hash, &manifest_hash, to_version)?;
+        Self::validate_child_upgrade_proposal(&wasm_hash, &manifest_hash, to_version)?;
         let mut args: Vec<Val> = Vec::new(&env);
         args.push_back(wasm_hash.into_val(&env));
         args.push_back(manifest_hash.into_val(&env));
@@ -807,15 +989,32 @@ impl ZarfVestingFactoryContract {
         Ok(())
     }
 
-    fn validate_upgrade_proposal(
+    fn validate_factory_upgrade_proposal(
         wasm_hash: &BytesN<32>,
         manifest_hash: &BytesN<32>,
         to_version: u32,
     ) -> Result<(), Error> {
-        if to_version <= CONTRACT_VERSION
-            || Self::is_zero_hash(wasm_hash)
-            || Self::is_zero_hash(manifest_hash)
-        {
+        Self::validate_upgrade_artifacts(wasm_hash, manifest_hash, to_version)?;
+        if to_version <= CONTRACT_VERSION {
+            return Err(Error::InvalidUpgrade);
+        }
+        Ok(())
+    }
+
+    fn validate_child_upgrade_proposal(
+        wasm_hash: &BytesN<32>,
+        manifest_hash: &BytesN<32>,
+        to_version: u32,
+    ) -> Result<(), Error> {
+        Self::validate_upgrade_artifacts(wasm_hash, manifest_hash, to_version)
+    }
+
+    fn validate_upgrade_artifacts(
+        wasm_hash: &BytesN<32>,
+        manifest_hash: &BytesN<32>,
+        to_version: u32,
+    ) -> Result<(), Error> {
+        if to_version == 0 || Self::is_zero_hash(wasm_hash) || Self::is_zero_hash(manifest_hash) {
             return Err(Error::InvalidUpgrade);
         }
         Ok(())
@@ -823,6 +1022,50 @@ impl ZarfVestingFactoryContract {
 
     fn is_zero_hash(hash: &BytesN<32>) -> bool {
         hash.to_array().iter().all(|byte| *byte == 0)
+    }
+
+    fn validate_factory_verifier_update(
+        env: &Env,
+        verifier: &Address,
+        vk_hash: &BytesN<32>,
+        circuit_hash: &BytesN<32>,
+        manifest_hash: &BytesN<32>,
+    ) -> Result<(), Error> {
+        let current = Self::get_instance::<Address>(env, DataKey::Verifier)?;
+        if *verifier == current {
+            return Err(Error::InvalidVerifierUpdate);
+        }
+        Self::validate_verifier_metadata(env, verifier, vk_hash, circuit_hash, manifest_hash)
+    }
+
+    fn validate_verifier_metadata(
+        env: &Env,
+        verifier: &Address,
+        vk_hash: &BytesN<32>,
+        circuit_hash: &BytesN<32>,
+        manifest_hash: &BytesN<32>,
+    ) -> Result<(), Error> {
+        if Self::is_zero_hash(vk_hash)
+            || Self::is_zero_hash(circuit_hash)
+            || Self::is_zero_hash(manifest_hash)
+        {
+            return Err(Error::InvalidVerifierUpdate);
+        }
+        let observed_vk_hash = Self::verifier_vk_hash(env, verifier)?;
+        if observed_vk_hash != *vk_hash {
+            return Err(Error::InvalidVerifierUpdate);
+        }
+        Ok(())
+    }
+
+    fn verifier_vk_hash(env: &Env, verifier: &Address) -> Result<BytesN<32>, Error> {
+        env.try_invoke_contract::<BytesN<32>, InvokeError>(
+            verifier,
+            &Symbol::new(env, "vk_hash"),
+            Vec::new(env),
+        )
+        .map_err(|_| Error::VerifierUpdateCallFailed)?
+        .map_err(|_| Error::VerifierUpdateCallFailed)
     }
 
     fn invoke_vesting(
