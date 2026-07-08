@@ -4,6 +4,7 @@
     import { brand } from '$lib/brand';
     import type { PageData } from './$types';
     import type { EligibilityState } from '$lib/quests';
+    import { err as logErr } from '@zarf/core/utils/log';
 
     import ZenCard from '@zarf/ui/components/ui/ZenCard.svelte';
     import ZenAlert from '@zarf/ui/components/ui/ZenAlert.svelte';
@@ -56,7 +57,7 @@
             const res = await fetch('/api/auth/logout', { method: 'POST' });
             if (res.ok) await invalidateAll();
         } catch (err) {
-            console.error('Logout failed:', err);
+            logErr('Logout failed:', err);
         } finally {
             loggingOut = false;
         }
@@ -154,7 +155,8 @@
 
                     <p class="text-xs leading-relaxed text-base-content/45">
                         We use your X account to check you're human and that you follow
-                        <strong class="font-semibold text-base-content/70">@{data.brand.handle}</strong
+                        <strong class="font-semibold text-base-content/70"
+                            >@{data.brand.handle}</strong
                         >. No tweets, no DMs — ever.
                     </p>
                 </div>

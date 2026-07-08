@@ -7,6 +7,7 @@
     import ZenBadge from '@zarf/ui/components/ui/ZenBadge.svelte';
     import ZenAlert from '@zarf/ui/components/ui/ZenAlert.svelte';
     import ZenSpinner from '@zarf/ui/components/ui/ZenSpinner.svelte';
+    import { err as logErr } from '@zarf/core/utils/log';
 
     let { data }: { data: PageData } = $props();
 
@@ -132,7 +133,7 @@
         try {
             await fetch('/api/auth/logout', { method: 'POST' });
         } catch (err) {
-            console.error('Logout failed:', err);
+            logErr('Logout failed:', err);
         } finally {
             // Hard nav: layout guard re-runs with cleared cookie → bounced to /
             await goto('/', { invalidateAll: true });
