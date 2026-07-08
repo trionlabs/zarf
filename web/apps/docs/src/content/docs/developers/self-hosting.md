@@ -110,7 +110,8 @@ VESTING_WASM_HASH=$(stellar contract upload --wasm <zarf_vesting_soroban.wasm> \
 stellar contract deploy --wasm <zarf_vesting_factory_soroban.wasm> \
   --source <SOURCE> --network testnet \
   -- --verifier <VERIFIER_ID> --jwk_registry <REGISTRY_ID> \
-     --vesting_wasm_hash "$VESTING_WASM_HASH"
+     --vesting_wasm_hash "$VESTING_WASM_HASH" \
+     --upgrade_admin <COLD_MULTISIG_OR_SOURCE>
 ```
 
 Release WASM artifacts are written to each contract's

@@ -62,12 +62,14 @@ fn __constructor(
     verifier: Address,
     jwk_registry: Address,
     vesting_wasm_hash: BytesN<32>,
+    upgrade_admin: Address,
 )
 ```
 
 The factory is initialized once with the addresses it will inject into every
 vesting contract it deploys, plus the WASM hash of the vesting contract to
-deploy.
+deploy. `upgrade_admin` controls factory upgrades, pause/deprecate actions, and
+factory-mediated upgrades of vestings deployed by this factory.
 
 ### Deterministic addresses
 
@@ -187,11 +189,14 @@ fn __constructor(
     verifier: Address, jwk_registry: Address,
     name: String, description: String,
     merkle_root: BytesN<32>, audience_hash: BytesN<32>, metadata_cid: String,
+    upgrade_admin: Address,
 ) -> Result<(), Error>
 ```
 
 Deployed by the factory (never called directly). Validates the initial root and
-a non-zero canonical `audience_hash`.
+a non-zero canonical `audience_hash`. Factory-created vestings use the factory
+contract address as `upgrade_admin`, so factory governance remains the control
+point after factory admin rotation.
 
 ### `claim`
 

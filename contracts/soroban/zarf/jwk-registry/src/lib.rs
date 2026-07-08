@@ -31,6 +31,11 @@ pub const MAX_ACTIVATION_DELAY_SECS: u64 = 7 * 24 * 3600;
 /// and exceeds the Google id_token lifetime (<=1h). A zero/omitted delay
 /// (which silently disabled the operator/owner split) is now rejected.
 pub const MIN_ACTIVATION_DELAY_SECS: u64 = 6 * 3600;
+pub const CONTRACT_VERSION: u32 = 1;
+pub const SCHEMA_VERSION: u32 = 1;
+/// Registry upgrades can change the trust root for all vestings, so they must
+/// be at least as delayed as hot-operator key activation.
+pub const MIN_UPGRADE_DELAY_SECS: u64 = MIN_ACTIVATION_DELAY_SECS;
 
 #[contract]
 pub struct JwkRegistryContract;
@@ -48,6 +53,13 @@ pub enum Error {
     InvalidModulus = 7,
     InvalidActivationDelay = 8,
     PendingOwnerNotSet = 9,
+    UpgradeAdminNotSet = 10,
+    PendingUpgradeNotFound = 11,
+    UpgradeDelayNotElapsed = 12,
+    InvalidSchemaVersion = 13,
+    AlreadyMigrated = 14,
+    PendingUpgradeAdminNotSet = 15,
+    InvalidUpgrade = 16,
 }
 
 #[contracttype]
@@ -75,6 +87,10 @@ pub enum DataKey {
     PendingCount,
     PendingAt(u32),
     PendingIndex(BytesN<32>),
+    UpgradeAdmin,
+    PendingUpgradeAdmin,
+    PendingUpgrade,
+    SchemaVersion,
 }
 
 #[contracttype]
@@ -83,6 +99,17 @@ pub struct PendingKey {
     pub kid: String,
     /// Ledger timestamp after which `activate_key` succeeds.
     pub activate_after: u64,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PendingUpgrade {
+    pub wasm_hash: BytesN<32>,
+    pub manifest_hash: BytesN<32>,
+    pub proposed_at: u64,
+    pub execute_after: u64,
+    pub from_version: u32,
+    pub to_version: u32,
 }
 
 #[contractevent(topics = ["owner_set"])]
@@ -146,6 +173,54 @@ pub struct KeyRevoked {
     pub key_hash: BytesN<32>,
 }
 
+#[contractevent(topics = ["upgrade_proposed"])]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct UpgradeProposed {
+    #[topic]
+    pub wasm_hash: BytesN<32>,
+    #[topic]
+    pub manifest_hash: BytesN<32>,
+    pub execute_after: u64,
+    pub from_version: u32,
+    pub to_version: u32,
+}
+
+#[contractevent(topics = ["upgrade_cancelled"])]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct UpgradeCancelled {
+    #[topic]
+    pub wasm_hash: BytesN<32>,
+    #[topic]
+    pub manifest_hash: BytesN<32>,
+}
+
+#[contractevent(topics = ["upgrade_executed"])]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct UpgradeExecuted {
+    #[topic]
+    pub wasm_hash: BytesN<32>,
+    #[topic]
+    pub manifest_hash: BytesN<32>,
+    pub from_version: u32,
+    pub to_version: u32,
+}
+
+#[contractevent(topics = ["upgrade_admin_proposed"], data_format = "single-value")]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct UpgradeAdminProposed {
+    #[topic]
+    pub new_admin: Address,
+}
+
+#[contractevent(topics = ["upgrade_admin_set"])]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct UpgradeAdminTransferred {
+    #[topic]
+    pub previous_admin: Address,
+    #[topic]
+    pub new_admin: Address,
+}
+
 /// Trust root for every Zarf vesting campaign: a proof verifies against any
 /// RSA key this registry marks valid, so whoever can register keys can mint
 /// claims. v2 therefore splits roles:
@@ -176,6 +251,10 @@ impl JwkRegistryContract {
         env.storage().instance().set(&DataKey::Owner, &owner);
         env.storage().instance().set(&DataKey::KeyCount, &0_u32);
         env.storage().instance().set(&DataKey::PendingCount, &0_u32);
+        env.storage().instance().set(&DataKey::UpgradeAdmin, &owner);
+        env.storage()
+            .instance()
+            .set(&DataKey::SchemaVersion, &SCHEMA_VERSION);
         env.storage()
             .instance()
             .set(&DataKey::ActivationDelay, &activation_delay_secs);
@@ -183,6 +262,145 @@ impl JwkRegistryContract {
         Ok(())
     }
 
+    pub fn version() -> u32 {
+        CONTRACT_VERSION
+    }
+
+    pub fn schema_version(env: Env) -> u32 {
+        env.storage()
+            .instance()
+            .get(&DataKey::SchemaVersion)
+            .unwrap_or(0_u32)
+    }
+
+    pub fn upgrade_admin(env: Env) -> Result<Address, Error> {
+        env.storage()
+            .instance()
+            .get(&DataKey::UpgradeAdmin)
+            .ok_or(Error::UpgradeAdminNotSet)
+    }
+
+    pub fn pending_upgrade(env: Env) -> Option<PendingUpgrade> {
+        env.storage().instance().get(&DataKey::PendingUpgrade)
+    }
+
+    pub fn propose_upgrade_admin(env: Env, new_admin: Address) -> Result<(), Error> {
+        Self::require_upgrade_admin(&env)?;
+        env.storage()
+            .instance()
+            .set(&DataKey::PendingUpgradeAdmin, &new_admin);
+        Self::extend_contract_ttl(&env);
+        UpgradeAdminProposed { new_admin }.publish(&env);
+        Ok(())
+    }
+
+    pub fn accept_upgrade_admin(env: Env) -> Result<(), Error> {
+        let pending: Address = env
+            .storage()
+            .instance()
+            .get(&DataKey::PendingUpgradeAdmin)
+            .ok_or(Error::PendingUpgradeAdminNotSet)?;
+        pending.require_auth();
+        let previous_admin = Self::upgrade_admin(env.clone())?;
+        env.storage()
+            .instance()
+            .set(&DataKey::UpgradeAdmin, &pending);
+        env.storage()
+            .instance()
+            .remove(&DataKey::PendingUpgradeAdmin);
+        Self::extend_contract_ttl(&env);
+        UpgradeAdminTransferred {
+            previous_admin,
+            new_admin: pending,
+        }
+        .publish(&env);
+        Ok(())
+    }
+
+    pub fn cancel_upgrade_admin_transfer(env: Env) -> Result<(), Error> {
+        Self::require_upgrade_admin(&env)?;
+        if !env.storage().instance().has(&DataKey::PendingUpgradeAdmin) {
+            return Err(Error::PendingUpgradeAdminNotSet);
+        }
+        env.storage()
+            .instance()
+            .remove(&DataKey::PendingUpgradeAdmin);
+        Self::extend_contract_ttl(&env);
+        Ok(())
+    }
+
+    pub fn propose_upgrade(
+        env: Env,
+        wasm_hash: BytesN<32>,
+        manifest_hash: BytesN<32>,
+        to_version: u32,
+    ) -> Result<(), Error> {
+        Self::require_upgrade_admin(&env)?;
+        Self::validate_upgrade_proposal(&wasm_hash, &manifest_hash, to_version)?;
+        let proposed_at = env.ledger().timestamp();
+        let pending = PendingUpgrade {
+            wasm_hash: wasm_hash.clone(),
+            manifest_hash: manifest_hash.clone(),
+            proposed_at,
+            execute_after: proposed_at.saturating_add(MIN_UPGRADE_DELAY_SECS),
+            from_version: CONTRACT_VERSION,
+            to_version,
+        };
+        env.storage()
+            .instance()
+            .set(&DataKey::PendingUpgrade, &pending);
+        Self::extend_contract_ttl(&env);
+        UpgradeProposed {
+            wasm_hash,
+            manifest_hash,
+            execute_after: pending.execute_after,
+            from_version: pending.from_version,
+            to_version,
+        }
+        .publish(&env);
+        Ok(())
+    }
+
+    pub fn cancel_upgrade(env: Env) -> Result<(), Error> {
+        Self::require_upgrade_admin(&env)?;
+        let pending: PendingUpgrade = env
+            .storage()
+            .instance()
+            .get(&DataKey::PendingUpgrade)
+            .ok_or(Error::PendingUpgradeNotFound)?;
+        env.storage().instance().remove(&DataKey::PendingUpgrade);
+        Self::extend_contract_ttl(&env);
+        UpgradeCancelled {
+            wasm_hash: pending.wasm_hash,
+            manifest_hash: pending.manifest_hash,
+        }
+        .publish(&env);
+        Ok(())
+    }
+
+    pub fn execute_upgrade(env: Env) -> Result<(), Error> {
+        Self::require_upgrade_admin(&env)?;
+        let pending: PendingUpgrade = env
+            .storage()
+            .instance()
+            .get(&DataKey::PendingUpgrade)
+            .ok_or(Error::PendingUpgradeNotFound)?;
+        if env.ledger().timestamp() < pending.execute_after {
+            return Err(Error::UpgradeDelayNotElapsed);
+        }
+        env.storage().instance().remove(&DataKey::PendingUpgrade);
+        Self::extend_contract_ttl(&env);
+        UpgradeExecuted {
+            wasm_hash: pending.wasm_hash.clone(),
+            manifest_hash: pending.manifest_hash,
+            from_version: pending.from_version,
+            to_version: pending.to_version,
+        }
+        .publish(&env);
+        env.deployer()
+            .update_current_contract_wasm(pending.wasm_hash);
+        Ok(())
+    }
     pub fn owner(env: Env) -> Address {
         Self::owner_unchecked(&env)
     }
@@ -211,7 +429,14 @@ impl JwkRegistryContract {
             .ok_or(Error::PendingOwnerNotSet)?;
         pending.require_auth();
         let previous_owner = Self::owner_unchecked(&env);
+        let previous_upgrade_admin: Option<Address> =
+            env.storage().instance().get(&DataKey::UpgradeAdmin);
         env.storage().instance().set(&DataKey::Owner, &pending);
+        if previous_upgrade_admin == Some(previous_owner.clone()) {
+            env.storage()
+                .instance()
+                .set(&DataKey::UpgradeAdmin, &pending);
+        }
         env.storage().instance().remove(&DataKey::PendingOwner);
         Self::extend_contract_ttl(&env);
         OwnershipTransferred {
@@ -240,6 +465,7 @@ impl JwkRegistryContract {
     pub fn set_operator(env: Env, operator: Address) {
         Self::require_owner(&env);
         env.storage().instance().set(&DataKey::Operator, &operator);
+        Self::extend_contract_ttl(&env);
         OperatorSet {
             operator: operator.clone(),
         }
@@ -509,6 +735,34 @@ impl JwkRegistryContract {
         Ok(())
     }
 
+    fn require_upgrade_admin(env: &Env) -> Result<Address, Error> {
+        let admin: Address = env
+            .storage()
+            .instance()
+            .get(&DataKey::UpgradeAdmin)
+            .ok_or(Error::UpgradeAdminNotSet)?;
+        admin.require_auth();
+        Ok(admin)
+    }
+
+    fn validate_upgrade_proposal(
+        wasm_hash: &BytesN<32>,
+        manifest_hash: &BytesN<32>,
+        to_version: u32,
+    ) -> Result<(), Error> {
+        if to_version <= CONTRACT_VERSION
+            || Self::is_zero_hash(wasm_hash)
+            || Self::is_zero_hash(manifest_hash)
+        {
+            return Err(Error::InvalidUpgrade);
+        }
+        Ok(())
+    }
+
+    fn is_zero_hash(hash: &BytesN<32>) -> bool {
+        hash.to_array().iter().all(|byte| *byte == 0)
+    }
+
     fn extend_contract_ttl(env: &Env) {
         env.deployer()
             .extend_ttl(env.current_contract_address(), TTL_THRESHOLD, TTL_EXTEND_TO);
@@ -554,8 +808,12 @@ impl JwkRegistryContract {
                 if let Some(moved) =
                     persistent.get::<DataKey, BytesN<32>>(&DataKey::PendingAt(last))
                 {
-                    persistent.set(&DataKey::PendingAt(index), &moved);
-                    persistent.set(&DataKey::PendingIndex(moved), &index);
+                    let moved_at = DataKey::PendingAt(index);
+                    persistent.set(&moved_at, &moved);
+                    persistent.extend_ttl(&moved_at, TTL_THRESHOLD, TTL_EXTEND_TO);
+                    let moved_index = DataKey::PendingIndex(moved);
+                    persistent.set(&moved_index, &index);
+                    persistent.extend_ttl(&moved_index, TTL_THRESHOLD, TTL_EXTEND_TO);
                 }
             }
             persistent.remove(&DataKey::PendingAt(last));

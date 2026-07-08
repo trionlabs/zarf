@@ -273,6 +273,7 @@ fn setup_claim_case(env: &Env, verifier_id: Address, funded_amount: i128) -> Cla
             root.clone(),
             audience_hash(env),
             String::from_str(env, "ipfs://claim-list"),
+            Address::generate(env),
         ),
     );
     if funded_amount > 0 {
@@ -382,6 +383,7 @@ fn claim_checks_registry_root_recipient_time_and_transfers() {
             root.clone(),
             audience_hash(&env),
             String::from_str(&env, "ipfs://claim-list"),
+            Address::generate(&env),
         ),
     );
     let vesting = ZarfVestingContractClient::new(&env, &vesting_id);
@@ -461,6 +463,7 @@ fn claim_rejects_non_canonical_public_input_field() {
             root.clone(),
             audience_hash(&env),
             String::from_str(&env, "ipfs://claim-list"),
+            Address::generate(&env),
         ),
     );
     let vesting = ZarfVestingContractClient::new(&env, &vesting_id);
@@ -714,6 +717,83 @@ fn constructor_extends_instance_ttl() {
 }
 
 #[test]
+fn upgrade_governance_uses_separate_admin_not_campaign_owner() {
+    let env = Env::default();
+    let owner = Address::generate(&env);
+    let upgrade_admin = Address::generate(&env);
+    let token_asset = env.register_stellar_asset_contract_v2(owner.clone());
+    let token_id = token_asset.address();
+    let verifier_id = env.register(MockVerifier, ());
+    let registry_id = env.register(
+        JwkRegistryContract,
+        (owner.clone(), MIN_ACTIVATION_DELAY_SECS),
+    );
+    let vesting_id = env.register(
+        ZarfVestingContract,
+        (
+            owner.clone(),
+            token_id,
+            verifier_id,
+            registry_id,
+            String::from_str(&env, "Zarf"),
+            String::from_str(&env, "Private vesting"),
+            BytesN::from_array(&env, &[7_u8; 32]),
+            audience_hash(&env),
+            String::from_str(&env, "ipfs://claim-list"),
+            upgrade_admin.clone(),
+        ),
+    );
+    let vesting = ZarfVestingContractClient::new(&env, &vesting_id);
+    let wasm_hash = BytesN::from_array(&env, &[4_u8; 32]);
+    let manifest_hash = BytesN::from_array(&env, &[5_u8; 32]);
+
+    assert_eq!(vesting.owner(), owner);
+    assert_eq!(vesting.upgrade_admin(), upgrade_admin);
+    assert_eq!(vesting.version(), 1);
+    assert_eq!(vesting.schema_version(), 1);
+    assert!(vesting
+        .try_propose_upgrade(&wasm_hash, &manifest_hash, &2)
+        .is_err());
+
+    env.mock_all_auths();
+    match vesting.try_propose_upgrade(&wasm_hash, &manifest_hash, &1) {
+        Err(Ok(VestingError::InvalidUpgrade)) => {}
+        other => panic!("unexpected non-incrementing upgrade result: {:?}", other),
+    }
+    match vesting.try_propose_upgrade(&BytesN::from_array(&env, &[0_u8; 32]), &manifest_hash, &2) {
+        Err(Ok(VestingError::InvalidUpgrade)) => {}
+        other => panic!("unexpected zero wasm hash result: {:?}", other),
+    }
+    match vesting.try_propose_upgrade(&wasm_hash, &BytesN::from_array(&env, &[0_u8; 32]), &2) {
+        Err(Ok(VestingError::InvalidUpgrade)) => {}
+        other => panic!("unexpected zero manifest hash result: {:?}", other),
+    }
+
+    vesting.propose_upgrade(&wasm_hash, &manifest_hash, &2);
+    match vesting.try_execute_upgrade() {
+        Err(Ok(VestingError::UpgradeDelayNotElapsed)) => {}
+        other => panic!("unexpected early execute result: {:?}", other),
+    }
+    vesting.cancel_upgrade();
+    assert!(vesting.pending_upgrade().is_none());
+}
+
+#[test]
+fn vesting_upgrade_admin_transfer_is_two_step() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let verifier_id = env.register(MockVerifier, ());
+    let case = setup_claim_case(&env, verifier_id, 0);
+    let vesting = ZarfVestingContractClient::new(&env, &case.vesting_id);
+    let new_admin = Address::generate(&env);
+
+    vesting.propose_upgrade_admin(&new_admin);
+    assert_ne!(vesting.upgrade_admin(), new_admin);
+    vesting.accept_upgrade_admin();
+    assert_eq!(vesting.upgrade_admin(), new_admin);
+}
+
+#[test]
 fn set_merkle_root_re_extends_decayed_instance_ttl() {
     let env = Env::default();
     env.mock_all_auths();
@@ -741,6 +821,7 @@ fn set_merkle_root_re_extends_decayed_instance_ttl() {
             zero_root,
             audience_hash(&env),
             String::from_str(&env, "ipfs://claim-list"),
+            Address::generate(&env),
         ),
     );
     let vesting = ZarfVestingContractClient::new(&env, &vesting_id);
@@ -835,6 +916,7 @@ fn claim_guard_blocks_reentrant_verifier_callback() {
             root.clone(),
             audience_hash(&env),
             String::from_str(&env, "ipfs://claim-list"),
+            Address::generate(&env),
         ),
     );
     let vesting = ZarfVestingContractClient::new(&env, &vesting_id);
@@ -900,6 +982,7 @@ fn failed_verifier_does_not_leave_claimed_guard() {
             root.clone(),
             audience_hash(&env),
             String::from_str(&env, "ipfs://claim-list"),
+            Address::generate(&env),
         ),
     );
     let vesting = ZarfVestingContractClient::new(&env, &vesting_id);
@@ -955,6 +1038,7 @@ fn constructor_rejects_non_canonical_merkle_root() {
             non_canonical_field(&env, 1),
             audience_hash(&env),
             String::from_str(&env, "ipfs://claim-list"),
+            Address::generate(&env),
         ),
     );
 }
@@ -986,6 +1070,7 @@ fn constructor_rejects_zero_audience_hash() {
             BytesN::from_array(&env, &[7_u8; 32]),
             BytesN::from_array(&env, &[0_u8; 32]),
             String::from_str(&env, "ipfs://claim-list"),
+            Address::generate(&env),
         ),
     );
 }
@@ -1017,6 +1102,7 @@ fn constructor_rejects_non_canonical_audience_hash() {
             BytesN::from_array(&env, &[7_u8; 32]),
             non_canonical_field(&env, 1),
             String::from_str(&env, "ipfs://claim-list"),
+            Address::generate(&env),
         ),
     );
 }
@@ -1050,6 +1136,7 @@ fn set_merkle_root_is_one_time_before_funding_only() {
             zero_root.clone(),
             audience_hash(&env),
             String::from_str(&env, "ipfs://claim-list"),
+            Address::generate(&env),
         ),
     );
     let vesting = ZarfVestingContractClient::new(&env, &vesting_id);
@@ -1095,6 +1182,7 @@ fn set_merkle_root_allows_unsolicited_dust_before_root_finalization() {
             zero_root,
             audience_hash(&env),
             String::from_str(&env, "ipfs://claim-list"),
+            Address::generate(&env),
         ),
     );
     let vesting = ZarfVestingContractClient::new(&env, &vesting_id);
@@ -1134,6 +1222,7 @@ fn set_merkle_root_rejects_zero_root() {
             zero_root.clone(),
             audience_hash(&env),
             String::from_str(&env, "ipfs://claim-list"),
+            Address::generate(&env),
         ),
     );
     let vesting = ZarfVestingContractClient::new(&env, &vesting_id);
@@ -1171,6 +1260,7 @@ fn deposit_rejects_zero_merkle_root() {
             zero_root,
             audience_hash(&env),
             String::from_str(&env, "ipfs://claim-list"),
+            Address::generate(&env),
         ),
     );
     let vesting = ZarfVestingContractClient::new(&env, &vesting_id);
@@ -1209,6 +1299,7 @@ fn owner_methods_require_auth_without_mock_all_auths() {
             zero_root.clone(),
             audience_hash(&env),
             String::from_str(&env, "ipfs://claim-list"),
+            Address::generate(&env),
         ),
     );
     let vesting = ZarfVestingContractClient::new(&env, &vesting_id);
