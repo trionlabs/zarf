@@ -1,6 +1,7 @@
 <script lang="ts">
     import '../app.css';
     import { wizardStore } from '$lib/stores/wizardStore.svelte';
+    import { campaignStore } from '$lib/airdrop/stores/campaignStore.svelte';
     import { walletStore } from '@zarf/ui/stores/walletStore.svelte';
     import { networkStore } from '@zarf/ui/stores/networkStore.svelte';
     import { authStore } from '@zarf/ui/stores/authStore.svelte';
@@ -9,11 +10,15 @@
     import { browser } from '$app/environment';
     import { page } from '$app/state';
     import AppShell from '@zarf/ui/components/layout/AppShell.svelte';
-    import { LayoutGrid, PlusCircle } from 'lucide-svelte';
+    import { LayoutGrid, PlusCircle, Wallet } from 'lucide-svelte';
     import WalletSelectionModal from '@zarf/ui/components/wallet/WalletSelectionModal.svelte';
     import ZenAlert from '@zarf/ui/components/ui/ZenAlert.svelte';
 
     let { children } = $props();
+
+    if (browser) {
+        campaignStore.restore();
+    }
 
     onMount(() => {
         if (browser) {
@@ -29,6 +34,7 @@
     // Determine active section from URL
     let isDistributionsView = $derived(page.url.pathname.startsWith('/distributions'));
     let isCreateView = $derived(page.url.pathname.startsWith('/wizard'));
+    let isWalletCreateView = $derived(page.url.pathname.startsWith('/airdrop'));
 </script>
 
 <a href="#main" class="skip-link">Skip to content</a>
@@ -64,7 +70,17 @@
                 ? 'text-zen-fg'
                 : 'text-zen-fg-muted'}"
         >
-            Create
+            Email
+        </a>
+        <a
+            href="/airdrop"
+            class="text-xs font-medium transition-colors hover:text-zen-fg {page.url.pathname.startsWith(
+                '/airdrop',
+            )
+                ? 'text-zen-fg'
+                : 'text-zen-fg-muted'}"
+        >
+            Wallet
         </a>
         <a
             href="/distributions"
@@ -92,7 +108,16 @@
                 : 'text-zen-fg-faint'}"
         >
             <PlusCircle class="w-5 h-5" />
-            <span class="text-[10px] font-medium">Create</span>
+            <span class="text-[10px] font-medium">Email</span>
+        </a>
+        <a
+            href="/airdrop"
+            class="flex flex-col items-center justify-center flex-1 gap-0.5 transition-colors {isWalletCreateView
+                ? 'text-zen-fg'
+                : 'text-zen-fg-faint'}"
+        >
+            <Wallet class="w-5 h-5" />
+            <span class="text-[10px] font-medium">Wallet</span>
         </a>
         <a
             href="/distributions"

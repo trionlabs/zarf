@@ -4,9 +4,9 @@
     import { isValidAddressShape } from '@zarf/core/utils/addressShape';
     import { isPositiveAmountString } from '@zarf/core/utils/amount';
     import { formatAmount } from '@zarf/core/utils/format';
-    import { parseAirdropCSV, normalizeAirdropAddress } from '$lib/csv/airdropCsv';
-    import { findDuplicateAddresses } from '$lib/recipients';
-    import type { RecipientRow } from '$lib/stores/types';
+    import { parseAirdropCSV, normalizeAirdropAddress } from '$lib/airdrop/csv/airdropCsv';
+    import { findDuplicateAddresses } from '$lib/airdrop/recipients';
+    import type { RecipientRow } from '$lib/airdrop/stores/types';
 
     let {
         recipients = $bindable<RecipientRow[]>([]),

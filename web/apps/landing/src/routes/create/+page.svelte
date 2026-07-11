@@ -3,21 +3,14 @@
     import ThemeToggle from '@zarf/ui/components/layout/ThemeToggle.svelte';
     import ZenButton from '@zarf/ui/components/ui/ZenButton.svelte';
 
-    // Question-led chooser: the page does NOT merge the two products — it asks
-    // one question ("Who are you sending to?") and routes each answer to the
-    // matching, separately-deployed create app. The funnels fork at step 0 and
-    // never reconverge, so a chooser is the only honest unification.
-    //
-    // Cross-app URLs are per-environment. The email (ZK) create app has a prod
-    // domain; the wallet (airdrop) create app does not yet, so it falls back to
-    // '#' and its card renders as a non-interactive "Coming soon" state.
-    const zkCreateUrl = (import.meta.env.VITE_ZK_CREATE_URL ?? 'https://create.zarf.to').replace(
+    // Question-led chooser: both answers now land in the merged create app, but
+    // they still fork at step 0 because eligibility is either email/ZK or wallet.
+    const createBaseUrl = (import.meta.env.VITE_ZK_CREATE_URL ?? 'https://create.zarf.to').replace(
         /\/+$/,
         '',
     );
-    const airdropCreateUrl =
-        (import.meta.env.VITE_AIRDROP_CREATE_URL ?? '').replace(/\/+$/, '') || '#';
-    const airdropReady = airdropCreateUrl !== '#';
+    const zkCreateUrl = createBaseUrl;
+    const airdropCreateUrl = `${createBaseUrl}/airdrop`;
 
     const cardClass =
         'answer-card flex flex-col rounded-2xl border border-base-content/8 bg-base-content/[0.02] p-7 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-base-content/30 focus-visible:ring-offset-2 focus-visible:ring-offset-base-100';
@@ -77,29 +70,14 @@
                 {@render emailCard()}
             </a>
 
-            <!-- Answer: wallet — a real link when configured, an inert "Coming soon"
-                 card otherwise. An inert card is a real <div> (no href, out of the
-                 tab order), NOT a fake-disabled <a href="#"> (which stays keyboard-
-                 navigable and lies about being actionable). -->
-            {#if airdropReady}
-                <a
-                    href={airdropCreateUrl}
-                    data-answer="wallet"
-                    class="group enter {cardClass}{cardHover}"
-                    style="--enter-delay: 320ms"
-                >
-                    {@render walletCard()}
-                </a>
-            {:else}
-                <div
-                    class="enter {cardClass} opacity-70"
-                    data-answer="wallet"
-                    aria-disabled="true"
-                    style="--enter-delay: 320ms"
-                >
-                    {@render walletCard()}
-                </div>
-            {/if}
+            <a
+                href={airdropCreateUrl}
+                data-answer="wallet"
+                class="group enter {cardClass}{cardHover}"
+                style="--enter-delay: 320ms"
+            >
+                {@render walletCard()}
+            </a>
         </div>
     </main>
 </div>
@@ -218,9 +196,7 @@
             <dd class="font-medium text-base-content">Not available</dd>
         </div>
     </dl>
-    <ZenButton variant="secondary" size="md" class="w-full" disabled={!airdropReady}>
-        {airdropReady ? 'Send to wallets' : 'Coming soon'}
-    </ZenButton>
+    <ZenButton variant="secondary" size="md" class="w-full">Send to wallets</ZenButton>
 {/snippet}
 
 <style>

@@ -59,11 +59,10 @@ jobs:
             { app: 'landing', package: '@zarf/landing', kind: 'svelte', url: 'https://zarf.to' },
             { app: 'create', package: '@zarf/create', kind: 'svelte', url: 'https://create.zarf.to' },
             { app: 'claim', package: '@zarf/claim', kind: 'svelte', url: 'https://claim.zarf.to' },
-            // Airdrop apps are wallet/Merkle based (NO Noir prover, NOT VK-bound),
-            // so they ride the normal auto-deploy path. Their custom-domain routes
-            // (airdrop.zarf.to / claim-drop.zarf.to) stay commented in wrangler until
-            // the cutover runbook enables them; until then they deploy to *.workers.dev.
-            { app: 'airdrop-create', package: '@zarf/airdrop-create', kind: 'svelte', url: 'https://airdrop.zarf.to' },
+            // Wallet/Merkle create now lives inside @zarf/create, so it follows
+            // the same VK-bound manual deploy gate as the email creator. The
+            // standalone wallet claim app has no Noir prover and can ride the
+            // normal auto-deploy path.
             { app: 'airdrop-claim', package: '@zarf/airdrop-claim', kind: 'svelte', url: 'https://claim-drop.zarf.to' },
             { app: 'indexer', package: '@zarf/indexer', kind: 'worker', url: 'https://indexer.zarf.to' },
             { app: 'pin-proxy', package: '@zarf/pin-proxy', kind: 'worker', url: 'zarf-pin-proxy' },
@@ -101,6 +100,7 @@ jobs:
       VITE_GOOGLE_CLIENT_ID: ${{ vars.VITE_GOOGLE_CLIENT_ID || secrets.VITE_GOOGLE_CLIENT_ID }}
       VITE_INDEXER_URL: ${{ vars.VITE_INDEXER_URL || secrets.VITE_INDEXER_URL || 'https://indexer.zarf.to' }}
       VITE_PIN_PROXY_URL: ${{ vars.VITE_PIN_PROXY_URL || secrets.VITE_PIN_PROXY_URL }}
+      VITE_AIRDROP_CLAIM_URL: ${{ vars.VITE_AIRDROP_CLAIM_URL || secrets.VITE_AIRDROP_CLAIM_URL }}
       VITE_STELLAR_DEFAULT_NETWORK: ${{ vars.VITE_STELLAR_DEFAULT_NETWORK || secrets.VITE_STELLAR_DEFAULT_NETWORK }}
       VITE_STELLAR_TESTNET_RPC_URL: ${{ vars.VITE_STELLAR_TESTNET_RPC_URL || secrets.VITE_STELLAR_TESTNET_RPC_URL }}
       VITE_STELLAR_TESTNET_FACTORY_ADDRESS: ${{ vars.VITE_STELLAR_TESTNET_FACTORY_ADDRESS || secrets.VITE_STELLAR_TESTNET_FACTORY_ADDRESS }}
@@ -186,6 +186,9 @@ jobs:
             fi
             if [ -z "${VITE_PIN_PROXY_URL:-}" ]; then
               missing+=(VITE_PIN_PROXY_URL)
+            fi
+            if [ -z "${VITE_AIRDROP_CLAIM_URL:-}" ]; then
+              missing+=(VITE_AIRDROP_CLAIM_URL)
             fi
           fi
 

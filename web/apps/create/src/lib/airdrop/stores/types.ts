@@ -1,5 +1,5 @@
 /**
- * Store types for the airdrop-create wizard.
+ * Store types for the wallet-airdrop create wizard.
  *
  * Deliberately address-centric (no email / PII): an airdrop campaign is a token
  * + a public list of `(address, amount)` recipients + a deadline + a `locked`

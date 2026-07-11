@@ -13,7 +13,8 @@ but differ in how recipients prove they're eligible.
   revealing it on-chain. Created in the UI at
   [create.zarf.to](https://create.zarf.to).
 - **Wallet airdrop** — you upload Stellar addresses; recipients connect a wallet
-  and claim if their address is in the whitelist. Recipients claim at
+  and claim if their address is in the whitelist. Create it at
+  [create.zarf.to/airdrop](https://create.zarf.to/airdrop); recipients claim at
   [airdrop.zarf.to](https://airdrop.zarf.to).
 
 ## The one-question decision
@@ -58,14 +59,10 @@ The **email (ZK) flow has a full create UI** at
 [create.zarf.to](https://create.zarf.to) — follow the
 [Quickstart](/creators/quickstart/).
 
-The **wallet-airdrop create path is currently script-driven**: distributions are
-deployed with the repository's `deploy_demo_airdrop.ts` script (which builds a
-keccak Merkle claim-list, pins it, and calls the configured factory's
-wallet-mode `create_campaign`), while recipients claim through the
-[airdrop.zarf.to](https://airdrop.zarf.to) UI. There is not yet a hosted
-point-and-click create screen for wallet airdrops.
-
-<!-- verified 2026-07-02: apps/airdrop-create ships only src/routes/dev/+page.ts, hard-gated with `if (!dev) throw error(404)` — no production create UI -->
+The **wallet-airdrop create path** is available inside the same create app at
+[create.zarf.to/airdrop](https://create.zarf.to/airdrop). It builds the keccak
+Merkle claim-list, pins it, and calls the configured factory's wallet-mode
+`create_campaign`; recipients still claim through the wallet claim app.
 
 ## When to use which
 

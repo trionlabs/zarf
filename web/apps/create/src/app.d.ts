@@ -11,6 +11,8 @@ interface ImportMetaEnv {
     readonly VITE_GOOGLE_CLIENT_ID?: string;
     readonly VITE_INDEXER_URL?: string;
     readonly VITE_PIN_PROXY_URL?: string;
+    readonly VITE_AIRDROP_CLAIM_URL?: string;
+    readonly VITE_TELEMETRY_ENDPOINT?: string;
     readonly VITE_STELLAR_DEFAULT_NETWORK?: string;
     readonly VITE_STELLAR_RPC_URL?: string;
     readonly VITE_STELLAR_FACTORY_ADDRESS?: string;

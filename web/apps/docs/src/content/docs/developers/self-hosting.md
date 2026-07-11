@@ -21,9 +21,8 @@ contracts/soroban/
 web/
   apps/
     landing/                  zarf.to marketing site (@zarf/landing)
-    create/                   create.zarf.to — ZK distribution creator (@zarf/create)
+    create/                   create.zarf.to — email/ZK + wallet-airdrop creator (@zarf/create)
     claim/                    claim.zarf.to — ZK claim (@zarf/claim)
-    airdrop-create/           airdrop.zarf.to — wallet-airdrop creator
     airdrop-claim/            airdrop.zarf.to — wallet-airdrop claim
     indexer/                  indexer.zarf.to — shared read backend (@zarf/indexer)
     pin-proxy/                pin.zarf.to — IPFS pinning proxy (@zarf/pin-proxy)

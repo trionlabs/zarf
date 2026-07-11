@@ -31,10 +31,6 @@ const BUDGETS = {
     landing: { initialGz: 83 * KB, totalGz: 100 * KB },
     claim: { initialGz: 123 * KB, totalGz: 13250 * KB },
     create: { initialGz: 456 * KB, totalGz: 6350 * KB },
-    // airdrop-create: first client landing of the keccak Merkle bundle (D7).
-    // Lean — stellar-sdk stays off every route's eager closure (lazy-imported in
-    // the deploy step). Floor 2026-06-15: initial 79.7 KB, total 393.4 KB.
-    'airdrop-create': { initialGz: 84 * KB, totalGz: 450 * KB },
     // airdrop-claim: a single mobile-first claim screen. stellar-sdk stays OFF
     // the link-open paint — the proof check (merkle pulls stellar-sdk) and the
     // on-chain reads/claim are both dynamic-imported on wallet-connect, so the

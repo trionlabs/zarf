@@ -9,8 +9,8 @@
     import { getContractExplorerUrl, getExplorerUrl } from '@zarf/core/contracts/explorer';
     import { formatTokenAmount } from '@zarf/core/utils/amount';
     import { warn } from '@zarf/core/utils/log';
-    import { campaignStore } from '$lib/stores/campaignStore.svelte';
-    import type { Campaign } from '$lib/stores/types';
+    import { campaignStore } from '$lib/airdrop/stores/campaignStore.svelte';
+    import type { Campaign } from '$lib/airdrop/stores/types';
     import type { StellarAddress } from '@zarf/core';
 
     // Type-only alias via import() so @zarf/core/contracts (stellar-sdk) stays
@@ -47,7 +47,7 @@
             });
             progressById = { ...progressById, [c.id]: p };
         } catch (e) {
-            warn('[airdrop-create] progress read failed', c.airdropAddress, e);
+            warn('[create/airdrop] progress read failed', c.airdropAddress, e);
         }
     }
     async function loadProgress(list: Campaign[], source: StellarAddress) {
@@ -151,7 +151,7 @@
                 Campaigns you've launched from this browser.
             </p>
         </div>
-        <ZenButton variant="primary" onclick={() => goto('/wizard/step-0')}>
+        <ZenButton variant="primary" onclick={() => goto('/airdrop/wizard/step-0')}>
             <Plus class="mr-1 h-4 w-4" /> New
         </ZenButton>
     </header>
@@ -162,7 +162,7 @@
                 <Coins class="h-6 w-6 text-zen-fg-muted" />
             </div>
             <p class="text-sm text-zen-fg-muted">No distributions yet.</p>
-            <ZenButton variant="primary" onclick={() => goto('/wizard/step-0')}>
+            <ZenButton variant="primary" onclick={() => goto('/airdrop/wizard/step-0')}>
                 Create your first distribution
             </ZenButton>
         </ZenCard>

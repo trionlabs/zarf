@@ -12,13 +12,11 @@ set -u
 LANDING_PORT=4173
 CREATE_PORT=4174
 CLAIM_PORT=4175
-AIRDROP_CREATE_PORT=4176
 AIRDROP_CLAIM_PORT=4177
 
 LANDING_ROUTES=("/" "/thumbnail")
-CREATE_ROUTES=("/" "/wizard/step-0" "/wizard/step-1" "/wizard/step-2" "/wizard/done" "/distributions")
+CREATE_ROUTES=("/" "/wizard/step-0" "/wizard/step-1" "/wizard/step-2" "/wizard/done" "/distributions" "/airdrop" "/airdrop/wizard/step-0" "/airdrop/wizard/step-1" "/airdrop/wizard/step-2" "/airdrop/wizard/done" "/airdrop/distributions")
 CLAIM_ROUTES=("/")
-AIRDROP_CREATE_ROUTES=("/" "/distributions")
 # claim page renders its no-link state at 200 without ?a= (the link context).
 AIRDROP_CLAIM_ROUTES=("/")
 
@@ -31,7 +29,6 @@ ROUTE_TIMEOUT=45 # seconds — first hit on a route triggers Vite lazy compile
 : > /tmp/smoke-landing.log
 : > /tmp/smoke-create.log
 : > /tmp/smoke-claim.log
-: > /tmp/smoke-airdrop-create.log
 : > /tmp/smoke-airdrop-claim.log
 
 pnpm --filter "@zarf/landing" dev --port "$LANDING_PORT" > /tmp/smoke-landing.log 2>&1 < /dev/null &
@@ -40,8 +37,6 @@ pnpm --filter "@zarf/create"  dev --port "$CREATE_PORT"  > /tmp/smoke-create.log
 CREATE_PID=$!
 pnpm --filter "@zarf/claim"   dev --port "$CLAIM_PORT"   > /tmp/smoke-claim.log   2>&1 < /dev/null &
 CLAIM_PID=$!
-pnpm --filter "@zarf/airdrop-create" dev --port "$AIRDROP_CREATE_PORT" > /tmp/smoke-airdrop-create.log 2>&1 < /dev/null &
-AIRDROP_CREATE_PID=$!
 pnpm --filter "@zarf/airdrop-claim"  dev --port "$AIRDROP_CLAIM_PORT"  > /tmp/smoke-airdrop-claim.log  2>&1 < /dev/null &
 AIRDROP_CLAIM_PID=$!
 
@@ -52,9 +47,8 @@ cleanup() {
     pkill -P "$LANDING_PID" 2>/dev/null || true
     pkill -P "$CREATE_PID" 2>/dev/null || true
     pkill -P "$CLAIM_PID" 2>/dev/null || true
-    pkill -P "$AIRDROP_CREATE_PID" 2>/dev/null || true
     pkill -P "$AIRDROP_CLAIM_PID" 2>/dev/null || true
-    kill "$LANDING_PID" "$CREATE_PID" "$CLAIM_PID" "$AIRDROP_CREATE_PID" "$AIRDROP_CLAIM_PID" 2>/dev/null || true
+    kill "$LANDING_PID" "$CREATE_PID" "$CLAIM_PID" "$AIRDROP_CLAIM_PID" 2>/dev/null || true
 }
 trap cleanup EXIT
 
@@ -97,14 +91,12 @@ FAILED=0
 wait_listening landing $LANDING_PORT || FAILED=1
 wait_listening create $CREATE_PORT || FAILED=1
 wait_listening claim $CLAIM_PORT || FAILED=1
-wait_listening airdrop-create $AIRDROP_CREATE_PORT || FAILED=1
 wait_listening airdrop-claim $AIRDROP_CLAIM_PORT || FAILED=1
 
 if [ "$FAILED" = "0" ]; then
     check_routes landing $LANDING_PORT "${LANDING_ROUTES[@]}" || FAILED=1
     check_routes create $CREATE_PORT "${CREATE_ROUTES[@]}" || FAILED=1
     check_routes claim $CLAIM_PORT "${CLAIM_ROUTES[@]}" || FAILED=1
-    check_routes airdrop-create $AIRDROP_CREATE_PORT "${AIRDROP_CREATE_ROUTES[@]}" || FAILED=1
     check_routes airdrop-claim $AIRDROP_CLAIM_PORT "${AIRDROP_CLAIM_ROUTES[@]}" || FAILED=1
 fi
 
@@ -118,9 +110,6 @@ if [ "$FAILED" != "0" ]; then
     echo
     echo "=== claim dev log (tail) ==="
     tail -40 /tmp/smoke-claim.log
-    echo
-    echo "=== airdrop-create dev log (tail) ==="
-    tail -40 /tmp/smoke-airdrop-create.log
     echo
     echo "=== airdrop-claim dev log (tail) ==="
     tail -40 /tmp/smoke-airdrop-claim.log

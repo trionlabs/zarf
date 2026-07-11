@@ -20,8 +20,8 @@
     import { getContractExplorerUrl } from '@zarf/core/contracts/explorer';
     import { formatTokenAmount } from '@zarf/core/utils/amount';
     import { warn } from '@zarf/core/utils/log';
-    import { campaignStore } from '$lib/stores/campaignStore.svelte';
-    import type { StellarAddress, StellarContractId } from '$lib/stores/types';
+    import { campaignStore } from '$lib/airdrop/stores/campaignStore.svelte';
+    import type { StellarAddress, StellarContractId } from '$lib/airdrop/stores/types';
 
     let busy = $state(false);
     let error = $state<string | null>(null);
@@ -45,7 +45,7 @@
     onMount(() => {
         campaignStore.goToStep(2);
         if (!campaignStore.tokenDetails.tokenAddress || campaignStore.recipients.length === 0) {
-            goto('/wizard/step-1');
+            goto('/airdrop/wizard/step-1');
             return;
         }
         if (!campaignStore.activeDeploy) campaignStore.startDeploy();
@@ -72,7 +72,7 @@
         if (!inputs) return;
         busy = true;
         try {
-            const mod = await import('$lib/services/airdropDeploy');
+            const mod = await import('$lib/airdrop/services/airdropDeploy');
             let salt = campaignStore.activeDeploy?.salt ?? null;
             if (!salt) {
                 salt = mod.generateSalt();
@@ -127,7 +127,7 @@
         if (!inputs || !total) return;
         busy = true;
         try {
-            const mod = await import('$lib/services/airdropDeploy');
+            const mod = await import('$lib/airdrop/services/airdropDeploy');
             progressMsg = 'Approving the factory to fund the airdrop…';
             const hash = await mod.approveCampaign(
                 {
@@ -168,7 +168,7 @@
         }
         busy = true;
         try {
-            const mod = await import('$lib/services/airdropDeploy');
+            const mod = await import('$lib/airdrop/services/airdropDeploy');
             progressMsg = 'Deploying and funding the airdrop…';
             const hash = await mod.createCampaign(
                 {
@@ -191,7 +191,7 @@
             const query = campaign
                 ? `?a=${encodeURIComponent(campaign.airdropAddress)}&cid=${encodeURIComponent(campaign.metadataCid)}`
                 : '';
-            goto(`/wizard/done${query}`);
+            goto(`/airdrop/wizard/done${query}`);
         } catch (e) {
             error = sanitizeBlockchainError(e, {
                 fallback: 'Deployment failed. Please try again.',
@@ -205,7 +205,7 @@
 
     function handleBack() {
         campaignStore.previousStep();
-        goto('/wizard/step-1');
+        goto('/airdrop/wizard/step-1');
     }
 </script>
 
