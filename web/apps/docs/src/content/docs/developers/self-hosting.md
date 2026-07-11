@@ -102,20 +102,24 @@ stellar contract deploy --wasm <verifier.wasm> --source <SOURCE> --network testn
 stellar contract deploy --wasm <zarf_jwk_registry.wasm> --source <SOURCE> --network testnet \
   -- --owner <SOURCE> --activation_delay_secs 21600
 
-# 3) Upload the vesting WASM and capture its hash
+# 3) Upload the vesting and airdrop WASM and capture their hashes
 VESTING_WASM_HASH=$(stellar contract upload --wasm <zarf_vesting_soroban.wasm> \
   --source <SOURCE> --network testnet)
+AIRDROP_WASM_HASH=$(stellar contract upload --wasm <zarf_airdrop_soroban.wasm> \
+  --source <SOURCE> --network testnet)
 
-# 4) Deploy the factory, wiring it to the verifier, registry, and vesting hash
+# 4) Deploy the factory, wiring it to the verifier, registry, and WASM hashes
 stellar contract deploy --wasm <zarf_vesting_factory_soroban.wasm> \
   --source <SOURCE> --network testnet \
   -- --verifier <VERIFIER_ID> --jwk_registry <REGISTRY_ID> \
-     --vesting_wasm_hash "$VESTING_WASM_HASH"
+     --vesting_wasm_hash "$VESTING_WASM_HASH" \
+     --airdrop_wasm_hash "$AIRDROP_WASM_HASH"
 ```
 
 Release WASM artifacts are written to each contract's
 `target/wasm32v1-none/release/` directory (`rs_soroban_ultrahonk.wasm`,
 `zarf_jwk_registry.wasm`, `zarf_vesting_soroban.wasm`,
+`zarf_airdrop_soroban.wasm`,
 `zarf_vesting_factory_soroban.wasm`).
 
 After deploying, register at least one Google signing key in the JWK registry so

@@ -64,9 +64,9 @@ pub struct Config {
     /// OFF-CHAIN SOLVENCY INVARIANT: the root commits per-leaf `(index, address,
     /// amount)`, so the instance can verify a single claim's amount via its proof
     /// but cannot sum all leaves (that needs every proof) — `total` is therefore
-    /// NOT bound on-chain to the leaf sum. The factory floor-binds it
-    /// (`total >= recipient_count`, airdrop-factory `create_airdrop`) and funds
-    /// exactly `total`. Over-declared `total` strands the surplus (sweepable via
+    /// NOT bound on-chain to the leaf sum. The factory wallet-campaign path
+    /// floor-binds it (`total >= recipient_count`) and funds exactly `total`.
+    /// Over-declared `total` strands the surplus (sweepable via
     /// `withdraw_unclaimed`); under-declared `total` caps payouts at the funded
     /// balance (last claims fail at transfer — first-come-first-served).
     pub total: i128,

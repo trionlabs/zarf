@@ -206,11 +206,10 @@ flows these links open.
 
 Both contracts publish events you can subscribe to over Soroban RPC / Horizon.
 
-**Factory — `vesting_created`** (emitted on `create_vesting` and
-`create_and_fund_vesting`):
+**Factory — `campaign_created`** (emitted on `create_campaign`):
 
-- Topics: `["vesting_created", vesting: Address, owner: Address, token: Address]`
-- Data: `{ total_amount: i128, recipient_count: u32, metadata_cid: String }`
+- Topics: `["campaign_created", campaign: Address, owner: Address, token: Address]`
+- Data: `{ claim_authorization, claim_schedule, reclaim_policy, claim_deadline, total_amount, recipient_count, merkle_root, metadata_cid }`
 
 **Vesting — `claimed`** (emitted on a successful `claim`):
 

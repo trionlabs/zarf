@@ -3,7 +3,7 @@
  *
  * Builds the off-chain JSON document that the claim app needs to construct
  * Merkle proofs and check eligibility. This document is pinned to IPFS and
- * its CID is emitted in the factory's VestingCreated event.
+ * its CID is emitted in the factory's CampaignCreated event.
  *
  * Determinism is load-bearing: same input MUST produce byte-identical JSON,
  * because IPFS CIDs are content-addressed. Any non-determinism (Map iteration

@@ -23,30 +23,42 @@ const params: CreateAirdropParams = {
 };
 
 describe('buildCreateAirdropArgs', () => {
-    it('emits the 9 args in the exact 02 §2.5 order and ScVal types', () => {
+    it('emits the wallet campaign args in the exact create_campaign order and ScVal types', () => {
         const args = buildCreateAirdropArgs(params);
-        // owner, token, merkle_root, total, deadline, locked, recipient_count, salt, metadata_cid
         expect(args.map((a) => a.switch().name)).toEqual([
             'scvAddress',
             'scvAddress',
             'scvBytes',
+            'scvU32',
+            'scvU32',
+            'scvU32',
+            'scvString',
+            'scvString',
+            'scvBytes',
+            'scvBytes',
+            'scvU32',
             'scvI128',
             'scvU64',
-            'scvBool',
-            'scvU32',
-            'scvBytes',
             'scvString',
+            'scvU32',
         ]);
     });
 
-    it('encodes each field faithfully (owner->admin first, 32-byte root/salt, locked bool)', () => {
+    it('encodes each field faithfully (owner->admin first, wallet/immediate modes)', () => {
         const args = buildCreateAirdropArgs(params);
         expect(Address.fromScVal(args[0]).toString()).toBe(OWNER);
         expect(Address.fromScVal(args[1]).toString()).toBe(TOKEN);
-        expect(Buffer.from(args[2].bytes()).toString('hex')).toBe('11'.repeat(32));
-        expect(args[5].b()).toBe(true);
-        expect(args[6].u32()).toBe(3);
-        expect(Buffer.from(args[7].bytes()).toString('hex')).toBe('22'.repeat(32));
-        expect(args[8].str().toString()).toBe('bafyTESTcid');
+        expect(Buffer.from(args[2].bytes()).toString('hex')).toBe('22'.repeat(32));
+        expect(args[3].u32()).toBe(1); // wallet authorization
+        expect(args[4].u32()).toBe(1); // immediate schedule
+        expect(args[5].u32()).toBe(1); // reclaim after deadline
+        expect(args[6].str().toString()).toBe('');
+        expect(args[7].str().toString()).toBe('');
+        expect(Buffer.from(args[8].bytes()).toString('hex')).toBe('11'.repeat(32));
+        expect(Buffer.from(args[9].bytes()).toString('hex')).toBe('00'.repeat(32));
+        expect(args[10].u32()).toBe(3);
+        expect(args[12].u64().toString()).toBe('1756000000');
+        expect(args[13].str().toString()).toBe('bafyTESTcid');
+        expect(args[14].u32()).toBe(1); // atomic funding
     });
 });

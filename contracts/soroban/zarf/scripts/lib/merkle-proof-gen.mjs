@@ -41,7 +41,7 @@
  *
  * Mode — what to print:
  *   --index <n>            emit a proof bundle for leaf n (default: 0)
- *   --root-only            emit just { root, rootBare } (seeds create_airdrop)
+ *   --root-only            emit just { root, rootBare } (seeds wallet-mode create_campaign)
  *   --all                  emit { root, rootBare, leaves:[{index,leaf,proof}] }
  *   --gen-list             ignore input; print a deterministic `[{address,amount},
  *                          …]` claim list (self-contained — NEEDS NO @zarf/core),

@@ -156,8 +156,8 @@ you have enough.
 ### 9. Deploy
 
 The **Deploy** step runs **two transactions**: it approves the factory to move
-your tokens, then calls `create_and_fund_vesting`, which deterministically
-deploys your vesting contract and transfers the full pool into it in one call.
+your tokens, then calls `create_campaign` with email/ZK + epoch modes, which
+deterministically deploys your vesting contract and transfers the full pool into it in one call.
 Confirm both in Freighter.
 
 *What you'll see:* a two-step pipeline, then a "Deployment Complete" screen with
@@ -180,7 +180,7 @@ step-by-step claim walkthrough.
 
 Check claim progress from your dashboard and on a testnet explorer. See
 [Monitoring](/creators/monitoring/) for what the indexer exposes and which
-events to watch. The combined create-and-fund call emits `vesting_created`, and
+events to watch. The combined create-and-fund call emits `campaign_created`, and
 each recipient's claim emits `claimed` (the standalone `deposited` event belongs
 to the separate `deposit` call, which this flow doesn't use).
 

@@ -30,8 +30,8 @@ reimplementing proof verification.
     deterministic vesting addresses.
   - Tracks global deployments, owner deployments, and metadata CIDs in
     persistent storage.
-  - `create_and_fund_vesting` deploys vesting and transfers token funding from
-    the owner to the new vesting contract via a factory allowance.
+  - `create_campaign` deploys email/ZK vesting or wallet-airdrop campaigns and
+    can transfer token funding from the owner via a factory allowance.
   - Exposes `recipient_id(recipient)` so a Stellar-bound proof can be generated
     before the vesting instance exists.
 

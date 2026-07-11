@@ -5,11 +5,11 @@
  * The claim app reads an instance address from the URL (`?a=`) and never calls
  * the factory — but core's `isConfigured()` couples "configured" to a factory
  * address (so `setActiveStellarNetwork` accepts a network on toggle). We
- * therefore require the airdrop factory address per network (same env as
- * airdrop-create) purely to satisfy that gate; it is otherwise unused here.
+ * therefore require a factory address per network purely to satisfy that gate;
+ * it is otherwise unused here.
  *
- * App-specific env-var names live here, NOT in @zarf/core. The airdrop app
- * only needs the airdrop factory — no ZK vesting / verifier / jwk-registry.
+ * App-specific env-var names live here, NOT in @zarf/core. Airdrops use the
+ * unified factory address.
  */
 import {
     configureCore,
@@ -45,8 +45,7 @@ const ENV: Readonly<Record<string, string | boolean | undefined>> = {
     VITE_STELLAR_TESTNET_NETWORK_PASSPHRASE: import.meta.env
         .VITE_STELLAR_TESTNET_NETWORK_PASSPHRASE,
     VITE_STELLAR_TESTNET_NETWORK_NAME: import.meta.env.VITE_STELLAR_TESTNET_NETWORK_NAME,
-    VITE_STELLAR_TESTNET_AIRDROP_FACTORY_ADDRESS: import.meta.env
-        .VITE_STELLAR_TESTNET_AIRDROP_FACTORY_ADDRESS,
+    VITE_STELLAR_TESTNET_FACTORY_ADDRESS: import.meta.env.VITE_STELLAR_TESTNET_FACTORY_ADDRESS,
     VITE_STELLAR_TESTNET_EXPLORER_URL: import.meta.env.VITE_STELLAR_TESTNET_EXPLORER_URL,
 
     VITE_STELLAR_MAINNET_RPC_URL: import.meta.env.VITE_STELLAR_MAINNET_RPC_URL,
@@ -54,8 +53,7 @@ const ENV: Readonly<Record<string, string | boolean | undefined>> = {
     VITE_STELLAR_MAINNET_NETWORK_PASSPHRASE: import.meta.env
         .VITE_STELLAR_MAINNET_NETWORK_PASSPHRASE,
     VITE_STELLAR_MAINNET_NETWORK_NAME: import.meta.env.VITE_STELLAR_MAINNET_NETWORK_NAME,
-    VITE_STELLAR_MAINNET_AIRDROP_FACTORY_ADDRESS: import.meta.env
-        .VITE_STELLAR_MAINNET_AIRDROP_FACTORY_ADDRESS,
+    VITE_STELLAR_MAINNET_FACTORY_ADDRESS: import.meta.env.VITE_STELLAR_MAINNET_FACTORY_ADDRESS,
     VITE_STELLAR_MAINNET_EXPLORER_URL: import.meta.env.VITE_STELLAR_MAINNET_EXPLORER_URL,
 };
 
@@ -83,11 +81,11 @@ function buildNetwork(id: 'testnet' | 'mainnet', label: string): StellarRuntimeC
         horizonUrl: value('HORIZON_URL') ?? DEFAULTS[id].horizonUrl,
         networkPassphrase: value('NETWORK_PASSPHRASE') ?? DEFAULTS[id].networkPassphrase,
         networkName: value('NETWORK_NAME') ?? label,
-        airdropFactoryAddress: value('AIRDROP_FACTORY_ADDRESS'),
+        factoryAddress: value('FACTORY_ADDRESS'),
         explorerBaseUrl: value('EXPLORER_URL') ?? DEFAULTS[id].explorerBaseUrl,
     };
 
-    if (!config.rpcUrl || !config.airdropFactoryAddress) {
+    if (!config.rpcUrl || !config.factoryAddress) {
         return null;
     }
     return config;
@@ -114,7 +112,7 @@ const stellar = stellarNetworks[defaultStellarNetwork];
 if (!stellar) {
     throw new Error(
         'Missing Stellar network config. Configure VITE_STELLAR_TESTNET_* env vars ' +
-            '(incl. VITE_STELLAR_TESTNET_AIRDROP_FACTORY_ADDRESS).',
+            '(incl. VITE_STELLAR_TESTNET_FACTORY_ADDRESS).',
     );
 }
 

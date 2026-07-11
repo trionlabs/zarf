@@ -18,9 +18,9 @@ interface ImportMetaEnv {
     readonly VITE_TELEMETRY_ENDPOINT?: string;
     readonly VITE_STELLAR_DEFAULT_NETWORK?: string;
     readonly VITE_STELLAR_TESTNET_RPC_URL?: string;
-    readonly VITE_STELLAR_TESTNET_AIRDROP_FACTORY_ADDRESS?: string;
+    readonly VITE_STELLAR_TESTNET_FACTORY_ADDRESS?: string;
     readonly VITE_STELLAR_MAINNET_RPC_URL?: string;
-    readonly VITE_STELLAR_MAINNET_AIRDROP_FACTORY_ADDRESS?: string;
+    readonly VITE_STELLAR_MAINNET_FACTORY_ADDRESS?: string;
 }
 
 interface ImportMeta {

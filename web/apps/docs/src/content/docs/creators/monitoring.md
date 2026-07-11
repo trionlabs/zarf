@@ -56,7 +56,7 @@ three sources:
 
 ```mermaid
 flowchart LR
-  FAC[("Factory")] -->|"vesting_created"| IDX["Zarf indexer<br/>indexer.zarf.to"]
+  FAC[("Factory")] -->|"campaign_created"| IDX["Zarf indexer<br/>indexer.zarf.to"]
   VEST[("Your vesting contract")] -->|"deposited · claimed · balance"| IDX
   IDX --> DASH["create.zarf.to<br/>dashboard"]
   VEST --> EXP["Stellar explorer"]
@@ -73,7 +73,7 @@ explorer or your own indexer:
 
 | Event | Emitted by | Topics | Data | Meaning |
 |---|---|---|---|---|
-| `vesting_created` | Factory | vesting, owner, token | total_amount, recipient_count, metadata_cid | A distribution was deployed. When you deploy through create.zarf.to it is also funded in the same transaction, so `total_amount` is your funded total. |
+| `campaign_created` | Factory | campaign, owner, token | claim_authorization, claim_schedule, reclaim_policy, claim_deadline, total_amount, recipient_count, merkle_root, metadata_cid | A campaign was deployed. When you deploy through create.zarf.to it is also funded in the same transaction, so `total_amount` is your funded total. |
 | `deposited` | Vesting | — | amount | A standalone top-up deposit landed. The default create.zarf.to flow funds during creation, so you only see this if you deposit again later. |
 | `claimed` | Vesting | epoch_commitment, recipient | amount | A recipient successfully claimed `amount` to their wallet. |
 | `merkle_root_set` | Vesting | merkle_root | — | The recipient list root was set (only if it was not set at creation). |
@@ -125,7 +125,7 @@ point.
 - How much has been claimed (from the balance and from `claimed` events).
 - The wallet addresses that received tokens (the `recipient` topic on each
   `claimed` event) and the amounts.
-- Your recipient count and funded total (from `vesting_created`).
+- Your recipient count and funded total (from `campaign_created`).
 
 **You cannot see:**
 

@@ -51,8 +51,10 @@ deliberately gated on a third-party audit — see
 
 ## Factory — `ZarfVestingFactoryContract`
 
-Deploys vesting contracts at deterministic addresses and maintains a global and
-per-owner registry of deployments.
+Deploys vesting and wallet-airdrop contracts at deterministic addresses. Vesting
+deployments keep the existing global/per-owner registry; airdrops use a separate
+flat registry so vesting discovery does not treat airdrops as ZK/email
+campaigns.
 
 ### Constructor
 
@@ -62,50 +64,79 @@ fn __constructor(
     verifier: Address,
     jwk_registry: Address,
     vesting_wasm_hash: BytesN<32>,
+    airdrop_wasm_hash: BytesN<32>,
 )
 ```
 
 The factory is initialized once with the addresses it will inject into every
 vesting contract it deploys, plus the WASM hash of the vesting contract to
-deploy.
+deploy. It also records the wallet-airdrop WASM hash used by wallet campaigns.
 
 ### Deterministic addresses
 
 ```rust
 fn predict_vesting_address(env: Env, owner: Address, salt: BytesN<32>) -> Address
+fn predict_airdrop_address(env: Env, owner: Address, salt: BytesN<32>) -> Address
 ```
 
 The deployment salt is owner-bound: `keccak256(owner.to_xdr() || salt)`. The
 address is derived with `env.deployer().with_current_contract(deployment_salt)`,
 so `predict_vesting_address` returns exactly the address a subsequent
-`create_vesting`/`create_and_fund_vesting` with the same `(owner, salt)` will
-produce. This lets callers compute the vesting address before the transaction
-lands.
+email/ZK `create_campaign` with the same `(owner, salt)` will produce. This lets
+callers compute the vesting address before the transaction lands.
 
-### Creating a distribution
+Airdrops use the same owner-bound pattern with an airdrop domain separator, so
+the same `(owner, salt)` cannot collide with a vesting address.
+
+### Creating a campaign
 
 ```rust
-fn create_vesting(
-    env: Env, owner: Address, token: Address, salt: BytesN<32>,
-    name: String, description: String,
-    merkle_root: BytesN<32>, audience_hash: BytesN<32>,
-    recipient_count: u32, total_amount: i128, metadata_cid: String,
+fn create_campaign(
+    env: Env,
+    owner: Address,
+    token: Address,
+    salt: BytesN<32>,
+    claim_authorization: u32,
+    claim_schedule: u32,
+    reclaim_policy: u32,
+    name: String,
+    description: String,
+    merkle_root: BytesN<32>,
+    audience_hash: BytesN<32>,
+    recipient_count: u32,
+    total_amount: i128,
+    claim_deadline: u64,
+    metadata_cid: String,
+    funding_mode: u32,
 ) -> Result<Address, Error>
-
-fn create_and_fund_vesting(/* identical parameters */) -> Result<Address, Error>
 ```
 
-Both require `owner.require_auth()`, validate the metadata (`recipient_count >
-0`, `total_amount >= 0`), validate the initial root (canonical field, or zero
-if not yet funded), and require a non-zero canonical `audience_hash`. They
-deploy the vesting contract with `deploy_v2` and record a `DeploymentInfo`.
+Mode values:
 
-`create_and_fund_vesting` additionally moves `total_amount` of `token` from the
-owner into the freshly deployed vesting contract via `transfer_from`, so the
-owner must have approved the factory as spender for that amount beforehand. It
-requires `total_amount > 0` and asserts the received balance matches (else
-`TokenTransferMismatch`). `create_vesting` leaves the contract unfunded (deposit
-later with the vesting contract's `deposit`).
+- `claim_authorization`: `0` email/ZK, `1` wallet.
+- `claim_schedule`: `0` epochs, `1` immediate.
+- `reclaim_policy`: `0` none, `1` after deadline, `2` anytime.
+- `funding_mode`: `0` deferred, `1` atomic.
+
+For email/ZK campaigns, use authorization `0`, schedule `0`, reclaim policy `0`,
+and `claim_deadline = 0`. The factory validates `recipient_count > 0`,
+canonical non-zero `merkle_root`, non-zero canonical `audience_hash`, and
+`total_amount >= 0` (`> 0` when `funding_mode = 1`). Atomic funding moves
+`total_amount` of `token` from the owner into the freshly deployed vesting
+contract via `transfer_from`, so the owner must approve the factory first. The
+factory records both vesting-compatible `DeploymentInfo` and unified
+`CampaignInfo`.
+
+For wallet campaigns, use authorization `1`, schedule `1`, and funding mode `1`.
+`name`, `description`, and `audience_hash` are ignored by the wallet-airdrop
+instance; pass empty strings and a zero 32-byte field. The factory rejects a zero
+root, validates `recipient_count > 0`, `total_amount > 0`,
+`total_amount >= recipient_count`, and rejects past non-zero deadlines. Reclaim
+policy `1` requires a future deadline; reclaim policy `0` requires
+`claim_deadline = 0`; reclaim policy `2` keeps the current airdrop behavior of
+allowing admin reclaim at any time. The factory deploys the wallet-airdrop
+instance, transfers funding, verifies the credited balance, and emits
+`campaign_created`.
 
 `metadata_cid` is the IPFS CID of the pinned claim list; see
 [IPFS & metadata](/developers/ipfs-and-metadata/).
@@ -116,6 +147,7 @@ later with the vesting contract's `deposit`).
 fn verifier(env: Env) -> Result<Address, Error>
 fn jwk_registry(env: Env) -> Result<Address, Error>
 fn vesting_wasm_hash(env: Env) -> Result<BytesN<32>, Error>
+fn airdrop_wasm_hash(env: Env) -> Result<BytesN<32>, Error>
 fn recipient_id(env: Env, recipient: Address) -> BytesN<32>
 fn vesting_metadata_cid(env: Env, vesting: Address) -> Result<String, Error>
 
@@ -130,24 +162,42 @@ fn get_owner_deployment(env: Env, owner: Address, index: u32) -> Result<Address,
 fn get_owner_deployments(env: Env, owner: Address, start: u32, limit: u32) -> Result<Vec<Address>, Error>
 fn get_owner_deployment_info(env: Env, owner: Address, index: u32) -> Result<DeploymentInfo, Error>
 fn get_owner_deployment_infos(env: Env, owner: Address, start: u32, limit: u32) -> Result<Vec<DeploymentInfo>, Error>
+
+fn get_campaign_count(env: Env) -> u32
+fn get_campaign(env: Env, index: u32) -> Result<Address, Error>
+fn get_campaign_info(env: Env, index: u32) -> Result<CampaignInfo, Error>
+fn get_campaign_infos(env: Env, start: u32, limit: u32) -> Result<Vec<CampaignInfo>, Error>
+fn get_owner_campaign_count(env: Env, owner: Address) -> u32
+fn get_owner_campaign(env: Env, owner: Address, index: u32) -> Result<Address, Error>
+fn get_owner_campaign_info(env: Env, owner: Address, index: u32) -> Result<CampaignInfo, Error>
+fn get_owner_campaign_infos(env: Env, owner: Address, start: u32, limit: u32) -> Result<Vec<CampaignInfo>, Error>
 ```
 
-`DeploymentInfo { address: Address, metadata_cid: String }`. Range reads are
-capped at `MAX_PAGE_LIMIT = 80` items (`InvalidLimit` otherwise); the cap counts
-ledger entries, not bytes, to stay under the network's ~100-entry footprint
-limit per transaction. In practice most integrators read these through the
+`DeploymentInfo { address: Address, metadata_cid: String }` is the legacy
+vesting-only discovery shape. `CampaignInfo` is the unified shape:
+`address`, `owner`, `token`, `claim_authorization`, `claim_schedule`,
+`reclaim_policy`, `claim_deadline`, `total_amount`, `recipient_count`,
+`merkle_root`, and `metadata_cid`. Range reads are capped at
+`MAX_PAGE_LIMIT = 80` items (`InvalidLimit` otherwise); the cap counts ledger
+entries, not bytes, to stay under the network's ~100-entry footprint limit per
+transaction. In practice most integrators read these through the
 [indexer](/developers/indexer-api/) rather than simulating directly.
 
 ### Event
 
 ```rust
-#[contractevent(topics = ["vesting_created"])]
-struct VestingCreated {
-    #[topic] vesting: Address,
+#[contractevent(topics = ["campaign_created"])]
+struct CampaignCreated {
+    #[topic] campaign: Address,
     #[topic] owner: Address,
     #[topic] token: Address,
+    claim_authorization: ClaimAuthorization, // EmailZk | Wallet
+    claim_schedule: ClaimSchedule,           // Epochs | Immediate
+    reclaim_policy: ReclaimPolicy,           // None | AfterDeadline | Anytime
+    claim_deadline: u64,
     total_amount: i128,
     recipient_count: u32,
+    merkle_root: BytesN<32>,
     metadata_cid: String,
 }
 ```

@@ -60,8 +60,8 @@ The **email (ZK) flow has a full create UI** at
 
 The **wallet-airdrop create path is currently script-driven**: distributions are
 deployed with the repository's `deploy_demo_airdrop.ts` script (which builds a
-keccak Merkle claim-list, pins it, and calls the airdrop factory's
-`create_airdrop`), while recipients claim through the
+keccak Merkle claim-list, pins it, and calls the configured factory's
+wallet-mode `create_campaign`), while recipients claim through the
 [airdrop.zarf.to](https://airdrop.zarf.to) UI. There is not yet a hosted
 point-and-click create screen for wallet airdrops.
 

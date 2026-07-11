@@ -32,6 +32,15 @@ import type {
 import { signTransaction } from './wallet';
 
 const FIELD_BYTES = 32;
+const CLAIM_AUTHORIZATION_EMAIL_ZK = 0;
+const CLAIM_AUTHORIZATION_WALLET = 1;
+const CLAIM_SCHEDULE_EPOCHS = 0;
+const CLAIM_SCHEDULE_IMMEDIATE = 1;
+const RECLAIM_POLICY_NONE = 0;
+const RECLAIM_POLICY_AFTER_DEADLINE = 1;
+const RECLAIM_POLICY_ANYTIME = 2;
+const FUNDING_MODE_ATOMIC = 1;
+const ZERO_BYTES_32 = `0x${'00'.repeat(FIELD_BYTES)}` as `0x${string}`;
 
 export interface VestingContractMetadata {
     name: string;
@@ -433,18 +442,23 @@ export async function createAndFundVesting(
     const { hash } = await invoke(
         params.owner,
         params.factoryAddress,
-        'create_and_fund_vesting',
+        'create_campaign',
         [
             scAddress(params.owner),
             scAddress(params.tokenAddress),
             scBytesN32(params.salt),
+            scU32(CLAIM_AUTHORIZATION_EMAIL_ZK),
+            scU32(CLAIM_SCHEDULE_EPOCHS),
+            scU32(RECLAIM_POLICY_NONE),
             scString(params.name),
             scString(params.description),
             scBytesN32(params.merkleRoot),
             scBytesN32(params.audienceHash),
             scU32(params.recipientCount),
             scI128(params.totalAmount),
+            scU64(0),
             scString(params.metadataCid),
+            scU32(FUNDING_MODE_ATOMIC),
         ],
         onSubmitted,
     );
@@ -464,7 +478,7 @@ export async function predictVestingAddress(
     return indexed.address;
 }
 
-// ---- Airdrop factory (standalone; separate from the ZK vesting factory above) ----
+// ---- Wallet campaign helpers ----
 
 export interface CreateAirdropParams {
     factoryAddress: StellarContractId;
@@ -481,27 +495,37 @@ export interface CreateAirdropParams {
 }
 
 /**
- * Build the `create_airdrop` ScVal argument list in the exact positional order
- * the contract expects (02 §2.5): owner, token, merkle_root, total, deadline,
- * locked, recipient_count, salt, metadata_cid. Exported so the ordering can be
+ * Build the wallet campaign `create_campaign` ScVal argument list in the exact
+ * positional order the contract expects. Exported so the ordering can be
  * unit-tested without a live network.
  */
 export function buildCreateAirdropArgs(params: CreateAirdropParams): xdr.ScVal[] {
+    const reclaimPolicy = params.locked
+        ? params.deadline === 0
+            ? RECLAIM_POLICY_NONE
+            : RECLAIM_POLICY_AFTER_DEADLINE
+        : RECLAIM_POLICY_ANYTIME;
     return [
         scAddress(params.owner),
         scAddress(params.token),
+        scBytesN32(params.salt),
+        scU32(CLAIM_AUTHORIZATION_WALLET),
+        scU32(CLAIM_SCHEDULE_IMMEDIATE),
+        scU32(reclaimPolicy),
+        scString(''),
+        scString(''),
         scBytesN32(params.merkleRoot),
+        scBytesN32(ZERO_BYTES_32),
+        scU32(params.recipientCount),
         scI128(params.total),
         scU64(params.deadline),
-        scBool(params.locked),
-        scU32(params.recipientCount),
-        scBytesN32(params.salt),
         scString(params.metadataCid),
+        scU32(FUNDING_MODE_ATOMIC),
     ];
 }
 
 /**
- * Deploy + atomically fund an airdrop instance via the airdrop factory. The
+ * Deploy + atomically fund an airdrop instance via the configured factory. The
  * caller already holds the predicted address (from `predictAirdropAddress`) to
  * build/pin the claim-list, so this returns only the tx hash; the deployed
  * address equals the predicted one (proven by the factory's M2 tests).
@@ -513,7 +537,7 @@ export async function createAirdrop(
     const { hash } = await invoke(
         params.owner,
         params.factoryAddress,
-        'create_airdrop',
+        'create_campaign',
         buildCreateAirdropArgs(params),
         onSubmitted,
     );

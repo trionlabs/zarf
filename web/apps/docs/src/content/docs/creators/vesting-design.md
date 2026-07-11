@@ -54,7 +54,7 @@ merkle generator derives them from the lock **date at 00:00 UTC** (`period 1 =
 wizard's time-of-day field is **not** baked into the leaves, so it does not
 change when a period actually unlocks on-chain.
 
-<!-- verified 2026-07-02: processWhitelist uses new Date(cliffEndDate) (00:00 UTC) and ignores cliffTime; create_and_fund_vesting stores no schedule, so the leaf unlock_time is the only value the claim's EpochLocked check reads -->
+<!-- verified 2026-07-02, updated 2026-07-05: processWhitelist uses new Date(cliffEndDate) (00:00 UTC) and ignores cliffTime; the factory stores no schedule, so the leaf unlock_time is the only value the claim's EpochLocked check reads -->
 
 ## Worked examples
 

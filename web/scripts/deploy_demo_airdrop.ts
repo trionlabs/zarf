@@ -3,7 +3,7 @@
  *
  * Sibling of deploy_demo_distribution.ts (ZK vesting). Builds the keccak Merkle
  * claim-list via @zarf/core/merkle, pins it to the pin-proxy /pin-airdrop route,
- * deploys + funds the instance through the airdrop factory, and prints the
+ * deploys + funds the instance through the unified factory, and prints the
  * airdrop-claim link (?a=<airdrop>&cid=<cid>).
  *
  *   cd web && ./node_modules/.bin/tsx scripts/deploy_demo_airdrop.ts \
@@ -171,7 +171,7 @@ async function main() {
     const factory = argString(
         args,
         'factory',
-        requireEnv(env, 'VITE_STELLAR_TESTNET_AIRDROP_FACTORY_ADDRESS'),
+        requireEnv(env, 'VITE_STELLAR_TESTNET_FACTORY_ADDRESS'),
     );
     // Prod pin.zarf.to is pre-integration and lacks /pin-airdrop; override with a
     // local pin-proxy (wrangler dev + PINATA_JWT) until integration is deployed:
@@ -181,6 +181,7 @@ async function main() {
     const decimals = Number(argString(args, 'decimals', '7'));
     const deadline = Number(argString(args, 'deadline', '0')); // 0 = no deadline
     const locked = args['locked'] === true || args['locked'] === 'true';
+    const reclaimPolicy = locked ? (deadline === 0 ? '0' : '1') : '2';
     const salt = strip0x(argString(args, 'salt', randomBytes(32).toString('hex')));
 
     const rows = RECIPIENTS.map((r) => ({ address: r.address, amount: toBaseUnits(r.human, decimals).toString() }));
@@ -235,16 +236,22 @@ async function main() {
     run('stellar', [
         'contract', 'invoke', '--id', factory, '--source', ownerAlias,
         '--network', network, '--auto-sign', '--',
-        'create_airdrop',
+        'create_campaign',
         '--owner', owner,
         '--token', token,
-        '--merkle_root', strip0x(doc.root),
-        '--total', total.toString(),
-        '--deadline', String(deadline),
-        '--locked', String(locked),
-        '--recipient_count', String(rows.length),
         '--salt', salt,
+        '--claim_authorization', '1',
+        '--claim_schedule', '1',
+        '--reclaim_policy', reclaimPolicy,
+        '--name', JSON.stringify(''),
+        '--description', JSON.stringify(''),
+        '--merkle_root', strip0x(doc.root),
+        '--audience_hash', '00'.repeat(32),
+        '--recipient_count', String(rows.length),
+        '--total_amount', total.toString(),
+        '--claim_deadline', String(deadline),
         '--metadata_cid', JSON.stringify(cid),
+        '--funding_mode', '1',
     ]);
 
     console.log('Verifying config...');

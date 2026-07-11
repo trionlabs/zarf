@@ -60,7 +60,7 @@
         const factory = getAirdropFactoryAddress() ?? null;
         const token = td.tokenAddress;
         if (!owner || !factory || !token) {
-            error = 'Connect your wallet (and configure an airdrop factory) to continue.';
+            error = 'Connect your wallet (and configure a factory) to continue.';
             return null;
         }
         return { owner, factory, token };

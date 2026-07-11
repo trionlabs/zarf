@@ -15,7 +15,7 @@
     // Custom domain is operator-chosen (TBD). Until one is attached, `wrangler deploy`
     // serves this worker at https://zarf-airdrop-create.<subdomain>.workers.dev. To bind
     // a custom domain, uncomment and set the pattern (runbook 08 §13 documents the order:
-    // factory must be deployed + VITE_*_AIRDROP_FACTORY_ADDRESS set BEFORE the app build):
+    // factory must be deployed + VITE_*_FACTORY_ADDRESS set BEFORE the app build):
     // "routes": [
     //     { "pattern": "airdrop.zarf.to", "custom_domain": true },
     // ],
