@@ -27,6 +27,7 @@
     "check:budget": "node scripts/check-bundle-budget.mjs",
     "check:any": "node scripts/check-any-allow-list.mjs",
     "check:console": "node scripts/check-console-allow-list.mjs",
+    "check:merkle-parity": "tsx ../contracts/soroban/zarf/scripts/lib/merkle-proof-gen.mjs --self-test",
     "lint": "eslint .",
     "format:check": "prettier --check .",
     "format:write": "prettier --write .",
