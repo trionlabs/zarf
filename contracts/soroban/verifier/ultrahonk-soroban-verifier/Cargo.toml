@@ -16,10 +16,10 @@ hex = { version = "0.4", default-features = false, features = ["alloc"] }
 
 lazy_static = { version = "1.4", optional = true }
 once_cell = { version = "1.19", default-features = false, features = ["alloc", "race"] }
-soroban-sdk = { version = "26.0.0-rc.1", default-features = false }
+soroban-sdk = { version = "26.1.0", default-features = false }
 
 [dev-dependencies]
-soroban-sdk = { version = "26.0.0-rc.1", default-features = false, features = ["testutils"] }
+soroban-sdk = { version = "26.1.0", default-features = false, features = ["testutils"] }
 
 # Vendored verbatim from upstream (yugocabrio/rs-soroban-ultrahonk); these are
 # upstream-parity / churn lints, not defects. NOTE: `deprecated` is a rustc
