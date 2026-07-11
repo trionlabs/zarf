@@ -26,6 +26,11 @@ const config = {
                 'script-src': [
                     'self',
                     'wasm-unsafe-eval',
+                    // Required by @noir-lang/acvm_js's `new Function` shim during
+                    // witness generation (see hooks.server.ts). Must match the
+                    // header script-src in hooks.server.ts; the browser enforces
+                    // the intersection of this <meta> policy and that header.
+                    'unsafe-eval',
                     'blob:',
                     'https://static.cloudflareinsights.com',
                 ],

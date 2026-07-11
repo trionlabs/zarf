@@ -59,6 +59,12 @@ jobs:
             { app: 'landing', package: '@zarf/landing', kind: 'svelte', url: 'https://zarf.to' },
             { app: 'create', package: '@zarf/create', kind: 'svelte', url: 'https://create.zarf.to' },
             { app: 'claim', package: '@zarf/claim', kind: 'svelte', url: 'https://claim.zarf.to' },
+            // Airdrop apps are wallet/Merkle based (NO Noir prover, NOT VK-bound),
+            // so they ride the normal auto-deploy path. Their custom-domain routes
+            // (airdrop.zarf.to / claim-drop.zarf.to) stay commented in wrangler until
+            // the cutover runbook enables them; until then they deploy to *.workers.dev.
+            { app: 'airdrop-create', package: '@zarf/airdrop-create', kind: 'svelte', url: 'https://airdrop.zarf.to' },
+            { app: 'airdrop-claim', package: '@zarf/airdrop-claim', kind: 'svelte', url: 'https://claim-drop.zarf.to' },
             { app: 'indexer', package: '@zarf/indexer', kind: 'worker', url: 'https://indexer.zarf.to' },
             { app: 'pin-proxy', package: '@zarf/pin-proxy', kind: 'worker', url: 'zarf-pin-proxy' },
             { app: 'jwk-rotation', package: '@zarf/jwk-rotation', kind: 'worker', url: 'https://jwt.zarf.to' },
@@ -100,6 +106,12 @@ jobs:
       VITE_STELLAR_TESTNET_FACTORY_ADDRESS: ${{ vars.VITE_STELLAR_TESTNET_FACTORY_ADDRESS || secrets.VITE_STELLAR_TESTNET_FACTORY_ADDRESS }}
       VITE_STELLAR_MAINNET_RPC_URL: ${{ vars.VITE_STELLAR_MAINNET_RPC_URL || secrets.VITE_STELLAR_MAINNET_RPC_URL }}
       VITE_STELLAR_MAINNET_FACTORY_ADDRESS: ${{ vars.VITE_STELLAR_MAINNET_FACTORY_ADDRESS || secrets.VITE_STELLAR_MAINNET_FACTORY_ADDRESS }}
+      # Airdrop factory addresses — REQUIRED for the airdrop-create/airdrop-claim
+      # build (their coreInit throws at module-eval if no network resolves). Mirror
+      # of the vesting factory vars above; set the matching repo var/secret before
+      # deploying the airdrop apps.
+      VITE_STELLAR_TESTNET_AIRDROP_FACTORY_ADDRESS: ${{ vars.VITE_STELLAR_TESTNET_AIRDROP_FACTORY_ADDRESS || secrets.VITE_STELLAR_TESTNET_AIRDROP_FACTORY_ADDRESS }}
+      VITE_STELLAR_MAINNET_AIRDROP_FACTORY_ADDRESS: ${{ vars.VITE_STELLAR_MAINNET_AIRDROP_FACTORY_ADDRESS || secrets.VITE_STELLAR_MAINNET_AIRDROP_FACTORY_ADDRESS }}
       STELLAR_TESTNET_RPC_URL: ${{ vars.STELLAR_TESTNET_RPC_URL || secrets.STELLAR_TESTNET_RPC_URL || vars.VITE_STELLAR_TESTNET_RPC_URL || secrets.VITE_STELLAR_TESTNET_RPC_URL }}
       STELLAR_TESTNET_FACTORY_ADDRESS: ${{ vars.STELLAR_TESTNET_FACTORY_ADDRESS || secrets.STELLAR_TESTNET_FACTORY_ADDRESS || vars.VITE_STELLAR_TESTNET_FACTORY_ADDRESS || secrets.VITE_STELLAR_TESTNET_FACTORY_ADDRESS }}
       STELLAR_TESTNET_NETWORK_PASSPHRASE: ${{ vars.STELLAR_TESTNET_NETWORK_PASSPHRASE || secrets.STELLAR_TESTNET_NETWORK_PASSPHRASE }}

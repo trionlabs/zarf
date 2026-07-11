@@ -7,7 +7,15 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { stringToBytes, computeLeaf, computeIdentityCommitment, hashAudience } from './merkleTree';
+import {
+    stringToBytes,
+    computeLeaf,
+    computeIdentityCommitment,
+    hashAudience,
+    processWhitelist,
+} from './merkleTree';
+import { calculateUnlockEvents } from '../utils/vesting';
+import type { Schedule } from '../types';
 
 describe('stringToBytes', () => {
     it('encodes ASCII into a fixed-length byte array, zero-padded', () => {
@@ -69,7 +77,9 @@ describe('Zarf proof fixture public input layout', () => {
             '../../../contracts/soroban/zarf/vesting/tests/fixtures/zarf-stellar-recipient',
         );
         const publicInputs = readFileSync(resolve(fixtureRoot, 'public_inputs'));
-        const metadata = JSON.parse(readFileSync(resolve(fixtureRoot, 'metadata.json'), 'utf8')) as {
+        const metadata = JSON.parse(
+            readFileSync(resolve(fixtureRoot, 'metadata.json'), 'utf8'),
+        ) as {
             audience_hash: `0x${string}`;
         };
 
@@ -78,4 +88,40 @@ describe('Zarf proof fixture public input layout', () => {
         expect(audienceHashField).toBe(metadata.audience_hash);
         expect(await hashAudience('test-client-id')).toBe(metadata.audience_hash);
     }, 30_000);
+});
+
+// ──────────────────────────────────────────────────────────────────────────
+// processWhitelist epoch clamping. `epochs = Math.max(1, Math.round(duration))`
+// must (a) never feed BigInt() a non-integer (RangeError) and (b) match the
+// UI's calculateUnlockEvents. duration=0 ("instant unlock") and fractional
+// durations both used to crash at `amount / BigInt(epochs)`.
+// ──────────────────────────────────────────────────────────────────────────
+describe('processWhitelist epoch clamping (duration=0 / fractional)', () => {
+    const recipients = [
+        { email: 'a@example.com', amount: 1000n, pin: '12345678' },
+        { email: 'b@example.com', amount: 2000n, pin: '87654321' },
+    ];
+    const makeSchedule = (distributionDuration: number): Schedule => ({
+        cliffEndDate: '2030-01-01',
+        cliffTime: '00:00',
+        distributionDuration,
+        durationUnit: 'months',
+    });
+
+    it.each([
+        [0, 1], // instant unlock
+        [2.4, 2], // rounds down
+        [2.5, 3], // rounds up — would be BigInt(2.5) -> RangeError without Math.round
+    ])(
+        'duration=%s -> %s epoch(s)/recipient, no RangeError',
+        async (duration, expectedEpochs) => {
+            const result = await processWhitelist(recipients, makeSchedule(duration));
+            // One leaf per recipient per epoch.
+            expect(result.claims.length).toBe(recipients.length * expectedEpochs);
+            // Parity with the UI's calculateUnlockEvents (the comment's claimed equal).
+            const d = new Date('2030-01-01');
+            expect(calculateUnlockEvents(d, d, duration)).toBe(expectedEpochs);
+        },
+        30_000,
+    );
 });

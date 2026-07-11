@@ -30,12 +30,19 @@ interface Env {
     PINATA_JWT: string;
     ALLOWED_ORIGINS: string;
     MAX_BODY_BYTES: string;
+    /** Optional ceiling on claim-list entries; defaults to DEFAULT_MAX_CLAIM_ENTRIES. */
+    MAX_CLAIM_ENTRIES?: string;
     // Optional: per-IP and per-owner limits on /pin. Pin auth only proves
     // possession of *some* keypair, so without limits anyone can fill the
     // Pinata account with throwaway identities. Missing bindings degrade
     // to no limiting (deploys never break on absent bindings).
     PIN_IP_LIMITER?: RateLimiter;
     PIN_OWNER_LIMITER?: RateLimiter;
+    // Optional: per-IP limit on /ipfs/:cid reads. This route is unauthenticated
+    // and fans out up to 3 upstream gateway fetches (each up to
+    // MAX_GATEWAY_RESPONSE_BYTES), so without a cap it is a 3x amplification /
+    // subrequest-quota burn surface. Missing binding degrades to no limiting.
+    IPFS_READ_LIMITER?: RateLimiter;
 }
 
 interface ClaimList {
@@ -43,6 +50,18 @@ interface ClaimList {
     leaves: string[];
     schedule: unknown;
     emailHashes?: string[];
+    [key: string]: unknown;
+}
+
+/** The standalone airdrop claim-list shape (doc 09 §6): `root`/`claims`, no `schedule`. */
+interface AirdropClaimList {
+    v: number;
+    network: string;
+    airdrop: string;
+    token: string;
+    root: string;
+    format: unknown;
+    claims: Array<{ address: string; amount: string; proof: string[] }>;
     [key: string]: unknown;
 }
 
@@ -64,6 +83,14 @@ const IPFS_READ_GATEWAYS = [
 ];
 const MAX_GATEWAY_RESPONSE_BYTES = 8 * 1024 * 1024;
 
+// Deterministic ceiling on claim-list entries, independent of byte size: bounds
+// the JSON parse + per-entry work regardless of how MAX_BODY_BYTES is tuned. The
+// default sits well above any realistic distribution (the body-size cap binds
+// first under the default MAX_BODY_BYTES) so it never rejects a legitimate
+// airdrop — it is the meaningful backstop when an operator RAISES MAX_BODY_BYTES
+// for a large list. Override via env.MAX_CLAIM_ENTRIES.
+const DEFAULT_MAX_CLAIM_ENTRIES = 100_000;
+
 export default {
     async fetch(request: Request, env: Env): Promise<Response> {
         const url = new URL(request.url);
@@ -82,8 +109,12 @@ export default {
             return handlePin(request, env, corsHeaders);
         }
 
+        if (url.pathname === '/pin-airdrop' && request.method === 'POST') {
+            return handlePinAirdrop(request, env, corsHeaders);
+        }
+
         if (url.pathname.startsWith('/ipfs/') && request.method === 'GET') {
-            return handleIpfsRead(url, corsHeaders);
+            return handleIpfsRead(request, url, env, corsHeaders);
         }
 
         return json({ error: 'not_found' }, 404, corsHeaders);
@@ -130,7 +161,8 @@ async function handlePin(
         return json({ error: 'invalid_json' }, 400, corsHeaders);
     }
 
-    const validationError = validateClaimList(body);
+    const maxEntries = Number(env.MAX_CLAIM_ENTRIES) || DEFAULT_MAX_CLAIM_ENTRIES;
+    const validationError = validateClaimList(body, maxEntries);
     if (validationError) {
         return json({ error: 'invalid_claim_list', reason: validationError }, 400, corsHeaders);
     }
@@ -188,7 +220,126 @@ async function handlePin(
     return json({ cid: data.IpfsHash, size: data.PinSize }, 200, corsHeaders);
 }
 
-async function handleIpfsRead(url: URL, corsHeaders: Record<string, string>): Promise<Response> {
+/**
+ * Pin an airdrop claim-list (doc 09 §6 shape). Additive sibling of `handlePin`;
+ * the vesting `/pin` route is untouched (D4). Auth is the shared
+ * `validatePinAuth`, bound to the claim-list `root`.
+ */
+async function handlePinAirdrop(
+    request: Request,
+    env: Env,
+    corsHeaders: Record<string, string>,
+): Promise<Response> {
+    // Per-IP limit first (see handlePin): CF-Connecting-IP is Cloudflare-set
+    // and cannot be spoofed, so it is the real volume/DoS backstop.
+    if (env.PIN_IP_LIMITER) {
+        const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
+        const { success } = await env.PIN_IP_LIMITER.limit({ key: ip });
+        if (!success) {
+            return json({ error: 'rate_limited' }, 429, corsHeaders);
+        }
+    }
+
+    const maxBytes = Number(env.MAX_BODY_BYTES) || 1_048_576;
+    const contentLength = Number(request.headers.get('Content-Length') || '0');
+    if (contentLength > maxBytes) {
+        return json({ error: 'payload_too_large', maxBytes }, 413, corsHeaders);
+    }
+
+    const contentType = request.headers.get('Content-Type') || '';
+    if (!contentType.includes('application/json')) {
+        return json({ error: 'unsupported_media_type' }, 415, corsHeaders);
+    }
+
+    let raw: string;
+    let body: AirdropClaimList;
+    try {
+        raw = await request.text();
+        if (new TextEncoder().encode(raw).length > maxBytes) {
+            return json({ error: 'payload_too_large', maxBytes }, 413, corsHeaders);
+        }
+        body = JSON.parse(raw);
+    } catch {
+        return json({ error: 'invalid_json' }, 400, corsHeaders);
+    }
+
+    const maxEntries = Number(env.MAX_CLAIM_ENTRIES) || DEFAULT_MAX_CLAIM_ENTRIES;
+    const validationError = validateAirdropClaimList(body, maxEntries);
+    if (validationError) {
+        return json({ error: 'invalid_claim_list', reason: validationError }, 400, corsHeaders);
+    }
+
+    const authError = await validatePinAuth(request, raw, body.root);
+    if (authError) {
+        return json(
+            { error: 'unauthorized_pin', reason: authError.reason },
+            authError.status,
+            corsHeaders,
+        );
+    }
+
+    // Per-owner rate limit AFTER auth, keyed on the now-VERIFIED owner.
+    if (env.PIN_OWNER_LIMITER) {
+        const owner = request.headers.get('X-Zarf-Owner') || 'unknown';
+        const { success } = await env.PIN_OWNER_LIMITER.limit({ key: owner });
+        if (!success) {
+            return json({ error: 'rate_limited' }, 429, corsHeaders);
+        }
+    }
+
+    if (!env.PINATA_JWT) {
+        return json({ error: 'pinata_not_configured' }, 500, corsHeaders);
+    }
+
+    let pinataRes: Response;
+    try {
+        pinataRes = await fetch(PINATA_PIN_URL, {
+            method: 'POST',
+            headers: {
+                Authorization: `Bearer ${env.PINATA_JWT}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                pinataContent: body,
+                pinataMetadata: {
+                    name: `zarf-airdrop-list-${body.root}`,
+                },
+            }),
+        });
+    } catch {
+        return json({ error: 'pinata_unreachable' }, 502, corsHeaders);
+    }
+
+    if (!pinataRes.ok) {
+        const detail = await safeText(pinataRes);
+        return json({ error: 'pinata_error', status: pinataRes.status, detail }, 502, corsHeaders);
+    }
+
+    const data = (await pinataRes.json()) as PinataResponse;
+    return json({ cid: data.IpfsHash, size: data.PinSize }, 200, corsHeaders);
+}
+
+async function handleIpfsRead(
+    request: Request,
+    url: URL,
+    env: Env,
+    corsHeaders: Record<string, string>,
+): Promise<Response> {
+    // Per-IP limit first: this unauthenticated route fans out up to 3 upstream
+    // gateway fetches (each up to MAX_GATEWAY_RESPONSE_BYTES), so an unthrottled
+    // /ipfs/:cid is a 3x amplification / subrequest-quota burn surface (the
+    // indexer's equivalent read path is already covered by its REQUEST_LIMITER).
+    // CF-Connecting-IP is Cloudflare-set and cannot be spoofed. The limit is more
+    // generous than /pin (reads are legitimate and frequent) but still bounds the
+    // amplification. Missing binding degrades to no limiting.
+    if (env.IPFS_READ_LIMITER) {
+        const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
+        const { success } = await env.IPFS_READ_LIMITER.limit({ key: ip });
+        if (!success) {
+            return json({ error: 'rate_limited' }, 429, corsHeaders);
+        }
+    }
+
     const cid = validateCid(url.pathname.slice('/ipfs/'.length));
     if (!cid) {
         return json({ error: 'invalid_cid' }, 400, corsHeaders);
@@ -242,7 +393,7 @@ async function handleIpfsRead(url: URL, corsHeaders: Record<string, string>): Pr
     return json({ error: 'ipfs_gateway_error', detail: errors.join('; ') }, 502, corsHeaders);
 }
 
-export function validateClaimList(body: unknown): string | null {
+export function validateClaimList(body: unknown, maxEntries: number): string | null {
     if (!body || typeof body !== 'object') return 'not_an_object';
     const obj = body as Record<string, unknown>;
 
@@ -252,11 +403,50 @@ export function validateClaimList(body: unknown): string | null {
     if (!Array.isArray(obj.leaves) || obj.leaves.length === 0) {
         return 'missing_or_empty_leaves';
     }
+    if (obj.leaves.length > maxEntries) {
+        return 'too_many_leaves';
+    }
     if (obj.leaves.some((leaf) => typeof leaf !== 'string' || !HEX_32.test(leaf))) {
         return 'invalid_leaf';
     }
     if (!obj.schedule || typeof obj.schedule !== 'object') {
         return 'missing_schedule';
+    }
+    return null;
+}
+
+/**
+ * Validate the airdrop claim-list shape (doc 09 §6): `v`/`network`/`airdrop`/
+ * `token`/`root`/`format`/`claims`, with a 0x-hex root and per-claim proofs.
+ * No `schedule` (that is the vesting shape). Additive — `validateClaimList`
+ * stays untouched.
+ */
+export function validateAirdropClaimList(body: unknown, maxEntries: number): string | null {
+    if (!body || typeof body !== 'object') return 'not_an_object';
+    const obj = body as Record<string, unknown>;
+
+    if (obj.v !== 1) return 'invalid_version';
+    if (obj.network !== 'testnet' && obj.network !== 'mainnet') return 'invalid_network';
+    if (typeof obj.airdrop !== 'string' || obj.airdrop.length === 0) return 'missing_airdrop';
+    if (typeof obj.token !== 'string' || obj.token.length === 0) return 'missing_token';
+    if (typeof obj.root !== 'string' || !HEX_32.test(obj.root)) return 'missing_or_invalid_root';
+    if (!obj.format || typeof obj.format !== 'object') return 'missing_format';
+    if (!Array.isArray(obj.claims) || obj.claims.length === 0) return 'missing_or_empty_claims';
+    if (obj.claims.length > maxEntries) return 'too_many_claims';
+
+    for (const entry of obj.claims) {
+        if (!entry || typeof entry !== 'object') return 'invalid_claim';
+        const claim = entry as Record<string, unknown>;
+        if (typeof claim.address !== 'string' || claim.address.length === 0) {
+            return 'invalid_claim_address';
+        }
+        if (typeof claim.amount !== 'string' || !/^\d+$/.test(claim.amount)) {
+            return 'invalid_claim_amount';
+        }
+        if (!Array.isArray(claim.proof)) return 'invalid_claim_proof';
+        if (claim.proof.some((node) => typeof node !== 'string' || !HEX_32.test(node))) {
+            return 'invalid_proof_node';
+        }
     }
     return null;
 }
@@ -384,24 +574,30 @@ export function validateCid(raw: string): string | null {
     return cidV0.test(cid) || cidV1Base32.test(cid) ? cid : null;
 }
 
+// Fail-closed CORS (mirrors the indexer): advertise Access-Control-Allow-Origin
+// ONLY when the request Origin is on the allow-list. The previous
+// `allowed[0] || '*'` fallback echoed an allow-listed origin — or a literal `*`
+// when ALLOWED_ORIGINS was unset — to EVERY caller, on a state-changing POST
+// worker (the write path was weaker than the indexer's read path, the opposite
+// of what it should be). With no matching ACAO the browser blocks the
+// cross-origin response, which is the intended deny.
 export function buildCorsHeaders(origin: string | null, env: Env): Record<string, string> {
     const allowed = (env.ALLOWED_ORIGINS || '')
         .split(',')
         .map((o) => o.trim())
         .filter(Boolean);
 
-    // Unmatched origins get the first allow-listed origin (a deny for the
-    // requesting page) — never '*', even when the var is misconfigured/empty.
-    const allowOrigin = origin && allowed.includes(origin) ? origin : (allowed[0] ?? 'null');
-
-    return {
-        'Access-Control-Allow-Origin': allowOrigin,
+    const headers: Record<string, string> = {
         'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
         'Access-Control-Allow-Headers':
             'Content-Type, X-Zarf-Owner, X-Zarf-Issued-At, X-Zarf-Body-SHA256, X-Zarf-Signature',
         'Access-Control-Max-Age': '86400',
         Vary: 'Origin',
     };
+    if (origin && allowed.includes(origin)) {
+        headers['Access-Control-Allow-Origin'] = origin;
+    }
+    return headers;
 }
 
 function json(body: unknown, status: number, extraHeaders: Record<string, string> = {}): Response {

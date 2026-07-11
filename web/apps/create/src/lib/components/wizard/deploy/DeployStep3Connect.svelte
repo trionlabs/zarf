@@ -94,8 +94,12 @@
 <div class="max-w-2xl py-4">
     <div class="mb-8 flex items-start gap-4">
         <div class="relative flex items-center justify-center shrink-0">
-            <div class="absolute w-14 h-14 rounded-full bg-zen-primary/10 blur-md animate-pulse"></div>
-            <div class="w-12 h-12 rounded-xl border border-zen-border bg-zen-bg-elevated flex items-center justify-center relative animate-float text-zen-primary">
+            <div
+                class="absolute w-14 h-14 rounded-full bg-zen-primary/10 blur-md animate-pulse"
+            ></div>
+            <div
+                class="w-12 h-12 rounded-xl border border-zen-border bg-zen-bg-elevated flex items-center justify-center relative animate-float text-zen-primary"
+            >
                 <Wallet class="w-5 h-5" />
             </div>
         </div>
@@ -120,8 +124,10 @@
             <div class="flex flex-col sm:flex-row items-center justify-between gap-6">
                 <div class="flex items-center gap-4 w-full sm:w-auto">
                     <div class="relative flex items-center justify-center">
-                        <div class="absolute w-16 h-16 rounded-full blur-xl animate-pulse-glow
-                            {walletStore.isConnected ? 'bg-zen-success/15' : 'bg-zen-fg/5'}"></div>
+                        <div
+                            class="absolute w-16 h-16 rounded-full blur-xl animate-pulse-glow
+                            {walletStore.isConnected ? 'bg-zen-success/15' : 'bg-zen-fg/5'}"
+                        ></div>
                         <div
                             class="w-14 h-14 rounded-full border flex items-center justify-center relative animate-float transition-all duration-300
                             {walletStore.isConnected
@@ -310,16 +316,18 @@
 
 <style>
     @keyframes float {
-        0%, 100% {
+        0%,
+        100% {
             transform: translateY(0px);
         }
         50% {
             transform: translateY(-4px);
         }
     }
-    
+
     @keyframes pulse-glow {
-        0%, 100% {
+        0%,
+        100% {
             opacity: 0.35;
             transform: scale(0.95);
         }

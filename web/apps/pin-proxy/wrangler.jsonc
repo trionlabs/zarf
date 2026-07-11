@@ -8,11 +8,14 @@
         // localhost origins are a dev convenience; override in production via
         // the dashboard or `wrangler deploy --var ALLOWED_ORIGINS:...` if a
         // stricter origin set is wanted (pin auth is signature-gated anyway).
-        "ALLOWED_ORIGINS": "http://localhost:5173,http://localhost:5174,http://localhost:5175,https://create.zarf.to,https://claim.zarf.to",
+        "ALLOWED_ORIGINS": "http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost:5176,http://localhost:5177,https://create.zarf.to,https://claim.zarf.to,https://airdrop.zarf.to,https://claim-drop.zarf.to",
         "MAX_BODY_BYTES": "1048576",
     },
     // Burst control on /pin: pin auth proves possession of *some* keypair,
     // not authorization, so unlimited pinning = Pinata quota/cost abuse.
+    // IPFS_READ_LIMITER caps the unauthenticated /ipfs/:cid read route, which
+    // fans out up to 3 upstream gateway fetches per call (3x amplification);
+    // higher ceiling than /pin since reads are legitimate and frequent.
     "unsafe": {
         "bindings": [
             {
@@ -26,6 +29,12 @@
                 "name": "PIN_OWNER_LIMITER",
                 "namespace_id": "2002",
                 "simple": { "limit": 5, "period": 60 },
+            },
+            {
+                "type": "ratelimit",
+                "name": "IPFS_READ_LIMITER",
+                "namespace_id": "2004",
+                "simple": { "limit": 30, "period": 60 },
             },
         ],
     },
@@ -41,6 +50,8 @@
     // Set the Pinata JWT as a secret (NOT a var):
     //   wrangler secret put PINATA_JWT
     //
-    // For production, override ALLOWED_ORIGINS via dashboard or:
-    //   wrangler deploy --var ALLOWED_ORIGINS:"https://create.zarf.to"
+    // For production, override ALLOWED_ORIGINS via dashboard or wrangler --var.
+    // CORS now FAILS CLOSED (no '*' fallback), so an override must list the FULL
+    // set — narrowing to one origin hard-blocks the rest:
+    //   --var ALLOWED_ORIGINS:"https://create.zarf.to,https://claim.zarf.to,https://airdrop.zarf.to"
 }

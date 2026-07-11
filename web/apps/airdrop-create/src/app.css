@@ -1,0 +1,8 @@
+@import 'tailwindcss';
+
+/* Scan @zarf/ui package for Tailwind classes used by reused components. */
+@source "../../../packages/ui/lib/**/*.svelte";
+@source "../../../packages/ui/lib/**/*.ts";
+
+/* Zen Design System (themes & tokens) — shared with create/claim. */
+@import '@zarf/ui/styles/index.css';
